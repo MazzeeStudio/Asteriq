@@ -1,0 +1,350 @@
+using Asteriq.Models;
+using Asteriq.VJoy;
+
+namespace Asteriq.Services;
+
+/// <summary>
+/// Processes input mappings and outputs to vJoy/keyboard
+/// </summary>
+public class MappingEngine : IDisposable
+{
+    private readonly VJoyService _vjoy;
+    private readonly Dictionary<string, float[]> _deviceAxisValues = new();
+    private readonly Dictionary<string, bool[]> _deviceButtonValues = new();
+    private readonly Dictionary<Guid, float> _mergeAxisCache = new();
+    private readonly object _lock = new();
+
+    private MappingProfile? _activeProfile;
+    private bool _isRunning;
+
+    public MappingEngine(VJoyService vjoy)
+    {
+        _vjoy = vjoy;
+    }
+
+    /// <summary>
+    /// Currently active profile
+    /// </summary>
+    public MappingProfile? ActiveProfile => _activeProfile;
+
+    /// <summary>
+    /// Whether the engine is processing mappings
+    /// </summary>
+    public bool IsRunning => _isRunning;
+
+    /// <summary>
+    /// Load and activate a mapping profile
+    /// </summary>
+    public void LoadProfile(MappingProfile profile)
+    {
+        lock (_lock)
+        {
+            _activeProfile = profile;
+            _mergeAxisCache.Clear();
+
+            // Initialize merge cache for axis mappings with multiple inputs
+            foreach (var mapping in profile.AxisMappings.Where(m => m.Inputs.Count > 1))
+            {
+                _mergeAxisCache[mapping.Id] = 0f;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Start processing mappings
+    /// </summary>
+    public bool Start()
+    {
+        if (_activeProfile == null)
+            return false;
+
+        // Acquire required vJoy devices
+        var requiredDevices = GetRequiredVJoyDevices();
+        foreach (var deviceId in requiredDevices)
+        {
+            if (!_vjoy.AcquireDevice(deviceId))
+            {
+                Console.WriteLine($"Failed to acquire vJoy device {deviceId}");
+                return false;
+            }
+        }
+
+        _isRunning = true;
+        return true;
+    }
+
+    /// <summary>
+    /// Stop processing mappings
+    /// </summary>
+    public void Stop()
+    {
+        _isRunning = false;
+
+        // Reset all vJoy devices
+        var requiredDevices = GetRequiredVJoyDevices();
+        foreach (var deviceId in requiredDevices)
+        {
+            _vjoy.ResetDevice(deviceId);
+        }
+    }
+
+    /// <summary>
+    /// Process input state and apply mappings
+    /// </summary>
+    public void ProcessInput(DeviceInputState state)
+    {
+        if (!_isRunning || _activeProfile == null)
+            return;
+
+        var deviceId = GetDeviceId(state);
+
+        lock (_lock)
+        {
+            // Cache current values for this device
+            _deviceAxisValues[deviceId] = state.Axes;
+            _deviceButtonValues[deviceId] = state.Buttons;
+
+            // Process axis mappings
+            foreach (var mapping in _activeProfile.AxisMappings.Where(m => m.Enabled))
+            {
+                ProcessAxisMapping(mapping, deviceId, state);
+            }
+
+            // Process button mappings
+            foreach (var mapping in _activeProfile.ButtonMappings.Where(m => m.Enabled))
+            {
+                ProcessButtonMapping(mapping, deviceId, state);
+            }
+        }
+    }
+
+    private void ProcessAxisMapping(AxisMapping mapping, string deviceId, DeviceInputState state)
+    {
+        // Check if this input is relevant to this mapping
+        var relevantInputs = mapping.Inputs.Where(i =>
+            i.DeviceId == deviceId && i.Type == InputType.Axis).ToList();
+
+        if (relevantInputs.Count == 0)
+            return;
+
+        float outputValue;
+
+        if (mapping.Inputs.Count == 1)
+        {
+            // Single input - direct mapping
+            var input = mapping.Inputs[0];
+            if (input.Index >= state.Axes.Length)
+                return;
+
+            outputValue = state.Axes[input.Index];
+        }
+        else
+        {
+            // Multiple inputs - merge operation
+            var values = new List<float>();
+
+            foreach (var input in mapping.Inputs)
+            {
+                if (_deviceAxisValues.TryGetValue(input.DeviceId, out var axes) &&
+                    input.Index < axes.Length)
+                {
+                    values.Add(axes[input.Index]);
+                }
+            }
+
+            if (values.Count == 0)
+                return;
+
+            outputValue = ApplyMerge(values, mapping.MergeOp);
+        }
+
+        // Apply curve
+        outputValue = mapping.Curve.Apply(outputValue);
+
+        // Apply inversion
+        if (mapping.Invert)
+            outputValue = -outputValue;
+
+        // Output to vJoy
+        if (mapping.Output.Type == OutputType.VJoyAxis)
+        {
+            var axis = IndexToHidUsage(mapping.Output.Index);
+            _vjoy.SetAxis(mapping.Output.VJoyDevice, axis, outputValue);
+        }
+    }
+
+    private void ProcessButtonMapping(ButtonMapping mapping, string deviceId, DeviceInputState state)
+    {
+        // Check if this input is relevant
+        var relevantInputs = mapping.Inputs.Where(i =>
+            i.DeviceId == deviceId && i.Type == InputType.Button).ToList();
+
+        if (relevantInputs.Count == 0)
+            return;
+
+        // Get combined input state
+        bool inputPressed = false;
+
+        if (mapping.Inputs.Count == 1)
+        {
+            var input = mapping.Inputs[0];
+            if (input.Index < state.Buttons.Length)
+                inputPressed = state.Buttons[input.Index];
+        }
+        else
+        {
+            // Multiple inputs - any pressed = pressed
+            foreach (var input in mapping.Inputs)
+            {
+                if (_deviceButtonValues.TryGetValue(input.DeviceId, out var buttons) &&
+                    input.Index < buttons.Length && buttons[input.Index])
+                {
+                    inputPressed = true;
+                    break;
+                }
+            }
+        }
+
+        // Apply button mode
+        bool outputPressed = ApplyButtonMode(mapping, inputPressed);
+
+        // Apply inversion
+        if (mapping.Invert)
+            outputPressed = !outputPressed;
+
+        // Output
+        if (mapping.Output.Type == OutputType.VJoyButton)
+        {
+            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed);
+        }
+        // TODO: Keyboard output
+    }
+
+    private bool ApplyButtonMode(ButtonMapping mapping, bool inputPressed)
+    {
+        switch (mapping.Mode)
+        {
+            case ButtonMode.Normal:
+                return inputPressed;
+
+            case ButtonMode.Toggle:
+                if (inputPressed && mapping.HoldStartTime == null)
+                {
+                    // Rising edge - toggle
+                    mapping.ToggleState = !mapping.ToggleState;
+                    mapping.HoldStartTime = DateTime.UtcNow; // Prevent re-toggle
+                }
+                else if (!inputPressed)
+                {
+                    mapping.HoldStartTime = null; // Reset on release
+                }
+                return mapping.ToggleState;
+
+            case ButtonMode.Pulse:
+                if (inputPressed && mapping.HoldStartTime == null)
+                {
+                    // Rising edge - start pulse
+                    mapping.HoldStartTime = DateTime.UtcNow;
+                }
+
+                if (mapping.HoldStartTime != null)
+                {
+                    var elapsed = (DateTime.UtcNow - mapping.HoldStartTime.Value).TotalMilliseconds;
+                    if (elapsed < mapping.PulseDurationMs)
+                        return true;
+
+                    if (!inputPressed)
+                        mapping.HoldStartTime = null;
+                }
+                return false;
+
+            case ButtonMode.HoldToActivate:
+                if (inputPressed)
+                {
+                    if (mapping.HoldStartTime == null)
+                        mapping.HoldStartTime = DateTime.UtcNow;
+
+                    var elapsed = (DateTime.UtcNow - mapping.HoldStartTime.Value).TotalMilliseconds;
+                    return elapsed >= mapping.HoldDurationMs;
+                }
+                else
+                {
+                    mapping.HoldStartTime = null;
+                    return false;
+                }
+
+            default:
+                return inputPressed;
+        }
+    }
+
+    private static float ApplyMerge(List<float> values, MergeOperation op)
+    {
+        if (values.Count == 0)
+            return 0f;
+
+        return op switch
+        {
+            MergeOperation.Average => values.Average(),
+            MergeOperation.Minimum => values.Min(),
+            MergeOperation.Maximum => values.Max(),
+            MergeOperation.Sum => Math.Clamp(values.Sum(), -1f, 1f),
+            _ => values[0]
+        };
+    }
+
+    private static string GetDeviceId(DeviceInputState state)
+    {
+        // Use GUID for now, could extract VID:PID
+        return state.InstanceGuid.ToString();
+    }
+
+    private HashSet<uint> GetRequiredVJoyDevices()
+    {
+        var devices = new HashSet<uint>();
+
+        if (_activeProfile == null)
+            return devices;
+
+        foreach (var mapping in _activeProfile.AxisMappings)
+        {
+            if (mapping.Output.Type == OutputType.VJoyAxis ||
+                mapping.Output.Type == OutputType.VJoyButton)
+            {
+                devices.Add(mapping.Output.VJoyDevice);
+            }
+        }
+
+        foreach (var mapping in _activeProfile.ButtonMappings)
+        {
+            if (mapping.Output.Type == OutputType.VJoyAxis ||
+                mapping.Output.Type == OutputType.VJoyButton)
+            {
+                devices.Add(mapping.Output.VJoyDevice);
+            }
+        }
+
+        return devices;
+    }
+
+    private static HID_USAGES IndexToHidUsage(int index)
+    {
+        return index switch
+        {
+            0 => HID_USAGES.X,
+            1 => HID_USAGES.Y,
+            2 => HID_USAGES.Z,
+            3 => HID_USAGES.RX,
+            4 => HID_USAGES.RY,
+            5 => HID_USAGES.RZ,
+            6 => HID_USAGES.SL0,
+            7 => HID_USAGES.SL1,
+            _ => HID_USAGES.X
+        };
+    }
+
+    public void Dispose()
+    {
+        Stop();
+    }
+}

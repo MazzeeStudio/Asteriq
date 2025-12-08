@@ -62,6 +62,14 @@ static class Program
             return;
         }
 
+        if (args.Contains("--whitelist"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunWhitelist();
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new Form1());
     }
@@ -96,6 +104,9 @@ Commands:
   --match             Show device matching between SDL and HidHide
                       Correlates SDL device indices with HID instance paths.
                       Useful for understanding which devices to hide.
+
+  --whitelist         Add Asteriq to HidHide whitelist
+                      Allows Asteriq to see hidden devices.
 
 Examples:
   Asteriq.exe                     Launch GUI
@@ -490,6 +501,53 @@ Examples:
         }
 
         inputService.Dispose();
+
+        Console.WriteLine("\n(Press Enter to continue...)");
+    }
+
+    private static void RunWhitelist()
+    {
+        Console.WriteLine("=== Asteriq HidHide Whitelist ===\n");
+
+        var hidHide = new HidHideService();
+
+        if (!hidHide.IsAvailable())
+        {
+            Console.WriteLine("ERROR: HidHide not available");
+            return;
+        }
+
+        // Get current exe path
+        var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+        if (string.IsNullOrEmpty(exePath))
+        {
+            Console.WriteLine("ERROR: Could not determine executable path");
+            return;
+        }
+
+        Console.WriteLine($"Executable: {exePath}");
+
+        // Check if already whitelisted
+        var whitelisted = hidHide.GetWhitelistedApps();
+        bool alreadyWhitelisted = whitelisted.Any(w =>
+            w.Equals(exePath, StringComparison.OrdinalIgnoreCase));
+
+        if (alreadyWhitelisted)
+        {
+            Console.WriteLine("Status: Already whitelisted");
+        }
+        else
+        {
+            Console.WriteLine("Status: Not whitelisted, adding...");
+            if (hidHide.WhitelistApp(exePath))
+            {
+                Console.WriteLine("Result: Successfully added to whitelist");
+            }
+            else
+            {
+                Console.WriteLine("Result: FAILED to add to whitelist (may need admin rights)");
+            }
+        }
 
         Console.WriteLine("\n(Press Enter to continue...)");
     }

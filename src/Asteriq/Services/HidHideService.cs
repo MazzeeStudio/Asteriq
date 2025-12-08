@@ -149,6 +149,35 @@ public class HidHideService
     }
 
     /// <summary>
+    /// Check if inverse application cloak is enabled.
+    /// In inverse mode, whitelisted apps are BLOCKED from seeing hidden devices.
+    /// In normal mode, whitelisted apps CAN see hidden devices.
+    /// </summary>
+    public bool IsInverseMode()
+    {
+        var output = RunCommand("--inv-state");
+        return output.Contains("--inv-on", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Enable inverse application cloak mode
+    /// </summary>
+    public bool EnableInverseMode()
+    {
+        RunCommand("--inv-on");
+        return IsInverseMode();
+    }
+
+    /// <summary>
+    /// Disable inverse application cloak mode
+    /// </summary>
+    public bool DisableInverseMode()
+    {
+        RunCommand("--inv-off");
+        return !IsInverseMode();
+    }
+
+    /// <summary>
     /// Get list of whitelisted application paths
     /// </summary>
     public List<string> GetWhitelistedApps()
@@ -193,7 +222,45 @@ public class HidHideService
     }
 
     /// <summary>
-    /// Ensure Asteriq is whitelisted so it can see hidden devices
+    /// Ensure Asteriq can see hidden devices based on current mode.
+    /// In normal mode: adds to whitelist.
+    /// In inverse mode: removes from whitelist.
+    /// </summary>
+    public bool EnsureSelfCanSeeDevices()
+    {
+        var selfPath = Process.GetCurrentProcess().MainModule?.FileName;
+        if (string.IsNullOrEmpty(selfPath))
+            return false;
+
+        var whitelisted = GetWhitelistedApps();
+        bool isWhitelisted = whitelisted.Any(w => string.Equals(w, selfPath, StringComparison.OrdinalIgnoreCase));
+        bool isInverse = IsInverseMode();
+
+        if (isInverse)
+        {
+            // In inverse mode, whitelisted apps are BLOCKED
+            // So we need to REMOVE ourselves from whitelist to see devices
+            if (isWhitelisted)
+            {
+                return UnwhitelistApp(selfPath);
+            }
+            return true; // Already not whitelisted, can see devices
+        }
+        else
+        {
+            // In normal mode, whitelisted apps CAN see hidden devices
+            // So we need to ADD ourselves to whitelist
+            if (!isWhitelisted)
+            {
+                return WhitelistApp(selfPath);
+            }
+            return true; // Already whitelisted
+        }
+    }
+
+    /// <summary>
+    /// Ensure Asteriq is whitelisted so it can see hidden devices.
+    /// DEPRECATED: Use EnsureSelfCanSeeDevices() which handles inverse mode.
     /// </summary>
     public bool EnsureSelfWhitelisted()
     {
@@ -202,7 +269,7 @@ public class HidHideService
             return false;
 
         var whitelisted = GetWhitelistedApps();
-        if (!whitelisted.Contains(selfPath, StringComparer.OrdinalIgnoreCase))
+        if (!whitelisted.Any(w => string.Equals(w, selfPath, StringComparison.OrdinalIgnoreCase)))
         {
             return WhitelistApp(selfPath);
         }

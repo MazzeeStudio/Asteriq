@@ -9,6 +9,8 @@ namespace Asteriq.Services;
 public class MappingEngine : IDisposable
 {
     private readonly VJoyService _vjoy;
+    private readonly KeyboardService _keyboard;
+    private readonly bool _ownsKeyboard;
     private readonly Dictionary<string, float[]> _deviceAxisValues = new();
     private readonly Dictionary<string, bool[]> _deviceButtonValues = new();
     private readonly Dictionary<Guid, float> _mergeAxisCache = new();
@@ -17,9 +19,16 @@ public class MappingEngine : IDisposable
     private MappingProfile? _activeProfile;
     private bool _isRunning;
 
-    public MappingEngine(VJoyService vjoy)
+    public MappingEngine(VJoyService vjoy) : this(vjoy, new KeyboardService())
+    {
+        _ownsKeyboard = true;
+    }
+
+    public MappingEngine(VJoyService vjoy, KeyboardService keyboard)
     {
         _vjoy = vjoy;
+        _keyboard = keyboard;
+        _ownsKeyboard = false;
     }
 
     /// <summary>
@@ -217,7 +226,10 @@ public class MappingEngine : IDisposable
         {
             _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed);
         }
-        // TODO: Keyboard output
+        else if (mapping.Output.Type == OutputType.Keyboard)
+        {
+            _keyboard.SetKey(mapping.Output.Index, outputPressed, mapping.Output.Modifiers);
+        }
     }
 
     private bool ApplyButtonMode(ButtonMapping mapping, bool inputPressed)
@@ -346,5 +358,7 @@ public class MappingEngine : IDisposable
     public void Dispose()
     {
         Stop();
+        if (_ownsKeyboard)
+            _keyboard.Dispose();
     }
 }

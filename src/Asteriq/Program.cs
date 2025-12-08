@@ -396,8 +396,7 @@ Examples:
             }
         }
 
-        Console.WriteLine("\nPress any key to exit...");
-        Console.ReadKey(true);
-        Environment.Exit(0);
+        Console.WriteLine("\n(Press Enter to continue...)");
+        Console.ReadLine();
     }
 }

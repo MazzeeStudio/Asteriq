@@ -54,6 +54,14 @@ static class Program
             return;
         }
 
+        if (args.Contains("--match"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunDeviceMatching();
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new Form1());
     }
@@ -84,6 +92,10 @@ Commands:
   --hidhide           Show HidHide configuration
                       Lists gaming devices, hidden devices, and whitelisted
                       applications. Requires HidHide to be installed.
+
+  --match             Show device matching between SDL and HidHide
+                      Correlates SDL device indices with HID instance paths.
+                      Useful for understanding which devices to hide.
 
 Examples:
   Asteriq.exe                     Launch GUI
@@ -398,5 +410,87 @@ Examples:
 
         Console.WriteLine("\n(Press Enter to continue...)");
         Console.ReadLine();
+    }
+
+    private static void RunDeviceMatching()
+    {
+        Console.WriteLine("=== Asteriq Device Matching ===\n");
+
+        // Initialize SDL
+        var inputService = new InputService();
+        if (!inputService.Initialize())
+        {
+            Console.WriteLine("ERROR: Failed to initialize SDL2");
+            Console.ReadLine();
+            return;
+        }
+
+        // Initialize HidHide
+        var hidHide = new HidHideService();
+        if (!hidHide.IsAvailable())
+        {
+            Console.WriteLine("ERROR: HidHide not available");
+            inputService.Dispose();
+            Console.ReadLine();
+            return;
+        }
+
+        // Get SDL devices
+        var sdlDevices = inputService.EnumerateDevices();
+        Console.WriteLine($"Found {sdlDevices.Count} SDL device(s)\n");
+
+        // Match devices
+        var matcher = new DeviceMatchingService(hidHide);
+        var correlations = matcher.GetAllCorrelations(sdlDevices);
+
+        foreach (var corr in correlations)
+        {
+            var vidPid = corr.Vid > 0 ? $"VID_{corr.Vid:X4} PID_{corr.Pid:X4}" : "(no VID/PID)";
+            var type = corr.IsVJoy ? "[vJoy]" : "[Physical]";
+
+            Console.WriteLine($"{type} [{corr.SdlDevice.DeviceIndex}] {corr.SdlDevice.Name}");
+            Console.WriteLine($"  SDL GUID: {corr.SdlDevice.InstanceGuid}");
+            Console.WriteLine($"  {vidPid}");
+
+            if (corr.HidDevices.Count > 0)
+            {
+                Console.WriteLine($"  HID Matches ({corr.HidDevices.Count}):");
+                foreach (var hid in corr.HidDevices)
+                {
+                    var gaming = hid.IsGamingDevice ? "[Gaming]" : "[Other]";
+                    Console.WriteLine($"    {gaming} {hid.DeviceInstancePath}");
+                }
+            }
+            else if (!corr.IsVJoy)
+            {
+                Console.WriteLine("  HID Matches: NONE FOUND");
+            }
+            Console.WriteLine();
+        }
+
+        // Summary
+        var physicalDevices = correlations.Where(c => !c.IsVJoy).ToList();
+        var matchedDevices = physicalDevices.Where(c => c.HidDevices.Count > 0).ToList();
+
+        Console.WriteLine("=== Summary ===");
+        Console.WriteLine($"Physical devices: {physicalDevices.Count}");
+        Console.WriteLine($"Matched to HID: {matchedDevices.Count}");
+
+        if (matchedDevices.Count > 0)
+        {
+            Console.WriteLine("\nDevice paths to hide:");
+            foreach (var dev in matchedDevices)
+            {
+                var primaryPath = dev.PrimaryDevicePath;
+                if (primaryPath != null)
+                {
+                    Console.WriteLine($"  {primaryPath}");
+                }
+            }
+        }
+
+        inputService.Dispose();
+
+        Console.WriteLine("\n(Press Enter to continue...)");
     }
 }

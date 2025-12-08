@@ -1,4 +1,5 @@
 using Asteriq.Diagnostics;
+using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.VJoy;
 using System.Runtime.InteropServices;
@@ -70,6 +71,14 @@ static class Program
             return;
         }
 
+        if (args.Contains("--maptest"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunMappingTest(args);
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new Form1());
     }
@@ -107,6 +116,10 @@ Commands:
 
   --whitelist         Add Asteriq to HidHide whitelist
                       Allows Asteriq to see hidden devices.
+
+  --maptest <device> <vjoy>
+                      Test mapping engine with curve applied
+                      Passes device through with S-curve and deadzone.
 
 Examples:
   Asteriq.exe                     Launch GUI
@@ -550,5 +563,179 @@ Examples:
         }
 
         Console.WriteLine("\n(Press Enter to continue...)");
+    }
+
+    private static void RunMappingTest(string[] args)
+    {
+        Console.WriteLine("=== Asteriq Mapping Engine Test ===\n");
+
+        // Parse arguments
+        int physicalIndex = 1;
+        uint vjoyId = 1;
+
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--maptest")
+            {
+                if (i + 1 < args.Length && int.TryParse(args[i + 1], out int pIdx))
+                    physicalIndex = pIdx;
+                if (i + 2 < args.Length && uint.TryParse(args[i + 2], out uint vId))
+                    vjoyId = vId;
+            }
+        }
+
+        // Initialize services
+        var inputService = new InputService();
+        if (!inputService.Initialize())
+        {
+            Console.WriteLine("ERROR: Failed to initialize SDL2");
+            return;
+        }
+
+        var vjoyService = new VJoyService();
+        if (!vjoyService.Initialize())
+        {
+            Console.WriteLine("ERROR: Failed to initialize vJoy");
+            inputService.Dispose();
+            return;
+        }
+
+        // Enumerate devices
+        var devices = inputService.EnumerateDevices();
+        Console.WriteLine($"Found {devices.Count} device(s):");
+        foreach (var dev in devices)
+        {
+            string marker = dev.DeviceIndex == physicalIndex ? " <-- SOURCE" : "";
+            Console.WriteLine($"  [{dev.DeviceIndex}] {dev.Name}{marker}");
+        }
+
+        var sourceDevice = devices.FirstOrDefault(d => d.DeviceIndex == physicalIndex);
+        if (sourceDevice == null)
+        {
+            Console.WriteLine($"\nDevice index {physicalIndex} not found!");
+            inputService.Dispose();
+            vjoyService.Dispose();
+            return;
+        }
+
+        // Create a test profile with curves
+        var profile = new MappingProfile
+        {
+            Name = "Test Profile",
+            Description = "Passthrough with S-curve"
+        };
+
+        // Map all axes with S-curve and 5% deadzone
+        for (int i = 0; i < Math.Min(sourceDevice.AxisCount, 8); i++)
+        {
+            profile.AxisMappings.Add(new AxisMapping
+            {
+                Name = $"Axis {i}",
+                Inputs = new List<InputSource>
+                {
+                    new InputSource
+                    {
+                        DeviceId = sourceDevice.InstanceGuid.ToString(),
+                        DeviceName = sourceDevice.Name,
+                        Type = InputType.Axis,
+                        Index = i
+                    }
+                },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyAxis,
+                    VJoyDevice = vjoyId,
+                    Index = i
+                },
+                Curve = new AxisCurve
+                {
+                    Type = CurveType.SCurve,
+                    Curvature = 0.3f,  // Moderate S-curve
+                    Deadzone = 0.05f,  // 5% deadzone
+                    Saturation = 1.0f
+                }
+            });
+        }
+
+        // Map all buttons (normal mode)
+        for (int i = 0; i < sourceDevice.ButtonCount; i++)
+        {
+            profile.ButtonMappings.Add(new ButtonMapping
+            {
+                Name = $"Button {i + 1}",
+                Inputs = new List<InputSource>
+                {
+                    new InputSource
+                    {
+                        DeviceId = sourceDevice.InstanceGuid.ToString(),
+                        DeviceName = sourceDevice.Name,
+                        Type = InputType.Button,
+                        Index = i
+                    }
+                },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyButton,
+                    VJoyDevice = vjoyId,
+                    Index = i + 1  // vJoy buttons are 1-indexed
+                },
+                Mode = ButtonMode.Normal
+            });
+        }
+
+        Console.WriteLine($"\nCreated profile with {profile.AxisMappings.Count} axis mappings and {profile.ButtonMappings.Count} button mappings");
+        Console.WriteLine("Curve: S-Curve (0.3 curvature, 5% deadzone)\n");
+
+        // Initialize mapping engine
+        var mappingEngine = new MappingEngine(vjoyService);
+        mappingEngine.LoadProfile(profile);
+
+        if (!mappingEngine.Start())
+        {
+            Console.WriteLine("ERROR: Failed to start mapping engine");
+            inputService.Dispose();
+            vjoyService.Dispose();
+            return;
+        }
+
+        Console.WriteLine($"Mapping {sourceDevice.Name} -> vJoy {vjoyId}");
+        Console.WriteLine("Press any key to stop...\n");
+
+        int lineStart = Console.CursorTop;
+
+        // Process input
+        inputService.InputReceived += (sender, state) =>
+        {
+            if (state.DeviceIndex != physicalIndex)
+                return;
+
+            // Feed to mapping engine
+            mappingEngine.ProcessInput(state);
+
+            // Display status
+            try
+            {
+                if (lineStart >= 0 && lineStart < Console.BufferHeight)
+                {
+                    Console.SetCursorPosition(0, lineStart);
+                    var axes = string.Join(" ", state.Axes.Take(4).Select((v, i) => $"A{i}:{v:+0.00;-0.00}"));
+                    var btns = string.Join(",", state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b != null));
+                    Console.Write($"IN:  {axes} | Btn: {(btns.Length > 0 ? btns : "-"),-20}");
+                }
+            }
+            catch { }
+        };
+
+        inputService.StartPolling(500); // 500Hz for responsive mapping
+
+        Console.ReadKey(true);
+
+        Console.WriteLine("\n\nStopping...");
+        inputService.StopPolling();
+        mappingEngine.Stop();
+        inputService.Dispose();
+        vjoyService.Dispose();
+        mappingEngine.Dispose();
+        Console.WriteLine("Done.");
     }
 }

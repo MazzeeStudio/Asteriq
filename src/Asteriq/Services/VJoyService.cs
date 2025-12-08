@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Asteriq.VJoy;
 
 namespace Asteriq.Services;
@@ -28,13 +29,18 @@ public class VJoyDeviceInfo
 /// </summary>
 public class VJoyService : IDisposable
 {
-    private readonly HashSet<uint> _acquiredDevices = new();
+    private readonly ConcurrentDictionary<uint, bool> _acquiredDevices = new();
     private bool _isInitialized;
+    private System.Threading.Timer? _keepAliveTimer;
+    private readonly object _lock = new();
 
     // vJoy axis range (0 to 32767, center at 16384)
     public const int AxisMin = 0;
     public const int AxisMax = 32767;
     public const int AxisCenter = 16384;
+
+    // Keep-alive interval (GremlinEx uses 60 seconds)
+    private const int KeepAliveIntervalMs = 30000; // 30 seconds
 
     /// <summary>
     /// Initialize vJoy and check driver availability
@@ -62,6 +68,10 @@ public class VJoyService : IDisposable
             }
 
             _isInitialized = true;
+
+            // Start keep-alive timer
+            _keepAliveTimer = new System.Threading.Timer(KeepAliveCallback, null, KeepAliveIntervalMs, KeepAliveIntervalMs);
+
             return true;
         }
         catch (DllNotFoundException)
@@ -75,6 +85,49 @@ public class VJoyService : IDisposable
             return false;
         }
     }
+
+    /// <summary>
+    /// Keep-alive timer callback - checks ownership and re-acquires if lost
+    /// </summary>
+    private void KeepAliveCallback(object? state)
+    {
+        lock (_lock)
+        {
+            foreach (var deviceId in _acquiredDevices.Keys.ToList())
+            {
+                var status = VJoyInterop.GetVJDStatusEnum(deviceId);
+
+                if (status == VjdStat.Own)
+                    continue; // Still owned, all good
+
+                if (status == VjdStat.Free)
+                {
+                    // Lost ownership, try to re-acquire
+                    Console.WriteLine($"vJoy device {deviceId} ownership lost, re-acquiring...");
+                    if (VJoyInterop.AcquireVJD(deviceId))
+                    {
+                        Console.WriteLine($"vJoy device {deviceId} re-acquired successfully");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Failed to re-acquire vJoy device {deviceId}");
+                        _acquiredDevices.TryRemove(deviceId, out _);
+                    }
+                }
+                else
+                {
+                    // Device busy or missing
+                    Console.WriteLine($"vJoy device {deviceId} status changed to {status}");
+                    _acquiredDevices.TryRemove(deviceId, out _);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Event fired when a device is lost and could not be re-acquired
+    /// </summary>
+    public event EventHandler<uint>? DeviceLost;
 
     /// <summary>
     /// Get information about all vJoy device slots (1-16)
@@ -124,14 +177,14 @@ public class VJoyService : IDisposable
     /// </summary>
     public bool AcquireDevice(uint deviceId)
     {
-        if (_acquiredDevices.Contains(deviceId))
+        if (_acquiredDevices.ContainsKey(deviceId))
             return true;
 
         var status = VJoyInterop.GetVJDStatusEnum(deviceId);
 
         if (status == VjdStat.Own)
         {
-            _acquiredDevices.Add(deviceId);
+            _acquiredDevices[deviceId] = true;
             return true;
         }
 
@@ -147,7 +200,7 @@ public class VJoyService : IDisposable
             return false;
         }
 
-        _acquiredDevices.Add(deviceId);
+        _acquiredDevices[deviceId] = true;
         VJoyInterop.ResetVJD(deviceId);
         return true;
     }
@@ -157,10 +210,9 @@ public class VJoyService : IDisposable
     /// </summary>
     public void ReleaseDevice(uint deviceId)
     {
-        if (_acquiredDevices.Contains(deviceId))
+        if (_acquiredDevices.TryRemove(deviceId, out _))
         {
             VJoyInterop.RelinquishVJD(deviceId);
-            _acquiredDevices.Remove(deviceId);
         }
     }
 
@@ -169,7 +221,7 @@ public class VJoyService : IDisposable
     /// </summary>
     public bool SetAxis(uint deviceId, HID_USAGES axis, float value)
     {
-        if (!_acquiredDevices.Contains(deviceId))
+        if (!_acquiredDevices.ContainsKey(deviceId))
             return false;
 
         // Convert -1.0..1.0 to 0..32767
@@ -184,7 +236,7 @@ public class VJoyService : IDisposable
     /// </summary>
     public bool SetButton(uint deviceId, int button, bool pressed)
     {
-        if (!_acquiredDevices.Contains(deviceId))
+        if (!_acquiredDevices.ContainsKey(deviceId))
             return false;
 
         return VJoyInterop.SetBtn(pressed, deviceId, (byte)button);
@@ -195,7 +247,7 @@ public class VJoyService : IDisposable
     /// </summary>
     public bool SetDiscretePov(uint deviceId, uint povIndex, int direction)
     {
-        if (!_acquiredDevices.Contains(deviceId))
+        if (!_acquiredDevices.ContainsKey(deviceId))
             return false;
 
         return VJoyInterop.SetDiscPov(direction, deviceId, povIndex);
@@ -206,7 +258,7 @@ public class VJoyService : IDisposable
     /// </summary>
     public bool SetContinuousPov(uint deviceId, uint povIndex, int angle)
     {
-        if (!_acquiredDevices.Contains(deviceId))
+        if (!_acquiredDevices.ContainsKey(deviceId))
             return false;
 
         // vJoy expects angle * 100 (e.g., 90° = 9000)
@@ -219,7 +271,7 @@ public class VJoyService : IDisposable
     /// </summary>
     public bool ResetDevice(uint deviceId)
     {
-        if (!_acquiredDevices.Contains(deviceId))
+        if (!_acquiredDevices.ContainsKey(deviceId))
             return false;
 
         return VJoyInterop.ResetVJD(deviceId);
@@ -227,7 +279,10 @@ public class VJoyService : IDisposable
 
     public void Dispose()
     {
-        foreach (var deviceId in _acquiredDevices.ToList())
+        _keepAliveTimer?.Dispose();
+        _keepAliveTimer = null;
+
+        foreach (var deviceId in _acquiredDevices.Keys.ToList())
         {
             ReleaseDevice(deviceId);
         }

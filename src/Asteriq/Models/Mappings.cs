@@ -17,6 +17,7 @@ public enum OutputType
 {
     VJoyAxis,
     VJoyButton,
+    VJoyPov,
     Keyboard
 }
 
@@ -115,6 +116,7 @@ public class OutputTarget
     {
         OutputType.VJoyAxis => $"vJoy {VJoyDevice} Axis {Index}",
         OutputType.VJoyButton => $"vJoy {VJoyDevice} Button {Index}",
+        OutputType.VJoyPov => $"vJoy {VJoyDevice} POV {Index}",
         OutputType.Keyboard => $"Key {Index}",
         _ => "Unknown"
     };
@@ -220,6 +222,24 @@ public class AxisCurve
 }
 
 /// <summary>
+/// A shift layer that can be activated by holding a button
+/// </summary>
+public class ShiftLayer
+{
+    /// <summary>Unique identifier for this layer</summary>
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>Layer name (e.g., "Shift 1", "Mode A")</summary>
+    public string Name { get; set; } = "";
+
+    /// <summary>Button input that activates this layer</summary>
+    public InputSource? ActivatorButton { get; set; }
+
+    /// <summary>Whether this layer is currently active (runtime state)</summary>
+    internal bool IsActive { get; set; } = false;
+}
+
+/// <summary>
 /// A mapping from one or more inputs to an output
 /// </summary>
 public class Mapping
@@ -244,6 +264,9 @@ public class Mapping
 
     /// <summary>Invert the output</summary>
     public bool Invert { get; set; } = false;
+
+    /// <summary>Layer this mapping belongs to (null = base layer, always active)</summary>
+    public Guid? LayerId { get; set; }
 }
 
 /// <summary>
@@ -277,6 +300,54 @@ public class ButtonMapping : Mapping
 }
 
 /// <summary>
+/// Hat/POV-specific mapping
+/// </summary>
+public class HatMapping : Mapping
+{
+    /// <summary>Use continuous POV (angle-based) vs discrete (4-direction)</summary>
+    public bool UseContinuous { get; set; } = true;
+}
+
+/// <summary>
+/// Axis-to-button mapping - triggers button when axis crosses threshold
+/// </summary>
+public class AxisToButtonMapping : Mapping
+{
+    /// <summary>Threshold value where button activates (-1.0 to 1.0)</summary>
+    public float Threshold { get; set; } = 0.5f;
+
+    /// <summary>Activate when above threshold (true) or below (false)</summary>
+    public bool ActivateAbove { get; set; } = true;
+
+    /// <summary>Hysteresis to prevent flickering (0.0 to 0.5)</summary>
+    public float Hysteresis { get; set; } = 0.05f;
+
+    /// <summary>Internal state tracking</summary>
+    internal bool IsActivated { get; set; } = false;
+}
+
+/// <summary>
+/// Button-to-axis mapping - outputs axis value when button is pressed
+/// </summary>
+public class ButtonToAxisMapping : Mapping
+{
+    /// <summary>Axis value when button is pressed (-1.0 to 1.0)</summary>
+    public float PressedValue { get; set; } = 1.0f;
+
+    /// <summary>Axis value when button is released (-1.0 to 1.0)</summary>
+    public float ReleasedValue { get; set; } = 0.0f;
+
+    /// <summary>Smoothing time in milliseconds (0 = instant)</summary>
+    public int SmoothingMs { get; set; } = 0;
+
+    /// <summary>Internal current value for smoothing</summary>
+    internal float CurrentValue { get; set; } = 0f;
+
+    /// <summary>Internal timestamp for smoothing</summary>
+    internal DateTime? LastUpdate { get; set; }
+}
+
+/// <summary>
 /// A profile containing all mappings for a configuration
 /// </summary>
 public class MappingProfile
@@ -290,11 +361,23 @@ public class MappingProfile
     /// <summary>Description</summary>
     public string Description { get; set; } = "";
 
+    /// <summary>Shift layers for mode switching</summary>
+    public List<ShiftLayer> ShiftLayers { get; set; } = new();
+
     /// <summary>Axis mappings</summary>
     public List<AxisMapping> AxisMappings { get; set; } = new();
 
     /// <summary>Button mappings</summary>
     public List<ButtonMapping> ButtonMappings { get; set; } = new();
+
+    /// <summary>Hat/POV mappings</summary>
+    public List<HatMapping> HatMappings { get; set; } = new();
+
+    /// <summary>Axis-to-button mappings</summary>
+    public List<AxisToButtonMapping> AxisToButtonMappings { get; set; } = new();
+
+    /// <summary>Button-to-axis mappings</summary>
+    public List<ButtonToAxisMapping> ButtonToAxisMappings { get; set; } = new();
 
     /// <summary>When created</summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -13,9 +13,23 @@ static class Program
     [DllImport("kernel32.dll")]
     private static extern bool AttachConsole(int dwProcessId);
 
+    [DllImport("kernel32.dll")]
+    private static extern bool FreeConsole();
+
+    [DllImport("kernel32.dll")]
+    private static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);
+
     [STAThread]
     static void Main(string[] args)
     {
+        if (args.Contains("--help") || args.Contains("-h") || args.Contains("/?"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            ShowHelp();
+            return;
+        }
+
         if (args.Contains("--diag") || args.Contains("-d"))
         {
             if (!AttachConsole(-1))
@@ -32,8 +46,51 @@ static class Program
             return;
         }
 
+        if (args.Contains("--hidhide"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunHidHideDiag();
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new Form1());
+    }
+
+    private static void ShowHelp()
+    {
+        Console.WriteLine(@"
+Asteriq - Unified HOTAS Management
+
+Usage: Asteriq.exe [command] [options]
+
+Commands:
+  (none)              Launch the GUI application
+
+  --help, -h, /?      Show this help message
+
+  --diag, -d          Run input diagnostics
+                      Lists all connected joysticks and displays real-time
+                      axis/button state for each device. Useful for verifying
+                      SDL2 is detecting your devices correctly.
+
+  --passthrough, -p <device> <vjoy>
+                      Pass physical device input to vJoy device
+                      <device>  Physical device index (from --diag output)
+                      <vjoy>    Target vJoy device ID (1-16)
+                      Example: Asteriq.exe --passthrough 1 1
+
+  --hidhide           Show HidHide configuration
+                      Lists gaming devices, hidden devices, and whitelisted
+                      applications. Requires HidHide to be installed.
+
+Examples:
+  Asteriq.exe                     Launch GUI
+  Asteriq.exe --diag              Test input devices
+  Asteriq.exe --passthrough 1 1   Map device 1 to vJoy 1
+  Asteriq.exe --hidhide           Show HidHide status
+");
     }
 
     private static void RunDiagnostics()
@@ -140,12 +197,14 @@ static class Program
             inputService.StopPolling();
             inputService.Dispose();
             Log("Done.");
+            Environment.Exit(0);
         }
         catch (Exception ex)
         {
             Log($"EXCEPTION: {ex.GetType().Name}: {ex.Message}");
             Log(ex.StackTrace ?? "No stack trace");
             MessageBox.Show($"Error: {ex.Message}\nSee log: {logPath}", "Error");
+            Environment.Exit(1);
         }
     }
 
@@ -273,5 +332,72 @@ static class Program
         inputService.Dispose();
         vjoyService.Dispose();
         Console.WriteLine("Done.");
+        Environment.Exit(0);
+    }
+
+    private static void RunHidHideDiag()
+    {
+        Console.WriteLine("=== Asteriq HidHide Diagnostics ===\n");
+
+        var hidHide = new HidHideService();
+
+        if (!hidHide.IsAvailable())
+        {
+            Console.WriteLine("ERROR: HidHide CLI not found at expected path.");
+            Console.WriteLine("Please install HidHide from: https://github.com/nefarius/HidHide");
+            Console.ReadKey();
+            return;
+        }
+
+        Console.WriteLine("HidHide CLI: Available");
+        Console.WriteLine($"Cloaking: {(hidHide.IsCloakingEnabled() ? "ENABLED" : "DISABLED")}\n");
+
+        // List gaming devices
+        Console.WriteLine("=== Gaming Devices ===");
+        var devices = hidHide.GetGamingDevices();
+        foreach (var group in devices)
+        {
+            Console.WriteLine($"\n{group.FriendlyName}");
+            foreach (var dev in group.Devices)
+            {
+                var status = dev.IsGamingDevice ? "[Gaming]" : "[Other]";
+                Console.WriteLine($"  {status} {dev.Usage}");
+                Console.WriteLine($"    Path: {dev.DeviceInstancePath}");
+            }
+        }
+
+        // List hidden devices
+        Console.WriteLine("\n=== Hidden Devices ===");
+        var hidden = hidHide.GetHiddenDevices();
+        if (hidden.Count == 0)
+        {
+            Console.WriteLine("  (none)");
+        }
+        else
+        {
+            foreach (var path in hidden)
+            {
+                Console.WriteLine($"  {path}");
+            }
+        }
+
+        // List whitelisted apps
+        Console.WriteLine("\n=== Whitelisted Applications ===");
+        var apps = hidHide.GetWhitelistedApps();
+        if (apps.Count == 0)
+        {
+            Console.WriteLine("  (none)");
+        }
+        else
+        {
+            foreach (var app in apps)
+            {
+                Console.WriteLine($"  {app}");
+            }
+        }
+
+        Console.WriteLine("\nPress any key to exit...");
+        Console.ReadKey(true);
+        Environment.Exit(0);
     }
 }

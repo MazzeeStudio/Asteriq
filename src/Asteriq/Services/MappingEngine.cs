@@ -13,6 +13,7 @@ public class MappingEngine : IDisposable
     private readonly bool _ownsKeyboard;
     private readonly Dictionary<string, float[]> _deviceAxisValues = new();
     private readonly Dictionary<string, bool[]> _deviceButtonValues = new();
+    private readonly Dictionary<string, int[]> _deviceHatValues = new();
     private readonly Dictionary<Guid, float> _mergeAxisCache = new();
     private readonly object _lock = new();
 
@@ -112,19 +113,90 @@ public class MappingEngine : IDisposable
             // Cache current values for this device
             _deviceAxisValues[deviceId] = state.Axes;
             _deviceButtonValues[deviceId] = state.Buttons;
+            _deviceHatValues[deviceId] = state.Hats;
 
-            // Process axis mappings
-            foreach (var mapping in _activeProfile.AxisMappings.Where(m => m.Enabled))
+            // Update shift layer states
+            UpdateShiftLayers(deviceId, state);
+
+            // Process axis mappings (filtered by active layer)
+            foreach (var mapping in _activeProfile.AxisMappings.Where(m => m.Enabled && IsMappingActive(m)))
             {
                 ProcessAxisMapping(mapping, deviceId, state);
             }
 
-            // Process button mappings
-            foreach (var mapping in _activeProfile.ButtonMappings.Where(m => m.Enabled))
+            // Process button mappings (filtered by active layer)
+            foreach (var mapping in _activeProfile.ButtonMappings.Where(m => m.Enabled && IsMappingActive(m)))
             {
                 ProcessButtonMapping(mapping, deviceId, state);
             }
+
+            // Process hat mappings (filtered by active layer)
+            foreach (var mapping in _activeProfile.HatMappings.Where(m => m.Enabled && IsMappingActive(m)))
+            {
+                ProcessHatMapping(mapping, deviceId, state);
+            }
+
+            // Process axis-to-button mappings (filtered by active layer)
+            foreach (var mapping in _activeProfile.AxisToButtonMappings.Where(m => m.Enabled && IsMappingActive(m)))
+            {
+                ProcessAxisToButtonMapping(mapping, deviceId, state);
+            }
+
+            // Process button-to-axis mappings (filtered by active layer)
+            foreach (var mapping in _activeProfile.ButtonToAxisMappings.Where(m => m.Enabled && IsMappingActive(m)))
+            {
+                ProcessButtonToAxisMapping(mapping, deviceId, state);
+            }
         }
+    }
+
+    /// <summary>
+    /// Update shift layer active states based on button inputs
+    /// </summary>
+    private void UpdateShiftLayers(string deviceId, DeviceInputState state)
+    {
+        if (_activeProfile == null)
+            return;
+
+        foreach (var layer in _activeProfile.ShiftLayers)
+        {
+            if (layer.ActivatorButton == null)
+                continue;
+
+            // Check if activator button is on this device
+            if (layer.ActivatorButton.DeviceId != deviceId)
+                continue;
+
+            // Get button state
+            bool isPressed = false;
+            if (layer.ActivatorButton.Type == InputType.Button &&
+                layer.ActivatorButton.Index < state.Buttons.Length)
+            {
+                isPressed = state.Buttons[layer.ActivatorButton.Index];
+            }
+
+            layer.IsActive = isPressed;
+        }
+    }
+
+    /// <summary>
+    /// Check if a mapping should be processed based on its layer
+    /// </summary>
+    private bool IsMappingActive(Mapping mapping)
+    {
+        if (_activeProfile == null)
+            return false;
+
+        // No layer = base layer, always active when no shift is pressed
+        if (mapping.LayerId == null)
+        {
+            // Base layer is active when NO shift layers are active
+            return !_activeProfile.ShiftLayers.Any(l => l.IsActive);
+        }
+
+        // Check if this mapping's layer is active
+        var layer = _activeProfile.ShiftLayers.FirstOrDefault(l => l.Id == mapping.LayerId);
+        return layer?.IsActive ?? false;
     }
 
     private void ProcessAxisMapping(AxisMapping mapping, string deviceId, DeviceInputState state)
@@ -232,6 +304,209 @@ public class MappingEngine : IDisposable
         }
     }
 
+    private void ProcessHatMapping(HatMapping mapping, string deviceId, DeviceInputState state)
+    {
+        // Check if this input is relevant
+        var relevantInputs = mapping.Inputs.Where(i =>
+            i.DeviceId == deviceId && i.Type == InputType.Hat).ToList();
+
+        if (relevantInputs.Count == 0)
+            return;
+
+        // Get hat value (SDL reports -1 for centered, or angle in degrees 0-360)
+        int hatValue = -1;
+
+        if (mapping.Inputs.Count == 1)
+        {
+            var input = mapping.Inputs[0];
+            if (input.Index < state.Hats.Length)
+                hatValue = state.Hats[input.Index];
+        }
+        else
+        {
+            // Multiple hat inputs - take first non-centered value
+            foreach (var input in mapping.Inputs)
+            {
+                if (_deviceHatValues.TryGetValue(input.DeviceId, out var hats) &&
+                    input.Index < hats.Length && hats[input.Index] >= 0)
+                {
+                    hatValue = hats[input.Index];
+                    break;
+                }
+            }
+        }
+
+        // Output to vJoy POV
+        if (mapping.Output.Type == OutputType.VJoyPov)
+        {
+            uint povIndex = (uint)(mapping.Output.Index + 1); // vJoy POV is 1-indexed
+
+            if (mapping.UseContinuous)
+            {
+                // Continuous POV - pass angle directly
+                _vjoy.SetContinuousPov(mapping.Output.VJoyDevice, povIndex, hatValue);
+            }
+            else
+            {
+                // Discrete POV - convert angle to direction (0-3) or -1 for neutral
+                int direction = HatAngleToDiscrete(hatValue);
+                _vjoy.SetDiscretePov(mapping.Output.VJoyDevice, povIndex, direction);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Convert hat angle to discrete direction (0=N, 1=E, 2=S, 3=W, -1=neutral)
+    /// </summary>
+    private static int HatAngleToDiscrete(int angle)
+    {
+        if (angle < 0)
+            return -1; // Neutral
+
+        // Normalize to 0-359
+        angle = angle % 360;
+
+        // Map to 4 directions with 90-degree zones
+        // N: 315-360, 0-44 (centered on 0)
+        // E: 45-134 (centered on 90)
+        // S: 135-224 (centered on 180)
+        // W: 225-314 (centered on 270)
+        if (angle >= 315 || angle < 45)
+            return 0; // North
+        if (angle >= 45 && angle < 135)
+            return 1; // East
+        if (angle >= 135 && angle < 225)
+            return 2; // South
+        return 3; // West
+    }
+
+    private void ProcessAxisToButtonMapping(AxisToButtonMapping mapping, string deviceId, DeviceInputState state)
+    {
+        // Check if this input is relevant
+        var relevantInputs = mapping.Inputs.Where(i =>
+            i.DeviceId == deviceId && i.Type == InputType.Axis).ToList();
+
+        if (relevantInputs.Count == 0)
+            return;
+
+        // Get axis value
+        float axisValue = 0f;
+
+        if (mapping.Inputs.Count == 1)
+        {
+            var input = mapping.Inputs[0];
+            if (input.Index < state.Axes.Length)
+                axisValue = state.Axes[input.Index];
+        }
+        else
+        {
+            // Multiple inputs - use first available
+            foreach (var input in mapping.Inputs)
+            {
+                if (_deviceAxisValues.TryGetValue(input.DeviceId, out var axes) &&
+                    input.Index < axes.Length)
+                {
+                    axisValue = axes[input.Index];
+                    break;
+                }
+            }
+        }
+
+        // Apply hysteresis to prevent flickering
+        bool shouldActivate;
+        if (mapping.ActivateAbove)
+        {
+            // Activate when above threshold
+            float activateThreshold = mapping.IsActivated ? mapping.Threshold - mapping.Hysteresis : mapping.Threshold;
+            shouldActivate = axisValue > activateThreshold;
+        }
+        else
+        {
+            // Activate when below threshold
+            float activateThreshold = mapping.IsActivated ? mapping.Threshold + mapping.Hysteresis : mapping.Threshold;
+            shouldActivate = axisValue < activateThreshold;
+        }
+
+        mapping.IsActivated = shouldActivate;
+
+        // Apply inversion
+        bool outputPressed = mapping.Invert ? !shouldActivate : shouldActivate;
+
+        // Output
+        if (mapping.Output.Type == OutputType.VJoyButton)
+        {
+            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed);
+        }
+        else if (mapping.Output.Type == OutputType.Keyboard)
+        {
+            _keyboard.SetKey(mapping.Output.Index, outputPressed, mapping.Output.Modifiers);
+        }
+    }
+
+    private void ProcessButtonToAxisMapping(ButtonToAxisMapping mapping, string deviceId, DeviceInputState state)
+    {
+        // Check if this input is relevant
+        var relevantInputs = mapping.Inputs.Where(i =>
+            i.DeviceId == deviceId && i.Type == InputType.Button).ToList();
+
+        if (relevantInputs.Count == 0)
+            return;
+
+        // Get button state
+        bool isPressed = false;
+
+        if (mapping.Inputs.Count == 1)
+        {
+            var input = mapping.Inputs[0];
+            if (input.Index < state.Buttons.Length)
+                isPressed = state.Buttons[input.Index];
+        }
+        else
+        {
+            // Multiple inputs - any pressed = pressed
+            foreach (var input in mapping.Inputs)
+            {
+                if (_deviceButtonValues.TryGetValue(input.DeviceId, out var buttons) &&
+                    input.Index < buttons.Length && buttons[input.Index])
+                {
+                    isPressed = true;
+                    break;
+                }
+            }
+        }
+
+        // Determine target value
+        float targetValue = isPressed ? mapping.PressedValue : mapping.ReleasedValue;
+
+        // Apply smoothing if configured
+        float outputValue;
+        if (mapping.SmoothingMs > 0 && mapping.LastUpdate.HasValue)
+        {
+            var elapsed = (DateTime.UtcNow - mapping.LastUpdate.Value).TotalMilliseconds;
+            var rate = elapsed / mapping.SmoothingMs;
+            var delta = targetValue - mapping.CurrentValue;
+            outputValue = mapping.CurrentValue + (float)Math.Min(rate, 1.0) * delta;
+        }
+        else
+        {
+            outputValue = targetValue;
+        }
+
+        mapping.CurrentValue = outputValue;
+        mapping.LastUpdate = DateTime.UtcNow;
+
+        // Apply inversion
+        if (mapping.Invert)
+            outputValue = -outputValue;
+
+        // Output to vJoy
+        if (mapping.Output.Type == OutputType.VJoyAxis)
+        {
+            var axis = IndexToHidUsage(mapping.Output.Index);
+            _vjoy.SetAxis(mapping.Output.VJoyDevice, axis, outputValue);
+        }
+    }
+
     private bool ApplyButtonMode(ButtonMapping mapping, bool inputPressed)
     {
         switch (mapping.Mode)
@@ -321,7 +596,8 @@ public class MappingEngine : IDisposable
         foreach (var mapping in _activeProfile.AxisMappings)
         {
             if (mapping.Output.Type == OutputType.VJoyAxis ||
-                mapping.Output.Type == OutputType.VJoyButton)
+                mapping.Output.Type == OutputType.VJoyButton ||
+                mapping.Output.Type == OutputType.VJoyPov)
             {
                 devices.Add(mapping.Output.VJoyDevice);
             }
@@ -330,7 +606,32 @@ public class MappingEngine : IDisposable
         foreach (var mapping in _activeProfile.ButtonMappings)
         {
             if (mapping.Output.Type == OutputType.VJoyAxis ||
-                mapping.Output.Type == OutputType.VJoyButton)
+                mapping.Output.Type == OutputType.VJoyButton ||
+                mapping.Output.Type == OutputType.VJoyPov)
+            {
+                devices.Add(mapping.Output.VJoyDevice);
+            }
+        }
+
+        foreach (var mapping in _activeProfile.HatMappings)
+        {
+            if (mapping.Output.Type == OutputType.VJoyPov)
+            {
+                devices.Add(mapping.Output.VJoyDevice);
+            }
+        }
+
+        foreach (var mapping in _activeProfile.AxisToButtonMappings)
+        {
+            if (mapping.Output.Type == OutputType.VJoyButton)
+            {
+                devices.Add(mapping.Output.VJoyDevice);
+            }
+        }
+
+        foreach (var mapping in _activeProfile.ButtonToAxisMappings)
+        {
+            if (mapping.Output.Type == OutputType.VJoyAxis)
             {
                 devices.Add(mapping.Output.VJoyDevice);
             }

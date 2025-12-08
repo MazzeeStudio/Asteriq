@@ -130,6 +130,7 @@ public class ProfileService
                         Description = profile.Description,
                         AxisMappingCount = profile.AxisMappings.Count,
                         ButtonMappingCount = profile.ButtonMappings.Count,
+                        HatMappingCount = profile.HatMappings.Count,
                         CreatedAt = profile.CreatedAt,
                         ModifiedAt = profile.ModifiedAt,
                         FilePath = file
@@ -163,6 +164,29 @@ public class ProfileService
             ModifiedAt = DateTime.UtcNow
         };
 
+        // Create ID mapping for layers (old ID -> new ID)
+        var layerIdMap = new Dictionary<Guid, Guid>();
+
+        // Deep copy shift layers
+        foreach (var layer in source.ShiftLayers)
+        {
+            var newId = Guid.NewGuid();
+            layerIdMap[layer.Id] = newId;
+
+            duplicate.ShiftLayers.Add(new ShiftLayer
+            {
+                Id = newId,
+                Name = layer.Name,
+                ActivatorButton = layer.ActivatorButton == null ? null : new InputSource
+                {
+                    DeviceId = layer.ActivatorButton.DeviceId,
+                    DeviceName = layer.ActivatorButton.DeviceName,
+                    Type = layer.ActivatorButton.Type,
+                    Index = layer.ActivatorButton.Index
+                }
+            });
+        }
+
         // Deep copy axis mappings
         foreach (var mapping in source.AxisMappings)
         {
@@ -171,6 +195,7 @@ public class ProfileService
                 Id = Guid.NewGuid(),
                 Name = mapping.Name,
                 Enabled = mapping.Enabled,
+                LayerId = mapping.LayerId.HasValue && layerIdMap.TryGetValue(mapping.LayerId.Value, out var newAxisLayerId) ? newAxisLayerId : null,
                 Inputs = mapping.Inputs.Select(i => new InputSource
                 {
                     DeviceId = i.DeviceId,
@@ -206,6 +231,7 @@ public class ProfileService
                 Id = Guid.NewGuid(),
                 Name = mapping.Name,
                 Enabled = mapping.Enabled,
+                LayerId = mapping.LayerId.HasValue && layerIdMap.TryGetValue(mapping.LayerId.Value, out var newBtnLayerId) ? newBtnLayerId : null,
                 Inputs = mapping.Inputs.Select(i => new InputSource
                 {
                     DeviceId = i.DeviceId,
@@ -225,6 +251,97 @@ public class ProfileService
                 Mode = mapping.Mode,
                 PulseDurationMs = mapping.PulseDurationMs,
                 HoldDurationMs = mapping.HoldDurationMs
+            });
+        }
+
+        // Deep copy hat mappings
+        foreach (var mapping in source.HatMappings)
+        {
+            duplicate.HatMappings.Add(new HatMapping
+            {
+                Id = Guid.NewGuid(),
+                Name = mapping.Name,
+                Enabled = mapping.Enabled,
+                LayerId = mapping.LayerId.HasValue && layerIdMap.TryGetValue(mapping.LayerId.Value, out var newHatLayerId) ? newHatLayerId : null,
+                Inputs = mapping.Inputs.Select(i => new InputSource
+                {
+                    DeviceId = i.DeviceId,
+                    DeviceName = i.DeviceName,
+                    Type = i.Type,
+                    Index = i.Index
+                }).ToList(),
+                Output = new OutputTarget
+                {
+                    Type = mapping.Output.Type,
+                    VJoyDevice = mapping.Output.VJoyDevice,
+                    Index = mapping.Output.Index,
+                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                },
+                MergeOp = mapping.MergeOp,
+                Invert = mapping.Invert,
+                UseContinuous = mapping.UseContinuous
+            });
+        }
+
+        // Deep copy axis-to-button mappings
+        foreach (var mapping in source.AxisToButtonMappings)
+        {
+            duplicate.AxisToButtonMappings.Add(new AxisToButtonMapping
+            {
+                Id = Guid.NewGuid(),
+                Name = mapping.Name,
+                Enabled = mapping.Enabled,
+                LayerId = mapping.LayerId.HasValue && layerIdMap.TryGetValue(mapping.LayerId.Value, out var newA2BLayerId) ? newA2BLayerId : null,
+                Inputs = mapping.Inputs.Select(i => new InputSource
+                {
+                    DeviceId = i.DeviceId,
+                    DeviceName = i.DeviceName,
+                    Type = i.Type,
+                    Index = i.Index
+                }).ToList(),
+                Output = new OutputTarget
+                {
+                    Type = mapping.Output.Type,
+                    VJoyDevice = mapping.Output.VJoyDevice,
+                    Index = mapping.Output.Index,
+                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                },
+                MergeOp = mapping.MergeOp,
+                Invert = mapping.Invert,
+                Threshold = mapping.Threshold,
+                ActivateAbove = mapping.ActivateAbove,
+                Hysteresis = mapping.Hysteresis
+            });
+        }
+
+        // Deep copy button-to-axis mappings
+        foreach (var mapping in source.ButtonToAxisMappings)
+        {
+            duplicate.ButtonToAxisMappings.Add(new ButtonToAxisMapping
+            {
+                Id = Guid.NewGuid(),
+                Name = mapping.Name,
+                Enabled = mapping.Enabled,
+                LayerId = mapping.LayerId.HasValue && layerIdMap.TryGetValue(mapping.LayerId.Value, out var newB2ALayerId) ? newB2ALayerId : null,
+                Inputs = mapping.Inputs.Select(i => new InputSource
+                {
+                    DeviceId = i.DeviceId,
+                    DeviceName = i.DeviceName,
+                    Type = i.Type,
+                    Index = i.Index
+                }).ToList(),
+                Output = new OutputTarget
+                {
+                    Type = mapping.Output.Type,
+                    VJoyDevice = mapping.Output.VJoyDevice,
+                    Index = mapping.Output.Index,
+                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                },
+                MergeOp = mapping.MergeOp,
+                Invert = mapping.Invert,
+                PressedValue = mapping.PressedValue,
+                ReleasedValue = mapping.ReleasedValue,
+                SmoothingMs = mapping.SmoothingMs
             });
         }
 
@@ -356,11 +473,12 @@ public class ProfileInfo
     public string Description { get; init; } = "";
     public int AxisMappingCount { get; init; }
     public int ButtonMappingCount { get; init; }
+    public int HatMappingCount { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime ModifiedAt { get; init; }
     public string FilePath { get; init; } = "";
 
-    public int TotalMappings => AxisMappingCount + ButtonMappingCount;
+    public int TotalMappings => AxisMappingCount + ButtonMappingCount + HatMappingCount;
 }
 
 /// <summary>

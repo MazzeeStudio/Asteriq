@@ -1036,37 +1036,14 @@ public class MainForm : Form
     {
         byte alpha = (byte)(255 * opacity * input.AppearProgress);
         var lineColor = FUIColors.Active.WithAlpha(alpha);
-        var textColor = FUIColors.TextPrimary.WithAlpha(alpha);
-        var dimColor = FUIColors.TextDim.WithAlpha(alpha);
 
         // Animation: line grows from anchor to label
         float progress = Math.Min(1f, input.AppearProgress * 1.5f);
 
-        // Calculate intermediate point for angled line
-        float midX = goesRight
-            ? anchor.X + (labelPos.X - anchor.X) * 0.3f
-            : anchor.X - (anchor.X - labelPos.X) * 0.3f;
+        // Build the path points based on LeadLine definition or use default
+        var pathPoints = BuildLeadLinePath(anchor, input.Control?.LeadLine, goesRight);
 
-        // Animated endpoint
-        SKPoint currentEnd;
-        if (progress < 0.5f)
-        {
-            // First half: draw from anchor towards middle
-            float t = progress * 2f;
-            currentEnd = new SKPoint(
-                anchor.X + (midX - anchor.X) * t,
-                anchor.Y + (labelPos.Y - anchor.Y) * t * 0.5f);
-        }
-        else
-        {
-            // Second half: draw from middle to label
-            float t = (progress - 0.5f) * 2f;
-            currentEnd = new SKPoint(
-                midX + (labelPos.X - midX) * t,
-                anchor.Y + (labelPos.Y - anchor.Y) * (0.5f + t * 0.5f));
-        }
-
-        // Draw line
+        // Draw line with animation
         using var linePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -1075,20 +1052,44 @@ public class MainForm : Form
             IsAntialias = true
         };
 
-        var path = new SKPath();
-        path.MoveTo(anchor);
-        if (progress < 0.5f)
+        // Calculate total path length for animation
+        float totalLength = 0f;
+        for (int i = 1; i < pathPoints.Count; i++)
         {
-            path.LineTo(currentEnd);
+            totalLength += Distance(pathPoints[i - 1], pathPoints[i]);
         }
-        else
+
+        // Draw path up to current animation progress
+        float targetLength = totalLength * progress;
+        var path = new SKPath();
+        path.MoveTo(pathPoints[0]);
+
+        float drawnLength = 0f;
+        for (int i = 1; i < pathPoints.Count && drawnLength < targetLength; i++)
         {
-            path.LineTo(midX, anchor.Y + (labelPos.Y - anchor.Y) * 0.5f);
-            path.LineTo(currentEnd);
+            float segmentLength = Distance(pathPoints[i - 1], pathPoints[i]);
+            float remainingLength = targetLength - drawnLength;
+
+            if (remainingLength >= segmentLength)
+            {
+                // Draw full segment
+                path.LineTo(pathPoints[i]);
+                drawnLength += segmentLength;
+            }
+            else
+            {
+                // Draw partial segment
+                float t = remainingLength / segmentLength;
+                var partialEnd = new SKPoint(
+                    pathPoints[i - 1].X + (pathPoints[i].X - pathPoints[i - 1].X) * t,
+                    pathPoints[i - 1].Y + (pathPoints[i].Y - pathPoints[i - 1].Y) * t);
+                path.LineTo(partialEnd);
+                drawnLength += remainingLength;
+            }
         }
         canvas.DrawPath(path, linePaint);
 
-        // Draw endpoint dot
+        // Draw endpoint dot at anchor
         if (progress > 0.8f)
         {
             using var dotPaint = new SKPaint
@@ -1100,11 +1101,80 @@ public class MainForm : Form
             canvas.DrawCircle(anchor, 4f, dotPaint);
         }
 
-        // Draw label only when line is complete
-        if (progress > 0.95f)
+        // Draw label at the end of the path when line is complete
+        if (progress > 0.95f && pathPoints.Count > 0)
         {
-            DrawInputLabel(canvas, labelPos, goesRight, input, alpha);
+            var labelPoint = pathPoints[^1]; // Last point
+            DrawInputLabel(canvas, labelPoint, goesRight, input, alpha);
         }
+    }
+
+    /// <summary>
+    /// Build the lead-line path points from anchor based on LeadLine definition.
+    /// Returns a list of points: anchor -> shelf end -> segment1 end -> segment2 end...
+    /// </summary>
+    private List<SKPoint> BuildLeadLinePath(SKPoint anchor, LeadLineDefinition? leadLine, bool defaultGoesRight)
+    {
+        var points = new List<SKPoint> { anchor };
+
+        if (leadLine == null)
+        {
+            // Default: simple horizontal shelf then diagonal to a default label position
+            bool goesRight = defaultGoesRight;
+            float shelfLength = 60f * _svgScale;
+            float shelfEnd = goesRight ? anchor.X + shelfLength : anchor.X - shelfLength;
+            points.Add(new SKPoint(shelfEnd, anchor.Y));
+
+            // Default diagonal segment
+            float diagLength = 80f * _svgScale;
+            float diagX = goesRight ? shelfEnd + diagLength * 0.7f : shelfEnd - diagLength * 0.7f;
+            float diagY = anchor.Y - diagLength * 0.7f; // Go up by default
+            points.Add(new SKPoint(diagX, diagY));
+
+            return points;
+        }
+
+        // Use JSON-defined lead-line shape
+        bool shelfGoesRight = leadLine.ShelfSide.Equals("right", StringComparison.OrdinalIgnoreCase);
+        float scaledShelfLength = leadLine.ShelfLength * _svgScale;
+
+        // Shelf (horizontal)
+        float shelfEndX = shelfGoesRight ? anchor.X + scaledShelfLength : anchor.X - scaledShelfLength;
+        var shelfEndPoint = new SKPoint(shelfEndX, anchor.Y);
+        points.Add(shelfEndPoint);
+
+        // Process segments
+        if (leadLine.Segments != null)
+        {
+            var currentPoint = shelfEndPoint;
+            int shelfDirection = shelfGoesRight ? 1 : -1;
+
+            foreach (var segment in leadLine.Segments)
+            {
+                float scaledLength = segment.Length * _svgScale;
+                float angleRad = segment.Angle * MathF.PI / 180f;
+
+                // Calculate segment end point
+                // Angle 0 = horizontal in shelf direction
+                // Angle 90 = straight up
+                // Angle -90 = straight down
+                float dx = MathF.Cos(angleRad) * scaledLength * shelfDirection;
+                float dy = -MathF.Sin(angleRad) * scaledLength; // Negative because Y increases downward
+
+                var segmentEnd = new SKPoint(currentPoint.X + dx, currentPoint.Y + dy);
+                points.Add(segmentEnd);
+                currentPoint = segmentEnd;
+            }
+        }
+
+        return points;
+    }
+
+    private static float Distance(SKPoint a, SKPoint b)
+    {
+        float dx = b.X - a.X;
+        float dy = b.Y - a.Y;
+        return MathF.Sqrt(dx * dx + dy * dy);
     }
 
     private void DrawInputLabel(SKCanvas canvas, SKPoint pos, bool goesRight, ActiveInputState input, byte alpha)

@@ -72,6 +72,10 @@ public class MainForm : Form
     private SKPoint _svgOffset;
     private Dictionary<string, SKRect> _controlBounds = new();
 
+    // Device mapping and active input tracking
+    private DeviceMap? _deviceMap;
+    private readonly ActiveInputTracker _activeInputTracker = new();
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -85,6 +89,7 @@ public class MainForm : Form
     private void LoadSvgAssets()
     {
         var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices");
+        var mapsDir = Path.Combine(imagesDir, "Maps");
 
         var joystickPath = Path.Combine(imagesDir, "joystick.svg");
         if (File.Exists(joystickPath))
@@ -100,6 +105,10 @@ public class MainForm : Form
             _throttleSvg = new SKSvg();
             _throttleSvg.Load(throttlePath);
         }
+
+        // Load device map for generic joystick
+        var joystickMapPath = Path.Combine(mapsDir, "joystick.json");
+        _deviceMap = DeviceMap.Load(joystickMapPath);
     }
 
     private void ParseControlBounds(string svgPath)
@@ -303,6 +312,9 @@ public class MainForm : Form
         _leadLineProgress += 0.02f;
         if (_leadLineProgress > 1.3f) _leadLineProgress = 0f;
 
+        // Update active input animations (~16ms per tick = 0.016s)
+        _activeInputTracker.UpdateAnimations(0.016f);
+
         _canvas.Invalidate();
     }
 
@@ -321,7 +333,47 @@ public class MainForm : Form
             state.DeviceIndex == _devices[_selectedDevice].DeviceIndex)
         {
             _currentInputState = state;
+
+            // Track input activity for dynamic lead-lines
+            TrackInputActivity(state);
         }
+    }
+
+    private void TrackInputActivity(DeviceInputState state)
+    {
+        if (_deviceMap == null) return;
+
+        // Track axis changes
+        for (int i = 0; i < state.Axes.Length; i++)
+        {
+            string binding = GetAxisBindingName(i);
+            var control = _deviceMap.FindControlByBinding(binding);
+            _activeInputTracker.Update(binding, state.Axes[i], isAxis: true, control);
+        }
+
+        // Track button changes
+        for (int i = 0; i < state.Buttons.Length; i++)
+        {
+            string binding = $"button{i + 1}";
+            var control = _deviceMap.FindControlByBinding(binding);
+            _activeInputTracker.Update(binding, state.Buttons[i] ? 1f : 0f, isAxis: false, control);
+        }
+    }
+
+    private string GetAxisBindingName(int axisIndex)
+    {
+        return axisIndex switch
+        {
+            0 => "x",
+            1 => "y",
+            2 => "z",
+            3 => "rx",
+            4 => "ry",
+            5 => "rz",
+            6 => "slider1",
+            7 => "slider2",
+            _ => $"axis{axisIndex}"
+        };
     }
 
     private void OnDeviceDisconnected(object? sender, int deviceIndex)
@@ -883,74 +935,18 @@ public class MainForm : Form
             new SKPoint(bounds.Left + pad + 220, bounds.Top + 30),
             FUIColors.Primary.WithAlpha(60), 1f, 2f);
 
-        // NEW LAYOUT: Silhouette takes center/right, data panel on far left
-        float dataColumnWidth = 280f;
-
-        // Left data column: Axes and Buttons (compact)
-        float axisX = bounds.Left + 15;
-        float axisY = bounds.Top + 50;
-        float axisWidth = 120;
-        float axisHeight = 14;
-        float axisSpacing = 22;
-
-        string[] axisNames = { "X", "Y", "Z", "TH", "RX", "RY" };
-        var axes = _currentInputState?.Axes ?? Array.Empty<float>();
-        int axisCount = Math.Min(device.AxisCount, 6);
-
-        for (int i = 0; i < axisCount; i++)
-        {
-            float y = axisY + i * axisSpacing;
-            float value = i < axes.Length ? (axes[i] + 1f) / 2f : 0.5f;
-
-            FUIRenderer.DrawText(canvas, axisNames[i], new SKPoint(axisX, y + 10), FUIColors.TextDim, 9f);
-
-            var barBounds = new SKRect(axisX + 28, y, axisX + 28 + axisWidth, y + axisHeight);
-            FUIRenderer.DrawDataBar(canvas, barBounds, value, FUIColors.Active, FUIColors.Frame);
-
-            float rawValue = i < axes.Length ? axes[i] : 0f;
-            FUIRenderer.DrawText(canvas, $"{(int)(rawValue * 100):+00;-00}",
-                new SKPoint(axisX + 28 + axisWidth + 5, y + 10), FUIColors.TextPrimary, 8f);
-        }
-
-        // Compact button grid (below axes)
-        float buttonGridX = bounds.Left + 15;
-        float buttonGridY = axisY + axisCount * axisSpacing + 15;
-        float buttonSize = 18;
-        float buttonSpacing = 22;
-
-        FUIRenderer.DrawText(canvas, "BTN", new SKPoint(buttonGridX, buttonGridY - 8),
-            FUIColors.TextDim, 8f);
-
-        var buttons = _currentInputState?.Buttons ?? Array.Empty<bool>();
-        int buttonCount = Math.Min(device.ButtonCount, 24);
-        int buttonsPerRow = 6;
-
-        for (int i = 0; i < buttonCount; i++)
-        {
-            int row = i / buttonsPerRow;
-            int col = i % buttonsPerRow;
-            float bx = buttonGridX + col * buttonSpacing;
-            float by = buttonGridY + row * buttonSpacing;
-
-            bool isPressed = i < buttons.Length && buttons[i];
-            DrawButtonIndicator(canvas, bx, by, buttonSize, i + 1, isPressed);
-        }
-
-        // Main area: Device silhouette (much larger now!)
-        // Leave room on left for lead lines
-        float silhouetteLeft = bounds.Left + dataColumnWidth;
+        // Device silhouette takes the full panel area (with margin for lead-lines)
+        float leadLineMargin = 180f; // Space for labels on left/right sides
+        float silhouetteLeft = bounds.Left + leadLineMargin;
         float silhouetteTop = bounds.Top + 45;
-        float silhouetteRight = bounds.Right - 20;
+        float silhouetteRight = bounds.Right - leadLineMargin;
         float silhouetteBottom = bounds.Bottom - 20;
 
         _silhouetteBounds = new SKRect(silhouetteLeft, silhouetteTop, silhouetteRight, silhouetteBottom);
         DrawDeviceSilhouette(canvas, _silhouetteBounds);
 
-        // Draw selected control label/lead-line if any
-        if (!string.IsNullOrEmpty(_selectedControlId))
-        {
-            DrawControlCallout(canvas, _selectedControlId, bounds);
-        }
+        // Draw dynamic lead-lines for active inputs
+        DrawActiveInputLeadLines(canvas, bounds);
 
         // Connection line from device list (animated)
         var lineStart = new SKPoint(bounds.Left - 10, bounds.Top + 90);
@@ -966,17 +962,217 @@ public class MainForm : Form
         canvas.DrawLine(lineStart, lineEnd, connectorPaint);
     }
 
-    private void DrawControlCallout(SKCanvas canvas, string controlId, SKRect panelBounds)
+    private void DrawActiveInputLeadLines(SKCanvas canvas, SKRect panelBounds)
     {
-        // Convert control ID to display label
-        string label = controlId.Replace("control_", "").Replace("_", " ").ToUpper();
+        if (_deviceMap == null || _joystickSvg?.Picture == null) return;
 
-        // For now, draw a placeholder label - we'll add proper positioning with hit testing
-        float labelX = panelBounds.Left + 200;
-        float labelY = panelBounds.Bottom - 40;
+        var visibleInputs = _activeInputTracker.GetVisibleInputs();
+        int inputIndex = 0;
 
-        FUIRenderer.DrawText(canvas, $"SELECTED: {label}",
-            new SKPoint(labelX, labelY), FUIColors.Active, 11f);
+        foreach (var input in visibleInputs)
+        {
+            var control = input.Control;
+            if (control?.Anchor == null) continue; // Must have JSON anchor
+
+            float opacity = input.GetOpacity();
+            if (opacity < 0.01f) continue;
+
+            // Use the JSON anchor point (in viewBox coordinates 0-2048)
+            // Convert to screen coordinates using the stored SVG transform
+            SKPoint anchorScreen = ViewBoxToScreen(control.Anchor.X, control.Anchor.Y);
+
+            // Simple stacked label positioning - each label gets its own row
+            float labelY = panelBounds.Top + 80 + (inputIndex * 55);
+            if (labelY > panelBounds.Bottom - 60)
+            {
+                labelY = panelBounds.Top + 80 + ((inputIndex % 8) * 55);
+            }
+
+            // Labels go to the right of the silhouette
+            float labelX = _silhouetteBounds.Right + 20;
+
+            // Draw the lead-line with fade - from anchor on joystick to label
+            DrawInputLeadLine(canvas, anchorScreen, new SKPoint(labelX, labelY), true, opacity, input);
+
+            inputIndex++;
+        }
+    }
+
+    /// <summary>
+    /// Convert viewBox coordinates (0-2048) to screen coordinates.
+    /// The SVG viewBox is 0 0 2048 2048, and we render it scaled/translated.
+    /// </summary>
+    private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
+    {
+        if (_joystickSvg?.Picture == null)
+            return new SKPoint(viewBoxX, viewBoxY);
+
+        // The rendering in DrawSvgInBounds does:
+        // canvas.Translate(offsetX, offsetY);
+        // canvas.Scale(scale);
+        // canvas.DrawPicture(svg.Picture);
+        //
+        // This means a point at (px, py) in the picture is drawn at:
+        // screen = (offsetX + px*scale, offsetY + py*scale)
+        //
+        // But DrawPicture draws starting from CullRect origin, not (0,0).
+        // So if CullRect = (left, top, w, h), the top-left of content is at picture coord (left, top).
+        // ViewBox (0,0) corresponds to content origin which is at picture coord CullRect.Left, CullRect.Top
+        //
+        // Therefore: viewBox coord (vx, vy) -> picture coord (vx + cullRect.Left, vy + cullRect.Top)
+        // Wait, that's not right either. The Svg.Skia library should map viewBox to picture coords directly.
+        // Let's check: viewBox "0 0 2048 2048" means coords 0-2048 in both directions.
+        // Picture coords should match - content at viewBox (100,100) is at picture (100,100).
+        // CullRect just tells us the bounding box of actual content.
+        //
+        // So the simple transform should work:
+        float screenX = _svgOffset.X + viewBoxX * _svgScale;
+        float screenY = _svgOffset.Y + viewBoxY * _svgScale;
+        return new SKPoint(screenX, screenY);
+    }
+
+    private void DrawInputLeadLine(SKCanvas canvas, SKPoint anchor, SKPoint labelPos, bool goesRight,
+        float opacity, ActiveInputState input)
+    {
+        byte alpha = (byte)(255 * opacity * input.AppearProgress);
+        var lineColor = FUIColors.Active.WithAlpha(alpha);
+        var textColor = FUIColors.TextPrimary.WithAlpha(alpha);
+        var dimColor = FUIColors.TextDim.WithAlpha(alpha);
+
+        // Animation: line grows from anchor to label
+        float progress = Math.Min(1f, input.AppearProgress * 1.5f);
+
+        // Calculate intermediate point for angled line
+        float midX = goesRight
+            ? anchor.X + (labelPos.X - anchor.X) * 0.3f
+            : anchor.X - (anchor.X - labelPos.X) * 0.3f;
+
+        // Animated endpoint
+        SKPoint currentEnd;
+        if (progress < 0.5f)
+        {
+            // First half: draw from anchor towards middle
+            float t = progress * 2f;
+            currentEnd = new SKPoint(
+                anchor.X + (midX - anchor.X) * t,
+                anchor.Y + (labelPos.Y - anchor.Y) * t * 0.5f);
+        }
+        else
+        {
+            // Second half: draw from middle to label
+            float t = (progress - 0.5f) * 2f;
+            currentEnd = new SKPoint(
+                midX + (labelPos.X - midX) * t,
+                anchor.Y + (labelPos.Y - anchor.Y) * (0.5f + t * 0.5f));
+        }
+
+        // Draw line
+        using var linePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = lineColor,
+            StrokeWidth = 1.5f,
+            IsAntialias = true
+        };
+
+        var path = new SKPath();
+        path.MoveTo(anchor);
+        if (progress < 0.5f)
+        {
+            path.LineTo(currentEnd);
+        }
+        else
+        {
+            path.LineTo(midX, anchor.Y + (labelPos.Y - anchor.Y) * 0.5f);
+            path.LineTo(currentEnd);
+        }
+        canvas.DrawPath(path, linePaint);
+
+        // Draw endpoint dot
+        if (progress > 0.8f)
+        {
+            using var dotPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = lineColor,
+                IsAntialias = true
+            };
+            canvas.DrawCircle(anchor, 4f, dotPaint);
+        }
+
+        // Draw label only when line is complete
+        if (progress > 0.95f)
+        {
+            DrawInputLabel(canvas, labelPos, goesRight, input, alpha);
+        }
+    }
+
+    private void DrawInputLabel(SKCanvas canvas, SKPoint pos, bool goesRight, ActiveInputState input, byte alpha)
+    {
+        var control = input.Control;
+        string label = control?.Label ?? input.Binding.ToUpper();
+
+        var textColor = FUIColors.TextBright.WithAlpha(alpha);
+        var dimColor = FUIColors.TextDim.WithAlpha(alpha);
+        var activeColor = FUIColors.Active.WithAlpha(alpha);
+
+        float labelWidth = 140f;
+        float labelHeight = input.IsAxis ? 32f : 22f;
+        float x = goesRight ? pos.X : pos.X - labelWidth;
+        float y = pos.Y - labelHeight / 2;
+
+        // Background frame
+        var frameBounds = new SKRect(x, y, x + labelWidth, y + labelHeight);
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha((byte)(160 * alpha / 255)),
+            IsAntialias = true
+        };
+        canvas.DrawRect(frameBounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = activeColor,
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(frameBounds, framePaint);
+
+        // Label text
+        FUIRenderer.DrawText(canvas, label, new SKPoint(x + 5, y + 14), textColor, 11f);
+
+        // Value indicator
+        if (input.IsAxis)
+        {
+            // Data bar for axes
+            float barWidth = labelWidth - 10;
+            float barHeight = 10f;
+            float value = (input.Value + 1f) / 2f; // Normalize -1..1 to 0..1
+            var barBounds = new SKRect(x + 5, y + 18, x + 5 + barWidth, y + 18 + barHeight);
+            FUIRenderer.DrawDataBar(canvas, barBounds, value, activeColor, FUIColors.Frame.WithAlpha(alpha));
+        }
+        else
+        {
+            // Button indicator: show PRESSED or binding
+            string valueText = input.Value > 0.5f ? "PRESSED" : input.Binding.ToUpper();
+            var valueColor = input.Value > 0.5f ? activeColor : dimColor;
+            FUIRenderer.DrawText(canvas, valueText, new SKPoint(x + labelWidth - 60, y + 14), valueColor, 9f);
+        }
+    }
+
+    private SKPoint SvgToScreen(float svgX, float svgY, SKRect svgBounds)
+    {
+        // Convert SVG coordinates to screen coordinates
+        // Account for the fact that the SVG Picture.CullRect may not start at (0,0)
+        // The svgBounds is the CullRect (actual content bounds), not viewBox bounds
+        // SVG coordinates are in viewBox space, but rendering uses CullRect
+        float relativeX = svgX - svgBounds.Left;
+        float relativeY = svgY - svgBounds.Top;
+        float screenX = _svgOffset.X + relativeX * _svgScale;
+        float screenY = _svgOffset.Y + relativeY * _svgScale;
+        return new SKPoint(screenX, screenY);
     }
 
     private void DrawDeviceSilhouette(SKCanvas canvas, SKRect bounds)
@@ -1011,10 +1207,12 @@ public class MainForm : Form
         float scaledHeight = svgBounds.Height * scale;
 
         // Center the SVG within bounds
-        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2;
-        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2;
+        // Account for CullRect origin - we need to translate so content starts at the center position
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
 
         // Store transform info for hit testing
+        // This is the offset where viewBox (0,0) would be on screen
         _svgScale = scale;
         _svgOffset = new SKPoint(offsetX, offsetY);
 
@@ -1064,20 +1262,6 @@ public class MainForm : Form
         // Button cluster on side
         canvas.DrawCircle(centerX - stickWidth / 2 - 8, bounds.Top + 55, 5, outlinePaint);
         canvas.DrawCircle(centerX - stickWidth / 2 - 8, bounds.Top + 70, 5, outlinePaint);
-    }
-
-    private void DrawButtonIndicator(SKCanvas canvas, float x, float y, float size, int buttonNum, bool isPressed)
-    {
-        var buttonBounds = new SKRect(x, y, x + size, y + size);
-
-        var frameColor = isPressed ? FUIColors.Active : FUIColors.Frame;
-        var fillColor = isPressed ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
-
-        FUIRenderer.FillFrame(canvas, buttonBounds, fillColor, 4f);
-        FUIRenderer.DrawFrame(canvas, buttonBounds, frameColor, 4f, 1f, isPressed);
-
-        var textColor = isPressed ? FUIColors.TextBright : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, buttonNum.ToString(), buttonBounds, textColor, 10f, isPressed);
     }
 
     private void DrawStatusPanel(SKCanvas canvas, SKRect bounds)

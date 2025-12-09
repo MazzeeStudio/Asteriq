@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "device-control-map.schema.json",
+  "title": "Device Control Map",
+  "description": "Schema for mapping physical device controls to SVG elements for SCVirtStick",
+  "type": "object",
+  "required": ["schemaVersion", "device", "deviceType", "svgFile", "controls"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Schema version for forward compatibility",
+      "pattern": "^\\d+\\.\\d+$",
+      "default": "1.1"
+    },
+    "device": {
+      "type": "string",
+      "description": "Device model name (e.g., 'VPC Constellation Alpha-R')"
+    },
+    "vidPid": {
+      "type": "string",
+      "description": "VID:PID for device matching (e.g., '3344:0194')",
+      "pattern": "^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{4}$"
+    },
+    "deviceType": {
+      "type": "string",
+      "description": "Device category",
+      "enum": ["Stick", "Throttle", "Pedals", "Grip", "Generic"]
+    },
+    "svgFile": {
+      "type": "string",
+      "description": "SVG filename (without path)"
+    },
+    "viewBox": {
+      "type": "object",
+      "description": "SVG viewBox dimensions for coordinate mapping",
+      "properties": {
+        "x": { "type": "number", "description": "Width of SVG viewBox" },
+        "y": { "type": "number", "description": "Height of SVG viewBox" }
+      },
+      "required": ["x", "y"]
+    },
+    "controls": {
+      "type": "object",
+      "description": "Map of physical control definitions, keyed by control name",
+      "additionalProperties": {
+        "$ref": "#/definitions/control"
+      }
+    }
+  },
+  "definitions": {
+    "point2d": {
+      "type": "object",
+      "description": "2D point for positioning",
+      "properties": {
+        "x": { "type": "number", "description": "X coordinate" },
+        "y": { "type": "number", "description": "Y coordinate" }
+      },
+      "required": ["x", "y"]
+    },
+    "control": {
+      "type": "object",
+      "description": "A single physical control on the device (button, hat, axis, etc.)",
+      "required": ["type", "bindings", "label", "anchor", "labelOffset"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Control ID matching SVG group id (e.g., 'control_trigger', 'control_hat1')"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of physical control",
+          "enum": ["Button", "Axis", "Hat", "Encoder", "Toggle", "Slider", "Ministick"]
+        },
+        "bindings": {
+          "type": "array",
+          "description": "SC binding identifiers that map to this physical control. A single physical control may have multiple bindings (e.g., dual-stage trigger, hat with 4 directions + push)",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "examples": [
+            ["button1"],
+            ["button1", "button2"],
+            ["hat1_up", "hat1_down", "hat1_left", "hat1_right"],
+            ["hat1_up", "hat1_down", "hat1_left", "hat1_right", "button5"],
+            ["x", "y"]
+          ]
+        },
+        "binding": {
+          "type": "string",
+          "description": "DEPRECATED: Use 'bindings' array instead. Single binding identifier for backward compatibility.",
+          "deprecated": true
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label for the control (e.g., 'Trigger', 'Hat 1', 'Ministick')"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description or tooltip text"
+        },
+        "anchor": {
+          "$ref": "#/definitions/point2d",
+          "description": "Anchor point where FUI leading line connects (SVG coordinates)"
+        },
+        "labelOffset": {
+          "$ref": "#/definitions/point2d",
+          "description": "Offset from anchor for label placement"
+        }
+      }
+    }
+  }
+}

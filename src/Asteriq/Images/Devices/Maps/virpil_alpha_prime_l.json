@@ -5,43 +5,39 @@
   "vidPid": "3344:8194",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",
+  "mirror": true,
   "viewBox": { "x": 2048, "y": 2048 },
   "controls": {
+    "trigger": {
+      "id": "control_trigger",
+      "type": "Button",
+      "bindings": ["button4", "button5"],
+      "label": "Trigger",
+      "description": "Dual-stage trigger: Stage1=button4, Stage2=button5",
+      "anchor": { "x": 950, "y": 450 },
+      "labelOffset": { "x": 150, "y": -50 },
+      "leadLine": {
+        "shelfSide": "left",
+        "shelfLength": 100,
+        "segments": [
+          { "angle": 120, "length": 120 },
+          { "angle": 180, "length": 80 }
+        ]
+      }
+    },
     "ministick": {
       "id": "control_ministick",
       "type": "Ministick",
       "bindings": ["rx", "ry", "button6"],
       "label": "Ministick",
       "description": "Analog ministick: X=rX, Y=rY, Push=button6",
-      "anchor": { "x": 1648, "y": 200 },
-      "labelOffset": { "x": 120, "y": -40 }
-    },
-    "trigger": {
-      "id": "control_trigger",
-      "type": "Button",
-      "bindings": ["button1", "button2"],
-      "label": "Trigger",
-      "description": "Dual-stage trigger: Stage1=button1, Stage2=button2",
-      "anchor": { "x": 848, "y": 500 },
-      "labelOffset": { "x": -120, "y": 0 }
-    },
-    "flip_trigger": {
-      "id": "control_flip_trigger",
-      "type": "Button",
-      "bindings": ["button3"],
-      "label": "Flip Trigger",
-      "description": "Flip trigger: button3",
-      "anchor": { "x": 848, "y": 580 },
-      "labelOffset": { "x": -120, "y": 0 }
-    },
-    "pinky_button": {
-      "id": "control_pinky_button",
-      "type": "Button",
-      "bindings": ["button4", "button5"],
-      "label": "Pinky Buttons",
-      "description": "Pinky lever buttons: Upper=button4, Lower=button5",
-      "anchor": { "x": 798, "y": 650 },
-      "labelOffset": { "x": -130, "y": 0 }
+      "anchor": { "x": 350, "y": 153 },
+      "labelOffset": { "x": 200, "y": 50 },
+      "leadLine": {
+        "shelfSide": "right",
+        "shelfLength": 40,
+        "segments": []
+      }
     },
     "top_button": {
       "id": "control_top_button",
@@ -49,7 +45,7 @@
       "bindings": ["button7"],
       "label": "Top Button",
       "description": "Top center button: button7",
-      "anchor": { "x": 1448, "y": 150 },
+      "anchor": { "x": 600, "y": 150 },
       "labelOffset": { "x": 0, "y": -60 }
     },
     "top_hat": {
@@ -58,7 +54,7 @@
       "bindings": ["button8", "button9", "button10", "button11", "button12"],
       "label": "Top Hat",
       "description": "5-way top hat: Center=button8, Up=button9, Left=button10, Down=button11, Right=button12",
-      "anchor": { "x": 1148, "y": 180 },
+      "anchor": { "x": 900, "y": 180 },
       "labelOffset": { "x": -120, "y": -50 }
     },
     "castle_left": {
@@ -67,8 +63,16 @@
       "bindings": ["button14", "button15", "button16", "button17", "button18"],
       "label": "Castle Switch",
       "description": "5-way castle: Center=button14, Up=button15, Left=button16, Down=button17, Right=button18",
-      "anchor": { "x": 1698, "y": 380 },
-      "labelOffset": { "x": 130, "y": 0 }
+      "anchor": { "x": 350, "y": 380 },
+      "labelOffset": { "x": 130, "y": 0 },
+      "leadLine": {
+        "shelfSide": "right",
+        "shelfLength": 80,
+        "segments": [
+          { "angle": 135, "length": 100 },
+          { "angle": 180, "length": 60 }
+        ]
+      }
     },
     "side_button": {
       "id": "control_side_button",
@@ -76,16 +80,25 @@
       "bindings": ["button13"],
       "label": "Side Button",
       "description": "Side button: button13",
-      "anchor": { "x": 948, "y": 350 },
+      "anchor": { "x": 1100, "y": 350 },
       "labelOffset": { "x": -110, "y": 0 }
     },
-    "toggle_switch": {
+    "flip_trigger": {
+      "id": "control_flip_trigger",
+      "type": "Toggle",
+      "bindings": ["button2", "button3"],
+      "label": "Flip Trigger",
+      "description": "Flip trigger safety: button2, button3",
+      "anchor": { "x": 300, "y": 450 },
+      "labelOffset": { "x": 140, "y": 0 }
+    },
+    "toggle": {
       "id": "control_toggle",
       "type": "Toggle",
       "bindings": ["button19", "button20", "button21", "button22"],
       "label": "Toggle Switch",
       "description": "2-way toggle + buttons: Center=button19, Toggle=button20, Up=button21, Down=button22",
-      "anchor": { "x": 1748, "y": 550 },
+      "anchor": { "x": 300, "y": 550 },
       "labelOffset": { "x": 140, "y": 0 }
     },
     "thumb_hat": {
@@ -94,7 +107,7 @@
       "bindings": ["button23", "button24", "button25", "button26", "button27"],
       "label": "Thumb Hat",
       "description": "5-way thumb hat: Push=button23, Up=button24, Left=button25, Down=button26, Right=button27",
-      "anchor": { "x": 1348, "y": 750 },
+      "anchor": { "x": 700, "y": 750 },
       "labelOffset": { "x": 0, "y": 80 }
     },
     "two_way_hat": {
@@ -103,25 +116,23 @@
       "bindings": ["button28", "button29", "button30"],
       "label": "2-Way Hat",
       "description": "2-way hat + push: Center=button28, Up=button29, Down=button30",
-      "anchor": { "x": 748, "y": 380 },
-      "labelOffset": { "x": -130, "y": 0 }
+      "anchor": { "x": 807, "y": 245 },
+      "labelOffset": { "x": -130, "y": 0 },
+      "leadLine": {
+        "shelfSide": "left",
+        "shelfLength": 80,
+        "segments": [
+          { "angle": -150, "length": 100 }
+        ]
+      }
     },
-    "bottom_button": {
-      "id": "control_bottom_button",
-      "type": "Button",
-      "bindings": ["button31"],
-      "label": "Bottom Button",
-      "description": "Bottom button: button31",
-      "anchor": { "x": 1348, "y": 900 },
-      "labelOffset": { "x": 0, "y": 80 }
-    },
-    "brake_lever": {
-      "id": "control_brake",
+    "slider": {
+      "id": "control_slider",
       "type": "Slider",
       "bindings": ["slider1", "button32"],
       "label": "Brake Lever",
       "description": "Analog brake lever + button: Axis=slider1, Button=button32",
-      "anchor": { "x": 1148, "y": 680 },
+      "anchor": { "x": 900, "y": 680 },
       "labelOffset": { "x": -100, "y": 40 }
     }
   }

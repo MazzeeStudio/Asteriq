@@ -144,7 +144,7 @@ static class Program
         }
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new Form1());
+        Application.Run(new UI.MainForm());
     }
 
     private static void ShowHelp()

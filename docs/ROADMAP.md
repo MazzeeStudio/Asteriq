@@ -55,26 +55,28 @@
 - [x] CLI commands (--profiles, --profile-save, --profile-load, etc.)
 - [x] Unit tests for ProfileService
 
-## Phase 6: Advanced Mapping Features (Current)
+## Phase 6: Advanced Mapping Features ✅ COMPLETE
 **Goal**: Complete mapping functionality for HOTAS use cases
 
-- [ ] Hat/POV mapping - pass hats through to vJoy POV outputs
-- [ ] Shift/mode layers - hold button to change what other inputs do
-- [ ] Axis-to-button - trigger button when axis crosses threshold
-- [ ] Button-to-axis - map button press to axis value
-- [ ] Unit tests for all new mapping types
+- [x] Hat/POV mapping - pass hats through to vJoy POV outputs (continuous + discrete)
+- [x] Shift/mode layers - hold button to change what other inputs do
+- [x] Axis-to-button - trigger button when axis crosses threshold (with hysteresis)
+- [x] Button-to-axis - map button press to axis value (with smoothing)
+- [x] Unit tests for all new mapping types (35 tests)
 
-## Phase 7: Configuration UI
-**Goal**: Device mapping and configuration interface
+## Phase 7: Configuration UI (Current)
+**Goal**: FUI (Futuristic User Interface) for device mapping and configuration
 
-- [ ] Custom window chrome (borderless, dark theme)
-- [ ] Device list panel (physical devices with status)
+- [ ] FUI theme system (slate, amber, magenta, acidgreen, etc. color schemes)
+- [ ] Custom window chrome (borderless, FUI styling)
+- [ ] Tab navigation (Devices, Mappings, SC Bindings, Settings)
+- [ ] Device list panel with live input visualization
 - [ ] vJoy slot assignment UI
 - [ ] Axis/button/hat mapping editor
 - [ ] Curve editor with visual preview
 - [ ] Shift layer configuration
-- [ ] Real-time input visualization
 - [ ] Profile management UI
+- [ ] Device silhouette display (SVG-based)
 
 ## Phase 8: Star Citizen Integration
 **Goal**: Read and visualize SC bindings
@@ -101,10 +103,11 @@
 
 ## Current Focus
 
-**Phase 6** - Advanced Mapping Features:
-1. Hat/POV passthrough to vJoy
-2. Shift/mode layers for button remapping
-3. Axis-to-button threshold triggers
+**Phase 7** - Configuration UI (FUI):
+1. FUI theme system with multiple color schemes
+2. Custom borderless window chrome
+3. Device list with live input visualization
+4. Mapping editor with curve preview
 
 ## Dependencies Between Phases
 
@@ -118,10 +121,10 @@ Phase 1 (Input) ──> Phase 2 (vJoy) ──> Phase 3 (HidHide)
                     Phase 5 (Profiles)
                           │
                           v
-                    Phase 6 (Advanced Mappings) <-- CURRENT
+                    Phase 6 (Advanced Mappings) ✅
                           │
                           v
-                    Phase 7 (Config UI)
+                    Phase 7 (Config UI) <-- CURRENT
                           │
                           v
                     Phase 8 (SC Integration)

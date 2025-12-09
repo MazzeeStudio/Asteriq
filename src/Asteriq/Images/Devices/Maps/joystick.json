@@ -84,9 +84,9 @@
     "flip_trigger": {
       "id": "control_flip_trigger",
       "type": "Toggle",
-      "bindings": ["button1", "button2"],
+      "bindings": ["button2", "button3"],
       "label": "Flip Trigger",
-      "description": "Flip trigger safety: button1, button2",
+      "description": "Flip trigger safety: button1, button2, button3",
       "anchor": { "x": 300, "y": 450 },
       "labelOffset": { "x": -140, "y": 0 }
     },

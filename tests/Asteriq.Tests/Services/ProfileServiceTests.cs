@@ -345,6 +345,276 @@ public class ProfileServiceTests : IDisposable
         Assert.True(loaded.ModifiedAt > originalModified);
     }
 
+    [Fact]
+    public void SaveProfile_PreservesDeviceAssignments()
+    {
+        var profile = CreateTestProfile("Device Assignment Test");
+        profile.DeviceAssignments.Add(new DeviceAssignment
+        {
+            PhysicalDevice = new PhysicalDeviceRef
+            {
+                Name = "VPC Stick WarBRD",
+                Guid = "abc123-def456",
+                VidPid = "3344:0194"
+            },
+            VJoyDevice = 1,
+            DeviceMapOverride = "custom_map"
+        });
+
+        _service.SaveProfile(profile);
+        var loaded = _service.LoadProfile(profile.Id);
+
+        Assert.NotNull(loaded);
+        Assert.Single(loaded.DeviceAssignments);
+        var assignment = loaded.DeviceAssignments[0];
+        Assert.Equal("VPC Stick WarBRD", assignment.PhysicalDevice.Name);
+        Assert.Equal("abc123-def456", assignment.PhysicalDevice.Guid);
+        Assert.Equal("3344:0194", assignment.PhysicalDevice.VidPid);
+        Assert.Equal(1u, assignment.VJoyDevice);
+        Assert.Equal("custom_map", assignment.DeviceMapOverride);
+    }
+
+    [Fact]
+    public void DuplicateProfile_CopiesDeviceAssignments()
+    {
+        var original = CreateTestProfile("Original With Assignments");
+        original.DeviceAssignments.Add(new DeviceAssignment
+        {
+            PhysicalDevice = new PhysicalDeviceRef
+            {
+                Name = "Test Device",
+                Guid = "guid-123",
+                VidPid = "1234:5678"
+            },
+            VJoyDevice = 2
+        });
+        _service.SaveProfile(original);
+
+        var duplicate = _service.DuplicateProfile(original.Id, "Copy");
+
+        Assert.NotNull(duplicate);
+        Assert.Single(duplicate.DeviceAssignments);
+        Assert.Equal("Test Device", duplicate.DeviceAssignments[0].PhysicalDevice.Name);
+        Assert.Equal(2u, duplicate.DeviceAssignments[0].VJoyDevice);
+    }
+
+    [Fact]
+    public void ActivateProfile_SetsActiveProfile()
+    {
+        var profile = CreateTestProfile("Activate Test");
+        _service.SaveProfile(profile);
+
+        var result = _service.ActivateProfile(profile.Id);
+
+        Assert.True(result);
+        Assert.NotNull(_service.ActiveProfile);
+        Assert.Equal(profile.Id, _service.ActiveProfile.Id);
+        Assert.True(_service.HasActiveProfile);
+    }
+
+    [Fact]
+    public void ActivateProfile_NonExistent_ReturnsFalse()
+    {
+        var result = _service.ActivateProfile(Guid.NewGuid());
+
+        Assert.False(result);
+        Assert.Null(_service.ActiveProfile);
+        Assert.False(_service.HasActiveProfile);
+    }
+
+    [Fact]
+    public void ActivateProfile_UpdatesLastProfileId()
+    {
+        var profile = CreateTestProfile("Last Profile Test");
+        _service.SaveProfile(profile);
+
+        _service.ActivateProfile(profile.Id);
+
+        Assert.Equal(profile.Id, _service.LastProfileId);
+    }
+
+    [Fact]
+    public void DeactivateProfile_ClearsActiveProfile()
+    {
+        var profile = CreateTestProfile("Deactivate Test");
+        _service.SaveProfile(profile);
+        _service.ActivateProfile(profile.Id);
+
+        _service.DeactivateProfile();
+
+        Assert.Null(_service.ActiveProfile);
+        Assert.False(_service.HasActiveProfile);
+    }
+
+    [Fact]
+    public void CreateProfile_CreatesAndSavesProfile()
+    {
+        var profile = _service.CreateProfile("New Profile", "Test description");
+
+        Assert.NotNull(profile);
+        Assert.Equal("New Profile", profile.Name);
+        Assert.Equal("Test description", profile.Description);
+
+        // Verify it was saved
+        var loaded = _service.LoadProfile(profile.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("New Profile", loaded.Name);
+    }
+
+    [Fact]
+    public void CreateAndActivateProfile_CreatesAndActivates()
+    {
+        var profile = _service.CreateAndActivateProfile("Active Profile", "Activated");
+
+        Assert.NotNull(profile);
+        Assert.Equal("Active Profile", profile.Name);
+        Assert.True(_service.HasActiveProfile);
+        Assert.Equal(profile.Id, _service.ActiveProfile!.Id);
+    }
+
+    [Fact]
+    public void SaveActiveProfile_SavesCurrentProfile()
+    {
+        var profile = _service.CreateAndActivateProfile("Save Active Test");
+        // Modify the active profile directly (not the returned profile which is a different object)
+        _service.ActiveProfile!.Description = "Modified description";
+
+        _service.SaveActiveProfile();
+
+        var loaded = _service.LoadProfile(profile.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("Modified description", loaded.Description);
+    }
+
+    [Fact]
+    public void Initialize_LoadsLastProfile()
+    {
+        var profile = CreateTestProfile("Initialize Test");
+        _service.SaveProfile(profile);
+        _service.LastProfileId = profile.Id;
+        _service.AutoLoadLastProfile = true;
+
+        // Create new service instance and initialize
+        var newService = new ProfileService(_profilesDir, _settingsFile);
+        newService.Initialize();
+
+        Assert.NotNull(newService.ActiveProfile);
+        Assert.Equal(profile.Id, newService.ActiveProfile.Id);
+    }
+
+    [Fact]
+    public void Initialize_WithAutoLoadDisabled_DoesNotLoadProfile()
+    {
+        var profile = CreateTestProfile("No Auto Load Test");
+        _service.SaveProfile(profile);
+        _service.LastProfileId = profile.Id;
+        _service.AutoLoadLastProfile = false;
+
+        var newService = new ProfileService(_profilesDir, _settingsFile);
+        newService.Initialize();
+
+        Assert.Null(newService.ActiveProfile);
+    }
+
+    [Fact]
+    public void ProfileChanged_FiresOnActivation()
+    {
+        var profile = CreateTestProfile("Event Test");
+        _service.SaveProfile(profile);
+
+        MappingProfile? newProfile = null;
+        MappingProfile? oldProfile = null;
+        bool eventFired = false;
+
+        _service.ProfileChanged += (sender, args) =>
+        {
+            eventFired = true;
+            oldProfile = args.OldProfile;
+            newProfile = args.NewProfile;
+        };
+
+        _service.ActivateProfile(profile.Id);
+
+        Assert.True(eventFired);
+        Assert.Null(oldProfile);
+        Assert.NotNull(newProfile);
+        Assert.Equal(profile.Id, newProfile.Id);
+    }
+
+    [Fact]
+    public void ProfileChanged_FiresOnDeactivation()
+    {
+        var profile = CreateTestProfile("Deactivate Event Test");
+        _service.SaveProfile(profile);
+        _service.ActivateProfile(profile.Id);
+
+        MappingProfile? newProfile = null;
+        MappingProfile? oldProfile = null;
+        bool eventFired = false;
+
+        _service.ProfileChanged += (sender, args) =>
+        {
+            eventFired = true;
+            oldProfile = args.OldProfile;
+            newProfile = args.NewProfile;
+        };
+
+        _service.DeactivateProfile();
+
+        Assert.True(eventFired);
+        Assert.NotNull(oldProfile);
+        Assert.Equal(profile.Id, oldProfile.Id);
+        Assert.Null(newProfile);
+    }
+
+    [Fact]
+    public void ProfileChanged_FiresOnSwitch()
+    {
+        var profile1 = CreateTestProfile("Profile 1");
+        var profile2 = CreateTestProfile("Profile 2");
+        _service.SaveProfile(profile1);
+        _service.SaveProfile(profile2);
+        _service.ActivateProfile(profile1.Id);
+
+        MappingProfile? newProfile = null;
+        MappingProfile? oldProfile = null;
+
+        _service.ProfileChanged += (sender, args) =>
+        {
+            oldProfile = args.OldProfile;
+            newProfile = args.NewProfile;
+        };
+
+        _service.ActivateProfile(profile2.Id);
+
+        Assert.NotNull(oldProfile);
+        Assert.NotNull(newProfile);
+        Assert.Equal(profile1.Id, oldProfile.Id);
+        Assert.Equal(profile2.Id, newProfile.Id);
+    }
+
+    [Fact]
+    public void ListProfiles_IncludesDeviceAssignmentCount()
+    {
+        var profile = CreateTestProfile("Assignment Count Test");
+        profile.DeviceAssignments.Add(new DeviceAssignment
+        {
+            PhysicalDevice = new PhysicalDeviceRef { Name = "Device 1" },
+            VJoyDevice = 1
+        });
+        profile.DeviceAssignments.Add(new DeviceAssignment
+        {
+            PhysicalDevice = new PhysicalDeviceRef { Name = "Device 2" },
+            VJoyDevice = 2
+        });
+
+        _service.SaveProfile(profile);
+        var profiles = _service.ListProfiles();
+
+        var info = profiles.First(p => p.Id == profile.Id);
+        Assert.Equal(2, info.DeviceAssignmentCount);
+    }
+
     private static MappingProfile CreateTestProfile(string name)
     {
         return new MappingProfile

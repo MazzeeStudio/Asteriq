@@ -1352,29 +1352,26 @@ public class MainForm : Form
         float centerX = bounds.MidX;
         float centerY = bounds.MidY;
 
-        // Draw the joystick SVG if available
+        // Draw the joystick SVG if available - use same brightness as device tab
         if (_joystickSvg?.Picture != null)
         {
-            var picture = _joystickSvg.Picture;
-            var picBounds = picture.CullRect;
+            // Limit size to 900px max and apply same rendering as device tab
+            float maxSize = 900f;
+            float maxWidth = Math.Min(bounds.Width - 40, maxSize);
+            float maxHeight = Math.Min(bounds.Height - 40, maxSize);
 
-            // Calculate scale to fit
-            float maxWidth = bounds.Width - 40;
-            float maxHeight = bounds.Height - 40;
-            float scale = Math.Min(maxWidth / picBounds.Width, maxHeight / picBounds.Height) * 0.8f;
+            // Create constrained bounds centered in the panel
+            float constrainedWidth = Math.Min(maxWidth, maxHeight); // Keep square-ish
+            float constrainedHeight = constrainedWidth;
+            var constrainedBounds = new SKRect(
+                centerX - constrainedWidth / 2,
+                centerY - constrainedHeight / 2,
+                centerX + constrainedWidth / 2,
+                centerY + constrainedHeight / 2
+            );
 
-            // Center the image
-            float drawX = centerX - (picBounds.Width * scale) / 2;
-            float drawY = centerY - (picBounds.Height * scale) / 2;
-
-            canvas.Save();
-            canvas.Translate(drawX, drawY);
-            canvas.Scale(scale);
-
-            // Draw with transparency
-            using var paint = new SKPaint { Color = SKColors.White.WithAlpha(180) };
-            canvas.DrawPicture(picture, paint);
-            canvas.Restore();
+            bool mirror = _deviceMap?.Mirror ?? false;
+            DrawSvgInBounds(canvas, _joystickSvg, constrainedBounds, mirror);
         }
         else
         {
@@ -3522,11 +3519,28 @@ public class MainForm : Form
             FUIColors.Primary.WithAlpha(60), 1f, 2f);
 
         // Device silhouette takes the full panel area (with margin for lead-lines)
+        // But limit max size to 900px for consistent appearance
         float leadLineMargin = 180f; // Space for labels on left/right sides
         float silhouetteLeft = bounds.Left + leadLineMargin;
         float silhouetteTop = bounds.Top + 45;
         float silhouetteRight = bounds.Right - leadLineMargin;
         float silhouetteBottom = bounds.Bottom - 20;
+
+        // Apply 900px max size limit
+        float maxSize = 900f;
+        float availWidth = silhouetteRight - silhouetteLeft;
+        float availHeight = silhouetteBottom - silhouetteTop;
+
+        if (availWidth > maxSize || availHeight > maxSize)
+        {
+            float constrainedSize = Math.Min(Math.Min(availWidth, availHeight), maxSize);
+            float centerX = (silhouetteLeft + silhouetteRight) / 2;
+            float centerY = (silhouetteTop + silhouetteBottom) / 2;
+            silhouetteLeft = centerX - constrainedSize / 2;
+            silhouetteRight = centerX + constrainedSize / 2;
+            silhouetteTop = centerY - constrainedSize / 2;
+            silhouetteBottom = centerY + constrainedSize / 2;
+        }
 
         _silhouetteBounds = new SKRect(silhouetteLeft, silhouetteTop, silhouetteRight, silhouetteBottom);
         DrawDeviceSilhouette(canvas, _silhouetteBounds);

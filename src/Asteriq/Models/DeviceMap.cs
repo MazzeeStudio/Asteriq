@@ -21,6 +21,9 @@ public class DeviceMap
     [JsonPropertyName("svgFile")]
     public string SvgFile { get; set; } = "";
 
+    [JsonPropertyName("mirror")]
+    public bool Mirror { get; set; } = false;
+
     [JsonPropertyName("viewBox")]
     public ViewBoxDimensions? ViewBox { get; set; }
 

@@ -70,6 +70,7 @@ public class MainForm : Form
     private SKRect _silhouetteBounds;
     private float _svgScale = 1f;
     private SKPoint _svgOffset;
+    private bool _svgMirrored;
     private Dictionary<string, SKRect> _controlBounds = new();
     private Point _mousePosition; // For debug display
 
@@ -107,9 +108,68 @@ public class MainForm : Form
             _throttleSvg.Load(throttlePath);
         }
 
-        // Load device map for generic joystick
-        var joystickMapPath = Path.Combine(mapsDir, "joystick.json");
-        _deviceMap = DeviceMap.Load(joystickMapPath);
+        // Load default device map (will be updated when device is selected)
+        LoadDeviceMapForDevice(null);
+    }
+
+    /// <summary>
+    /// Load the appropriate device map based on device name.
+    /// Searches for maps matching the device name, falls back to generic joystick.json.
+    /// Also detects left-hand devices by "LEFT" prefix and sets mirror flag.
+    /// </summary>
+    private void LoadDeviceMapForDevice(string? deviceName)
+    {
+        var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+
+        // Try to find a device-specific map by matching device name
+        if (!string.IsNullOrEmpty(deviceName))
+        {
+            // Check all JSON files in the maps directory
+            foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
+            {
+                if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var map = DeviceMap.Load(mapFile);
+                if (map != null && !string.IsNullOrEmpty(map.Device))
+                {
+                    // Match by device name (case-insensitive contains)
+                    if (deviceName.Contains(map.Device, StringComparison.OrdinalIgnoreCase) ||
+                        map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _deviceMap = map;
+                        System.Diagnostics.Debug.WriteLine($"Loaded device map: {mapFile} for device: {deviceName}");
+                        return;
+                    }
+                }
+            }
+
+            // No specific map found - check if device name indicates left-hand
+            // and apply mirror to the default joystick map
+            bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
+                              deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
+                              deviceName.EndsWith(" L", StringComparison.OrdinalIgnoreCase);
+
+            var defaultMapPath = Path.Combine(mapsDir, "joystick.json");
+            _deviceMap = DeviceMap.Load(defaultMapPath);
+
+            if (_deviceMap != null && isLeftHand)
+            {
+                // Override mirror setting for left-hand devices using generic map
+                _deviceMap.Mirror = true;
+                System.Diagnostics.Debug.WriteLine($"Loaded default device map with MIRROR for left-hand device: {deviceName}");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json for device: {deviceName}");
+            }
+            return;
+        }
+
+        // Fall back to generic joystick map
+        var defaultMapPath2 = Path.Combine(mapsDir, "joystick.json");
+        _deviceMap = DeviceMap.Load(defaultMapPath2);
+        System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json");
     }
 
     private void ParseControlBounds(string svgPath)
@@ -325,6 +385,8 @@ public class MainForm : Form
         if (_devices.Count > 0 && _selectedDevice < 0)
         {
             _selectedDevice = 0;
+            // Load device map for the first device
+            LoadDeviceMapForDevice(_devices[0].Name);
         }
     }
 
@@ -385,6 +447,9 @@ public class MainForm : Form
             if (_selectedDevice >= _devices.Count)
             {
                 _selectedDevice = Math.Max(0, _devices.Count - 1);
+                // Load device map for the new selected device
+                if (_devices.Count > 0)
+                    LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
             }
         });
     }
@@ -569,6 +634,9 @@ public class MainForm : Form
         {
             _selectedDevice = _hoveredDevice;
             _currentInputState = null;
+            // Load device map for the selected device
+            LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+            _activeInputTracker.Clear(); // Clear lead-lines when switching devices
         }
 
         // Tab clicks
@@ -1020,33 +1088,31 @@ public class MainForm : Form
     /// <summary>
     /// Convert viewBox coordinates (0-2048) to screen coordinates.
     /// The SVG viewBox is 0 0 2048 2048, and we render it scaled/translated.
+    /// Handles mirroring: when SVG is mirrored, viewBox X is inverted.
     /// </summary>
     private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
     {
         if (_joystickSvg?.Picture == null)
             return new SKPoint(viewBoxX, viewBoxY);
 
-        // The rendering in DrawSvgInBounds does:
-        // canvas.Translate(offsetX, offsetY);
-        // canvas.Scale(scale);
-        // canvas.DrawPicture(svg.Picture);
-        //
-        // This means a point at (px, py) in the picture is drawn at:
-        // screen = (offsetX + px*scale, offsetY + py*scale)
-        //
-        // But DrawPicture draws starting from CullRect origin, not (0,0).
-        // So if CullRect = (left, top, w, h), the top-left of content is at picture coord (left, top).
-        // ViewBox (0,0) corresponds to content origin which is at picture coord CullRect.Left, CullRect.Top
-        //
-        // Therefore: viewBox coord (vx, vy) -> picture coord (vx + cullRect.Left, vy + cullRect.Top)
-        // Wait, that's not right either. The Svg.Skia library should map viewBox to picture coords directly.
-        // Let's check: viewBox "0 0 2048 2048" means coords 0-2048 in both directions.
-        // Picture coords should match - content at viewBox (100,100) is at picture (100,100).
-        // CullRect just tells us the bounding box of actual content.
-        //
-        // So the simple transform should work:
-        float screenX = _svgOffset.X + viewBoxX * _svgScale;
-        float screenY = _svgOffset.Y + viewBoxY * _svgScale;
+        float screenX, screenY;
+
+        if (_svgMirrored)
+        {
+            // When mirrored, the SVG is drawn with Scale(-scale, scale) after
+            // Translate(scaledWidth, 0). This means viewBox X is inverted:
+            // viewBox 0 -> screen offsetX + scaledWidth
+            // viewBox 2048 -> screen offsetX
+            var svgBounds = _joystickSvg.Picture.CullRect;
+            float scaledWidth = svgBounds.Width * _svgScale;
+            screenX = _svgOffset.X + scaledWidth - viewBoxX * _svgScale;
+        }
+        else
+        {
+            screenX = _svgOffset.X + viewBoxX * _svgScale;
+        }
+
+        screenY = _svgOffset.Y + viewBoxY * _svgScale;
         return new SKPoint(screenX, screenY);
     }
 
@@ -1268,7 +1334,8 @@ public class MainForm : Form
         // Draw the actual SVG if loaded, otherwise fallback to simple outline
         if (_joystickSvg?.Picture != null)
         {
-            DrawSvgInBounds(canvas, _joystickSvg, bounds);
+            bool mirror = _deviceMap?.Mirror ?? false;
+            DrawSvgInBounds(canvas, _joystickSvg, bounds, mirror);
         }
         else
         {
@@ -1276,7 +1343,7 @@ public class MainForm : Form
         }
     }
 
-    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds)
+    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
     {
         if (svg.Picture == null) return;
 
@@ -1296,14 +1363,25 @@ public class MainForm : Form
         float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
         float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
 
-        // Store transform info for hit testing
-        // This is the offset where viewBox (0,0) would be on screen
+        // Store transform info for hit testing and coordinate conversion
         _svgScale = scale;
         _svgOffset = new SKPoint(offsetX, offsetY);
+        _svgMirrored = mirror;
 
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
-        canvas.Scale(scale);
+
+        if (mirror)
+        {
+            // Flip horizontally: translate to right edge, then scale X by -1
+            canvas.Translate(scaledWidth, 0);
+            canvas.Scale(-scale, scale);
+        }
+        else
+        {
+            canvas.Scale(scale);
+        }
+
         canvas.DrawPicture(svg.Picture);
         canvas.Restore();
     }

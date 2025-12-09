@@ -1327,16 +1327,17 @@ public class MainForm : Form
         // vJoy device selector: [<] vJoy Device 1 [>]
         float arrowButtonSize = 28f;
         _vjoyPrevButtonBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
-        DrawArrowButton(canvas, _vjoyPrevButtonBounds, "◀", _vjoyPrevHovered, _selectedVJoyDeviceIndex > 0);
+        DrawArrowButton(canvas, _vjoyPrevButtonBounds, "<", _vjoyPrevHovered, _selectedVJoyDeviceIndex > 0);
 
         string deviceName = _vjoyDevices.Count > 0 && _selectedVJoyDeviceIndex < _vjoyDevices.Count
             ? $"vJoy Device {_vjoyDevices[_selectedVJoyDeviceIndex].Id}"
             : "No vJoy Devices";
-        float deviceNameX = leftMargin + arrowButtonSize + 10;
-        FUIRenderer.DrawText(canvas, deviceName, new SKPoint(deviceNameX, y + 18), FUIColors.TextBright, 12f);
+        // Center the device name between the two arrow buttons
+        var labelBounds = new SKRect(leftMargin + arrowButtonSize, y, rightMargin - arrowButtonSize, y + arrowButtonSize);
+        FUIRenderer.DrawTextCentered(canvas, deviceName, labelBounds, FUIColors.TextBright, 12f);
 
         _vjoyNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
-        DrawArrowButton(canvas, _vjoyNextButtonBounds, "▶", _vjoyNextHovered, _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1);
+        DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1);
         y += arrowButtonSize + 15;
 
         FUIRenderer.DrawGlowingLine(canvas,
@@ -1576,10 +1577,9 @@ public class MainForm : Form
                 centerY + constrainedHeight / 2
             );
 
-            bool mirror = _deviceMap?.Mirror ?? false;
-            var activeSvg = GetActiveSvg();
-            if (activeSvg != null)
-                DrawSvgInBounds(canvas, activeSvg, constrainedBounds, mirror);
+            // Mappings tab always shows joystick SVG (vJoy is a virtual joystick)
+            // Don't use _deviceMap here - that's for the Devices tab context
+            DrawSvgInBounds(canvas, _joystickSvg, constrainedBounds, false);
         }
         else
         {
@@ -2432,7 +2432,7 @@ public class MainForm : Form
         var bgColor = enabled
             ? (hovered ? FUIColors.Primary.WithAlpha(80) : FUIColors.Background2)
             : FUIColors.Background1;
-        var textColor = enabled
+        var arrowColor = enabled
             ? (hovered ? FUIColors.TextBright : FUIColors.TextPrimary)
             : FUIColors.TextDisabled;
 
@@ -2447,7 +2447,36 @@ public class MainForm : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, arrow, bounds, textColor, 14f);
+        // Draw arrow shape instead of text (more reliable rendering)
+        float centerX = bounds.MidX;
+        float centerY = bounds.MidY;
+        float arrowSize = 8f;
+
+        using var arrowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = arrowColor,
+            IsAntialias = true
+        };
+
+        using var path = new SKPath();
+        if (arrow == "<")
+        {
+            // Left arrow: <
+            path.MoveTo(centerX + arrowSize / 2, centerY - arrowSize);
+            path.LineTo(centerX - arrowSize / 2, centerY);
+            path.LineTo(centerX + arrowSize / 2, centerY + arrowSize);
+            path.Close();
+        }
+        else
+        {
+            // Right arrow: >
+            path.MoveTo(centerX - arrowSize / 2, centerY - arrowSize);
+            path.LineTo(centerX + arrowSize / 2, centerY);
+            path.LineTo(centerX - arrowSize / 2, centerY + arrowSize);
+            path.Close();
+        }
+        canvas.DrawPath(path, arrowPaint);
     }
 
     private void DrawOutputMappingList(SKCanvas canvas, SKRect bounds)

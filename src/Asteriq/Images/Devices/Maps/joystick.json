@@ -29,8 +29,13 @@
       "bindings": ["rx", "ry", "button6"],
       "label": "Ministick",
       "description": "Analog ministick: X=rX, Y=rY, Push=button6",
-      "anchor": { "x": 1100, "y": 350 },
-      "labelOffset": { "x": 120, "y": -40 }
+      "anchor": { "x": 350, "y": 153 },
+      "labelOffset": { "x": -200, "y": 50 },
+      "leadLine": {
+        "shelfSide": "left",
+        "shelfLength": 40,
+        "segments": []
+      }
     },
     "top_button": {
       "id": "control_top_button",
@@ -109,7 +114,7 @@
       "bindings": ["button28", "button29", "button30"],
       "label": "2-Way Hat",
       "description": "2-way hat + push: Center=button28, Up=button29, Down=button30",
-      "anchor": { "x": 1300, "y": 380 },
+      "anchor": { "x": 807, "y": 245 },
       "labelOffset": { "x": 130, "y": 0 },
       "leadLine": {
         "shelfSide": "right",

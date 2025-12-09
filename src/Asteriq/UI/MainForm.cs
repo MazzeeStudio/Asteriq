@@ -1,8 +1,10 @@
 using System.Runtime.InteropServices;
+using System.Xml.Linq;
 using Asteriq.Models;
 using Asteriq.Services;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
+using Svg.Skia;
 
 namespace Asteriq.UI;
 
@@ -58,6 +60,18 @@ public class MainForm : Form
     // Window control hover state
     private int _hoveredWindowControl = -1;
 
+    // SVG device silhouettes
+    private SKSvg? _joystickSvg;
+    private SKSvg? _throttleSvg;
+
+    // SVG interaction state
+    private string? _hoveredControlId;
+    private string? _selectedControlId;
+    private SKRect _silhouetteBounds;
+    private float _svgScale = 1f;
+    private SKPoint _svgOffset;
+    private Dictionary<string, SKRect> _controlBounds = new();
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -65,6 +79,165 @@ public class MainForm : Form
         InitializeCanvas();
         InitializeInput();
         InitializeRenderLoop();
+        LoadSvgAssets();
+    }
+
+    private void LoadSvgAssets()
+    {
+        var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices");
+
+        var joystickPath = Path.Combine(imagesDir, "joystick.svg");
+        if (File.Exists(joystickPath))
+        {
+            _joystickSvg = new SKSvg();
+            _joystickSvg.Load(joystickPath);
+            ParseControlBounds(joystickPath);
+        }
+
+        var throttlePath = Path.Combine(imagesDir, "throttle.svg");
+        if (File.Exists(throttlePath))
+        {
+            _throttleSvg = new SKSvg();
+            _throttleSvg.Load(throttlePath);
+        }
+    }
+
+    private void ParseControlBounds(string svgPath)
+    {
+        _controlBounds.Clear();
+
+        try
+        {
+            var doc = XDocument.Load(svgPath);
+            XNamespace svg = "http://www.w3.org/2000/svg";
+
+            // Find all groups with id starting with "control_"
+            var controlGroups = doc.Descendants(svg + "g")
+                .Where(g => g.Attribute("id")?.Value?.StartsWith("control_") == true);
+
+            foreach (var group in controlGroups)
+            {
+                string id = group.Attribute("id")!.Value;
+
+                // Calculate bounding box by examining child elements
+                var bounds = CalculateGroupBounds(group, svg);
+                if (bounds.HasValue)
+                {
+                    _controlBounds[id] = bounds.Value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error parsing SVG control bounds: {ex.Message}");
+        }
+    }
+
+    private SKRect? CalculateGroupBounds(XElement group, XNamespace svg)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        bool hasValidBounds = false;
+
+        // Check for transform attribute on the group
+        var transform = group.Attribute("transform")?.Value;
+        float tx = 0, ty = 0;
+        if (transform != null && transform.StartsWith("translate("))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(transform, @"translate\(([\d.-]+),?\s*([\d.-]*)\)");
+            if (match.Success)
+            {
+                float.TryParse(match.Groups[1].Value, out tx);
+                if (!string.IsNullOrEmpty(match.Groups[2].Value))
+                    float.TryParse(match.Groups[2].Value, out ty);
+            }
+        }
+
+        // Find all path, rect, circle, ellipse elements and their bounds
+        foreach (var element in group.Descendants())
+        {
+            var localName = element.Name.LocalName;
+            SKRect? elementBounds = null;
+
+            switch (localName)
+            {
+                case "rect":
+                    {
+                        float.TryParse(element.Attribute("x")?.Value ?? "0", out float x);
+                        float.TryParse(element.Attribute("y")?.Value ?? "0", out float y);
+                        float.TryParse(element.Attribute("width")?.Value ?? "0", out float w);
+                        float.TryParse(element.Attribute("height")?.Value ?? "0", out float h);
+                        elementBounds = new SKRect(x + tx, y + ty, x + tx + w, y + ty + h);
+                    }
+                    break;
+
+                case "circle":
+                    {
+                        float.TryParse(element.Attribute("cx")?.Value ?? "0", out float cx);
+                        float.TryParse(element.Attribute("cy")?.Value ?? "0", out float cy);
+                        float.TryParse(element.Attribute("r")?.Value ?? "0", out float r);
+                        elementBounds = new SKRect(cx + tx - r, cy + ty - r, cx + tx + r, cy + ty + r);
+                    }
+                    break;
+
+                case "ellipse":
+                    {
+                        float.TryParse(element.Attribute("cx")?.Value ?? "0", out float cx);
+                        float.TryParse(element.Attribute("cy")?.Value ?? "0", out float cy);
+                        float.TryParse(element.Attribute("rx")?.Value ?? "0", out float rx);
+                        float.TryParse(element.Attribute("ry")?.Value ?? "0", out float ry);
+                        elementBounds = new SKRect(cx + tx - rx, cy + ty - ry, cx + tx + rx, cy + ty + ry);
+                    }
+                    break;
+
+                case "path":
+                    // For paths, extract approximate bounds from d attribute
+                    var d = element.Attribute("d")?.Value;
+                    if (!string.IsNullOrEmpty(d))
+                    {
+                        elementBounds = GetPathApproximateBounds(d, tx, ty);
+                    }
+                    break;
+            }
+
+            if (elementBounds.HasValue)
+            {
+                hasValidBounds = true;
+                minX = Math.Min(minX, elementBounds.Value.Left);
+                minY = Math.Min(minY, elementBounds.Value.Top);
+                maxX = Math.Max(maxX, elementBounds.Value.Right);
+                maxY = Math.Max(maxY, elementBounds.Value.Bottom);
+            }
+        }
+
+        return hasValidBounds ? new SKRect(minX, minY, maxX, maxY) : null;
+    }
+
+    private SKRect? GetPathApproximateBounds(string d, float tx, float ty)
+    {
+        // Simple extraction of coordinate values from path data
+        var numbers = System.Text.RegularExpressions.Regex.Matches(d, @"[-+]?\d*\.?\d+");
+        if (numbers.Count < 2) return null;
+
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+
+        // Process pairs of numbers as x,y coordinates (very simplified)
+        for (int i = 0; i < numbers.Count - 1; i += 2)
+        {
+            if (float.TryParse(numbers[i].Value, out float x) &&
+                float.TryParse(numbers[i + 1].Value, out float y))
+            {
+                minX = Math.Min(minX, x + tx);
+                maxX = Math.Max(maxX, x + tx);
+                minY = Math.Min(minY, y + ty);
+                maxY = Math.Max(maxY, y + ty);
+            }
+        }
+
+        if (minX == float.MaxValue) return null;
+
+        return new SKRect(minX, minY, maxX, maxY);
     }
 
     private void InitializeForm()
@@ -285,6 +458,21 @@ public class MainForm : Form
         {
             _hoveredWindowControl = -1;
         }
+
+        // SVG silhouette hover detection
+        if (_silhouetteBounds.Contains(e.X, e.Y) && _joystickSvg != null)
+        {
+            var hitControlId = HitTestSvg(new SKPoint(e.X, e.Y));
+            if (hitControlId != _hoveredControlId)
+            {
+                _hoveredControlId = hitControlId;
+                Cursor = hitControlId != null ? Cursors.Hand : Cursors.Default;
+            }
+        }
+        else if (_hoveredControlId != null)
+        {
+            _hoveredControlId = null;
+        }
     }
 
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
@@ -343,12 +531,45 @@ public class MainForm : Form
                 }
             }
         }
+
+        // SVG control clicks
+        if (_hoveredControlId != null)
+        {
+            _selectedControlId = _hoveredControlId;
+            _leadLineProgress = 0f; // Reset animation for new selection
+        }
+        else if (_silhouetteBounds.Contains(e.X, e.Y))
+        {
+            // Clicked inside silhouette but not on a control - deselect
+            _selectedControlId = null;
+        }
     }
 
     private void OnCanvasMouseLeave(object? sender, EventArgs e)
     {
         _hoveredDevice = -1;
         _hoveredWindowControl = -1;
+        _hoveredControlId = null;
+    }
+
+    private string? HitTestSvg(SKPoint screenPoint)
+    {
+        if (_joystickSvg?.Picture == null || _controlBounds.Count == 0) return null;
+
+        // Transform screen coordinates to SVG coordinates
+        float svgX = (screenPoint.X - _svgOffset.X) / _svgScale;
+        float svgY = (screenPoint.Y - _svgOffset.Y) / _svgScale;
+
+        // Check each control's bounds
+        foreach (var (controlId, bounds) in _controlBounds)
+        {
+            if (bounds.Contains(svgX, svgY))
+            {
+                return controlId;
+            }
+        }
+
+        return null;
     }
 
     #endregion
@@ -662,57 +883,73 @@ public class MainForm : Form
             new SKPoint(bounds.Left + pad + 220, bounds.Top + 30),
             FUIColors.Primary.WithAlpha(60), 1f, 2f);
 
-        // Axis visualization
-        float axisX = bounds.Left + 30;
-        float axisY = bounds.Top + 70;
-        float axisWidth = 180;
-        float axisHeight = 20;
-        float axisSpacing = 35;
+        // NEW LAYOUT: Silhouette takes center/right, data panel on far left
+        float dataColumnWidth = 280f;
 
-        string[] axisNames = { "X-AXIS", "Y-AXIS", "Z-AXIS", "RX-AXIS", "RY-AXIS", "RZ-AXIS", "SLIDER0", "SLIDER1" };
+        // Left data column: Axes and Buttons (compact)
+        float axisX = bounds.Left + 15;
+        float axisY = bounds.Top + 50;
+        float axisWidth = 120;
+        float axisHeight = 14;
+        float axisSpacing = 22;
+
+        string[] axisNames = { "X", "Y", "Z", "TH", "RX", "RY" };
         var axes = _currentInputState?.Axes ?? Array.Empty<float>();
-        int axisCount = Math.Min(device.AxisCount, 8);
+        int axisCount = Math.Min(device.AxisCount, 6);
 
         for (int i = 0; i < axisCount; i++)
         {
             float y = axisY + i * axisSpacing;
-            float value = i < axes.Length ? (axes[i] + 1f) / 2f : 0.5f; // Convert -1..1 to 0..1
+            float value = i < axes.Length ? (axes[i] + 1f) / 2f : 0.5f;
 
-            // Axis label
-            FUIRenderer.DrawText(canvas, axisNames[i], new SKPoint(axisX, y + 14), FUIColors.TextDim, 11f);
+            FUIRenderer.DrawText(canvas, axisNames[i], new SKPoint(axisX, y + 10), FUIColors.TextDim, 9f);
 
-            // Axis bar
-            var barBounds = new SKRect(axisX + 75, y, axisX + 75 + axisWidth, y + axisHeight);
+            var barBounds = new SKRect(axisX + 28, y, axisX + 28 + axisWidth, y + axisHeight);
             FUIRenderer.DrawDataBar(canvas, barBounds, value, FUIColors.Active, FUIColors.Frame);
 
-            // Value display
             float rawValue = i < axes.Length ? axes[i] : 0f;
-            FUIRenderer.DrawText(canvas, $"[{(int)(rawValue * 100):+00;-00}]",
-                new SKPoint(axisX + 75 + axisWidth + 10, y + 14), FUIColors.TextPrimary, 10f);
+            FUIRenderer.DrawText(canvas, $"{(int)(rawValue * 100):+00;-00}",
+                new SKPoint(axisX + 28 + axisWidth + 5, y + 10), FUIColors.TextPrimary, 8f);
         }
 
-        // Button grid
-        float buttonGridX = bounds.Left + 320;
-        float buttonGridY = bounds.Top + 70;
-        float buttonSize = 28;
-        float buttonSpacing = 35;
+        // Compact button grid (below axes)
+        float buttonGridX = bounds.Left + 15;
+        float buttonGridY = axisY + axisCount * axisSpacing + 15;
+        float buttonSize = 18;
+        float buttonSpacing = 22;
 
-        FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(buttonGridX, buttonGridY - 10),
-            FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, "BTN", new SKPoint(buttonGridX, buttonGridY - 8),
+            FUIColors.TextDim, 8f);
 
         var buttons = _currentInputState?.Buttons ?? Array.Empty<bool>();
-        int buttonCount = Math.Min(device.ButtonCount, 32);
-        int buttonsPerRow = 8;
+        int buttonCount = Math.Min(device.ButtonCount, 24);
+        int buttonsPerRow = 6;
 
         for (int i = 0; i < buttonCount; i++)
         {
             int row = i / buttonsPerRow;
             int col = i % buttonsPerRow;
             float bx = buttonGridX + col * buttonSpacing;
-            float by = buttonGridY + row * buttonSpacing + 10;
+            float by = buttonGridY + row * buttonSpacing;
 
             bool isPressed = i < buttons.Length && buttons[i];
             DrawButtonIndicator(canvas, bx, by, buttonSize, i + 1, isPressed);
+        }
+
+        // Main area: Device silhouette (much larger now!)
+        // Leave room on left for lead lines
+        float silhouetteLeft = bounds.Left + dataColumnWidth;
+        float silhouetteTop = bounds.Top + 45;
+        float silhouetteRight = bounds.Right - 20;
+        float silhouetteBottom = bounds.Bottom - 20;
+
+        _silhouetteBounds = new SKRect(silhouetteLeft, silhouetteTop, silhouetteRight, silhouetteBottom);
+        DrawDeviceSilhouette(canvas, _silhouetteBounds);
+
+        // Draw selected control label/lead-line if any
+        if (!string.IsNullOrEmpty(_selectedControlId))
+        {
+            DrawControlCallout(canvas, _selectedControlId, bounds);
         }
 
         // Connection line from device list (animated)
@@ -727,6 +964,106 @@ public class MainForm : Form
             PathEffect = SKPathEffect.CreateDash(new[] { 6f, 4f }, _dashPhase)
         };
         canvas.DrawLine(lineStart, lineEnd, connectorPaint);
+    }
+
+    private void DrawControlCallout(SKCanvas canvas, string controlId, SKRect panelBounds)
+    {
+        // Convert control ID to display label
+        string label = controlId.Replace("control_", "").Replace("_", " ").ToUpper();
+
+        // For now, draw a placeholder label - we'll add proper positioning with hit testing
+        float labelX = panelBounds.Left + 200;
+        float labelY = panelBounds.Bottom - 40;
+
+        FUIRenderer.DrawText(canvas, $"SELECTED: {label}",
+            new SKPoint(labelX, labelY), FUIColors.Active, 11f);
+    }
+
+    private void DrawDeviceSilhouette(SKCanvas canvas, SKRect bounds)
+    {
+        // L-corner frame for "targeting" feel
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(100), 20f, 6f);
+
+        // Draw the actual SVG if loaded, otherwise fallback to simple outline
+        if (_joystickSvg?.Picture != null)
+        {
+            DrawSvgInBounds(canvas, _joystickSvg, bounds);
+        }
+        else
+        {
+            DrawJoystickOutlineFallback(canvas, bounds);
+        }
+    }
+
+    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds)
+    {
+        if (svg.Picture == null) return;
+
+        var svgBounds = svg.Picture.CullRect;
+        if (svgBounds.Width <= 0 || svgBounds.Height <= 0) return;
+
+        // Calculate scale to fit SVG within bounds while maintaining aspect ratio
+        float scaleX = bounds.Width / svgBounds.Width;
+        float scaleY = bounds.Height / svgBounds.Height;
+        float scale = Math.Min(scaleX, scaleY) * 0.95f; // 95% - make it larger!
+
+        float scaledWidth = svgBounds.Width * scale;
+        float scaledHeight = svgBounds.Height * scale;
+
+        // Center the SVG within bounds
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2;
+
+        // Store transform info for hit testing
+        _svgScale = scale;
+        _svgOffset = new SKPoint(offsetX, offsetY);
+
+        canvas.Save();
+        canvas.Translate(offsetX, offsetY);
+        canvas.Scale(scale);
+        canvas.DrawPicture(svg.Picture);
+        canvas.Restore();
+    }
+
+    private void DrawJoystickOutlineFallback(SKCanvas canvas, SKRect bounds)
+    {
+        // Fallback simple outline when SVG not loaded
+        using var outlinePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Primary.WithAlpha(60),
+            StrokeWidth = 1.5f,
+            IsAntialias = true
+        };
+
+        float centerX = bounds.MidX;
+        float stickWidth = 36f;
+        float baseWidth = 70f;
+
+        // Stick shaft
+        canvas.DrawLine(centerX, bounds.Top + 35, centerX, bounds.Bottom - 55, outlinePaint);
+
+        // Stick top (grip area)
+        var gripRect = new SKRect(centerX - stickWidth / 2, bounds.Top + 25,
+                                   centerX + stickWidth / 2, bounds.Top + 85);
+        canvas.DrawRoundRect(gripRect, 8, 8, outlinePaint);
+
+        // Base
+        var baseRect = new SKRect(centerX - baseWidth / 2, bounds.Bottom - 65,
+                                   centerX + baseWidth / 2, bounds.Bottom - 30);
+        canvas.DrawRoundRect(baseRect, 4, 4, outlinePaint);
+
+        // Hat indicator (small circle on top)
+        canvas.DrawCircle(centerX, bounds.Top + 45, 7, outlinePaint);
+
+        // Trigger area (small rect on front)
+        var triggerRect = new SKRect(centerX + stickWidth / 2 - 4, bounds.Top + 65,
+                                      centerX + stickWidth / 2 + 12, bounds.Top + 82);
+        canvas.DrawRect(triggerRect, outlinePaint);
+
+        // Button cluster on side
+        canvas.DrawCircle(centerX - stickWidth / 2 - 8, bounds.Top + 55, 5, outlinePaint);
+        canvas.DrawCircle(centerX - stickWidth / 2 - 8, bounds.Top + 70, 5, outlinePaint);
     }
 
     private void DrawButtonIndicator(SKCanvas canvas, float x, float y, float size, int buttonNum, bool isPressed)
@@ -875,6 +1212,8 @@ public class MainForm : Form
         _renderTimer?.Dispose();
         _inputService?.StopPolling();
         _inputService?.Dispose();
+        _joystickSvg?.Dispose();
+        _throttleSvg?.Dispose();
         base.OnFormClosing(e);
     }
 

@@ -40,6 +40,14 @@ public class MainForm : Form
 
     // Services
     private readonly InputService _inputService;
+    private readonly ProfileService _profileService;
+
+    // Profile UI state
+    private List<ProfileInfo> _profiles = new();
+    private bool _profileDropdownOpen;
+    private int _hoveredProfileIndex = -1;
+    private SKRect _profileSelectorBounds;
+    private SKRect _profileDropdownBounds;
 
     // UI State
     private SKControl _canvas = null!;
@@ -81,11 +89,97 @@ public class MainForm : Form
     public MainForm()
     {
         _inputService = new InputService();
+        _profileService = new ProfileService();
         InitializeForm();
         InitializeCanvas();
         InitializeInput();
         InitializeRenderLoop();
         LoadSvgAssets();
+        InitializeProfiles();
+    }
+
+    private void InitializeProfiles()
+    {
+        _profileService.Initialize();
+        RefreshProfileList();
+    }
+
+    private void RefreshProfileList()
+    {
+        _profiles = _profileService.ListProfiles();
+    }
+
+    private void CreateNewProfilePrompt()
+    {
+        // Simple input dialog for profile name
+        // In production, this would be a proper FUI-styled dialog
+        string defaultName = $"Profile {_profiles.Count + 1}";
+
+        using var dialog = new Form
+        {
+            Text = "New Profile",
+            Width = 320,
+            Height = 140,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = Color.FromArgb(20, 22, 30)
+        };
+
+        var label = new Label
+        {
+            Text = "Profile Name:",
+            Left = 15,
+            Top = 15,
+            Width = 280,
+            ForeColor = Color.FromArgb(180, 190, 210)
+        };
+
+        var textBox = new TextBox
+        {
+            Text = defaultName,
+            Left = 15,
+            Top = 40,
+            Width = 275,
+            BackColor = Color.FromArgb(35, 38, 50),
+            ForeColor = Color.FromArgb(220, 230, 240)
+        };
+        textBox.SelectAll();
+
+        var okButton = new Button
+        {
+            Text = "Create",
+            Left = 130,
+            Top = 70,
+            Width = 75,
+            DialogResult = DialogResult.OK,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(40, 90, 120),
+            ForeColor = Color.White
+        };
+
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            Left = 215,
+            Top = 70,
+            Width = 75,
+            DialogResult = DialogResult.Cancel,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(50, 52, 60),
+            ForeColor = Color.FromArgb(180, 190, 210)
+        };
+
+        dialog.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+
+        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
+        {
+            _profileService.CreateAndActivateProfile(textBox.Text.Trim());
+            RefreshProfileList();
+        }
     }
 
     private void LoadSvgAssets()
@@ -510,6 +604,20 @@ public class MainForm : Form
         // Store mouse position for debug display
         _mousePosition = e.Location;
 
+        // Profile dropdown hover detection
+        if (_profileDropdownOpen && _profileDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemHeight = 24f;
+            int itemIndex = (int)((e.Y - _profileDropdownBounds.Top - 2) / itemHeight);
+            _hoveredProfileIndex = itemIndex;
+            Cursor = Cursors.Hand;
+            return;
+        }
+        else
+        {
+            _hoveredProfileIndex = -1;
+        }
+
         // Update cursor based on hit test (for resize feedback)
         int hitResult = HitTest(e.Location);
         switch (hitResult)
@@ -599,6 +707,46 @@ public class MainForm : Form
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
     {
         if (e.Button != MouseButtons.Left) return;
+
+        // Profile dropdown clicks (must be handled first when dropdown is open)
+        if (_profileDropdownOpen)
+        {
+            if (_profileDropdownBounds.Contains(e.X, e.Y))
+            {
+                // Click on dropdown item
+                if (_hoveredProfileIndex >= 0 && _hoveredProfileIndex < _profiles.Count)
+                {
+                    // Select existing profile
+                    _profileService.ActivateProfile(_profiles[_hoveredProfileIndex].Id);
+                    _profileDropdownOpen = false;
+                    return;
+                }
+                else if (_hoveredProfileIndex == _profiles.Count)
+                {
+                    // "New Profile" clicked
+                    CreateNewProfilePrompt();
+                    _profileDropdownOpen = false;
+                    return;
+                }
+            }
+            else
+            {
+                // Click outside dropdown - close it
+                _profileDropdownOpen = false;
+                return;
+            }
+        }
+
+        // Profile selector click (toggle dropdown)
+        if (_profileSelectorBounds.Contains(e.X, e.Y))
+        {
+            _profileDropdownOpen = !_profileDropdownOpen;
+            if (_profileDropdownOpen)
+            {
+                RefreshProfileList();
+            }
+            return;
+        }
 
         // Window controls
         if (_hoveredWindowControl >= 0)
@@ -799,6 +947,9 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, "UNIFIED HOTAS MANAGEMENT SYSTEM", new SKPoint(subtitleX, titleBarY + 38),
             FUIColors.TextDim, 12f);
 
+        // Profile selector (positioned between subtitle and tabs)
+        DrawProfileSelector(canvas, bounds.Right - 650, titleBarY + 22);
+
         // Horizontal base line
         FUIRenderer.DrawGlowingLine(canvas,
             new SKPoint(pad, titleBarY + titleBarHeight + 8),
@@ -858,6 +1009,162 @@ public class MainForm : Form
             canvas.DrawLine(bounds.Right - pad, titleBarY + 8, bounds.Right - pad, titleBarY + titleBarHeight - 5, accentPaint);
             canvas.DrawLine(bounds.Right - pad - 25, titleBarY + 8, bounds.Right - pad, titleBarY + 8, accentPaint);
         }
+    }
+
+    private void DrawProfileSelector(SKCanvas canvas, float x, float y)
+    {
+        float width = 100f;
+        float height = 26f;
+        _profileSelectorBounds = new SKRect(x, y, x + width, y + height);
+
+        // Get profile name
+        string profileName = _profileService.HasActiveProfile
+            ? _profileService.ActiveProfile!.Name
+            : "No Profile";
+
+        // Truncate if too long
+        if (profileName.Length > 12)
+            profileName = profileName.Substring(0, 11) + "…";
+
+        // Background
+        bool isHovered = _profileSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150),
+            IsAntialias = true
+        };
+        canvas.DrawRect(_profileSelectorBounds, bgPaint);
+
+        // Border
+        using var borderPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = _profileDropdownOpen ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(_profileSelectorBounds, borderPaint);
+
+        // Profile name (with dropdown arrow prefix)
+        string displayText = $"▾ {profileName}";
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, y + 17),
+            _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+
+        // Draw dropdown if open
+        if (_profileDropdownOpen)
+        {
+            DrawProfileDropdown(canvas, x, y + height);
+        }
+    }
+
+    private void DrawProfileDropdown(SKCanvas canvas, float x, float y)
+    {
+        float itemHeight = 24f;
+        float width = 150f;
+        int itemCount = Math.Max(_profiles.Count + 1, 2); // +1 for "New Profile", minimum 2
+        float height = itemHeight * itemCount + 4;
+
+        _profileDropdownBounds = new SKRect(x, y, x + width, y + height);
+
+        // Shadow
+        using var shadowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.Black.WithAlpha(80),
+            ImageFilter = SKImageFilter.CreateBlur(8f, 8f)
+        };
+        canvas.DrawRect(new SKRect(x + 4, y + 4, x + width + 4, y + height + 4), shadowPaint);
+
+        // Background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(240),
+            IsAntialias = true
+        };
+        canvas.DrawRect(_profileDropdownBounds, bgPaint);
+
+        // Border
+        using var borderPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Frame,
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(_profileDropdownBounds, borderPaint);
+
+        // Draw profile items
+        float itemY = y + 2;
+        for (int i = 0; i < _profiles.Count; i++)
+        {
+            var profile = _profiles[i];
+            var itemBounds = new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight);
+            bool isHovered = _hoveredProfileIndex == i;
+            bool isActive = _profileService.ActiveProfile?.Id == profile.Id;
+
+            // Hover background
+            if (isHovered)
+            {
+                using var hoverPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Primary.WithAlpha(40),
+                    IsAntialias = true
+                };
+                canvas.DrawRect(itemBounds, hoverPaint);
+            }
+
+            // Active indicator
+            if (isActive)
+            {
+                using var activePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Active,
+                    IsAntialias = true
+                };
+                canvas.DrawRect(new SKRect(x + 2, itemY, x + 4, itemY + itemHeight), activePaint);
+            }
+
+            // Profile name
+            string name = profile.Name;
+            if (name.Length > 16)
+                name = name.Substring(0, 15) + "…";
+
+            var color = isActive ? FUIColors.Active : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+            FUIRenderer.DrawText(canvas, name, new SKPoint(x + 10, itemY + 16), color, 11f);
+
+            itemY += itemHeight;
+        }
+
+        // "New Profile" option
+        var newItemBounds = new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight);
+        bool newHovered = _hoveredProfileIndex == _profiles.Count;
+
+        if (newHovered)
+        {
+            using var hoverPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Primary.WithAlpha(40),
+                IsAntialias = true
+            };
+            canvas.DrawRect(newItemBounds, hoverPaint);
+        }
+
+        // Separator
+        using var sepPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Frame.WithAlpha(100),
+            StrokeWidth = 1f
+        };
+        canvas.DrawLine(x + 8, itemY, x + width - 8, itemY, sepPaint);
+
+        FUIRenderer.DrawText(canvas, "+ New Profile", new SKPoint(x + 10, itemY + 16),
+            newHovered ? FUIColors.Active : FUIColors.TextDim, 11f);
     }
 
     private void DrawDeviceListPanel(SKCanvas canvas, SKRect bounds)

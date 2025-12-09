@@ -348,6 +348,36 @@ public class ButtonToAxisMapping : Mapping
 }
 
 /// <summary>
+/// Assignment of a physical device to a vJoy device slot
+/// </summary>
+public class DeviceAssignment
+{
+    /// <summary>Physical device identification</summary>
+    public PhysicalDeviceRef PhysicalDevice { get; set; } = new();
+
+    /// <summary>vJoy device ID (1-16)</summary>
+    public uint VJoyDevice { get; set; }
+
+    /// <summary>Optional device map override (null = auto-detect)</summary>
+    public string? DeviceMapOverride { get; set; }
+}
+
+/// <summary>
+/// Physical device identification info for matching across sessions
+/// </summary>
+public class PhysicalDeviceRef
+{
+    /// <summary>Human-readable device name</summary>
+    public string Name { get; set; } = "";
+
+    /// <summary>Device instance GUID (primary identifier)</summary>
+    public string Guid { get; set; } = "";
+
+    /// <summary>Vendor:Product ID for fallback matching (e.g., "3344:0194")</summary>
+    public string VidPid { get; set; } = "";
+}
+
+/// <summary>
 /// A profile containing all mappings for a configuration
 /// </summary>
 public class MappingProfile
@@ -360,6 +390,9 @@ public class MappingProfile
 
     /// <summary>Description</summary>
     public string Description { get; set; } = "";
+
+    /// <summary>Device assignments (physical device → vJoy slot)</summary>
+    public List<DeviceAssignment> DeviceAssignments { get; set; } = new();
 
     /// <summary>Shift layers for mode switching</summary>
     public List<ShiftLayer> ShiftLayers { get; set; } = new();
@@ -384,4 +417,29 @@ public class MappingProfile
 
     /// <summary>Last modified</summary>
     public DateTime ModifiedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Get the vJoy device assigned to a physical device by GUID or VID:PID</summary>
+    public uint? GetVJoyDeviceForPhysical(string deviceGuid, string? vidPid = null)
+    {
+        // First try exact GUID match
+        var assignment = DeviceAssignments.FirstOrDefault(a =>
+            !string.IsNullOrEmpty(a.PhysicalDevice.Guid) &&
+            a.PhysicalDevice.Guid.Equals(deviceGuid, StringComparison.OrdinalIgnoreCase));
+
+        // Fallback to VID:PID match
+        if (assignment == null && !string.IsNullOrEmpty(vidPid))
+        {
+            assignment = DeviceAssignments.FirstOrDefault(a =>
+                !string.IsNullOrEmpty(a.PhysicalDevice.VidPid) &&
+                a.PhysicalDevice.VidPid.Equals(vidPid, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return assignment?.VJoyDevice;
+    }
+
+    /// <summary>Get the physical device assigned to a vJoy device</summary>
+    public DeviceAssignment? GetAssignmentForVJoy(uint vJoyDevice)
+    {
+        return DeviceAssignments.FirstOrDefault(a => a.VJoyDevice == vJoyDevice);
+    }
 }

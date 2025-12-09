@@ -13,12 +13,19 @@
     <PackageReference Include="SkiaSharp" Version="2.88.7" />
     <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.7" />
     <PackageReference Include="SkiaSharp.Views.WindowsForms" Version="2.88.7" />
+    <PackageReference Include="Svg.Skia" Version="1.0.0.18" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="vJoyInterface.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Images\Devices\*.svg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

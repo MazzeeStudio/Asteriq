@@ -30,3 +30,6 @@ Thumbs.db
 
 # Project specific
 *.log
+
+# Mockups (design exploration, not part of main codebase)
+mockups/

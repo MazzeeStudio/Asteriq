@@ -12,6 +12,34 @@ public class ProfileService
     private readonly string _profilesDirectory;
     private readonly string _settingsFile;
     private readonly JsonSerializerOptions _jsonOptions;
+    private MappingProfile? _activeProfile;
+
+    /// <summary>
+    /// Event fired when the active profile changes
+    /// </summary>
+    public event EventHandler<ProfileChangedEventArgs>? ProfileChanged;
+
+    /// <summary>
+    /// The currently active profile (null if no profile is loaded)
+    /// </summary>
+    public MappingProfile? ActiveProfile
+    {
+        get => _activeProfile;
+        private set
+        {
+            var oldProfile = _activeProfile;
+            _activeProfile = value;
+            if (oldProfile != value)
+            {
+                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs(oldProfile, value));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether a profile is currently active
+    /// </summary>
+    public bool HasActiveProfile => _activeProfile != null;
 
     public ProfileService()
     {
@@ -128,6 +156,7 @@ public class ProfileService
                         Id = profile.Id,
                         Name = profile.Name,
                         Description = profile.Description,
+                        DeviceAssignmentCount = profile.DeviceAssignments.Count,
                         AxisMappingCount = profile.AxisMappings.Count,
                         ButtonMappingCount = profile.ButtonMappings.Count,
                         HatMappingCount = profile.HatMappings.Count,
@@ -163,6 +192,22 @@ public class ProfileService
             CreatedAt = DateTime.UtcNow,
             ModifiedAt = DateTime.UtcNow
         };
+
+        // Deep copy device assignments
+        foreach (var assignment in source.DeviceAssignments)
+        {
+            duplicate.DeviceAssignments.Add(new DeviceAssignment
+            {
+                PhysicalDevice = new PhysicalDeviceRef
+                {
+                    Name = assignment.PhysicalDevice.Name,
+                    Guid = assignment.PhysicalDevice.Guid,
+                    VidPid = assignment.PhysicalDevice.VidPid
+                },
+                VJoyDevice = assignment.VJoyDevice,
+                DeviceMapOverride = assignment.DeviceMapOverride
+            });
+        }
 
         // Create ID mapping for layers (old ID -> new ID)
         var layerIdMap = new Dictionary<Guid, Guid>();
@@ -431,6 +476,79 @@ public class ProfileService
         return LoadProfile(settings.LastProfileId.Value);
     }
 
+    /// <summary>
+    /// Activate a profile by ID, making it the current active profile
+    /// </summary>
+    public bool ActivateProfile(Guid profileId)
+    {
+        var profile = LoadProfile(profileId);
+        if (profile == null)
+            return false;
+
+        ActiveProfile = profile;
+        LastProfileId = profileId;
+        return true;
+    }
+
+    /// <summary>
+    /// Deactivate the current profile (mappings will stop)
+    /// </summary>
+    public void DeactivateProfile()
+    {
+        ActiveProfile = null;
+    }
+
+    /// <summary>
+    /// Create a new empty profile with the given name
+    /// </summary>
+    public MappingProfile CreateProfile(string name, string description = "")
+    {
+        var profile = new MappingProfile
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Description = description,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        SaveProfile(profile);
+        return profile;
+    }
+
+    /// <summary>
+    /// Create and activate a new profile
+    /// </summary>
+    public MappingProfile CreateAndActivateProfile(string name, string description = "")
+    {
+        var profile = CreateProfile(name, description);
+        ActivateProfile(profile.Id);
+        return profile;
+    }
+
+    /// <summary>
+    /// Save the currently active profile
+    /// </summary>
+    public void SaveActiveProfile()
+    {
+        if (ActiveProfile != null)
+        {
+            SaveProfile(ActiveProfile);
+        }
+    }
+
+    /// <summary>
+    /// Initialize the profile service and load last profile if enabled
+    /// </summary>
+    public void Initialize()
+    {
+        var profile = LoadLastProfileIfEnabled();
+        if (profile != null)
+        {
+            ActiveProfile = profile;
+        }
+    }
+
     private string GetProfilePath(Guid profileId)
     {
         return Path.Combine(_profilesDirectory, $"{profileId}.json");
@@ -471,6 +589,7 @@ public class ProfileInfo
     public Guid Id { get; init; }
     public string Name { get; init; } = "";
     public string Description { get; init; } = "";
+    public int DeviceAssignmentCount { get; init; }
     public int AxisMappingCount { get; init; }
     public int ButtonMappingCount { get; init; }
     public int HatMappingCount { get; init; }
@@ -488,4 +607,19 @@ public class AppSettings
 {
     public Guid? LastProfileId { get; set; }
     public bool AutoLoadLastProfile { get; set; } = true;
+}
+
+/// <summary>
+/// Event args for profile changed events
+/// </summary>
+public class ProfileChangedEventArgs : EventArgs
+{
+    public MappingProfile? OldProfile { get; }
+    public MappingProfile? NewProfile { get; }
+
+    public ProfileChangedEventArgs(MappingProfile? oldProfile, MappingProfile? newProfile)
+    {
+        OldProfile = oldProfile;
+        NewProfile = newProfile;
+    }
 }

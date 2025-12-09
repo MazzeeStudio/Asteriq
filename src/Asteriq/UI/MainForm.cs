@@ -71,6 +71,7 @@ public class MainForm : Form
     private float _svgScale = 1f;
     private SKPoint _svgOffset;
     private Dictionary<string, SKRect> _controlBounds = new();
+    private Point _mousePosition; // For debug display
 
     // Device mapping and active input tracking
     private DeviceMap? _deviceMap;
@@ -441,6 +442,9 @@ public class MainForm : Form
 
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
     {
+        // Store mouse position for debug display
+        _mousePosition = e.Location;
+
         // Update cursor based on hit test (for resize feedback)
         int hitResult = HitTest(e.Location);
         switch (hitResult)
@@ -1433,10 +1437,18 @@ public class MainForm : Form
             new SKPoint(bounds.Right - 30, y),
             FUIColors.Frame.WithAlpha(100), 1f, 2f);
 
-        // Left: connection status
+        // Far left: mouse position in viewBox coordinates (for JSON anchor editing)
+        // Convert screen coords to viewBox coords
+        float viewBoxX = (_mousePosition.X - _svgOffset.X) / _svgScale;
+        float viewBoxY = (_mousePosition.Y - _svgOffset.Y) / _svgScale;
+        string mousePos = $"VB:{viewBoxX,5:F0},{viewBoxY,5:F0}";
+        FUIRenderer.DrawText(canvas, mousePos,
+            new SKPoint(40, y + 22), FUIColors.TextDim, 10f);
+
+        // Left-center: connection status
         string deviceText = _devices.Count == 1 ? "1 DEVICE CONNECTED" : $"{_devices.Count} DEVICES CONNECTED";
         FUIRenderer.DrawText(canvas, deviceText,
-            new SKPoint(40, y + 22), FUIColors.TextDim, 12f);
+            new SKPoint(180, y + 22), FUIColors.TextDim, 12f);
 
         // Center: current status
         FUIRenderer.DrawText(canvas, "READY",

@@ -9,9 +9,9 @@
     "trigger": {
       "id": "control_trigger",
       "type": "Button",
-      "bindings": ["button1", "button2"],
+      "bindings": ["button4", "button5"],
       "label": "Trigger",
-      "description": "Dual-stage trigger: Stage1=button1, Stage2=button2",
+      "description": "Dual-stage trigger: Stage1=button4, Stage2=button5",
       "anchor": { "x": 950, "y": 450 },
       "labelOffset": { "x": -150, "y": -50 },
       "leadLine": {
@@ -75,6 +75,15 @@
       "description": "Side button: button13",
       "anchor": { "x": 1100, "y": 350 },
       "labelOffset": { "x": 110, "y": 0 }
+    },
+    "flip_trigger": {
+      "id": "control_flip_trigger",
+      "type": "Toggle",
+      "bindings": ["button1", "button2"],
+      "label": "Flip Trigger",
+      "description": "Flip trigger safety: button1, button2",
+      "anchor": { "x": 300, "y": 450 },
+      "labelOffset": { "x": -140, "y": 0 }
     },
     "toggle": {
       "id": "control_toggle",

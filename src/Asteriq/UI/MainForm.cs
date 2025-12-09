@@ -140,6 +140,14 @@ public class MainForm : Form
     private int _lastClickedRow = -1;
     private const int DoubleClickMs = 400;
 
+    // Right panel - input sources and actions
+    private SKRect _addInputButtonBounds;
+    private SKRect _clearAllButtonBounds;
+    private List<SKRect> _inputSourceRemoveBounds = new();
+    private bool _addInputButtonHovered;
+    private bool _clearAllButtonHovered;
+    private int _hoveredInputSourceRemove = -1;
+
     // Mapping editor - action buttons
     private SKRect _saveButtonBounds;
     private SKRect _cancelButtonBounds;
@@ -684,114 +692,51 @@ public class MainForm : Form
         // Mappings tab hover handling
         if (_activeTab == 1)
         {
-            // Reset hover states for left panel
+            // Reset hover states
             _vjoyPrevHovered = false;
             _vjoyNextHovered = false;
             _hoveredMappingRow = -1;
             _hoveredAddButton = -1;
             _hoveredRemoveButton = -1;
-
-            // Reset hover states for editor panel
-            _inputFieldHovered = false;
-            _manualEntryButtonHovered = false;
-            _saveButtonHovered = false;
-            _cancelButtonHovered = false;
             _hoveredButtonMode = -1;
-            _hoveredDeviceIndex = -1;
-            _hoveredControlIndex = -1;
+            _addInputButtonHovered = false;
+            _clearAllButtonHovered = false;
+            _hoveredInputSourceRemove = -1;
 
-            // Editor panel hover detection (if open) - set hover states but don't return
-            // so left panel can still be hovered
-            bool editorHandledHover = false;
-            if (_mappingEditorOpen)
+            // Right panel: Add input button
+            if (_addInputButtonBounds.Contains(e.X, e.Y))
             {
-                if (_inputFieldBounds.Contains(e.X, e.Y))
-                {
-                    _inputFieldHovered = true;
-                    Cursor = Cursors.Hand;
-                    editorHandledHover = true;
-                }
-                else if (_manualEntryButtonBounds.Contains(e.X, e.Y))
-                {
-                    _manualEntryButtonHovered = true;
-                    Cursor = Cursors.Hand;
-                    editorHandledHover = true;
-                }
-                else if (_saveButtonBounds.Contains(e.X, e.Y))
-                {
-                    _saveButtonHovered = true;
-                    Cursor = Cursors.Hand;
-                    editorHandledHover = true;
-                }
-                else if (_cancelButtonBounds.Contains(e.X, e.Y))
-                {
-                    _cancelButtonHovered = true;
-                    Cursor = Cursors.Hand;
-                    editorHandledHover = true;
-                }
-                // Button mode hover
-                else if (!_isEditingAxis)
-                {
-                    for (int i = 0; i < _buttonModeBounds.Length; i++)
-                    {
-                        if (_buttonModeBounds[i].Contains(e.X, e.Y))
-                        {
-                            _hoveredButtonMode = i;
-                            Cursor = Cursors.Hand;
-                            editorHandledHover = true;
-                            break;
-                        }
-                    }
-                }
+                _addInputButtonHovered = true;
+                Cursor = Cursors.Hand;
+                return;
+            }
 
-                // Manual entry dropdowns hover (these should return early since they overlap content)
-                if (!editorHandledHover && _manualEntryMode)
+            // Right panel: Input source remove buttons
+            for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
+            {
+                if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
                 {
-                    if (_deviceDropdownOpen)
+                    _hoveredInputSourceRemove = i;
+                    Cursor = Cursors.Hand;
+                    return;
+                }
+            }
+
+            // Right panel: Button mode buttons
+            if (_selectedMappingRow >= 8)
+            {
+                for (int i = 0; i < _buttonModeBounds.Length; i++)
+                {
+                    if (_buttonModeBounds[i].Contains(e.X, e.Y))
                     {
-                        float itemHeight = 26f;
-                        float listTop = _deviceDropdownBounds.Bottom + 2;
-                        for (int i = 0; i < _devices.Count; i++)
-                        {
-                            var itemBounds = new SKRect(_deviceDropdownBounds.Left, listTop + i * itemHeight,
-                                _deviceDropdownBounds.Right, listTop + (i + 1) * itemHeight);
-                            if (itemBounds.Contains(e.X, e.Y))
-                            {
-                                _hoveredDeviceIndex = i;
-                                Cursor = Cursors.Hand;
-                                return; // Dropdown overlays content
-                            }
-                        }
-                    }
-                    if (_controlDropdownOpen)
-                    {
-                        float itemHeight = 24f;
-                        float listTop = _controlDropdownBounds.Bottom + 2;
-                        int controlCount = _isEditingAxis ? 8 : 32;
-                        for (int i = 0; i < controlCount; i++)
-                        {
-                            var itemBounds = new SKRect(_controlDropdownBounds.Left, listTop + i * itemHeight,
-                                _controlDropdownBounds.Right, listTop + (i + 1) * itemHeight);
-                            if (itemBounds.Contains(e.X, e.Y))
-                            {
-                                _hoveredControlIndex = i;
-                                Cursor = Cursors.Hand;
-                                return; // Dropdown overlays content
-                            }
-                        }
-                    }
-                    if (_deviceDropdownBounds.Contains(e.X, e.Y) || _controlDropdownBounds.Contains(e.X, e.Y))
-                    {
+                        _hoveredButtonMode = i;
                         Cursor = Cursors.Hand;
-                        editorHandledHover = true;
+                        return;
                     }
                 }
             }
 
-            // Skip left panel hover if editor already handled it
-            if (editorHandledHover) return;
-
-            // vJoy device selector buttons
+            // Left panel: vJoy device selector buttons
             if (_vjoyPrevButtonBounds.Contains(e.X, e.Y) && _selectedVJoyDeviceIndex > 0)
             {
                 _vjoyPrevHovered = true;
@@ -805,30 +750,12 @@ public class MainForm : Form
                 return;
             }
 
-            // Mapping row hover and buttons
+            // Left panel: Mapping row hover
             for (int i = 0; i < _mappingRowBounds.Count; i++)
             {
                 if (_mappingRowBounds[i].Contains(e.X, e.Y))
                 {
                     _hoveredMappingRow = i;
-
-                    // Check [+] button
-                    if (i < _mappingAddButtonBounds.Count && _mappingAddButtonBounds[i].Contains(e.X, e.Y))
-                    {
-                        _hoveredAddButton = i;
-                        Cursor = Cursors.Hand;
-                        return;
-                    }
-
-                    // Check [×] button
-                    if (i < _mappingRemoveButtonBounds.Count && !_mappingRemoveButtonBounds[i].IsEmpty &&
-                        _mappingRemoveButtonBounds[i].Contains(e.X, e.Y))
-                    {
-                        _hoveredRemoveButton = i;
-                        Cursor = Cursors.Hand;
-                        return;
-                    }
-
                     Cursor = Cursors.Hand;
                     return;
                 }
@@ -1044,7 +971,36 @@ public class MainForm : Form
         // Mappings tab click handling
         if (_activeTab == 1)
         {
-            // vJoy device navigation
+            // Right panel: Add input button - toggles listening
+            if (_addInputButtonHovered && _selectedMappingRow >= 0)
+            {
+                if (_isListeningForInput)
+                {
+                    CancelInputListening();
+                }
+                else
+                {
+                    StartInputListening(_selectedMappingRow);
+                }
+                return;
+            }
+
+            // Right panel: Remove input source
+            if (_hoveredInputSourceRemove >= 0)
+            {
+                RemoveInputSourceAtIndex(_hoveredInputSourceRemove);
+                return;
+            }
+
+            // Right panel: Button mode selection
+            if (_selectedMappingRow >= 8 && _hoveredButtonMode >= 0)
+            {
+                _selectedButtonMode = (ButtonMode)_hoveredButtonMode;
+                UpdateButtonModeForSelected();
+                return;
+            }
+
+            // Left panel: vJoy device navigation
             if (_vjoyPrevHovered && _selectedVJoyDeviceIndex > 0)
             {
                 _selectedVJoyDeviceIndex--;
@@ -1060,35 +1016,15 @@ public class MainForm : Form
                 return;
             }
 
-            // Button mode selection (right panel)
-            if (_selectedMappingRow >= 8 && _hoveredButtonMode >= 0)
-            {
-                _selectedButtonMode = (ButtonMode)_hoveredButtonMode;
-                return;
-            }
-
-            // Binding row clicked - single click selects, double click starts listening
+            // Left panel: Output row clicked - select it
             if (_hoveredMappingRow >= 0)
             {
-                var now = DateTime.Now;
-                bool isDoubleClick = (_hoveredMappingRow == _lastClickedRow) &&
-                                     (now - _lastRowClickTime).TotalMilliseconds < DoubleClickMs;
-
-                if (isDoubleClick)
+                if (_hoveredMappingRow != _selectedMappingRow)
                 {
-                    // Double-click: start listening for input
-                    _selectedMappingRow = _hoveredMappingRow;
-                    StartInputListening(_hoveredMappingRow);
-                    _lastClickedRow = -1;
-                }
-                else
-                {
-                    // Single click: just select the row
-                    _selectedMappingRow = _hoveredMappingRow;
+                    // Selecting a different row - cancel listening
                     CancelInputListening();
-                    _lastClickedRow = _hoveredMappingRow;
-                    _lastRowClickTime = now;
                 }
+                _selectedMappingRow = _hoveredMappingRow;
                 return;
             }
         }
@@ -1282,11 +1218,6 @@ public class MainForm : Form
             FUIColors.Primary.WithAlpha(80), 1f, 2f);
         y += 10;
 
-        // Column headers
-        FUIRenderer.DrawText(canvas, "OUTPUT", new SKPoint(leftMargin, y + 10), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, "INPUT", new SKPoint(leftMargin + 120, y + 10), FUIColors.TextDim, 10f);
-        y += 25;
-
         // Scrollable binding rows
         float listBottom = bounds.Bottom - frameInset - 10;
         DrawBindingsList(canvas, new SKRect(leftMargin - 5, y, rightMargin + 5, listBottom));
@@ -1308,8 +1239,8 @@ public class MainForm : Form
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         var profile = _profileService.ActiveProfile;
 
-        float rowHeight = 48f;  // Chunky rows
-        float rowGap = 6f;
+        float rowHeight = 32f;  // Compact rows (bindings shown in right panel now)
+        float rowGap = 4f;
         float y = bounds.Top;
         int rowIndex = 0;
 
@@ -1360,6 +1291,8 @@ public class MainForm : Form
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
         bool isSelected, bool isHovered, int rowIndex)
     {
+        bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
+
         // Background
         SKColor bgColor;
         if (isSelected)
@@ -1381,62 +1314,24 @@ public class MainForm : Form
         };
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
-        // Output name (left side, top)
+        // Output name (centered vertically)
         float leftTextX = bounds.Left + 12;
-        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftTextX, bounds.Top + 18),
+        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftTextX, bounds.MidY + 5),
             isSelected ? FUIColors.Active : FUIColors.TextPrimary, 12f, true);
 
-        // Binding button/indicator (spans width, bottom half)
-        float bindingY = bounds.Top + 26;
-        float bindingHeight = bounds.Height - 30;
-        var bindingBounds = new SKRect(bounds.Left + 8, bindingY, bounds.Right - 8, bounds.Bottom - 6);
-
-        bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
-        bool isListening = _isListeningForInput && isSelected;
-
-        // Binding area background
-        SKColor bindBgColor;
-        if (isListening)
-            bindBgColor = FUIColors.Warning.WithAlpha(40);
-        else if (hasBinding)
-            bindBgColor = FUIColors.Background1;
-        else
-            bindBgColor = FUIColors.Background1.WithAlpha(150);
-
-        using var bindBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bindBgColor };
-        canvas.DrawRoundRect(bindingBounds, 3, 3, bindBgPaint);
-
-        using var bindFramePaint = new SKPaint
+        // Binding indicator dot on the right (shows if has binding)
+        if (hasBinding)
         {
-            Style = SKPaintStyle.Stroke,
-            Color = isListening ? FUIColors.Warning : (hasBinding ? FUIColors.Frame : FUIColors.FrameDim),
-            StrokeWidth = 1f,
-            PathEffect = hasBinding ? null : SKPathEffect.CreateDash(new float[] { 4, 2 }, 0)
-        };
-        canvas.DrawRoundRect(bindingBounds, 3, 3, bindFramePaint);
-
-        // Binding text
-        string displayText;
-        SKColor textColor;
-        if (isListening)
-        {
-            byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
-            displayText = "Press input...";
-            textColor = FUIColors.Warning.WithAlpha(alpha);
+            float dotX = bounds.Right - 20;
+            float dotY = bounds.MidY;
+            using var dotPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Active,
+                IsAntialias = true
+            };
+            canvas.DrawCircle(dotX, dotY, 5f, dotPaint);
         }
-        else if (hasBinding)
-        {
-            displayText = binding;
-            textColor = FUIColors.TextPrimary;
-        }
-        else
-        {
-            displayText = "None";
-            textColor = FUIColors.TextDisabled;
-        }
-
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bindingBounds.Left + 8, bindingBounds.MidY + 4),
-            textColor, 11f);
     }
 
     private void DrawDeviceVisualizationPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1519,7 +1414,7 @@ public class MainForm : Form
         // Show settings for selected row
         if (_selectedMappingRow < 0)
         {
-            FUIRenderer.DrawText(canvas, "Select a binding to configure",
+            FUIRenderer.DrawText(canvas, "Select an output to configure",
                 new SKPoint(leftMargin, y + 30), FUIColors.TextDim, 12f);
             return;
         }
@@ -1531,14 +1426,196 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 15), FUIColors.Active, 13f, true);
         y += 35;
 
+        // INPUT SOURCES section - shows mapped inputs with add/remove
+        y = DrawInputSourcesSection(canvas, leftMargin, rightMargin, y);
+
+        float bottomMargin = bounds.Bottom - frameInset - 10;
+
         if (isAxis)
         {
-            DrawAxisSettings(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 10);
+            DrawAxisSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
         }
         else
         {
-            DrawButtonSettings(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 10);
+            DrawButtonSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
         }
+    }
+
+    private float DrawInputSourcesSection(SKCanvas canvas, float leftMargin, float rightMargin, float y)
+    {
+        _inputSourceRemoveBounds.Clear();
+
+        FUIRenderer.DrawText(canvas, "INPUT SOURCES", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 18;
+
+        // Get current mappings for selected output
+        var inputs = GetInputsForSelectedOutput();
+        bool isListening = _isListeningForInput;
+
+        float rowHeight = 28f;
+        float rowGap = 4f;
+
+        if (inputs.Count == 0 && !isListening)
+        {
+            // No inputs - show "None" with dashed border
+            var emptyBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
+            using var emptyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(100) };
+            canvas.DrawRoundRect(emptyBounds, 3, 3, emptyBgPaint);
+
+            using var emptyFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.FrameDim,
+                StrokeWidth = 1f,
+                PathEffect = SKPathEffect.CreateDash(new float[] { 4, 2 }, 0)
+            };
+            canvas.DrawRoundRect(emptyBounds, 3, 3, emptyFramePaint);
+
+            FUIRenderer.DrawText(canvas, "No input mapped", new SKPoint(leftMargin + 10, y + 18), FUIColors.TextDisabled, 11f);
+            y += rowHeight + rowGap;
+        }
+        else
+        {
+            // Draw each input source row
+            for (int i = 0; i < inputs.Count; i++)
+            {
+                var input = inputs[i];
+                var rowBounds = new SKRect(leftMargin, y, rightMargin - 30, y + rowHeight);
+
+                // Row background
+                using var rowBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+                canvas.DrawRoundRect(rowBounds, 3, 3, rowBgPaint);
+
+                using var rowFramePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = FUIColors.Frame,
+                    StrokeWidth = 1f
+                };
+                canvas.DrawRoundRect(rowBounds, 3, 3, rowFramePaint);
+
+                // Input text
+                string inputText = $"{input.DeviceName} - {input.Type} {input.Index}";
+                if (inputText.Length > 30) inputText = inputText.Substring(0, 27) + "...";
+                FUIRenderer.DrawText(canvas, inputText, new SKPoint(leftMargin + 8, y + 18), FUIColors.TextPrimary, 10f);
+
+                // Remove [×] button
+                var removeBounds = new SKRect(rightMargin - 26, y + 2, rightMargin, y + rowHeight - 2);
+                bool removeHovered = _hoveredInputSourceRemove == i;
+
+                using var removeBgPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = removeHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2
+                };
+                canvas.DrawRoundRect(removeBounds, 3, 3, removeBgPaint);
+
+                using var removeFramePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = removeHovered ? FUIColors.Warning : FUIColors.Frame,
+                    StrokeWidth = 1f
+                };
+                canvas.DrawRoundRect(removeBounds, 3, 3, removeFramePaint);
+
+                FUIRenderer.DrawTextCentered(canvas, "×", removeBounds,
+                    removeHovered ? FUIColors.Warning : FUIColors.TextDim, 14f);
+
+                _inputSourceRemoveBounds.Add(removeBounds);
+                y += rowHeight + rowGap;
+            }
+        }
+
+        // Listening indicator
+        if (isListening)
+        {
+            var listenBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
+            byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
+
+            using var listenBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(40) };
+            canvas.DrawRoundRect(listenBounds, 3, 3, listenBgPaint);
+
+            using var listenFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Warning.WithAlpha(alpha),
+                StrokeWidth = 2f
+            };
+            canvas.DrawRoundRect(listenBounds, 3, 3, listenFramePaint);
+
+            FUIRenderer.DrawText(canvas, "Press input...", new SKPoint(leftMargin + 10, y + 18),
+                FUIColors.Warning.WithAlpha(alpha), 11f);
+            y += rowHeight + rowGap;
+        }
+
+        // Add input button [+]
+        var addBounds = new SKRect(leftMargin, y, rightMargin, y + 28);
+        _addInputButtonBounds = addBounds;
+        bool addHovered = _addInputButtonHovered;
+
+        using var addBgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = addHovered ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2
+        };
+        canvas.DrawRoundRect(addBounds, 3, 3, addBgPaint);
+
+        using var addFramePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = addHovered ? FUIColors.Active : FUIColors.Frame,
+            StrokeWidth = addHovered ? 2f : 1f,
+            PathEffect = isListening ? null : SKPathEffect.CreateDash(new float[] { 4, 2 }, 0)
+        };
+        canvas.DrawRoundRect(addBounds, 3, 3, addFramePaint);
+
+        string addText = isListening ? "Cancel" : "+ Add Input";
+        FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
+            addHovered ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+        y += 28 + 15;
+
+        // Separator line before settings
+        FUIRenderer.DrawGlowingLine(canvas,
+            new SKPoint(leftMargin - 5, y - 5),
+            new SKPoint(rightMargin + 5, y - 5),
+            FUIColors.Frame.WithAlpha(60), 1f, 1f);
+
+        return y;
+    }
+
+    private List<InputSource> GetInputsForSelectedOutput()
+    {
+        var inputs = new List<InputSource>();
+        if (_selectedMappingRow < 0) return inputs;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return inputs;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return inputs;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        bool isAxis = _selectedMappingRow < 8;
+        int outputIndex = isAxis ? _selectedMappingRow : _selectedMappingRow - 8;
+
+        if (isAxis)
+        {
+            var mapping = profile.AxisMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyAxis &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+            if (mapping != null)
+                inputs.AddRange(mapping.Inputs);
+        }
+        else
+        {
+            var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyButton &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+            if (mapping != null)
+                inputs.AddRange(mapping.Inputs);
+        }
+
+        return inputs;
     }
 
     private string GetSelectedOutputName()
@@ -2717,46 +2794,151 @@ public class MainForm : Form
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = isAxis ? rowIndex : rowIndex - 8;
-
-        // Remove existing binding first
-        RemoveBindingAtRow(rowIndex, save: false);
+        var newInputSource = input.ToInputSource();
 
         if (isAxis)
         {
-            var mapping = new AxisMapping
+            // Find existing mapping or create new one
+            var existingMapping = profile.AxisMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyAxis &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+
+            if (existingMapping != null)
             {
-                Name = $"{input.DeviceName} Axis {input.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
-                Inputs = new List<InputSource> { input.ToInputSource() },
-                Output = new OutputTarget
+                // Add input to existing mapping (support multiple inputs)
+                existingMapping.Inputs.Add(newInputSource);
+                existingMapping.Name = $"vJoy {vjoyDevice.Id} Axis {outputIndex} ({existingMapping.Inputs.Count} inputs)";
+            }
+            else
+            {
+                // Create new mapping
+                var mapping = new AxisMapping
                 {
-                    Type = OutputType.VJoyAxis,
-                    VJoyDevice = vjoyDevice.Id,
-                    Index = outputIndex
-                },
-                Curve = new AxisCurve()
-            };
-            profile.AxisMappings.Add(mapping);
+                    Name = $"{input.DeviceName} Axis {input.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
+                    Inputs = new List<InputSource> { newInputSource },
+                    Output = new OutputTarget
+                    {
+                        Type = OutputType.VJoyAxis,
+                        VJoyDevice = vjoyDevice.Id,
+                        Index = outputIndex
+                    },
+                    Curve = new AxisCurve()
+                };
+                profile.AxisMappings.Add(mapping);
+            }
         }
         else
         {
-            var mapping = new ButtonMapping
+            // Find existing mapping or create new one
+            var existingMapping = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyButton &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+
+            if (existingMapping != null)
             {
-                Name = $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
-                Inputs = new List<InputSource> { input.ToInputSource() },
-                Output = new OutputTarget
+                // Add input to existing mapping (support multiple inputs)
+                existingMapping.Inputs.Add(newInputSource);
+                existingMapping.Name = $"vJoy {vjoyDevice.Id} Button {outputIndex + 1} ({existingMapping.Inputs.Count} inputs)";
+            }
+            else
+            {
+                // Create new mapping
+                var mapping = new ButtonMapping
                 {
-                    Type = OutputType.VJoyButton,
-                    VJoyDevice = vjoyDevice.Id,
-                    Index = outputIndex
-                },
-                Mode = _selectedButtonMode
-            };
-            profile.ButtonMappings.Add(mapping);
+                    Name = $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
+                    Inputs = new List<InputSource> { newInputSource },
+                    Output = new OutputTarget
+                    {
+                        Type = OutputType.VJoyButton,
+                        VJoyDevice = vjoyDevice.Id,
+                        Index = outputIndex
+                    },
+                    Mode = _selectedButtonMode
+                };
+                profile.ButtonMappings.Add(mapping);
+            }
         }
 
         profile.ModifiedAt = DateTime.UtcNow;
         _profileService.SaveActiveProfile();
         _pendingInput = null;
+    }
+
+    private void RemoveInputSourceAtIndex(int inputIndex)
+    {
+        if (_selectedMappingRow < 0) return;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        bool isAxis = _selectedMappingRow < 8;
+        int outputIndex = isAxis ? _selectedMappingRow : _selectedMappingRow - 8;
+
+        if (isAxis)
+        {
+            var mapping = profile.AxisMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyAxis &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+
+            if (mapping != null && inputIndex >= 0 && inputIndex < mapping.Inputs.Count)
+            {
+                mapping.Inputs.RemoveAt(inputIndex);
+                if (mapping.Inputs.Count == 0)
+                {
+                    // Remove the entire mapping if no inputs left
+                    profile.AxisMappings.Remove(mapping);
+                }
+            }
+        }
+        else
+        {
+            var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyButton &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+
+            if (mapping != null && inputIndex >= 0 && inputIndex < mapping.Inputs.Count)
+            {
+                mapping.Inputs.RemoveAt(inputIndex);
+                if (mapping.Inputs.Count == 0)
+                {
+                    // Remove the entire mapping if no inputs left
+                    profile.ButtonMappings.Remove(mapping);
+                }
+            }
+        }
+
+        profile.ModifiedAt = DateTime.UtcNow;
+        _profileService.SaveActiveProfile();
+    }
+
+    private void UpdateButtonModeForSelected()
+    {
+        if (_selectedMappingRow < 8) return; // Only for buttons
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow - 8;
+
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyButton &&
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping != null)
+        {
+            mapping.Mode = _selectedButtonMode;
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+        }
     }
 
     private void DrawAddMappingButton(SKCanvas canvas, SKRect bounds, bool hovered)

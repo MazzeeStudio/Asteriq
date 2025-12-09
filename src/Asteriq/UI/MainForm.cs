@@ -936,14 +936,15 @@ public class MainForm : Form
             _hoveredDevice = -1;
         }
 
-        // Window controls hover
-        float windowControlsX = ClientSize.Width - pad - 88;
+        // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
+        float btnSize = 28f;
+        float btnGap = 8f;
+        float btnTotalWidth = btnSize * 3 + btnGap * 2; // 100px
+        float windowControlsX = ClientSize.Width - pad - btnTotalWidth; // Align with page padding
         float titleBarY = 15;
-        if (e.Y >= titleBarY + 10 && e.Y <= titleBarY + 34)
+        if (e.Y >= titleBarY + 12 && e.Y <= titleBarY + 40)
         {
             float relX = e.X - windowControlsX;
-            float btnSize = 24f;
-            float btnGap = 8f;
 
             if (relX >= 0 && relX < btnSize) _hoveredWindowControl = 0;
             else if (relX >= btnSize + btnGap && relX < btnSize * 2 + btnGap) _hoveredWindowControl = 1;
@@ -3432,24 +3433,11 @@ public class MainForm : Form
             tabX += tabSpacing;
         }
 
-        // Window controls
-        float windowControlsX = bounds.Right - pad - 88;
-        FUIRenderer.DrawWindowControls(canvas, windowControlsX, titleBarY + 10,
+        // Window controls - aligned with page content (right edge at pad from window edge)
+        float btnTotalWidth = 28f * 3 + 8f * 2; // 3 buttons at 28px + 2 gaps at 8px = 100px
+        float windowControlsX = bounds.Right - pad - btnTotalWidth; // Align right edge with page padding
+        FUIRenderer.DrawWindowControls(canvas, windowControlsX, titleBarY + 12,
             _hoveredWindowControl == 0, _hoveredWindowControl == 1, _hoveredWindowControl == 2);
-
-        // Right L-corner accent
-        using (var accentPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary.WithAlpha(100),
-            StrokeWidth = 2f,
-            IsAntialias = true,
-            StrokeCap = SKStrokeCap.Square
-        })
-        {
-            canvas.DrawLine(bounds.Right - pad, titleBarY + 8, bounds.Right - pad, titleBarY + titleBarHeight - 5, accentPaint);
-            canvas.DrawLine(bounds.Right - pad - 25, titleBarY + 8, bounds.Right - pad, titleBarY + 8, accentPaint);
-        }
     }
 
     private void DrawProfileSelector(SKCanvas canvas, float x, float y)

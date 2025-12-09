@@ -89,7 +89,9 @@ Asteriq/
       },
       "options": {
         "curve": "linear",
-        "deadzone": 0.05,
+        "startDeadzone": 0.0,
+        "endDeadzone": 0.0,
+        "centerDeadzone": { "enabled": true, "value": 0.03 },
         "saturation": 1.0,
         "invert": false
       }
@@ -139,9 +141,47 @@ Maps to keyboard key press:
 
 ### Axis Options
 - **curve**: linear, exponential, s-curve, custom
-- **deadzone**: 0.0 - 0.5 (percentage from center)
-- **saturation**: 0.5 - 1.0 (percentage for full output)
 - **invert**: Reverse axis direction
+- **saturation**: 0.5 - 1.0 (percentage for full output)
+
+#### Deadzone Configuration
+Deadzones provide granular control over axis response. Available preset values: **0%, 1%, 2%, 3%, 5%, 7%, 10%**
+
+- **startDeadzone**: Deadzone at the minimum end of the axis range (e.g., throttle at idle)
+  - Applied when axis value is near -1.0 (or 0.0 for unidirectional axes)
+  - Useful for eliminating jitter at throttle idle or rudder neutral positions
+
+- **endDeadzone**: Deadzone at the maximum end of the axis range (e.g., throttle at full)
+  - Applied when axis value is near +1.0 (or 1.0 for unidirectional axes)
+  - Useful for ensuring full input is reached even with slight sensor variation
+
+- **centerDeadzone** (optional, can be enabled/disabled):
+  - Deadzone around the center position (0.0)
+  - Essential for self-centering axes like joystick X/Y
+  - Not typically used for throttle axes
+  - When disabled, the axis responds to all movement through center
+
+```json
+"options": {
+  "curve": "linear",
+  "startDeadzone": 0.02,
+  "endDeadzone": 0.01,
+  "centerDeadzone": {
+    "enabled": true,
+    "value": 0.03
+  },
+  "saturation": 1.0,
+  "invert": false
+}
+```
+
+**Axis Types and Typical Deadzone Usage:**
+| Axis Type | Start DZ | End DZ | Center DZ |
+|-----------|----------|--------|-----------|
+| Joystick X/Y | 0% | 0% | 2-5% (enabled) |
+| Throttle | 1-2% | 1% | N/A (disabled) |
+| Rudder Pedals | 0% | 0% | 2-3% (enabled) |
+| Rotary Encoders | 0% | 0% | 0% (disabled) |
 
 ## UI Design
 

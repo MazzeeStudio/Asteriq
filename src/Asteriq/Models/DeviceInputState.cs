@@ -38,5 +38,10 @@ public class PhysicalDeviceInfo
     public int ButtonCount { get; init; }
     public int HatCount { get; init; }
 
+    /// <summary>
+    /// Whether this is a virtual device (vJoy, vXBox, etc.)
+    /// </summary>
+    public bool IsVirtual { get; init; }
+
     public override string ToString() => $"{Name} (Axes:{AxisCount}, Buttons:{ButtonCount}, Hats:{HatCount})";
 }

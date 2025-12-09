@@ -417,8 +417,8 @@ public static class FUIRenderer
     public static void DrawWindowControls(SKCanvas canvas, float x, float y,
         bool minimizeHovered = false, bool maximizeHovered = false, bool closeHovered = false)
     {
-        float btnSize = 24f;
-        float btnGap = SpaceSM;
+        float btnSize = 28f;
+        float btnGap = 8f;
 
         var minBounds = new SKRect(x, y, x + btnSize, y + btnSize);
         DrawWindowControlButton(canvas, minBounds, WindowControlType.Minimize, minimizeHovered);
@@ -434,31 +434,33 @@ public static class FUIRenderer
 
     public static void DrawWindowControlButton(SKCanvas canvas, SKRect bounds, WindowControlType type, bool isHovered)
     {
-        bool isClose = type == WindowControlType.Close;
+        // FUI style: chamfered corner boxes (like other FUI elements)
+        var frameColor = isHovered ? FUIColors.Primary : FUIColors.Frame.WithAlpha(150);
+        float chamfer = 4f; // Chamfer size for corner cut
 
-        if (isClose)
-        {
-            using var bgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = isHovered ? FUIColors.Danger : FUIColors.Danger.WithAlpha(180),
-                IsAntialias = true
-            };
-            canvas.DrawRect(bounds, bgPaint);
-        }
-
+        // Draw chamfered rectangle frame (top-right corner cut)
         using var framePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = isClose ? FUIColors.Danger.WithAlpha(200) : FUIColors.FrameDim,
+            Color = frameColor,
             StrokeWidth = 1f,
             IsAntialias = true
         };
-        canvas.DrawRect(bounds, framePaint);
 
-        float pad = 7f;
-        var iconColor = isClose ? FUIColors.TextBright : FUIColors.TextDim;
+        using var path = new SKPath();
+        path.MoveTo(bounds.Left, bounds.Top);
+        path.LineTo(bounds.Right, bounds.Top);
+        path.LineTo(bounds.Right, bounds.Bottom - chamfer);
+        path.LineTo(bounds.Right - chamfer, bounds.Bottom);
+        path.LineTo(bounds.Left, bounds.Bottom);
+        path.Close();
+        canvas.DrawPath(path, framePaint);
 
+        // Icon color - brighter on hover
+        var iconColor = isHovered ? FUIColors.Primary : FUIColors.TextDim;
+
+        // Larger padding for more space around icons
+        float pad = 9f;
         using var iconPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -471,13 +473,35 @@ public static class FUIRenderer
         switch (type)
         {
             case WindowControlType.Minimize:
-                canvas.DrawLine(bounds.Left + pad, bounds.MidY, bounds.Right - pad, bounds.MidY, iconPaint);
+                // Single horizontal line positioned lower (near bottom third)
+                float underscoreY = bounds.Bottom - pad - 1;
+                canvas.DrawLine(bounds.Left + pad, underscoreY, bounds.Right - pad, underscoreY, iconPaint);
                 break;
             case WindowControlType.Maximize:
-                var iconRect = new SKRect(bounds.Left + pad, bounds.Top + pad, bounds.Right - pad, bounds.Bottom - pad);
-                canvas.DrawRect(iconRect, iconPaint);
-                break;
+                {
+                    // Two overlapping squares (restore/maximize icon style)
+                    float iconPad = pad + 1;
+                    float offset = 3f;
+                    // Back square (smaller, offset up-right)
+                    var backRect = new SKRect(bounds.Left + iconPad + offset, bounds.Top + iconPad,
+                                              bounds.Right - iconPad, bounds.Bottom - iconPad - offset);
+                    canvas.DrawRect(backRect, iconPaint);
+                    // Front square (offset down-left) - partial to show overlap
+                    var frontRect = new SKRect(bounds.Left + iconPad, bounds.Top + iconPad + offset,
+                                               bounds.Right - iconPad - offset, bounds.Bottom - iconPad);
+                    // Fill area behind front square to occlude back square
+                    using var fillPaint = new SKPaint
+                    {
+                        Style = SKPaintStyle.Fill,
+                        Color = FUIColors.Background1,
+                        IsAntialias = true
+                    };
+                    canvas.DrawRect(frontRect, fillPaint);
+                    canvas.DrawRect(frontRect, iconPaint);
+                    break;
+                }
             case WindowControlType.Close:
+                // X shape
                 canvas.DrawLine(bounds.Left + pad, bounds.Top + pad, bounds.Right - pad, bounds.Bottom - pad, iconPaint);
                 canvas.DrawLine(bounds.Right - pad, bounds.Top + pad, bounds.Left + pad, bounds.Bottom - pad, iconPaint);
                 break;

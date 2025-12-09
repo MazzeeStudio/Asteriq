@@ -13,7 +13,15 @@
       "label": "Trigger",
       "description": "Dual-stage trigger: Stage1=button1, Stage2=button2",
       "anchor": { "x": 950, "y": 450 },
-      "labelOffset": { "x": -150, "y": -50 }
+      "labelOffset": { "x": -150, "y": -50 },
+      "leadLine": {
+        "shelfSide": "right",
+        "shelfLength": 100,
+        "segments": [
+          { "angle": 60, "length": 120 },
+          { "angle": 0, "length": 80 }
+        ]
+      }
     },
     "ministick": {
       "id": "control_ministick",
@@ -49,7 +57,15 @@
       "label": "Castle Switch",
       "description": "5-way castle: Center=button14, Up=button15, Left=button16, Down=button17, Right=button18",
       "anchor": { "x": 350, "y": 380 },
-      "labelOffset": { "x": -130, "y": 0 }
+      "labelOffset": { "x": -130, "y": 0 },
+      "leadLine": {
+        "shelfSide": "left",
+        "shelfLength": 80,
+        "segments": [
+          { "angle": 45, "length": 100 },
+          { "angle": 0, "length": 60 }
+        ]
+      }
     },
     "side_button": {
       "id": "control_side_button",
@@ -85,7 +101,14 @@
       "label": "2-Way Hat",
       "description": "2-way hat + push: Center=button28, Up=button29, Down=button30",
       "anchor": { "x": 1300, "y": 380 },
-      "labelOffset": { "x": 130, "y": 0 }
+      "labelOffset": { "x": 130, "y": 0 },
+      "leadLine": {
+        "shelfSide": "right",
+        "shelfLength": 80,
+        "segments": [
+          { "angle": -30, "length": 100 }
+        ]
+      }
     },
     "slider": {
       "id": "control_slider",

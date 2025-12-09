@@ -108,6 +108,9 @@ public class MainForm : Form
     private List<SKRect> _mappingRemoveButtonBounds = new();
     private int _hoveredAddButton = -1;
     private int _hoveredRemoveButton = -1;
+    private float _bindingsScrollOffset = 0;
+    private float _bindingsContentHeight = 0;
+    private SKRect _bindingsListBounds;
 
     // Mappings tab UI state - Right panel (mapping editor)
     private bool _mappingEditorOpen = false;
@@ -381,18 +384,44 @@ public class MainForm : Form
     {
         var name = deviceName.ToUpperInvariant();
 
-        // Throttle keywords - MongooseT, 50CM, TWCS, etc.
-        if (name.Contains("THROTTLE") || name.Contains("50CM") || name.Contains("TM50") ||
-            name.Contains("TWCS") || name.Contains("MONGOOSE"))
+        // Throttle keywords - VPC throttles (MongoosT-50CM, CM2, CM3), TWCS, Warthog, etc.
+        if (name.Contains("THROTTLE") || name.Contains("-50CM") || name.Contains("50CM") ||
+            name.Contains("TM50") || name.Contains("TWCS") || name.Contains("MONGOOST") ||
+            name.Contains("MONGOOSE") || name.Contains("CM2") || name.Contains("CM3"))
+        {
+            System.Diagnostics.Debug.WriteLine($"DetectDeviceType: '{deviceName}' -> Throttle");
             return "Throttle";
+        }
 
         // Pedals keywords
         if (name.Contains("PEDAL") || name.Contains("RUDDER") || name.Contains("TPR") ||
             name.Contains("MFG") || name.Contains("CROSSWIND"))
+        {
+            System.Diagnostics.Debug.WriteLine($"DetectDeviceType: '{deviceName}' -> Pedals");
             return "Pedals";
+        }
 
         // Default to joystick
+        System.Diagnostics.Debug.WriteLine($"DetectDeviceType: '{deviceName}' -> Joystick (default)");
         return "Joystick";
+    }
+
+    /// <summary>
+    /// Get the appropriate SVG for the current device map
+    /// </summary>
+    private SKSvg? GetActiveSvg()
+    {
+        if (_deviceMap == null)
+            return _joystickSvg;
+
+        // Check the device map's svgFile field
+        var svgFile = _deviceMap.SvgFile?.ToLowerInvariant() ?? "";
+
+        if (svgFile.Contains("throttle"))
+            return _throttleSvg ?? _joystickSvg;
+
+        // Default to joystick
+        return _joystickSvg;
     }
 
     private void ParseControlBounds(string svgPath)
@@ -554,6 +583,7 @@ public class MainForm : Form
         _canvas.MouseMove += OnCanvasMouseMove;
         _canvas.MouseDown += OnCanvasMouseDown;
         _canvas.MouseLeave += OnCanvasMouseLeave;
+        _canvas.MouseWheel += OnCanvasMouseWheel;
         Controls.Add(_canvas);
     }
 
@@ -1087,6 +1117,7 @@ public class MainForm : Form
             {
                 _selectedVJoyDeviceIndex--;
                 _selectedMappingRow = -1;
+                _bindingsScrollOffset = 0; // Reset scroll when changing device
                 CancelInputListening();
                 return;
             }
@@ -1094,6 +1125,7 @@ public class MainForm : Form
             {
                 _selectedVJoyDeviceIndex++;
                 _selectedMappingRow = -1;
+                _bindingsScrollOffset = 0; // Reset scroll when changing device
                 CancelInputListening();
                 return;
             }
@@ -1129,6 +1161,19 @@ public class MainForm : Form
         _hoveredDevice = -1;
         _hoveredWindowControl = -1;
         _hoveredControlId = null;
+    }
+
+    private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
+    {
+        // Only handle scroll on MAPPINGS tab when mouse is over the bindings list
+        if (_activeTab == 1 && _bindingsListBounds.Contains(e.X, e.Y))
+        {
+            float scrollAmount = -e.Delta / 4f; // Delta is usually ±120, divide for smooth scrolling
+            float maxScroll = Math.Max(0, _bindingsContentHeight - _bindingsListBounds.Height);
+
+            _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset + scrollAmount, 0, maxScroll);
+            _canvas.Invalidate();
+        }
     }
 
     private string? HitTestSvg(SKPoint screenPoint)
@@ -1196,7 +1241,7 @@ public class MainForm : Form
 
         // Calculate panel widths
         float leftPanelWidth = 300f;
-        float rightPanelWidth = 230f;
+        float rightPanelWidth = 330f;
         float centerStart = pad + leftPanelWidth + gap;
         float centerEnd = bounds.Right - pad - rightPanelWidth - gap;
 
@@ -1231,8 +1276,8 @@ public class MainForm : Form
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
         // Three-panel layout: Left (bindings list) | Center (device view) | Right (settings)
-        float leftPanelWidth = 320f;
-        float rightPanelWidth = 320f;
+        float leftPanelWidth = 300f;
+        float rightPanelWidth = 330f;
         float centerPanelWidth = contentBounds.Width - leftPanelWidth - rightPanelWidth - 20;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
@@ -1276,7 +1321,7 @@ public class MainForm : Form
         float rightMargin = bounds.Right - frameInset - 10;
 
         // Title
-        FUIRenderer.DrawText(canvas, "VJOY BINDINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "VJOY MAPPINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
         y += 30;
 
         // vJoy device selector: [<] vJoy Device 1 [>]
@@ -1310,6 +1355,7 @@ public class MainForm : Form
         _mappingRowBounds.Clear();
         _mappingAddButtonBounds.Clear();
         _mappingRemoveButtonBounds.Clear();
+        _bindingsListBounds = bounds;
 
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
         {
@@ -1323,51 +1369,129 @@ public class MainForm : Form
 
         float rowHeight = 32f;  // Compact rows (bindings shown in right panel now)
         float rowGap = 4f;
-        float y = bounds.Top;
+        float sectionHeaderHeight = 22f;
+        float sectionGap = 8f;
+
+        // Calculate total content height for scrolling
+        string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
+        int axisCount = Math.Min(axisNames.Length, 8);
+        int buttonCount = vjoyDevice.ButtonCount;
+        _bindingsContentHeight = sectionHeaderHeight + (axisCount * (rowHeight + rowGap)) +
+                                 sectionGap + sectionHeaderHeight + (buttonCount * (rowHeight + rowGap));
+
+        // Clamp scroll offset
+        float maxScroll = Math.Max(0, _bindingsContentHeight - bounds.Height);
+        _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset, 0, maxScroll);
+
+        // Set up clipping
+        canvas.Save();
+        canvas.ClipRect(bounds);
+
+        float y = bounds.Top - _bindingsScrollOffset;
         int rowIndex = 0;
 
         // Section: AXES
-        FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
-        y += 22;
-
-        string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
-        for (int i = 0; i < Math.Min(axisNames.Length, 8); i++)
+        if (y + sectionHeaderHeight > bounds.Top - 20)
         {
-            if (y + rowHeight > bounds.Bottom) break;
+            FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
+        }
+        y += sectionHeaderHeight;
 
-            var rowBounds = new SKRect(bounds.Left, y, bounds.Right, y + rowHeight);
-            string binding = GetAxisBindingText(profile, vjoyDevice.Id, i);
-            bool isSelected = rowIndex == _selectedMappingRow;
-            bool isHovered = rowIndex == _hoveredMappingRow;
+        for (int i = 0; i < axisCount; i++)
+        {
+            float rowTop = y;
+            float rowBottom = y + rowHeight;
 
-            DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
+            // Only draw if visible
+            if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
+            {
+                var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
+                string binding = GetAxisBindingText(profile, vjoyDevice.Id, i);
+                bool isSelected = rowIndex == _selectedMappingRow;
+                bool isHovered = rowIndex == _hoveredMappingRow;
 
-            _mappingRowBounds.Add(rowBounds);
+                DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
+                _mappingRowBounds.Add(rowBounds);
+            }
+            else
+            {
+                // Add placeholder bounds for hit testing even when not visible
+                _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
+            }
+
             y += rowHeight + rowGap;
             rowIndex++;
         }
 
         // Section: BUTTONS
-        y += 8;
-        if (y + 22 < bounds.Bottom)
+        y += sectionGap;
+        if (y + sectionHeaderHeight > bounds.Top && y < bounds.Bottom)
         {
             FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
-            y += 22;
         }
+        y += sectionHeaderHeight;
 
-        for (int i = 0; i < vjoyDevice.ButtonCount && y + rowHeight <= bounds.Bottom; i++)
+        for (int i = 0; i < buttonCount; i++)
         {
-            var rowBounds = new SKRect(bounds.Left, y, bounds.Right, y + rowHeight);
-            string binding = GetButtonBindingText(profile, vjoyDevice.Id, i);
-            bool isSelected = rowIndex == _selectedMappingRow;
-            bool isHovered = rowIndex == _hoveredMappingRow;
+            float rowTop = y;
+            float rowBottom = y + rowHeight;
 
-            DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex);
+            // Only draw if visible
+            if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
+            {
+                var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
+                string binding = GetButtonBindingText(profile, vjoyDevice.Id, i);
+                bool isSelected = rowIndex == _selectedMappingRow;
+                bool isHovered = rowIndex == _hoveredMappingRow;
 
-            _mappingRowBounds.Add(rowBounds);
+                DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex);
+                _mappingRowBounds.Add(rowBounds);
+            }
+            else
+            {
+                _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
+            }
+
             y += rowHeight + rowGap;
             rowIndex++;
         }
+
+        canvas.Restore();
+
+        // Draw scroll indicator if content overflows
+        if (_bindingsContentHeight > bounds.Height)
+        {
+            DrawScrollIndicator(canvas, bounds, _bindingsScrollOffset, _bindingsContentHeight);
+        }
+    }
+
+    private void DrawScrollIndicator(SKCanvas canvas, SKRect bounds, float scrollOffset, float contentHeight)
+    {
+        float trackHeight = bounds.Height - 20;
+        float thumbRatio = bounds.Height / contentHeight;
+        float thumbHeight = Math.Max(20, trackHeight * thumbRatio);
+        float thumbOffset = (scrollOffset / (contentHeight - bounds.Height)) * (trackHeight - thumbHeight);
+
+        // Position track outside the list bounds, aligned with corner frame edge
+        float trackX = bounds.Right + 8; // Outside cells, inline with frame
+        float trackTop = bounds.Top + 10;
+        float trackWidth = 3f;
+
+        // Track (subtle)
+        using var trackPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Frame.WithAlpha(40)
+        };
+        canvas.DrawRoundRect(new SKRect(trackX, trackTop, trackX + trackWidth, trackTop + trackHeight), 1.5f, 1.5f, trackPaint);
+
+        // Thumb
+        using var thumbPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Primary.WithAlpha(200)
+        };
+        canvas.DrawRoundRect(new SKRect(trackX, trackTop + thumbOffset, trackX + trackWidth, trackTop + thumbOffset + thumbHeight), 1.5f, 1.5f, thumbPaint);
     }
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
@@ -1453,7 +1577,9 @@ public class MainForm : Form
             );
 
             bool mirror = _deviceMap?.Mirror ?? false;
-            DrawSvgInBounds(canvas, _joystickSvg, constrainedBounds, mirror);
+            var activeSvg = GetActiveSvg();
+            if (activeSvg != null)
+                DrawSvgInBounds(canvas, activeSvg, constrainedBounds, mirror);
         }
         else
         {
@@ -3242,8 +3368,8 @@ public class MainForm : Form
             new SKPoint(bounds.Right - pad, titleBarY + titleBarHeight + 8),
             FUIColors.Frame.WithAlpha(80), 1f, 2f);
 
-        // Tab indicators
-        float tabStartX = bounds.Right - 540;
+        // Tab indicators (32px gap after profile dropdown)
+        float tabStartX = bounds.Right - 508;
         float tabX = tabStartX;
         float tabSpacing = 100;
 
@@ -3693,29 +3819,21 @@ public class MainForm : Form
             new SKPoint(bounds.Left + pad + 220, bounds.Top + 30),
             FUIColors.Primary.WithAlpha(60), 1f, 2f);
 
-        // Device silhouette takes the full panel area (with margin for lead-lines)
-        // But limit max size to 900px for consistent appearance
-        float leadLineMargin = 180f; // Space for labels on left/right sides
-        float silhouetteLeft = bounds.Left + leadLineMargin;
+        // Device silhouette - fill available space (height-constrained, like mappings view)
         float silhouetteTop = bounds.Top + 45;
-        float silhouetteRight = bounds.Right - leadLineMargin;
         float silhouetteBottom = bounds.Bottom - 20;
-
-        // Apply 900px max size limit
-        float maxSize = 900f;
-        float availWidth = silhouetteRight - silhouetteLeft;
         float availHeight = silhouetteBottom - silhouetteTop;
 
-        if (availWidth > maxSize || availHeight > maxSize)
-        {
-            float constrainedSize = Math.Min(Math.Min(availWidth, availHeight), maxSize);
-            float centerX = (silhouetteLeft + silhouetteRight) / 2;
-            float centerY = (silhouetteTop + silhouetteBottom) / 2;
-            silhouetteLeft = centerX - constrainedSize / 2;
-            silhouetteRight = centerX + constrainedSize / 2;
-            silhouetteTop = centerY - constrainedSize / 2;
-            silhouetteBottom = centerY + constrainedSize / 2;
-        }
+        // Use height as the primary constraint, keep it square-ish
+        float maxSize = 900f;
+        float size = Math.Min(availHeight, maxSize);
+
+        // Center horizontally in the available space
+        float centerX = bounds.MidX;
+        float centerY = (silhouetteTop + silhouetteBottom) / 2;
+
+        float silhouetteLeft = centerX - size / 2;
+        float silhouetteRight = centerX + size / 2;
 
         _silhouetteBounds = new SKRect(silhouetteLeft, silhouetteTop, silhouetteRight, silhouetteBottom);
         DrawDeviceSilhouette(canvas, _silhouetteBounds);
@@ -4035,10 +4153,11 @@ public class MainForm : Form
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(100), 20f, 6f);
 
         // Draw the actual SVG if loaded, otherwise fallback to simple outline
-        if (_joystickSvg?.Picture != null)
+        var activeSvg = GetActiveSvg();
+        if (activeSvg?.Picture != null)
         {
             bool mirror = _deviceMap?.Mirror ?? false;
-            DrawSvgInBounds(canvas, _joystickSvg, bounds, mirror);
+            DrawSvgInBounds(canvas, activeSvg, bounds, mirror);
         }
         else
         {

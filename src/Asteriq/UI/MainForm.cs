@@ -41,6 +41,8 @@ public class MainForm : Form
     // Services
     private readonly InputService _inputService;
     private readonly ProfileService _profileService;
+    private readonly VJoyService _vjoyService;
+    private readonly MappingEngine _mappingEngine;
 
     // Profile UI state
     private List<ProfileInfo> _profiles = new();
@@ -86,16 +88,85 @@ public class MainForm : Form
     private DeviceMap? _deviceMap;
     private readonly ActiveInputTracker _activeInputTracker = new();
 
+    // Mappings tab UI state - Left panel (output list)
+    private int _selectedVJoyDeviceIndex = 0;
+    private List<VJoyDeviceInfo> _vjoyDevices = new();
+    private int _selectedMappingRow = -1;
+    private int _hoveredMappingRow = -1;
+    private SKRect _vjoyPrevButtonBounds;
+    private SKRect _vjoyNextButtonBounds;
+    private bool _vjoyPrevHovered;
+    private bool _vjoyNextHovered;
+    private List<SKRect> _mappingRowBounds = new();
+    private List<SKRect> _mappingAddButtonBounds = new();
+    private List<SKRect> _mappingRemoveButtonBounds = new();
+    private int _hoveredAddButton = -1;
+    private int _hoveredRemoveButton = -1;
+
+    // Mappings tab UI state - Right panel (mapping editor)
+    private bool _mappingEditorOpen = false;
+    private int _editingRowIndex = -1;
+    private bool _isEditingAxis = false;
+    private InputDetectionService? _inputDetectionService;
+
+    // Mapping editor - input detection
+    private bool _isListeningForInput = false;
+    private SKRect _inputFieldBounds;
+    private bool _inputFieldHovered;
+    private DetectedInput? _pendingInput;
+    private DateTime _lastInputFieldClick;
+    private const int DoubleClickThresholdMs = 400;
+
+    // Mapping editor - manual entry
+    private bool _manualEntryMode = false;
+    private SKRect _manualEntryButtonBounds;
+    private bool _manualEntryButtonHovered;
+    private int _selectedSourceDevice = 0;
+    private int _selectedSourceControl = 0;
+    private SKRect _deviceDropdownBounds;
+    private SKRect _controlDropdownBounds;
+    private bool _deviceDropdownOpen = false;
+    private bool _controlDropdownOpen = false;
+    private int _hoveredDeviceIndex = -1;
+    private int _hoveredControlIndex = -1;
+
+    // Mapping editor - button modes
+    private ButtonMode _selectedButtonMode = ButtonMode.Normal;
+    private SKRect[] _buttonModeBounds = new SKRect[4];
+    private int _hoveredButtonMode = -1;
+
+    // Double-click detection for binding rows
+    private DateTime _lastRowClickTime = DateTime.MinValue;
+    private int _lastClickedRow = -1;
+    private const int DoubleClickMs = 400;
+
+    // Mapping editor - action buttons
+    private SKRect _saveButtonBounds;
+    private SKRect _cancelButtonBounds;
+    private bool _saveButtonHovered;
+    private bool _cancelButtonHovered;
+
     public MainForm()
     {
         _inputService = new InputService();
         _profileService = new ProfileService();
+        _vjoyService = new VJoyService();
+        _mappingEngine = new MappingEngine(_vjoyService);
         InitializeForm();
         InitializeCanvas();
         InitializeInput();
+        InitializeVJoy();
         InitializeRenderLoop();
         LoadSvgAssets();
         InitializeProfiles();
+    }
+
+    private void InitializeVJoy()
+    {
+        if (!_vjoyService.Initialize())
+        {
+            System.Diagnostics.Debug.WriteLine("vJoy driver not available");
+        }
     }
 
     private void InitializeProfiles()
@@ -581,11 +652,17 @@ public class MainForm : Form
         if (top) return HTTOP;
         if (bottom) return HTBOTTOM;
 
-        // Title bar area for dragging (but not over buttons)
+        // Title bar area for dragging (but not over buttons or tabs)
         if (clientPoint.Y < TitleBarHeight)
         {
             // Exclude window controls area
             if (clientPoint.X >= ClientSize.Width - 120)
+            {
+                return HTCLIENT;
+            }
+            // Exclude tab area (tabs start at Width - 540 and span ~400px)
+            float tabStartX = ClientSize.Width - 540;
+            if (clientPoint.X >= tabStartX && clientPoint.Y >= 35 && clientPoint.Y <= 65)
             {
                 return HTCLIENT;
             }
@@ -603,6 +680,166 @@ public class MainForm : Form
     {
         // Store mouse position for debug display
         _mousePosition = e.Location;
+
+        // Mappings tab hover handling
+        if (_activeTab == 1)
+        {
+            // Reset hover states for left panel
+            _vjoyPrevHovered = false;
+            _vjoyNextHovered = false;
+            _hoveredMappingRow = -1;
+            _hoveredAddButton = -1;
+            _hoveredRemoveButton = -1;
+
+            // Reset hover states for editor panel
+            _inputFieldHovered = false;
+            _manualEntryButtonHovered = false;
+            _saveButtonHovered = false;
+            _cancelButtonHovered = false;
+            _hoveredButtonMode = -1;
+            _hoveredDeviceIndex = -1;
+            _hoveredControlIndex = -1;
+
+            // Editor panel hover detection (if open) - set hover states but don't return
+            // so left panel can still be hovered
+            bool editorHandledHover = false;
+            if (_mappingEditorOpen)
+            {
+                if (_inputFieldBounds.Contains(e.X, e.Y))
+                {
+                    _inputFieldHovered = true;
+                    Cursor = Cursors.Hand;
+                    editorHandledHover = true;
+                }
+                else if (_manualEntryButtonBounds.Contains(e.X, e.Y))
+                {
+                    _manualEntryButtonHovered = true;
+                    Cursor = Cursors.Hand;
+                    editorHandledHover = true;
+                }
+                else if (_saveButtonBounds.Contains(e.X, e.Y))
+                {
+                    _saveButtonHovered = true;
+                    Cursor = Cursors.Hand;
+                    editorHandledHover = true;
+                }
+                else if (_cancelButtonBounds.Contains(e.X, e.Y))
+                {
+                    _cancelButtonHovered = true;
+                    Cursor = Cursors.Hand;
+                    editorHandledHover = true;
+                }
+                // Button mode hover
+                else if (!_isEditingAxis)
+                {
+                    for (int i = 0; i < _buttonModeBounds.Length; i++)
+                    {
+                        if (_buttonModeBounds[i].Contains(e.X, e.Y))
+                        {
+                            _hoveredButtonMode = i;
+                            Cursor = Cursors.Hand;
+                            editorHandledHover = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Manual entry dropdowns hover (these should return early since they overlap content)
+                if (!editorHandledHover && _manualEntryMode)
+                {
+                    if (_deviceDropdownOpen)
+                    {
+                        float itemHeight = 26f;
+                        float listTop = _deviceDropdownBounds.Bottom + 2;
+                        for (int i = 0; i < _devices.Count; i++)
+                        {
+                            var itemBounds = new SKRect(_deviceDropdownBounds.Left, listTop + i * itemHeight,
+                                _deviceDropdownBounds.Right, listTop + (i + 1) * itemHeight);
+                            if (itemBounds.Contains(e.X, e.Y))
+                            {
+                                _hoveredDeviceIndex = i;
+                                Cursor = Cursors.Hand;
+                                return; // Dropdown overlays content
+                            }
+                        }
+                    }
+                    if (_controlDropdownOpen)
+                    {
+                        float itemHeight = 24f;
+                        float listTop = _controlDropdownBounds.Bottom + 2;
+                        int controlCount = _isEditingAxis ? 8 : 32;
+                        for (int i = 0; i < controlCount; i++)
+                        {
+                            var itemBounds = new SKRect(_controlDropdownBounds.Left, listTop + i * itemHeight,
+                                _controlDropdownBounds.Right, listTop + (i + 1) * itemHeight);
+                            if (itemBounds.Contains(e.X, e.Y))
+                            {
+                                _hoveredControlIndex = i;
+                                Cursor = Cursors.Hand;
+                                return; // Dropdown overlays content
+                            }
+                        }
+                    }
+                    if (_deviceDropdownBounds.Contains(e.X, e.Y) || _controlDropdownBounds.Contains(e.X, e.Y))
+                    {
+                        Cursor = Cursors.Hand;
+                        editorHandledHover = true;
+                    }
+                }
+            }
+
+            // Skip left panel hover if editor already handled it
+            if (editorHandledHover) return;
+
+            // vJoy device selector buttons
+            if (_vjoyPrevButtonBounds.Contains(e.X, e.Y) && _selectedVJoyDeviceIndex > 0)
+            {
+                _vjoyPrevHovered = true;
+                Cursor = Cursors.Hand;
+                return;
+            }
+            if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1)
+            {
+                _vjoyNextHovered = true;
+                Cursor = Cursors.Hand;
+                return;
+            }
+
+            // Mapping row hover and buttons
+            for (int i = 0; i < _mappingRowBounds.Count; i++)
+            {
+                if (_mappingRowBounds[i].Contains(e.X, e.Y))
+                {
+                    _hoveredMappingRow = i;
+
+                    // Check [+] button
+                    if (i < _mappingAddButtonBounds.Count && _mappingAddButtonBounds[i].Contains(e.X, e.Y))
+                    {
+                        _hoveredAddButton = i;
+                        Cursor = Cursors.Hand;
+                        return;
+                    }
+
+                    // Check [×] button
+                    if (i < _mappingRemoveButtonBounds.Count && !_mappingRemoveButtonBounds[i].IsEmpty &&
+                        _mappingRemoveButtonBounds[i].Contains(e.X, e.Y))
+                    {
+                        _hoveredRemoveButton = i;
+                        Cursor = Cursors.Hand;
+                        return;
+                    }
+
+                    Cursor = Cursors.Hand;
+                    return;
+                }
+            }
+        }
+        else
+        {
+            _hoveredMappingRow = -1;
+            _hoveredAddButton = -1;
+            _hoveredRemoveButton = -1;
+        }
 
         // Profile dropdown hover detection
         if (_profileDropdownOpen && _profileDropdownBounds.Contains(e.X, e.Y))
@@ -804,6 +1041,58 @@ public class MainForm : Form
             }
         }
 
+        // Mappings tab click handling
+        if (_activeTab == 1)
+        {
+            // vJoy device navigation
+            if (_vjoyPrevHovered && _selectedVJoyDeviceIndex > 0)
+            {
+                _selectedVJoyDeviceIndex--;
+                _selectedMappingRow = -1;
+                CancelInputListening();
+                return;
+            }
+            if (_vjoyNextHovered && _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1)
+            {
+                _selectedVJoyDeviceIndex++;
+                _selectedMappingRow = -1;
+                CancelInputListening();
+                return;
+            }
+
+            // Button mode selection (right panel)
+            if (_selectedMappingRow >= 8 && _hoveredButtonMode >= 0)
+            {
+                _selectedButtonMode = (ButtonMode)_hoveredButtonMode;
+                return;
+            }
+
+            // Binding row clicked - single click selects, double click starts listening
+            if (_hoveredMappingRow >= 0)
+            {
+                var now = DateTime.Now;
+                bool isDoubleClick = (_hoveredMappingRow == _lastClickedRow) &&
+                                     (now - _lastRowClickTime).TotalMilliseconds < DoubleClickMs;
+
+                if (isDoubleClick)
+                {
+                    // Double-click: start listening for input
+                    _selectedMappingRow = _hoveredMappingRow;
+                    StartInputListening(_hoveredMappingRow);
+                    _lastClickedRow = -1;
+                }
+                else
+                {
+                    // Single click: just select the row
+                    _selectedMappingRow = _hoveredMappingRow;
+                    CancelInputListening();
+                    _lastClickedRow = _hoveredMappingRow;
+                    _lastRowClickTime = now;
+                }
+                return;
+            }
+        }
+
         // SVG control clicks
         if (_hoveredControlId != null)
         {
@@ -893,20 +1182,1756 @@ public class MainForm : Form
         float centerStart = pad + leftPanelWidth + gap;
         float centerEnd = bounds.Right - pad - rightPanelWidth - gap;
 
-        // Left panel: Device List
-        var deviceListBounds = new SKRect(pad, contentTop, pad + leftPanelWidth, contentBottom);
-        DrawDeviceListPanel(canvas, deviceListBounds);
+        // Content based on active tab
+        if (_activeTab == 1) // MAPPINGS tab
+        {
+            DrawMappingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
+        }
+        else
+        {
+            // Default: Device tab layout
+            // Left panel: Device List
+            var deviceListBounds = new SKRect(pad, contentTop, pad + leftPanelWidth, contentBottom);
+            DrawDeviceListPanel(canvas, deviceListBounds);
 
-        // Center panel: Device Details
-        var detailsBounds = new SKRect(centerStart, contentTop, centerEnd, contentBottom);
-        DrawDeviceDetailsPanel(canvas, detailsBounds);
+            // Center panel: Device Details
+            var detailsBounds = new SKRect(centerStart, contentTop, centerEnd, contentBottom);
+            DrawDeviceDetailsPanel(canvas, detailsBounds);
 
-        // Right panel: Status
-        var statusBounds = new SKRect(bounds.Right - pad - rightPanelWidth, contentTop, bounds.Right - pad, contentBottom);
-        DrawStatusPanel(canvas, statusBounds);
+            // Right panel: Status
+            var statusBounds = new SKRect(bounds.Right - pad - rightPanelWidth, contentTop, bounds.Right - pad, contentBottom);
+            DrawStatusPanel(canvas, statusBounds);
+        }
 
         // Status bar
         DrawStatusBar(canvas, bounds);
+    }
+
+    private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
+    {
+        float frameInset = 5f;
+        var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
+
+        // Three-panel layout: Left (bindings list) | Center (device view) | Right (settings)
+        float leftPanelWidth = 320f;
+        float rightPanelWidth = 320f;
+        float centerPanelWidth = contentBounds.Width - leftPanelWidth - rightPanelWidth - 20;
+
+        var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
+            contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
+        var centerBounds = new SKRect(leftBounds.Right + 10, contentBounds.Top,
+            leftBounds.Right + 10 + centerPanelWidth, contentBounds.Bottom);
+        var rightBounds = new SKRect(centerBounds.Right + 10, contentBounds.Top,
+            contentBounds.Right, contentBounds.Bottom);
+
+        // Refresh vJoy devices list
+        if (_vjoyDevices.Count == 0)
+        {
+            _vjoyDevices = _vjoyService.EnumerateDevices();
+        }
+
+        // LEFT PANEL - Bindings List
+        DrawBindingsPanel(canvas, leftBounds, frameInset);
+
+        // CENTER PANEL - Device Visualization
+        DrawDeviceVisualizationPanel(canvas, centerBounds, frameInset);
+
+        // RIGHT PANEL - Settings
+        DrawMappingSettingsPanel(canvas, rightBounds, frameInset);
+    }
+
+    private void DrawBindingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(140),
+            IsAntialias = true
+        };
+        canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
+            bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 40f, 10f);
+
+        float y = bounds.Top + frameInset + 10;
+        float leftMargin = bounds.Left + frameInset + 10;
+        float rightMargin = bounds.Right - frameInset - 10;
+
+        // Title
+        FUIRenderer.DrawText(canvas, "VJOY BINDINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
+        y += 30;
+
+        // vJoy device selector: [<] vJoy Device 1 [>]
+        float arrowButtonSize = 28f;
+        _vjoyPrevButtonBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
+        DrawArrowButton(canvas, _vjoyPrevButtonBounds, "◀", _vjoyPrevHovered, _selectedVJoyDeviceIndex > 0);
+
+        string deviceName = _vjoyDevices.Count > 0 && _selectedVJoyDeviceIndex < _vjoyDevices.Count
+            ? $"vJoy Device {_vjoyDevices[_selectedVJoyDeviceIndex].Id}"
+            : "No vJoy Devices";
+        float deviceNameX = leftMargin + arrowButtonSize + 10;
+        FUIRenderer.DrawText(canvas, deviceName, new SKPoint(deviceNameX, y + 18), FUIColors.TextBright, 12f);
+
+        _vjoyNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
+        DrawArrowButton(canvas, _vjoyNextButtonBounds, "▶", _vjoyNextHovered, _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1);
+        y += arrowButtonSize + 15;
+
+        FUIRenderer.DrawGlowingLine(canvas,
+            new SKPoint(bounds.Left + frameInset, y),
+            new SKPoint(bounds.Right - frameInset, y),
+            FUIColors.Primary.WithAlpha(80), 1f, 2f);
+        y += 10;
+
+        // Column headers
+        FUIRenderer.DrawText(canvas, "OUTPUT", new SKPoint(leftMargin, y + 10), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "INPUT", new SKPoint(leftMargin + 120, y + 10), FUIColors.TextDim, 10f);
+        y += 25;
+
+        // Scrollable binding rows
+        float listBottom = bounds.Bottom - frameInset - 10;
+        DrawBindingsList(canvas, new SKRect(leftMargin - 5, y, rightMargin + 5, listBottom));
+    }
+
+    private void DrawBindingsList(SKCanvas canvas, SKRect bounds)
+    {
+        _mappingRowBounds.Clear();
+        _mappingAddButtonBounds.Clear();
+        _mappingRemoveButtonBounds.Clear();
+
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
+        {
+            FUIRenderer.DrawText(canvas, "No vJoy devices available",
+                new SKPoint(bounds.Left + 10, bounds.Top + 30), FUIColors.TextDim, 12f);
+            return;
+        }
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        var profile = _profileService.ActiveProfile;
+
+        float rowHeight = 48f;  // Chunky rows
+        float rowGap = 6f;
+        float y = bounds.Top;
+        int rowIndex = 0;
+
+        // Section: AXES
+        FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
+        y += 22;
+
+        string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
+        for (int i = 0; i < Math.Min(axisNames.Length, 8); i++)
+        {
+            if (y + rowHeight > bounds.Bottom) break;
+
+            var rowBounds = new SKRect(bounds.Left, y, bounds.Right, y + rowHeight);
+            string binding = GetAxisBindingText(profile, vjoyDevice.Id, i);
+            bool isSelected = rowIndex == _selectedMappingRow;
+            bool isHovered = rowIndex == _hoveredMappingRow;
+
+            DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
+
+            _mappingRowBounds.Add(rowBounds);
+            y += rowHeight + rowGap;
+            rowIndex++;
+        }
+
+        // Section: BUTTONS
+        y += 8;
+        if (y + 22 < bounds.Bottom)
+        {
+            FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
+            y += 22;
+        }
+
+        for (int i = 0; i < vjoyDevice.ButtonCount && y + rowHeight <= bounds.Bottom; i++)
+        {
+            var rowBounds = new SKRect(bounds.Left, y, bounds.Right, y + rowHeight);
+            string binding = GetButtonBindingText(profile, vjoyDevice.Id, i);
+            bool isSelected = rowIndex == _selectedMappingRow;
+            bool isHovered = rowIndex == _hoveredMappingRow;
+
+            DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex);
+
+            _mappingRowBounds.Add(rowBounds);
+            y += rowHeight + rowGap;
+            rowIndex++;
+        }
+    }
+
+    private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
+        bool isSelected, bool isHovered, int rowIndex)
+    {
+        // Background
+        SKColor bgColor;
+        if (isSelected)
+            bgColor = FUIColors.Active.WithAlpha(50);
+        else if (isHovered)
+            bgColor = FUIColors.Primary.WithAlpha(35);
+        else
+            bgColor = FUIColors.Background2.WithAlpha(100);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
+
+        // Frame
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = isSelected ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(100)),
+            StrokeWidth = isSelected ? 2f : 1f
+        };
+        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+
+        // Output name (left side, top)
+        float leftTextX = bounds.Left + 12;
+        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftTextX, bounds.Top + 18),
+            isSelected ? FUIColors.Active : FUIColors.TextPrimary, 12f, true);
+
+        // Binding button/indicator (spans width, bottom half)
+        float bindingY = bounds.Top + 26;
+        float bindingHeight = bounds.Height - 30;
+        var bindingBounds = new SKRect(bounds.Left + 8, bindingY, bounds.Right - 8, bounds.Bottom - 6);
+
+        bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
+        bool isListening = _isListeningForInput && isSelected;
+
+        // Binding area background
+        SKColor bindBgColor;
+        if (isListening)
+            bindBgColor = FUIColors.Warning.WithAlpha(40);
+        else if (hasBinding)
+            bindBgColor = FUIColors.Background1;
+        else
+            bindBgColor = FUIColors.Background1.WithAlpha(150);
+
+        using var bindBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bindBgColor };
+        canvas.DrawRoundRect(bindingBounds, 3, 3, bindBgPaint);
+
+        using var bindFramePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = isListening ? FUIColors.Warning : (hasBinding ? FUIColors.Frame : FUIColors.FrameDim),
+            StrokeWidth = 1f,
+            PathEffect = hasBinding ? null : SKPathEffect.CreateDash(new float[] { 4, 2 }, 0)
+        };
+        canvas.DrawRoundRect(bindingBounds, 3, 3, bindFramePaint);
+
+        // Binding text
+        string displayText;
+        SKColor textColor;
+        if (isListening)
+        {
+            byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
+            displayText = "Press input...";
+            textColor = FUIColors.Warning.WithAlpha(alpha);
+        }
+        else if (hasBinding)
+        {
+            displayText = binding;
+            textColor = FUIColors.TextPrimary;
+        }
+        else
+        {
+            displayText = "None";
+            textColor = FUIColors.TextDisabled;
+        }
+
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bindingBounds.Left + 8, bindingBounds.MidY + 4),
+            textColor, 11f);
+    }
+
+    private void DrawDeviceVisualizationPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(100),
+            IsAntialias = true
+        };
+        canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
+            bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(150), 30f, 8f);
+
+        // If we have a selected binding with a device, show the device silhouette
+        // For now, show placeholder
+        float centerX = bounds.MidX;
+        float centerY = bounds.MidY;
+
+        // Draw the joystick SVG if available
+        if (_joystickSvg?.Picture != null)
+        {
+            var picture = _joystickSvg.Picture;
+            var picBounds = picture.CullRect;
+
+            // Calculate scale to fit
+            float maxWidth = bounds.Width - 40;
+            float maxHeight = bounds.Height - 40;
+            float scale = Math.Min(maxWidth / picBounds.Width, maxHeight / picBounds.Height) * 0.8f;
+
+            // Center the image
+            float drawX = centerX - (picBounds.Width * scale) / 2;
+            float drawY = centerY - (picBounds.Height * scale) / 2;
+
+            canvas.Save();
+            canvas.Translate(drawX, drawY);
+            canvas.Scale(scale);
+
+            // Draw with transparency
+            using var paint = new SKPaint { Color = SKColors.White.WithAlpha(180) };
+            canvas.DrawPicture(picture, paint);
+            canvas.Restore();
+        }
+        else
+        {
+            // Placeholder text
+            FUIRenderer.DrawTextCentered(canvas, "Device Preview",
+                new SKRect(bounds.Left, centerY - 20, bounds.Right, centerY + 20),
+                FUIColors.TextDim, 14f);
+        }
+    }
+
+    private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(140),
+            IsAntialias = true
+        };
+        canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
+            bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+
+        float y = bounds.Top + frameInset + 10;
+        float leftMargin = bounds.Left + frameInset + 15;
+        float rightMargin = bounds.Right - frameInset - 15;
+
+        // Title
+        FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
+        y += 35;
+
+        FUIRenderer.DrawGlowingLine(canvas,
+            new SKPoint(bounds.Left + frameInset, y - 5),
+            new SKPoint(bounds.Right - frameInset, y - 5),
+            FUIColors.Primary.WithAlpha(80), 1f, 2f);
+
+        // Show settings for selected row
+        if (_selectedMappingRow < 0)
+        {
+            FUIRenderer.DrawText(canvas, "Select a binding to configure",
+                new SKPoint(leftMargin, y + 30), FUIColors.TextDim, 12f);
+            return;
+        }
+
+        // Determine if axis or button
+        bool isAxis = _selectedMappingRow < 8;
+        string outputName = GetSelectedOutputName();
+
+        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 15), FUIColors.Active, 13f, true);
+        y += 35;
+
+        if (isAxis)
+        {
+            DrawAxisSettings(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 10);
+        }
+        else
+        {
+            DrawButtonSettings(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 10);
+        }
+    }
+
+    private string GetSelectedOutputName()
+    {
+        if (_selectedMappingRow < 0) return "";
+
+        if (_selectedMappingRow < 8)
+        {
+            string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
+            return _selectedMappingRow < axisNames.Length ? axisNames[_selectedMappingRow] : $"Axis {_selectedMappingRow}";
+        }
+        else
+        {
+            return $"Button {_selectedMappingRow - 8 + 1}";
+        }
+    }
+
+    private void DrawAxisSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
+    {
+        float width = rightMargin - leftMargin;
+
+        // Response Curve section
+        FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        // Curve type selector with arrows
+        float curveSelectWidth = width;
+        float arrowSize = 28f;
+        var prevCurveBounds = new SKRect(leftMargin, y, leftMargin + arrowSize, y + arrowSize);
+        var nextCurveBounds = new SKRect(rightMargin - arrowSize, y, rightMargin, y + arrowSize);
+
+        DrawArrowButton(canvas, prevCurveBounds, "◀", false, true);
+        DrawArrowButton(canvas, nextCurveBounds, "▶", false, true);
+
+        // Curve name in center
+        string curveName = "Linear";  // Would come from selected mapping
+        FUIRenderer.DrawTextCentered(canvas, curveName,
+            new SKRect(leftMargin + arrowSize + 5, y, rightMargin - arrowSize - 5, y + arrowSize),
+            FUIColors.TextPrimary, 12f);
+        y += arrowSize + 15;
+
+        // Curve visualization
+        float curveHeight = 120f;
+        var curveBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
+        DrawCurveVisualization(canvas, curveBounds);
+        y += curveHeight + 20;
+
+        // Deadzone slider
+        if (y + 50 < bottom)
+        {
+            FUIRenderer.DrawText(canvas, "DEADZONE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "5%", new SKPoint(rightMargin - 25, y), FUIColors.TextPrimary, 10f);
+            y += 18;
+            DrawSlider(canvas, new SKRect(leftMargin, y, rightMargin, y + 8), 0.05f);
+            y += 25;
+        }
+
+        // Saturation slider
+        if (y + 50 < bottom)
+        {
+            FUIRenderer.DrawText(canvas, "SATURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "100%", new SKPoint(rightMargin - 30, y), FUIColors.TextPrimary, 10f);
+            y += 18;
+            DrawSlider(canvas, new SKRect(leftMargin, y, rightMargin, y + 8), 1.0f);
+            y += 25;
+        }
+
+        // Invert toggle
+        if (y + 30 < bottom)
+        {
+            FUIRenderer.DrawText(canvas, "Invert Axis", new SKPoint(leftMargin, y + 8), FUIColors.TextPrimary, 11f);
+            DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + 24), false);
+        }
+    }
+
+    private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
+    {
+        // Button Mode section
+        FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        // Mode buttons
+        string[] modes = { "Normal", "Toggle", "Pulse", "Hold" };
+        float buttonHeight = 32f;
+        float buttonGap = 6f;
+
+        for (int i = 0; i < modes.Length && y + buttonHeight < bottom; i++)
+        {
+            var modeBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
+            bool selected = i == (int)_selectedButtonMode;
+            bool hovered = i == _hoveredButtonMode;
+
+            SKColor bgColor = selected ? FUIColors.Active.WithAlpha(60) :
+                (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+
+            using var modeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRoundRect(modeBounds, 3, 3, modeBgPaint);
+
+            using var modeFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = selected ? FUIColors.Active : FUIColors.Frame,
+                StrokeWidth = selected ? 2f : 1f
+            };
+            canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
+
+            FUIRenderer.DrawText(canvas, modes[i], new SKPoint(modeBounds.Left + 12, modeBounds.MidY + 4),
+                selected ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+
+            _buttonModeBounds[i] = modeBounds;
+            y += buttonHeight + buttonGap;
+        }
+
+        y += 10;
+
+        // Clear binding button
+        if (y + 40 < bottom)
+        {
+            var clearBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
+            using var clearBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+            canvas.DrawRoundRect(clearBounds, 3, 3, clearBgPaint);
+
+            using var clearFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Warning.WithAlpha(150),
+                StrokeWidth = 1f
+            };
+            canvas.DrawRoundRect(clearBounds, 3, 3, clearFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, "Clear Binding", clearBounds, FUIColors.Warning, 11f);
+        }
+    }
+
+    private void DrawCurveVisualization(SKCanvas canvas, SKRect bounds)
+    {
+        // Background
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Grid
+        using var gridPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Grid.WithAlpha(50),
+            StrokeWidth = 1f
+        };
+        // Vertical center
+        canvas.DrawLine(bounds.MidX, bounds.Top, bounds.MidX, bounds.Bottom, gridPaint);
+        // Horizontal center
+        canvas.DrawLine(bounds.Left, bounds.MidY, bounds.Right, bounds.MidY, gridPaint);
+
+        // Frame
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Draw linear curve (diagonal line)
+        using var curvePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Active,
+            StrokeWidth = 2f,
+            IsAntialias = true
+        };
+        canvas.DrawLine(bounds.Left, bounds.Bottom, bounds.Right, bounds.Top, curvePaint);
+    }
+
+    private void DrawSlider(SKCanvas canvas, SKRect bounds, float value)
+    {
+        // Track background
+        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
+
+        // Fill
+        float fillWidth = bounds.Width * Math.Clamp(value, 0, 1);
+        var fillBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + fillWidth, bounds.Bottom);
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active };
+        canvas.DrawRoundRect(fillBounds, 4, 4, fillPaint);
+
+        // Handle
+        float handleX = bounds.Left + fillWidth;
+        float handleRadius = bounds.Height;
+        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
+        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
+    }
+
+    private void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, bool on)
+    {
+        // Track
+        SKColor trackColor = on ? FUIColors.Active.WithAlpha(150) : FUIColors.Background2;
+        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = trackColor };
+        canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, trackPaint);
+
+        // Frame
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = on ? FUIColors.Active : FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, framePaint);
+
+        // Knob
+        float knobRadius = bounds.Height / 2 - 3;
+        float knobX = on ? bounds.Right - knobRadius - 3 : bounds.Left + knobRadius + 3;
+        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
+        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
+    }
+
+    private void DrawMappingEditorPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Active, 30f, 8f);
+
+        float y = bounds.Top + frameInset + 15;
+        float leftMargin = bounds.Left + frameInset + 15;
+        float rightMargin = bounds.Right - frameInset - 15;
+
+        // Title
+        string outputName = GetEditingOutputName();
+        FUIRenderer.DrawText(canvas, $"EDIT: {outputName}", new SKPoint(leftMargin, y),
+            FUIColors.Active, 14f, true);
+        y += 30;
+
+        FUIRenderer.DrawGlowingLine(canvas,
+            new SKPoint(bounds.Left + frameInset, y - 10),
+            new SKPoint(bounds.Right - frameInset, y - 10),
+            FUIColors.Active.WithAlpha(80), 1f, 2f);
+
+        // INPUT SOURCE section
+        FUIRenderer.DrawText(canvas, "INPUT SOURCE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        // Input field - double-click to listen for input
+        float inputFieldHeight = 36f;
+        _inputFieldBounds = new SKRect(leftMargin, y, rightMargin, y + inputFieldHeight);
+        DrawInputField(canvas, _inputFieldBounds);
+        y += inputFieldHeight + 10;
+
+        // Manual entry toggle button
+        _manualEntryButtonBounds = new SKRect(leftMargin, y, leftMargin + 120, y + 24);
+        DrawToggleButton(canvas, _manualEntryButtonBounds, "Manual Entry", _manualEntryMode, _manualEntryButtonHovered);
+        y += 34;
+
+        // Manual entry dropdowns (if enabled)
+        if (_manualEntryMode)
+        {
+            y = DrawManualEntrySection(canvas, bounds, y, leftMargin, rightMargin);
+        }
+
+        // Button mode section (only for button outputs)
+        if (!_isEditingAxis)
+        {
+            y += 10;
+            FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 20;
+            DrawButtonModeSelector(canvas, leftMargin, y, rightMargin - leftMargin);
+            y += 40;
+        }
+
+        // Action buttons at bottom
+        float buttonWidth = 80f;
+        float buttonHeight = 32f;
+        float buttonY = bounds.Bottom - frameInset - buttonHeight - 15;
+
+        _cancelButtonBounds = new SKRect(rightMargin - buttonWidth * 2 - 10, buttonY,
+            rightMargin - buttonWidth - 10, buttonY + buttonHeight);
+        _saveButtonBounds = new SKRect(rightMargin - buttonWidth, buttonY,
+            rightMargin, buttonY + buttonHeight);
+
+        DrawActionButton(canvas, _cancelButtonBounds, "Cancel", _cancelButtonHovered, false);
+        DrawActionButton(canvas, _saveButtonBounds, "Save", _saveButtonHovered, true);
+    }
+
+    private string GetEditingOutputName()
+    {
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
+            return "Unknown";
+
+        if (_isEditingAxis)
+        {
+            string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
+            int axisIndex = _editingRowIndex;
+            return axisIndex < axisNames.Length ? axisNames[axisIndex] : $"Axis {axisIndex}";
+        }
+        else
+        {
+            int buttonIndex = _editingRowIndex - 8;
+            return $"Button {buttonIndex + 1}";
+        }
+    }
+
+    private void DrawInputField(SKCanvas canvas, SKRect bounds)
+    {
+        // Background
+        var bgColor = _isListeningForInput
+            ? FUIColors.Warning.WithAlpha(40)
+            : (_inputFieldHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Frame
+        var frameColor = _isListeningForInput
+            ? FUIColors.Warning
+            : (_inputFieldHovered ? FUIColors.Primary : FUIColors.Frame);
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = frameColor,
+            StrokeWidth = _isListeningForInput ? 2f : 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Text content
+        float textY = bounds.MidY + 5;
+        if (_isListeningForInput)
+        {
+            byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
+            FUIRenderer.DrawText(canvas, "Press a button or move an axis...",
+                new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 12f);
+        }
+        else if (_pendingInput != null)
+        {
+            FUIRenderer.DrawText(canvas, _pendingInput.ToString(),
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 12f);
+        }
+        else
+        {
+            FUIRenderer.DrawText(canvas, "Double-click to detect input",
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextDisabled, 12f);
+        }
+
+        // Clear button if there's input
+        if (_pendingInput != null && !_isListeningForInput)
+        {
+            var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
+            DrawSmallIconButton(canvas, clearBounds, "×", false, true);
+        }
+    }
+
+    private void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
+    {
+        var bgColor = active
+            ? FUIColors.Active.WithAlpha(60)
+            : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+        var textColor = active ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = active ? FUIColors.Active : FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+    }
+
+    private float DrawManualEntrySection(SKCanvas canvas, SKRect bounds, float y, float leftMargin, float rightMargin)
+    {
+        // Device dropdown
+        FUIRenderer.DrawText(canvas, "Device:", new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 10f);
+        float dropdownX = leftMargin + 55;
+        _deviceDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
+        string deviceText = _devices.Count > 0 && _selectedSourceDevice < _devices.Count
+            ? _devices[_selectedSourceDevice].Name
+            : "No devices";
+        DrawDropdown(canvas, _deviceDropdownBounds, deviceText, _deviceDropdownOpen);
+        y += 36;
+
+        // Control dropdown
+        string controlLabel = _isEditingAxis ? "Axis:" : "Button:";
+        FUIRenderer.DrawText(canvas, controlLabel, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 10f);
+        _controlDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
+        string controlText = GetControlDropdownText();
+        DrawDropdown(canvas, _controlDropdownBounds, controlText, _controlDropdownOpen);
+        y += 36;
+
+        // Draw dropdown lists if open
+        if (_deviceDropdownOpen)
+        {
+            DrawDeviceDropdownList(canvas, _deviceDropdownBounds);
+        }
+        else if (_controlDropdownOpen)
+        {
+            DrawControlDropdownList(canvas, _controlDropdownBounds);
+        }
+
+        return y;
+    }
+
+    private string GetControlDropdownText()
+    {
+        if (_devices.Count == 0 || _selectedSourceDevice >= _devices.Count)
+            return "—";
+
+        var device = _devices[_selectedSourceDevice];
+        if (_isEditingAxis)
+        {
+            int axisCount = 8; // Typical axis count
+            if (_selectedSourceControl < axisCount)
+                return $"Axis {_selectedSourceControl}";
+        }
+        else
+        {
+            if (_selectedSourceControl < 128)
+                return $"Button {_selectedSourceControl + 1}";
+        }
+        return "—";
+    }
+
+    private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
+    {
+        var bgColor = open ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = open ? FUIColors.Primary : FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4),
+            FUIColors.TextPrimary, 11f);
+
+        // Arrow indicator
+        string arrow = open ? "▲" : "▼";
+        FUIRenderer.DrawText(canvas, arrow, new SKPoint(bounds.Right - 18, bounds.MidY + 4),
+            FUIColors.TextDim, 10f);
+    }
+
+    private void DrawDeviceDropdownList(SKCanvas canvas, SKRect anchorBounds)
+    {
+        float itemHeight = 26f;
+        float listHeight = Math.Min(_devices.Count * itemHeight, 200);
+        var listBounds = new SKRect(anchorBounds.Left, anchorBounds.Bottom + 2,
+            anchorBounds.Right, anchorBounds.Bottom + 2 + listHeight);
+
+        // Draw shadow/backdrop for visual separation
+        using var shadowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.Black.WithAlpha(120)
+        };
+        var shadowBounds = new SKRect(listBounds.Left - 1, listBounds.Top - 1, listBounds.Right + 5, listBounds.Bottom + 5);
+        canvas.DrawRect(shadowBounds, shadowPaint);
+
+        // Solid opaque background
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        canvas.DrawRect(listBounds, bgPaint);
+
+        // Draw items
+        float y = listBounds.Top;
+        for (int i = 0; i < _devices.Count && y < listBounds.Bottom; i++)
+        {
+            var itemBounds = new SKRect(listBounds.Left, y, listBounds.Right, y + itemHeight);
+            bool hovered = i == _hoveredDeviceIndex;
+
+            if (hovered)
+            {
+                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(60) };
+                canvas.DrawRect(itemBounds, hoverPaint);
+            }
+
+            FUIRenderer.DrawText(canvas, _devices[i].Name, new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4),
+                hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 11f);
+            y += itemHeight;
+        }
+
+        // Frame on top
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Primary,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(listBounds, framePaint);
+    }
+
+    private void DrawControlDropdownList(SKCanvas canvas, SKRect anchorBounds)
+    {
+        int controlCount = _isEditingAxis ? 8 : 32; // Show first 8 axes or 32 buttons
+        float itemHeight = 24f;
+        float listHeight = Math.Min(controlCount * itemHeight, 200);
+        var listBounds = new SKRect(anchorBounds.Left, anchorBounds.Bottom + 2,
+            anchorBounds.Right, anchorBounds.Bottom + 2 + listHeight);
+
+        // Draw shadow/backdrop for visual separation
+        using var shadowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.Black.WithAlpha(120)
+        };
+        var shadowBounds = new SKRect(listBounds.Left - 1, listBounds.Top - 1, listBounds.Right + 5, listBounds.Bottom + 5);
+        canvas.DrawRect(shadowBounds, shadowPaint);
+
+        // Solid opaque background
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        canvas.DrawRect(listBounds, bgPaint);
+
+        // Draw items
+        float y = listBounds.Top;
+        for (int i = 0; i < controlCount && y < listBounds.Bottom; i++)
+        {
+            var itemBounds = new SKRect(listBounds.Left, y, listBounds.Right, y + itemHeight);
+            bool hovered = i == _hoveredControlIndex;
+
+            if (hovered)
+            {
+                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(60) };
+                canvas.DrawRect(itemBounds, hoverPaint);
+            }
+
+            string name = _isEditingAxis ? $"Axis {i}" : $"Button {i + 1}";
+            FUIRenderer.DrawText(canvas, name, new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4),
+                hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 11f);
+            y += itemHeight;
+        }
+
+        // Frame on top
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Primary,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(listBounds, framePaint);
+    }
+
+    private void DrawButtonModeSelector(SKCanvas canvas, float x, float y, float width)
+    {
+        ButtonMode[] modes = { ButtonMode.Normal, ButtonMode.Toggle, ButtonMode.Pulse, ButtonMode.HoldToActivate };
+        string[] labels = { "Normal", "Toggle", "Pulse", "Hold" };
+        float buttonWidth = (width - 15) / 4;
+        float buttonHeight = 28f;
+
+        for (int i = 0; i < modes.Length; i++)
+        {
+            var modeBounds = new SKRect(x + i * (buttonWidth + 5), y, x + i * (buttonWidth + 5) + buttonWidth, y + buttonHeight);
+            _buttonModeBounds[i] = modeBounds;
+
+            bool selected = _selectedButtonMode == modes[i];
+            bool hovered = _hoveredButtonMode == i;
+
+            var bgColor = selected
+                ? FUIColors.Active.WithAlpha(60)
+                : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(modeBounds, bgPaint);
+
+            using var framePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = selected ? FUIColors.Active : FUIColors.Frame,
+                StrokeWidth = selected ? 2f : 1f
+            };
+            canvas.DrawRect(modeBounds, framePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 10f);
+        }
+    }
+
+    private void DrawActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
+    {
+        var bgColor = isPrimary
+            ? (hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(180))
+            : (hovered ? FUIColors.Primary.WithAlpha(60) : FUIColors.Background2);
+        var textColor = isPrimary
+            ? FUIColors.Background1
+            : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = isPrimary ? FUIColors.Active : FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
+    }
+
+    private void DrawArrowButton(SKCanvas canvas, SKRect bounds, string arrow, bool hovered, bool enabled)
+    {
+        var bgColor = enabled
+            ? (hovered ? FUIColors.Primary.WithAlpha(80) : FUIColors.Background2)
+            : FUIColors.Background1;
+        var textColor = enabled
+            ? (hovered ? FUIColors.TextBright : FUIColors.TextPrimary)
+            : FUIColors.TextDisabled;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = enabled ? FUIColors.Frame : FUIColors.FrameDim,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, arrow, bounds, textColor, 14f);
+    }
+
+    private void DrawOutputMappingList(SKCanvas canvas, SKRect bounds)
+    {
+        _mappingRowBounds.Clear();
+        _mappingAddButtonBounds.Clear();
+        _mappingRemoveButtonBounds.Clear();
+
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
+        {
+            FUIRenderer.DrawText(canvas, "No vJoy devices available",
+                new SKPoint(bounds.Left + 20, bounds.Top + 20), FUIColors.TextDim, 12f);
+            FUIRenderer.DrawText(canvas, "Install vJoy driver to create mappings",
+                new SKPoint(bounds.Left + 20, bounds.Top + 40), FUIColors.TextDisabled, 11f);
+            return;
+        }
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        var profile = _profileService.ActiveProfile;
+
+        float rowHeight = 32f;
+        float rowGap = 4f;
+        float y = bounds.Top;
+        int rowIndex = 0;
+
+        // Section: AXES
+        FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 14), FUIColors.Active, 11f);
+        y += 20;
+
+        string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
+        for (int i = 0; i < Math.Min(axisNames.Length, 8); i++)
+        {
+            if (y + rowHeight > bounds.Bottom) break;
+
+            var rowBounds = new SKRect(bounds.Left, y, bounds.Right, y + rowHeight);
+            string binding = GetAxisBindingText(profile, vjoyDevice.Id, i);
+            bool isSelected = rowIndex == _selectedMappingRow;
+            bool isHovered = rowIndex == _hoveredMappingRow;
+            bool isEditing = _mappingEditorOpen && rowIndex == _editingRowIndex;
+
+            DrawMappingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, isEditing, rowIndex, !string.IsNullOrEmpty(binding) && binding != "—");
+
+            _mappingRowBounds.Add(rowBounds);
+            y += rowHeight + rowGap;
+            rowIndex++;
+        }
+
+        // Section: BUTTONS
+        y += 10;
+        if (y + 20 < bounds.Bottom)
+        {
+            FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 14), FUIColors.Active, 11f);
+            y += 20;
+        }
+
+        for (int i = 0; i < vjoyDevice.ButtonCount && y + rowHeight <= bounds.Bottom; i++)
+        {
+            var rowBounds = new SKRect(bounds.Left, y, bounds.Right, y + rowHeight);
+            string binding = GetButtonBindingText(profile, vjoyDevice.Id, i);
+            bool isSelected = rowIndex == _selectedMappingRow;
+            bool isHovered = rowIndex == _hoveredMappingRow;
+            bool isEditing = _mappingEditorOpen && rowIndex == _editingRowIndex;
+
+            DrawMappingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, isEditing, rowIndex, !string.IsNullOrEmpty(binding) && binding != "—");
+
+            _mappingRowBounds.Add(rowBounds);
+            y += rowHeight + rowGap;
+            rowIndex++;
+        }
+    }
+
+    private string GetAxisBindingText(MappingProfile? profile, uint vjoyId, int axisIndex)
+    {
+        if (profile == null) return "—";
+
+        var mapping = profile.AxisMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyAxis &&
+            m.Output.VJoyDevice == vjoyId &&
+            m.Output.Index == axisIndex);
+
+        if (mapping == null || mapping.Inputs.Count == 0) return "—";
+
+        var input = mapping.Inputs[0];
+        return $"{input.DeviceName} - Axis {input.Index}";
+    }
+
+    private string GetButtonBindingText(MappingProfile? profile, uint vjoyId, int buttonIndex)
+    {
+        if (profile == null) return "—";
+
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyButton &&
+            m.Output.VJoyDevice == vjoyId &&
+            m.Output.Index == buttonIndex);
+
+        if (mapping == null || mapping.Inputs.Count == 0) return "—";
+
+        var input = mapping.Inputs[0];
+        if (input.Type == InputType.Button)
+            return $"{input.DeviceName} - Button {input.Index + 1}";
+        return $"{input.DeviceName} - {input.Type} {input.Index}";
+    }
+
+    private void DrawMappingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
+        bool isSelected, bool isHovered, bool isEditing, int rowIndex, bool hasBind)
+    {
+        // Background
+        SKColor bgColor;
+        if (isEditing)
+            bgColor = FUIColors.Active.WithAlpha(60);
+        else if (isSelected)
+            bgColor = FUIColors.Active.WithAlpha(40);
+        else if (isHovered)
+            bgColor = FUIColors.Primary.WithAlpha(30);
+        else
+            bgColor = FUIColors.Background2.WithAlpha(60);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Frame
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = isEditing ? FUIColors.Active : (isSelected ? FUIColors.Active.WithAlpha(150) : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(80))),
+            StrokeWidth = isEditing ? 2f : (isSelected ? 1.5f : 1f)
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Output name (left)
+        float textY = bounds.MidY + 5;
+        FUIRenderer.DrawText(canvas, outputName, new SKPoint(bounds.Left + 10, textY),
+            isEditing ? FUIColors.Active : FUIColors.TextPrimary, 12f);
+
+        // Binding (center)
+        float bindingX = bounds.Left + 100;
+        var bindColor = binding == "—" ? FUIColors.TextDisabled : FUIColors.TextDim;
+        FUIRenderer.DrawText(canvas, binding, new SKPoint(bindingX, textY), bindColor, 11f);
+
+        // [+] button (Edit/Add)
+        float buttonSize = 24f;
+        float buttonY = bounds.MidY - buttonSize / 2;
+        float addButtonX = bounds.Right - (hasBind ? 60 : 35);
+        var addBounds = new SKRect(addButtonX, buttonY, addButtonX + buttonSize, buttonY + buttonSize);
+        _mappingAddButtonBounds.Add(addBounds);
+
+        bool addHovered = rowIndex == _hoveredAddButton;
+        string addIcon = hasBind ? "✎" : "+";  // Pencil for edit, plus for add
+        DrawSmallIconButton(canvas, addBounds, addIcon, addHovered);
+
+        // [×] button (only if bound)
+        if (hasBind)
+        {
+            float removeButtonX = bounds.Right - 32;
+            var removeBounds = new SKRect(removeButtonX, buttonY, removeButtonX + buttonSize, buttonY + buttonSize);
+            _mappingRemoveButtonBounds.Add(removeBounds);
+
+            bool removeHovered = rowIndex == _hoveredRemoveButton;
+            DrawSmallIconButton(canvas, removeBounds, "×", removeHovered, true);
+        }
+        else
+        {
+            _mappingRemoveButtonBounds.Add(SKRect.Empty);
+        }
+    }
+
+    private void DrawSmallIconButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, bool isDanger = false)
+    {
+        var bgColor = hovered
+            ? (isDanger ? FUIColors.Warning.WithAlpha(60) : FUIColors.Active.WithAlpha(60))
+            : FUIColors.Background2.WithAlpha(100);
+        var textColor = hovered
+            ? (isDanger ? FUIColors.Warning : FUIColors.Active)
+            : FUIColors.TextDim;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = hovered ? (isDanger ? FUIColors.Warning : FUIColors.Active) : FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, icon, bounds, textColor, 14f);
+    }
+
+    private void OpenMappingEditor(int rowIndex)
+    {
+        if (!_profileService.HasActiveProfile)
+        {
+            CreateNewProfilePrompt();
+            if (!_profileService.HasActiveProfile) return;
+        }
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        // Cancel any existing listening
+        CancelInputListening();
+
+        _mappingEditorOpen = true;
+        _editingRowIndex = rowIndex;
+        _selectedMappingRow = rowIndex;
+        _isEditingAxis = rowIndex < 8;
+        _pendingInput = null;
+        _manualEntryMode = false;
+        _selectedButtonMode = ButtonMode.Normal;
+        _selectedSourceDevice = 0;
+        _selectedSourceControl = 0;
+
+        // Load existing binding if present
+        LoadExistingBinding(rowIndex);
+    }
+
+    private void LoadExistingBinding(int rowIndex)
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        bool isAxis = rowIndex < 8;
+        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+
+        if (isAxis)
+        {
+            var mapping = profile.AxisMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyAxis &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+
+            if (mapping != null && mapping.Inputs.Count > 0)
+            {
+                var input = mapping.Inputs[0];
+                _pendingInput = new DetectedInput
+                {
+                    DeviceGuid = Guid.TryParse(input.DeviceId, out var guid) ? guid : Guid.Empty,
+                    DeviceName = input.DeviceName,
+                    Type = input.Type,
+                    Index = input.Index,
+                    Value = 0
+                };
+
+                // Set selected device in dropdown
+                for (int i = 0; i < _devices.Count; i++)
+                {
+                    if (_devices[i].InstanceGuid.ToString() == input.DeviceId)
+                    {
+                        _selectedSourceDevice = i;
+                        break;
+                    }
+                }
+                _selectedSourceControl = input.Index;
+            }
+        }
+        else
+        {
+            var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyButton &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+
+            if (mapping != null && mapping.Inputs.Count > 0)
+            {
+                var input = mapping.Inputs[0];
+                _pendingInput = new DetectedInput
+                {
+                    DeviceGuid = Guid.TryParse(input.DeviceId, out var guid) ? guid : Guid.Empty,
+                    DeviceName = input.DeviceName,
+                    Type = input.Type,
+                    Index = input.Index,
+                    Value = 0
+                };
+                _selectedButtonMode = mapping.Mode;
+
+                // Set selected device in dropdown
+                for (int i = 0; i < _devices.Count; i++)
+                {
+                    if (_devices[i].InstanceGuid.ToString() == input.DeviceId)
+                    {
+                        _selectedSourceDevice = i;
+                        break;
+                    }
+                }
+                _selectedSourceControl = input.Index;
+            }
+        }
+    }
+
+    private void CloseMappingEditor()
+    {
+        CancelInputListening();
+        _mappingEditorOpen = false;
+        _editingRowIndex = -1;
+        _pendingInput = null;
+        _deviceDropdownOpen = false;
+        _controlDropdownOpen = false;
+    }
+
+    private async void StartListeningForInput()
+    {
+        if (_isListeningForInput) return;
+        if (!_mappingEditorOpen) return;
+
+        _isListeningForInput = true;
+        _pendingInput = null;
+
+        // Determine input type based on what we're editing
+        var filter = _isEditingAxis ? InputDetectionFilter.Axes : InputDetectionFilter.Buttons;
+
+        _inputDetectionService ??= new InputDetectionService(_inputService);
+
+        try
+        {
+            // Wait for actual input change - use a delay to skip initial state
+            await Task.Delay(200); // Small delay to let user release any currently pressed buttons
+
+            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.5f, 15000);
+
+            if (detected != null && _mappingEditorOpen)
+            {
+                _pendingInput = detected;
+
+                // Update manual entry dropdowns to match detected input
+                for (int i = 0; i < _devices.Count; i++)
+                {
+                    if (_devices[i].InstanceGuid == detected.DeviceGuid)
+                    {
+                        _selectedSourceDevice = i;
+                        break;
+                    }
+                }
+                _selectedSourceControl = detected.Index;
+            }
+        }
+        catch (Exception)
+        {
+            // Cancelled or error
+        }
+        finally
+        {
+            _isListeningForInput = false;
+        }
+    }
+
+    private void SaveMapping()
+    {
+        if (!_mappingEditorOpen || _pendingInput == null) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _isEditingAxis ? _editingRowIndex : _editingRowIndex - 8;
+
+        // Remove existing binding
+        RemoveBindingAtRow(_editingRowIndex, save: false);
+
+        if (_isEditingAxis)
+        {
+            var mapping = new AxisMapping
+            {
+                Name = $"{_pendingInput.DeviceName} Axis {_pendingInput.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
+                Inputs = new List<InputSource> { _pendingInput.ToInputSource() },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyAxis,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                },
+                Curve = new AxisCurve()
+            };
+            profile.AxisMappings.Add(mapping);
+        }
+        else
+        {
+            var mapping = new ButtonMapping
+            {
+                Name = $"{_pendingInput.DeviceName} Button {_pendingInput.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
+                Inputs = new List<InputSource> { _pendingInput.ToInputSource() },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyButton,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                },
+                Mode = _selectedButtonMode
+            };
+            profile.ButtonMappings.Add(mapping);
+        }
+
+        _profileService.SaveActiveProfile();
+        CloseMappingEditor();
+    }
+
+    private void CreateBindingFromManualEntry()
+    {
+        if (!_manualEntryMode || _devices.Count == 0 || _selectedSourceDevice >= _devices.Count) return;
+
+        var device = _devices[_selectedSourceDevice];
+        _pendingInput = new DetectedInput
+        {
+            DeviceGuid = device.InstanceGuid,
+            DeviceName = device.Name,
+            Type = _isEditingAxis ? InputType.Axis : InputType.Button,
+            Index = _selectedSourceControl,
+            Value = 0
+        };
+    }
+
+    private void CreateBindingForRow(int rowIndex, DetectedInput input)
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        bool isAxis = rowIndex < 8;
+        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+
+        // Remove existing binding for this output
+        RemoveBindingAtRow(rowIndex, save: false);
+
+        if (isAxis)
+        {
+            var mapping = new AxisMapping
+            {
+                Name = $"{input.DeviceName} Axis {input.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
+                Inputs = new List<InputSource> { input.ToInputSource() },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyAxis,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                },
+                Curve = new AxisCurve()
+            };
+            profile.AxisMappings.Add(mapping);
+        }
+        else
+        {
+            var mapping = new ButtonMapping
+            {
+                Name = $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
+                Inputs = new List<InputSource> { input.ToInputSource() },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyButton,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                },
+                Mode = ButtonMode.Normal
+            };
+            profile.ButtonMappings.Add(mapping);
+        }
+
+        _profileService.SaveActiveProfile();
+    }
+
+    private void RemoveBindingAtRow(int rowIndex, bool save = true)
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        bool isAxis = rowIndex < 8;
+        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+
+        if (isAxis)
+        {
+            var existing = profile.AxisMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyAxis &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+            if (existing != null)
+            {
+                profile.AxisMappings.Remove(existing);
+            }
+        }
+        else
+        {
+            var existing = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Output.Type == OutputType.VJoyButton &&
+                m.Output.VJoyDevice == vjoyDevice.Id &&
+                m.Output.Index == outputIndex);
+            if (existing != null)
+            {
+                profile.ButtonMappings.Remove(existing);
+            }
+        }
+
+        if (save)
+        {
+            _profileService.SaveActiveProfile();
+        }
+    }
+
+    private void CancelInputListening()
+    {
+        if (_isListeningForInput)
+        {
+            _inputDetectionService?.Cancel();
+            _isListeningForInput = false;
+        }
+    }
+
+    private async void StartInputListening(int rowIndex)
+    {
+        if (_isListeningForInput) return;
+        if (rowIndex < 0) return;
+
+        _isListeningForInput = true;
+        _pendingInput = null;
+
+        // Determine input type based on row (first 8 are axes)
+        bool isAxis = rowIndex < 8;
+        var filter = isAxis ? InputDetectionFilter.Axes : InputDetectionFilter.Buttons;
+
+        _inputDetectionService ??= new InputDetectionService(_inputService);
+
+        try
+        {
+            // Small delay to let user release any currently pressed buttons
+            await Task.Delay(200);
+
+            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.5f, 15000);
+
+            if (detected != null && _selectedMappingRow == rowIndex)
+            {
+                _pendingInput = detected;
+                // Auto-save the mapping
+                SaveMappingForRow(rowIndex, detected, isAxis);
+            }
+        }
+        catch (Exception)
+        {
+            // Cancelled or error
+        }
+        finally
+        {
+            _isListeningForInput = false;
+        }
+    }
+
+    private void SaveMappingForRow(int rowIndex, DetectedInput input, bool isAxis)
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+
+        // Remove existing binding first
+        RemoveBindingAtRow(rowIndex, save: false);
+
+        if (isAxis)
+        {
+            var mapping = new AxisMapping
+            {
+                Name = $"{input.DeviceName} Axis {input.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
+                Inputs = new List<InputSource> { input.ToInputSource() },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyAxis,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                },
+                Curve = new AxisCurve()
+            };
+            profile.AxisMappings.Add(mapping);
+        }
+        else
+        {
+            var mapping = new ButtonMapping
+            {
+                Name = $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
+                Inputs = new List<InputSource> { input.ToInputSource() },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyButton,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                },
+                Mode = _selectedButtonMode
+            };
+            profile.ButtonMappings.Add(mapping);
+        }
+
+        profile.ModifiedAt = DateTime.UtcNow;
+        _profileService.SaveActiveProfile();
+        _pendingInput = null;
+    }
+
+    private void DrawAddMappingButton(SKCanvas canvas, SKRect bounds, bool hovered)
+    {
+        var bgColor = hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Primary.WithAlpha(30);
+        var frameColor = hovered ? FUIColors.Active : FUIColors.Primary;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = frameColor,
+            StrokeWidth = hovered ? 2f : 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Plus icon
+        float iconX = bounds.Left + 15;
+        float iconY = bounds.MidY;
+        using var iconPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = hovered ? FUIColors.TextBright : FUIColors.TextPrimary,
+            StrokeWidth = 2f,
+            IsAntialias = true
+        };
+        canvas.DrawLine(iconX - 6, iconY, iconX + 6, iconY, iconPaint);
+        canvas.DrawLine(iconX, iconY - 6, iconX, iconY + 6, iconPaint);
+
+        FUIRenderer.DrawText(canvas, "ADD MAPPING",
+            new SKPoint(bounds.Left + 30, bounds.MidY + 5),
+            hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 12f);
+    }
+
+    private void DrawMappingList(SKCanvas canvas, SKRect bounds)
+    {
+        float itemHeight = 50f;
+        float itemGap = 8f;
+        float y = bounds.Top;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null)
+        {
+            FUIRenderer.DrawText(canvas, "No profile selected",
+                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 12f);
+            FUIRenderer.DrawText(canvas, "Select or create a profile to add mappings",
+                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 11f);
+            return;
+        }
+
+        var allMappings = new List<(string source, string target, string type, bool enabled)>();
+
+        // Collect all mappings
+        foreach (var m in profile.ButtonMappings)
+        {
+            string source = m.Inputs.Count > 0 ? $"{m.Inputs[0].DeviceName} Btn {m.Inputs[0].Index + 1}" : "Unknown";
+            string target = m.Output.Type == OutputType.VJoyButton
+                ? $"vJoy {m.Output.VJoyDevice} Btn {m.Output.Index}"
+                : $"Key {m.Output.Index}";
+            allMappings.Add((source, target, "BUTTON", m.Enabled));
+        }
+
+        foreach (var m in profile.AxisMappings)
+        {
+            string source = m.Inputs.Count > 0 ? $"{m.Inputs[0].DeviceName} Axis {m.Inputs[0].Index}" : "Unknown";
+            string target = $"vJoy {m.Output.VJoyDevice} Axis {m.Output.Index}";
+            allMappings.Add((source, target, "AXIS", m.Enabled));
+        }
+
+        if (allMappings.Count == 0)
+        {
+            FUIRenderer.DrawText(canvas, "No mappings configured",
+                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 12f);
+            FUIRenderer.DrawText(canvas, "Click '+ ADD MAPPING' to create your first mapping",
+                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 11f);
+            return;
+        }
+
+        // Draw mapping items
+        foreach (var (source, target, type, enabled) in allMappings)
+        {
+            if (y + itemHeight > bounds.Bottom) break;
+
+            var itemBounds = new SKRect(bounds.Left, y, bounds.Right, y + itemHeight);
+            DrawMappingItem(canvas, itemBounds, source, target, type, enabled);
+            y += itemHeight + itemGap;
+        }
+    }
+
+    private void DrawMappingItem(SKCanvas canvas, SKRect bounds, string source, string target, string type, bool enabled)
+    {
+        // Background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = enabled ? FUIColors.Background2.WithAlpha(100) : FUIColors.Background1.WithAlpha(80)
+        };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Frame
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = enabled ? FUIColors.Frame : FUIColors.FrameDim,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Type badge
+        var typeColor = type == "BUTTON" ? FUIColors.Active : FUIColors.Primary;
+        FUIRenderer.DrawText(canvas, type, new SKPoint(bounds.Left + 10, bounds.Top + 18),
+            enabled ? typeColor : typeColor.WithAlpha(100), 10f);
+
+        // Source
+        FUIRenderer.DrawText(canvas, source, new SKPoint(bounds.Left + 80, bounds.Top + 18),
+            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 12f);
+
+        // Arrow
+        FUIRenderer.DrawText(canvas, "->", new SKPoint(bounds.Left + 80, bounds.Top + 36),
+            FUIColors.TextDim, 11f);
+
+        // Target
+        FUIRenderer.DrawText(canvas, target, new SKPoint(bounds.Left + 110, bounds.Top + 36),
+            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 12f);
+
+        // Status indicator
+        var statusColor = enabled ? FUIColors.Success : FUIColors.TextDisabled;
+        FUIRenderer.DrawGlowingDot(canvas, new SKPoint(bounds.Right - 20, bounds.MidY),
+            statusColor, 4f, enabled ? 6f : 2f);
+    }
+
+    private void OpenAddMappingDialog()
+    {
+        // Ensure we have an active profile
+        if (!_profileService.HasActiveProfile)
+        {
+            CreateNewProfilePrompt();
+            if (!_profileService.HasActiveProfile) return;
+        }
+
+        using var dialog = new MappingDialog(_inputService, _vjoyService);
+        if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Result.Success)
+        {
+            var result = dialog.Result;
+
+            // Create the mapping based on detected input type
+            if (result.Input!.Type == InputType.Button)
+            {
+                var mapping = new ButtonMapping
+                {
+                    Name = result.MappingName,
+                    Inputs = new List<InputSource> { result.Input.ToInputSource() },
+                    Output = result.Output!,
+                    Mode = result.ButtonMode
+                };
+                _profileService.ActiveProfile!.ButtonMappings.Add(mapping);
+            }
+            else if (result.Input.Type == InputType.Axis)
+            {
+                var mapping = new AxisMapping
+                {
+                    Name = result.MappingName,
+                    Inputs = new List<InputSource> { result.Input.ToInputSource() },
+                    Output = result.Output!,
+                    Curve = result.AxisCurve ?? new AxisCurve()
+                };
+                _profileService.ActiveProfile!.AxisMappings.Add(mapping);
+            }
+
+            // Save the profile
+            _profileService.SaveActiveProfile();
+        }
     }
 
     private void DrawTitleBar(SKCanvas canvas, SKRect bounds)

@@ -63,6 +63,12 @@ public class MainForm : Form
     private List<PhysicalDeviceInfo> _devices = new();
     private DeviceInputState? _currentInputState;
 
+    // Device category tabs (D1 = Physical, D2 = Virtual)
+    private int _deviceCategory = 0;  // 0 = Physical, 1 = Virtual
+    private int _hoveredDeviceCategory = -1;
+    private SKRect _deviceCategoryD1Bounds;
+    private SKRect _deviceCategoryD2Bounds;
+
     // Tab state
     private int _activeTab = 0;
     private readonly string[] _tabNames = { "DEVICES", "MAPPINGS", "BINDINGS", "SETTINGS" };
@@ -287,7 +293,7 @@ public class MainForm : Form
 
     /// <summary>
     /// Load the appropriate device map based on device name.
-    /// Searches for maps matching the device name, falls back to generic joystick.json.
+    /// Searches for maps matching the device name, falls back to device type, then generic joystick.json.
     /// Also detects left-hand devices by "LEFT" prefix and sets mirror flag.
     /// </summary>
     private void LoadDeviceMapForDevice(string? deviceName)
@@ -297,27 +303,50 @@ public class MainForm : Form
         // Try to find a device-specific map by matching device name
         if (!string.IsNullOrEmpty(deviceName))
         {
-            // Check all JSON files in the maps directory
+            // Load all device maps
+            var allMaps = new List<(string path, DeviceMap map)>();
             foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
             {
                 if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 var map = DeviceMap.Load(mapFile);
-                if (map != null && !string.IsNullOrEmpty(map.Device))
+                if (map != null)
+                    allMaps.Add((mapFile, map));
+            }
+
+            // Step 1: Try exact device name match (skip generic maps)
+            foreach (var (path, map) in allMaps)
+            {
+                if (!string.IsNullOrEmpty(map.Device) &&
+                    !map.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Match by device name (case-insensitive contains)
                     if (deviceName.Contains(map.Device, StringComparison.OrdinalIgnoreCase) ||
                         map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
-                        System.Diagnostics.Debug.WriteLine($"Loaded device map: {mapFile} for device: {deviceName}");
+                        System.Diagnostics.Debug.WriteLine($"Loaded device map (name match): {path} for device: {deviceName}");
                         return;
                     }
                 }
             }
 
-            // No specific map found - check if device name indicates left-hand
+            // Step 2: Try device type match based on keywords in device name
+            string detectedType = DetectDeviceType(deviceName);
+            if (detectedType != "Joystick")
+            {
+                foreach (var (path, map) in allMaps)
+                {
+                    if (map.DeviceType.Equals(detectedType, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _deviceMap = map;
+                        System.Diagnostics.Debug.WriteLine($"Loaded device map (type match '{detectedType}'): {path} for device: {deviceName}");
+                        return;
+                    }
+                }
+            }
+
+            // Step 3: No specific map found - check if device name indicates left-hand
             // and apply mirror to the default joystick map
             bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
                               deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
@@ -343,6 +372,27 @@ public class MainForm : Form
         var defaultMapPath2 = Path.Combine(mapsDir, "joystick.json");
         _deviceMap = DeviceMap.Load(defaultMapPath2);
         System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json");
+    }
+
+    /// <summary>
+    /// Detect device type from device name using common keywords
+    /// </summary>
+    private string DetectDeviceType(string deviceName)
+    {
+        var name = deviceName.ToUpperInvariant();
+
+        // Throttle keywords - MongooseT, 50CM, TWCS, etc.
+        if (name.Contains("THROTTLE") || name.Contains("50CM") || name.Contains("TM50") ||
+            name.Contains("TWCS") || name.Contains("MONGOOSE"))
+            return "Throttle";
+
+        // Pedals keywords
+        if (name.Contains("PEDAL") || name.Contains("RUDDER") || name.Contains("TPR") ||
+            name.Contains("MFG") || name.Contains("CROSSWIND"))
+            return "Pedals";
+
+        // Default to joystick
+        return "Joystick";
     }
 
     private void ParseControlBounds(string svgPath)
@@ -807,21 +857,44 @@ public class MainForm : Form
                 break;
         }
 
+        // Device category tabs hover detection (for Devices tab)
+        _hoveredDeviceCategory = -1;
+        if (_activeTab == 0)
+        {
+            if (_deviceCategoryD1Bounds.Contains(e.X, e.Y))
+            {
+                _hoveredDeviceCategory = 0;
+                Cursor = Cursors.Hand;
+            }
+            else if (_deviceCategoryD2Bounds.Contains(e.X, e.Y))
+            {
+                _hoveredDeviceCategory = 1;
+                Cursor = Cursors.Hand;
+            }
+        }
+
         // Device list hover detection
         float pad = FUIRenderer.SpaceLG;
         float contentTop = 90;
         float leftPanelWidth = 300f;
+        float sideTabWidth = 28f;
 
-        if (e.X >= pad && e.X <= pad + leftPanelWidth)
+        if (e.X >= pad + sideTabWidth && e.X <= pad + leftPanelWidth)
         {
             float itemY = contentTop + 32 + FUIRenderer.PanelPadding;
             float itemHeight = 60f;
             float itemGap = FUIRenderer.ItemSpacing;
 
-            int deviceIndex = (int)((e.Y - itemY) / (itemHeight + itemGap));
-            if (deviceIndex >= 0 && deviceIndex < _devices.Count)
+            // Filter devices by category and find hovered index
+            var filteredDevices = _deviceCategory == 0
+                ? _devices.Where(d => !d.IsVirtual).ToList()
+                : _devices.Where(d => d.IsVirtual).ToList();
+
+            int filteredIndex = (int)((e.Y - itemY) / (itemHeight + itemGap));
+            if (filteredIndex >= 0 && filteredIndex < filteredDevices.Count)
             {
-                _hoveredDevice = deviceIndex;
+                // Map back to actual device index
+                _hoveredDevice = _devices.IndexOf(filteredDevices[filteredIndex]);
             }
             else
             {
@@ -938,6 +1011,15 @@ public class MainForm : Form
         {
             ReleaseCapture();
             SendMessage(Handle, WM_NCLBUTTONDOWN, hitResult, 0);
+            return;
+        }
+
+        // Device category tab clicks (D1 Physical / D2 Virtual)
+        if (_activeTab == 0 && _hoveredDeviceCategory >= 0)
+        {
+            _deviceCategory = _hoveredDeviceCategory;
+            _selectedDevice = -1; // Reset selection when switching categories
+            _currentInputState = null;
             return;
         }
 
@@ -3377,11 +3459,14 @@ public class MainForm : Form
         float itemGap = FUIRenderer.ItemSpacing;
         float frameInset = 5f;
 
+        // Vertical side tabs width
+        float sideTabWidth = 28f;
+
         // Panel shadow
         FUIRenderer.DrawPanelShadow(canvas, bounds, 3f, 3f, 10f);
 
-        // Panel background
-        var contentBounds = new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
+        // Panel background (shifted right to make room for side tabs)
+        var contentBounds = new SKRect(bounds.Left + frameInset + sideTabWidth, bounds.Top + frameInset,
                                         bounds.Right - frameInset, bounds.Bottom - frameInset);
         using var bgPaint = new SKPaint
         {
@@ -3391,38 +3476,58 @@ public class MainForm : Form
         };
         canvas.DrawRect(contentBounds, bgPaint);
 
-        // L-corner frame
+        // Draw vertical side tabs (D1 Physical, D2 Virtual)
+        DrawDeviceCategorySideTabs(canvas, bounds.Left + frameInset, bounds.Top + frameInset,
+            sideTabWidth, bounds.Height - frameInset * 2);
+
+        // L-corner frame (adjusted for side tabs)
         bool panelHovered = _hoveredDevice >= 0;
-        FUIRenderer.DrawLCornerFrame(canvas, bounds,
+        var frameBounds = new SKRect(bounds.Left + sideTabWidth, bounds.Top, bounds.Right, bounds.Bottom);
+        FUIRenderer.DrawLCornerFrame(canvas, frameBounds,
             panelHovered ? FUIColors.FrameBright : FUIColors.Frame, 40f, 10f, 1.5f, panelHovered);
 
-        // Header
+        // Header - show D1 or D2 based on selected category
         float titleBarHeight = 32f;
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
-        FUIRenderer.DrawPanelTitle(canvas, titleBounds, "D1", "DEVICES");
+        string categoryCode = _deviceCategory == 0 ? "D1" : "D2";
+        string categoryName = _deviceCategory == 0 ? "PHYSICAL DEVICES" : "VIRTUAL DEVICES";
+        FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
         FUIRenderer.DrawGlowingLine(canvas,
             new SKPoint(contentBounds.Left, contentBounds.Top + titleBarHeight),
             new SKPoint(contentBounds.Right, contentBounds.Top + titleBarHeight),
             FUIColors.Primary.WithAlpha(100), 1f, 3f);
 
+        // Filter devices by category
+        var filteredDevices = _deviceCategory == 0
+            ? _devices.Where(d => !d.IsVirtual).ToList()
+            : _devices.Where(d => d.IsVirtual).ToList();
+
         // Device list
         float itemY = contentBounds.Top + titleBarHeight + pad;
         float itemHeight = 60f;
 
-        if (_devices.Count == 0)
+        if (filteredDevices.Count == 0)
         {
-            FUIRenderer.DrawText(canvas, "No devices detected",
-                new SKPoint(bounds.Left + pad + 30, itemY + 20), FUIColors.TextDim, 12f);
-            FUIRenderer.DrawText(canvas, "Connect a joystick or gamepad",
-                new SKPoint(bounds.Left + pad + 30, itemY + 38), FUIColors.TextDisabled, 10f);
+            string emptyMsg = _deviceCategory == 0
+                ? "No physical devices detected"
+                : "No virtual devices detected";
+            string helpMsg = _deviceCategory == 0
+                ? "Connect a joystick or gamepad"
+                : "Install vJoy or start a virtual device";
+            FUIRenderer.DrawText(canvas, emptyMsg,
+                new SKPoint(contentBounds.Left + pad, itemY + 20), FUIColors.TextDim, 12f);
+            FUIRenderer.DrawText(canvas, helpMsg,
+                new SKPoint(contentBounds.Left + pad, itemY + 38), FUIColors.TextDisabled, 10f);
         }
         else
         {
-            for (int i = 0; i < _devices.Count && itemY + itemHeight < contentBounds.Bottom - 40; i++)
+            for (int i = 0; i < filteredDevices.Count && itemY + itemHeight < contentBounds.Bottom - 40; i++)
             {
-                DrawDeviceListItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2,
-                    _devices[i].Name, "ONLINE", i == _selectedDevice, i == _hoveredDevice);
+                // Find the actual device index in _devices
+                int actualIndex = _devices.IndexOf(filteredDevices[i]);
+                DrawDeviceListItem(canvas, contentBounds.Left + pad - 10, itemY, contentBounds.Width - pad,
+                    filteredDevices[i].Name, "ONLINE", actualIndex == _selectedDevice, actualIndex == _hoveredDevice);
                 itemY += itemHeight + itemGap;
             }
         }
@@ -3430,7 +3535,7 @@ public class MainForm : Form
         // "Scan for devices" prompt
         float promptY = bounds.Bottom - pad - 20;
         FUIRenderer.DrawText(canvas, "+ SCAN FOR DEVICES",
-            new SKPoint(bounds.Left + pad + 30, promptY), FUIColors.TextDim, 12f);
+            new SKPoint(contentBounds.Left + pad, promptY), FUIColors.TextDim, 12f);
 
         using var bracketPaint = new SKPaint
         {
@@ -3438,8 +3543,66 @@ public class MainForm : Form
             Color = FUIColors.FrameDim,
             StrokeWidth = 1f
         };
-        canvas.DrawLine(bounds.Left + pad + 10, promptY - 10, bounds.Left + pad + 10, promptY + 5, bracketPaint);
-        canvas.DrawLine(bounds.Left + pad + 10, promptY - 10, bounds.Left + pad + 22, promptY - 10, bracketPaint);
+        canvas.DrawLine(contentBounds.Left + pad - 20, promptY - 10, contentBounds.Left + pad - 20, promptY + 5, bracketPaint);
+        canvas.DrawLine(contentBounds.Left + pad - 20, promptY - 10, contentBounds.Left + pad - 8, promptY - 10, bracketPaint);
+    }
+
+    private void DrawDeviceCategorySideTabs(SKCanvas canvas, float x, float y, float width, float height)
+    {
+        float tabHeight = 100f;
+        float tabGap = 5f;
+
+        // D1 Physical Devices tab
+        var d1Bounds = new SKRect(x, y, x + width, y + tabHeight);
+        _deviceCategoryD1Bounds = d1Bounds;
+        DrawVerticalSideTab(canvas, d1Bounds, "D1", _deviceCategory == 0, _hoveredDeviceCategory == 0);
+
+        // D2 Virtual Devices tab
+        var d2Bounds = new SKRect(x, y + tabHeight + tabGap, x + width, y + tabHeight * 2 + tabGap);
+        _deviceCategoryD2Bounds = d2Bounds;
+        DrawVerticalSideTab(canvas, d2Bounds, "D2", _deviceCategory == 1, _hoveredDeviceCategory == 1);
+    }
+
+    private void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
+    {
+        // Background
+        var bgColor = isSelected ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Left edge highlight for selected tab
+        if (isSelected)
+        {
+            using var edgePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active,
+                StrokeWidth = 3f,
+                IsAntialias = true
+            };
+            canvas.DrawLine(bounds.Left, bounds.Top, bounds.Left, bounds.Bottom, edgePaint);
+        }
+
+        // Frame
+        var frameColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.FrameDim);
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = frameColor,
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Vertical text (rotated)
+        canvas.Save();
+        canvas.Translate(bounds.MidX, bounds.MidY);
+        canvas.RotateDegrees(-90);
+        var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextDim);
+        FUIRenderer.DrawTextCentered(canvas, label,
+            new SKRect(-bounds.Height / 2, -bounds.Width / 2, bounds.Height / 2, bounds.Width / 2),
+            textColor, 11f, isSelected);
+        canvas.Restore();
     }
 
     private void DrawDeviceListItem(SKCanvas canvas, float x, float y, float width,

@@ -97,7 +97,8 @@ public class InputService : IDisposable
             InstanceGuid = guid,
             AxisCount = SDL.SDL_JoystickNumAxes(joystick),
             ButtonCount = SDL.SDL_JoystickNumButtons(joystick),
-            HatCount = SDL.SDL_JoystickNumHats(joystick)
+            HatCount = SDL.SDL_JoystickNumHats(joystick),
+            IsVirtual = IsVirtualDevice(name)
         };
 
         // Keep joystick open for polling
@@ -105,6 +106,19 @@ public class InputService : IDisposable
         _deviceInfo[deviceIndex] = info;
 
         return info;
+    }
+
+    /// <summary>
+    /// Check if a device name indicates a virtual device (vJoy, vXBox, etc.)
+    /// </summary>
+    private static bool IsVirtualDevice(string name)
+    {
+        var upper = name.ToUpperInvariant();
+        return upper.Contains("VJOY") ||
+               upper.Contains("VXBOX") ||
+               upper.Contains("VIGEM") ||
+               upper.Contains("VIRTUAL") ||
+               upper.Contains("FEEDER");
     }
 
     /// <summary>

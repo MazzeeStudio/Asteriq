@@ -3490,7 +3490,8 @@ public class MainForm : Form
         float titleBarHeight = 32f;
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
         string categoryCode = _deviceCategory == 0 ? "D1" : "D2";
-        string categoryName = _deviceCategory == 0 ? "PHYSICAL DEVICES" : "VIRTUAL DEVICES";
+        //string categoryName = _deviceCategory == 0 ? "PHYSICAL DEVICES" : "VIRTUAL DEVICES";
+        string categoryName = _deviceCategory == 0 ? "DEVICES" : "DEVICES";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
         FUIRenderer.DrawGlowingLine(canvas,
@@ -3549,59 +3550,70 @@ public class MainForm : Form
 
     private void DrawDeviceCategorySideTabs(SKCanvas canvas, float x, float y, float width, float height)
     {
-        float tabHeight = 100f;
-        float tabGap = 5f;
+        // Style based on reference: narrow vertical tabs with text reading bottom-to-top
+        // Accent bar on right side for selected tab, 4px space between tabs
+        float tabHeight = 80f;
+        float tabGap = 4f; // 4px space between tabs
 
-        // D1 Physical Devices tab
-        var d1Bounds = new SKRect(x, y, x + width, y + tabHeight);
+        // Calculate total tabs height and start from bottom of available space
+        float totalTabsHeight = tabHeight * 2 + tabGap;
+        float startY = y + height - totalTabsHeight - 10f; // Align tabs near bottom
+
+        // D1 Physical Devices tab (bottom)
+        var d1Bounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
         _deviceCategoryD1Bounds = d1Bounds;
-        DrawVerticalSideTab(canvas, d1Bounds, "D1", _deviceCategory == 0, _hoveredDeviceCategory == 0);
+        DrawVerticalSideTab(canvas, d1Bounds, "DEVICES_01", _deviceCategory == 0, _hoveredDeviceCategory == 0);
 
-        // D2 Virtual Devices tab
-        var d2Bounds = new SKRect(x, y + tabHeight + tabGap, x + width, y + tabHeight * 2 + tabGap);
+        // D2 Virtual Devices tab (above D1)
+        var d2Bounds = new SKRect(x, startY, x + width, startY + tabHeight);
         _deviceCategoryD2Bounds = d2Bounds;
-        DrawVerticalSideTab(canvas, d2Bounds, "D2", _deviceCategory == 1, _hoveredDeviceCategory == 1);
+        DrawVerticalSideTab(canvas, d2Bounds, "DEVICES_02", _deviceCategory == 1, _hoveredDeviceCategory == 1);
     }
 
     private void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
     {
-        // Background
-        var bgColor = isSelected ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRect(bounds, bgPaint);
+        // No background box - minimalist style like reference image
+        // Just text and accent bar for selected state
 
-        // Left edge highlight for selected tab
+        // Accent bar on right edge for selected tab (facing the content)
         if (isSelected)
         {
-            using var edgePaint = new SKPaint
+            using var accentPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 Color = FUIColors.Active,
                 StrokeWidth = 3f,
                 IsAntialias = true
             };
-            canvas.DrawLine(bounds.Left, bounds.Top, bounds.Left, bounds.Bottom, edgePaint);
+            canvas.DrawLine(bounds.Right - 1, bounds.Top + 5, bounds.Right - 1, bounds.Bottom - 5, accentPaint);
+
+            // Add glow effect for selected
+            using var glowPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active.WithAlpha(60),
+                StrokeWidth = 8f,
+                IsAntialias = true,
+                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 4f)
+            };
+            canvas.DrawLine(bounds.Right - 1, bounds.Top + 5, bounds.Right - 1, bounds.Bottom - 5, glowPaint);
         }
 
-        // Frame
-        var frameColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.FrameDim);
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        // Vertical text (rotated)
+        // Vertical text (rotated 90 degrees, reading bottom-to-top)
         canvas.Save();
-        canvas.Translate(bounds.MidX, bounds.MidY);
+        canvas.Translate(bounds.MidX - 2, bounds.MidY);
         canvas.RotateDegrees(-90);
-        var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextDim);
-        FUIRenderer.DrawTextCentered(canvas, label,
-            new SKRect(-bounds.Height / 2, -bounds.Width / 2, bounds.Height / 2, bounds.Width / 2),
-            textColor, 11f, isSelected);
+
+        var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextDim.WithAlpha(150));
+        using var textPaint = new SKPaint
+        {
+            Color = textColor,
+            TextSize = 10f,
+            IsAntialias = true,
+            Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright),
+            TextAlign = SKTextAlign.Center
+        };
+        canvas.DrawText(label, 0, 4f, textPaint);
         canvas.Restore();
     }
 

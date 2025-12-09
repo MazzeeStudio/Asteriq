@@ -978,7 +978,7 @@ public class MainForm : Form
             var control = input.Control;
             if (control?.Anchor == null) continue; // Must have JSON anchor
 
-            float opacity = input.GetOpacity();
+            float opacity = input.GetOpacity(_activeInputTracker.FadeDelay, _activeInputTracker.FadeDuration);
             if (opacity < 0.01f) continue;
 
             // Use the JSON anchor point (in viewBox coordinates 0-2048)

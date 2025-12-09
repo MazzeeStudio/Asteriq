@@ -71,8 +71,8 @@ public class ActiveInputTracker
     private readonly Dictionary<string, float> _axisBaselines = new();
     private readonly object _lock = new();
 
-    public float FadeDelay { get; set; } = 3f;
-    public float FadeDuration { get; set; } = 2f;
+    public float FadeDelay { get; set; } = 0.5f;
+    public float FadeDuration { get; set; } = 2.5f;
 
     /// <summary>
     /// Threshold for axis movement from baseline to be considered "active"

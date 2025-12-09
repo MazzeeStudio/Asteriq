@@ -985,18 +985,33 @@ public class MainForm : Form
             // Convert to screen coordinates using the stored SVG transform
             SKPoint anchorScreen = ViewBoxToScreen(control.Anchor.X, control.Anchor.Y);
 
-            // Simple stacked label positioning - each label gets its own row
-            float labelY = panelBounds.Top + 80 + (inputIndex * 55);
-            if (labelY > panelBounds.Bottom - 60)
+            // Label position: use JSON labelOffset if specified, otherwise auto-stack
+            float labelX, labelY;
+            bool goesRight = true;
+
+            if (control.LabelOffset != null)
             {
-                labelY = panelBounds.Top + 80 + ((inputIndex % 8) * 55);
+                // labelOffset is relative to anchor, in viewBox units
+                float labelVbX = control.Anchor.X + control.LabelOffset.X;
+                float labelVbY = control.Anchor.Y + control.LabelOffset.Y;
+                var labelScreen = ViewBoxToScreen(labelVbX, labelVbY);
+                labelX = labelScreen.X;
+                labelY = labelScreen.Y;
+                goesRight = control.LabelOffset.X >= 0;
+            }
+            else
+            {
+                // Fallback: auto-stack labels to the right of silhouette
+                labelY = panelBounds.Top + 80 + (inputIndex * 55);
+                if (labelY > panelBounds.Bottom - 60)
+                {
+                    labelY = panelBounds.Top + 80 + ((inputIndex % 8) * 55);
+                }
+                labelX = _silhouetteBounds.Right + 20;
             }
 
-            // Labels go to the right of the silhouette
-            float labelX = _silhouetteBounds.Right + 20;
-
             // Draw the lead-line with fade - from anchor on joystick to label
-            DrawInputLeadLine(canvas, anchorScreen, new SKPoint(labelX, labelY), true, opacity, input);
+            DrawInputLeadLine(canvas, anchorScreen, new SKPoint(labelX, labelY), goesRight, opacity, input);
 
             inputIndex++;
         }
@@ -1045,7 +1060,8 @@ public class MainForm : Form
         float progress = Math.Min(1f, input.AppearProgress * 1.5f);
 
         // Build the path points based on LeadLine definition or use default
-        var pathPoints = BuildLeadLinePath(anchor, input.Control?.LeadLine, goesRight);
+        // Pass labelPos so the line ends at the label
+        var pathPoints = BuildLeadLinePath(anchor, labelPos, input.Control?.LeadLine, goesRight);
 
         // Draw line with animation
         using var linePaint = new SKPaint
@@ -1105,36 +1121,30 @@ public class MainForm : Form
             canvas.DrawCircle(anchor, 4f, dotPaint);
         }
 
-        // Draw label at the end of the path when line is complete
-        if (progress > 0.95f && pathPoints.Count > 0)
+        // Draw label at the specified label position when line is complete
+        if (progress > 0.95f)
         {
-            var labelPoint = pathPoints[^1]; // Last point
-            DrawInputLabel(canvas, labelPoint, goesRight, input, alpha);
+            DrawInputLabel(canvas, labelPos, goesRight, input, alpha);
         }
     }
 
     /// <summary>
-    /// Build the lead-line path points from anchor based on LeadLine definition.
-    /// Returns a list of points: anchor -> shelf end -> segment1 end -> segment2 end...
+    /// Build the lead-line path points from anchor to label position.
+    /// Uses LeadLine definition for intermediate segments, always ends at labelPos.
+    /// Returns a list of points: anchor -> shelf end -> segment ends... -> label position
     /// </summary>
-    private List<SKPoint> BuildLeadLinePath(SKPoint anchor, LeadLineDefinition? leadLine, bool defaultGoesRight)
+    private List<SKPoint> BuildLeadLinePath(SKPoint anchor, SKPoint labelPos, LeadLineDefinition? leadLine, bool defaultGoesRight)
     {
         var points = new List<SKPoint> { anchor };
 
         if (leadLine == null)
         {
-            // Default: simple horizontal shelf then diagonal to a default label position
+            // Default: simple path from anchor to label
+            // Add a midpoint to create a nice angled line
             bool goesRight = defaultGoesRight;
-            float shelfLength = 60f * _svgScale;
-            float shelfEnd = goesRight ? anchor.X + shelfLength : anchor.X - shelfLength;
-            points.Add(new SKPoint(shelfEnd, anchor.Y));
-
-            // Default diagonal segment
-            float diagLength = 80f * _svgScale;
-            float diagX = goesRight ? shelfEnd + diagLength * 0.7f : shelfEnd - diagLength * 0.7f;
-            float diagY = anchor.Y - diagLength * 0.7f; // Go up by default
-            points.Add(new SKPoint(diagX, diagY));
-
+            float midX = goesRight ? anchor.X + 40 : anchor.X - 40;
+            points.Add(new SKPoint(midX, anchor.Y)); // Horizontal shelf
+            points.Add(labelPos); // End at label
             return points;
         }
 
@@ -1147,29 +1157,30 @@ public class MainForm : Form
         var shelfEndPoint = new SKPoint(shelfEndX, anchor.Y);
         points.Add(shelfEndPoint);
 
-        // Process segments
-        if (leadLine.Segments != null)
+        // Process intermediate segments (if any)
+        if (leadLine.Segments != null && leadLine.Segments.Count > 0)
         {
             var currentPoint = shelfEndPoint;
             int shelfDirection = shelfGoesRight ? 1 : -1;
 
-            foreach (var segment in leadLine.Segments)
+            // Process all but the last segment normally
+            for (int i = 0; i < leadLine.Segments.Count - 1; i++)
             {
+                var segment = leadLine.Segments[i];
                 float scaledLength = segment.Length * _svgScale;
                 float angleRad = segment.Angle * MathF.PI / 180f;
 
-                // Calculate segment end point
-                // Angle 0 = horizontal in shelf direction
-                // Angle 90 = straight up
-                // Angle -90 = straight down
                 float dx = MathF.Cos(angleRad) * scaledLength * shelfDirection;
-                float dy = -MathF.Sin(angleRad) * scaledLength; // Negative because Y increases downward
+                float dy = -MathF.Sin(angleRad) * scaledLength;
 
                 var segmentEnd = new SKPoint(currentPoint.X + dx, currentPoint.Y + dy);
                 points.Add(segmentEnd);
                 currentPoint = segmentEnd;
             }
         }
+
+        // Always end at the label position
+        points.Add(labelPos);
 
         return points;
     }

@@ -69,11 +69,11 @@ public class MainForm : Form
     private SKRect _deviceCategoryD1Bounds;
     private SKRect _deviceCategoryD2Bounds;
 
-    // Mapping category tabs (M1 = Axes, M2 = Buttons)
-    private int _mappingCategory = 0;  // 0 = Axes, 1 = Buttons
+    // Mapping category tabs (M1 = Buttons, M2 = Axes)
+    private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
     private int _hoveredMappingCategory = -1;
-    private SKRect _mappingCategoryAxesBounds;
     private SKRect _mappingCategoryButtonsBounds;
+    private SKRect _mappingCategoryAxesBounds;
 
     // Tab state
     private int _activeTab = 0;
@@ -1261,12 +1261,12 @@ public class MainForm : Form
         _hoveredMappingCategory = -1;
         if (_activeTab == 1)
         {
-            if (_mappingCategoryAxesBounds.Contains(e.X, e.Y))
+            if (_mappingCategoryButtonsBounds.Contains(e.X, e.Y))
             {
                 _hoveredMappingCategory = 0;
                 Cursor = Cursors.Hand;
             }
-            else if (_mappingCategoryButtonsBounds.Contains(e.X, e.Y))
+            else if (_mappingCategoryAxesBounds.Contains(e.X, e.Y))
             {
                 _hoveredMappingCategory = 1;
                 Cursor = Cursors.Hand;
@@ -1274,12 +1274,12 @@ public class MainForm : Form
         }
 
         // Device list hover detection
-        float pad = FUIRenderer.SpaceLG;
+        float sideTabPad = 8f;  // Reduced padding for side-tabbed panels
         float contentTop = 90;
-        float leftPanelWidth = 300f;
+        float leftPanelWidth = 400f;  // Matches Settings panel width
         float sideTabWidth = 28f;
 
-        if (e.X >= pad + sideTabWidth && e.X <= pad + leftPanelWidth)
+        if (e.X >= sideTabPad + sideTabWidth && e.X <= sideTabPad + leftPanelWidth)
         {
             float itemY = contentTop + 32 + FUIRenderer.PanelPadding;
             float itemHeight = 60f;
@@ -1307,6 +1307,7 @@ public class MainForm : Form
         }
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
+        float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
         float btnSize = 28f;
         float btnGap = 8f;
         float btnTotalWidth = btnSize * 3 + btnGap * 2; // 100px
@@ -1747,15 +1748,17 @@ public class MainForm : Form
         float contentBottom = bounds.Bottom - 55;
 
         // Calculate panel widths
-        float leftPanelWidth = 300f;
+        // Side-tabbed panels (Devices, Mappings) use reduced left padding to put tabs closer to edge
+        float sideTabPad = 8f;  // Reduced padding for panels with side tabs
+        float leftPanelWidth = 400f;  // Match Settings panel width
         float rightPanelWidth = 330f;
-        float centerStart = pad + leftPanelWidth + gap;
+        float centerStart = sideTabPad + leftPanelWidth + gap;
         float centerEnd = bounds.Right - pad - rightPanelWidth - gap;
 
         // Content based on active tab
         if (_activeTab == 1) // MAPPINGS tab
         {
-            DrawMappingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
+            DrawMappingsTabContent(canvas, bounds, sideTabPad, contentTop, contentBottom);
         }
         else if (_activeTab == 3) // SETTINGS tab
         {
@@ -1764,8 +1767,8 @@ public class MainForm : Form
         else
         {
             // Default: Device tab layout
-            // Left panel: Device List
-            var deviceListBounds = new SKRect(pad, contentTop, pad + leftPanelWidth, contentBottom);
+            // Left panel: Device List (using reduced padding for side tabs)
+            var deviceListBounds = new SKRect(sideTabPad, contentTop, sideTabPad + leftPanelWidth, contentBottom);
             DrawDeviceListPanel(canvas, deviceListBounds);
 
             // Center panel: Device Details
@@ -2200,13 +2203,14 @@ public class MainForm : Form
         }
     }
 
-    private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
+    private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float sideTabPad, float contentTop, float contentBottom)
     {
         float frameInset = 5f;
-        var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
+        float pad = FUIRenderer.SpaceLG;  // Standard padding for right side
+        var contentBounds = new SKRect(sideTabPad, contentTop, bounds.Right - pad, contentBottom);
 
         // Three-panel layout: Left (bindings list) | Center (device view) | Right (settings)
-        float leftPanelWidth = 300f;
+        float leftPanelWidth = 400f;  // Match Settings panel width
         float rightPanelWidth = 330f;
         float centerPanelWidth = contentBounds.Width - leftPanelWidth - rightPanelWidth - 20;
 
@@ -2311,15 +2315,15 @@ public class MainForm : Form
         float totalTabsHeight = tabHeight * 2 + tabGap;
         float startY = y + height - totalTabsHeight - 10f;
 
-        // M1 Axes tab (bottom)
-        var axesBounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
-        _mappingCategoryAxesBounds = axesBounds;
-        DrawVerticalSideTab(canvas, axesBounds, "AXES_01", _mappingCategory == 0, _hoveredMappingCategory == 0);
-
-        // M2 Buttons tab (above M1)
-        var buttonsBounds = new SKRect(x, startY, x + width, startY + tabHeight);
+        // M1 Buttons tab (bottom)
+        var buttonsBounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
         _mappingCategoryButtonsBounds = buttonsBounds;
-        DrawVerticalSideTab(canvas, buttonsBounds, "BUTTONS_02", _mappingCategory == 1, _hoveredMappingCategory == 1);
+        DrawVerticalSideTab(canvas, buttonsBounds, "BUTTONS_01", _mappingCategory == 0, _hoveredMappingCategory == 0);
+
+        // M2 Axes tab (above M1)
+        var axesBounds = new SKRect(x, startY, x + width, startY + tabHeight);
+        _mappingCategoryAxesBounds = axesBounds;
+        DrawVerticalSideTab(canvas, axesBounds, "AXES_02", _mappingCategory == 1, _hoveredMappingCategory == 1);
     }
 
     private void DrawBindingsList(SKCanvas canvas, SKRect bounds)
@@ -2343,7 +2347,8 @@ public class MainForm : Form
         int buttonCount = vjoyDevice?.ButtonCount ?? 0;
 
         // Calculate content height based on selected category (no section headers when filtered)
-        int itemCount = _mappingCategory == 0 ? axisCount : buttonCount;
+        // Category 0 = Buttons, Category 1 = Axes
+        int itemCount = _mappingCategory == 0 ? buttonCount : axisCount;
         _bindingsContentHeight = itemCount * (rowHeight + rowGap);
 
         // Clamp scroll offset
@@ -2357,38 +2362,8 @@ public class MainForm : Form
         float y = bounds.Top - _bindingsScrollOffset;
         int rowIndex = 0;
 
-        // Show AXES when category is 0
-        if (_mappingCategory == 0 && hasVJoy && axisCount > 0)
-        {
-            for (int i = 0; i < axisCount; i++)
-            {
-                float rowTop = y;
-                float rowBottom = y + rowHeight;
-
-                // Only draw if visible
-                if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
-                {
-                    var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
-                    string binding = GetAxisBindingText(profile, vjoyDevice!.Id, i);
-                    bool isSelected = rowIndex == _selectedMappingRow;
-                    bool isHovered = rowIndex == _hoveredMappingRow;
-
-                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
-                    _mappingRowBounds.Add(rowBounds);
-                }
-                else
-                {
-                    // Add placeholder bounds for hit testing even when not visible
-                    _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
-                }
-
-                y += rowHeight + rowGap;
-                rowIndex++;
-            }
-        }
-
-        // Show BUTTONS when category is 1
-        if (_mappingCategory == 1 && hasVJoy && buttonCount > 0)
+        // Show BUTTONS when category is 0
+        if (_mappingCategory == 0 && hasVJoy && buttonCount > 0)
         {
             for (int i = 0; i < buttonCount; i++)
             {
@@ -2409,6 +2384,36 @@ public class MainForm : Form
                 }
                 else
                 {
+                    _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
+                }
+
+                y += rowHeight + rowGap;
+                rowIndex++;
+            }
+        }
+
+        // Show AXES when category is 1
+        if (_mappingCategory == 1 && hasVJoy && axisCount > 0)
+        {
+            for (int i = 0; i < axisCount; i++)
+            {
+                float rowTop = y;
+                float rowBottom = y + rowHeight;
+
+                // Only draw if visible
+                if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
+                {
+                    var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
+                    string binding = GetAxisBindingText(profile, vjoyDevice!.Id, i);
+                    bool isSelected = rowIndex == _selectedMappingRow;
+                    bool isHovered = rowIndex == _hoveredMappingRow;
+
+                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
+                    _mappingRowBounds.Add(rowBounds);
+                }
+                else
+                {
+                    // Add placeholder bounds for hit testing even when not visible
                     _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
                 }
 

@@ -1779,6 +1779,13 @@ public class MainForm : Form
                 float tabX = tabStartX + i * tabSpacing;
                 if (e.X >= tabX && e.X < tabX + tabSpacing - 10)
                 {
+                    if (_activeTab != i)
+                    {
+                        // Clear any dragging state when switching tabs
+                        _draggingBgSlider = null;
+                        _draggingPulseDuration = false;
+                        _draggingHoldDuration = false;
+                    }
                     _activeTab = i;
                     break;
                 }
@@ -2099,13 +2106,17 @@ public class MainForm : Form
         {
             DrawMappingsTabContent(canvas, bounds, sideTabPad, contentTop, contentBottom);
         }
+        else if (_activeTab == 2) // BINDINGS tab (Star Citizen integration - placeholder)
+        {
+            DrawBindingsTabPlaceholder(canvas, bounds, pad, contentTop, contentBottom);
+        }
         else if (_activeTab == 3) // SETTINGS tab
         {
             DrawSettingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
         }
         else
         {
-            // Default: Device tab layout
+            // Tab 0: DEVICES tab layout
             // Left panel: Device List (using reduced padding for side tabs)
             var deviceListBounds = new SKRect(sideTabPad, contentTop, sideTabPad + leftPanelWidth, contentBottom);
             DrawDeviceListPanel(canvas, deviceListBounds);
@@ -2143,6 +2154,54 @@ public class MainForm : Form
             // Get position from profile selector bounds
             DrawProfileDropdown(canvas, _profileSelectorBounds.Left, _profileSelectorBounds.Bottom);
         }
+    }
+
+    private void DrawBindingsTabPlaceholder(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
+    {
+        float frameInset = 5f;
+        var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
+
+        // Single centered panel
+        float panelWidth = 500f;
+        float panelHeight = 200f;
+        float panelX = contentBounds.Left + (contentBounds.Width - panelWidth) / 2;
+        float panelY = contentBounds.Top + (contentBounds.Height - panelHeight) / 2;
+        var panelBounds = new SKRect(panelX, panelY, panelX + panelWidth, panelY + panelHeight);
+
+        // Panel shadow
+        FUIRenderer.DrawPanelShadow(canvas, panelBounds, 3f, 3f, 10f);
+
+        // Panel background
+        var innerBounds = new SKRect(panelBounds.Left + frameInset, panelBounds.Top + frameInset,
+            panelBounds.Right - frameInset, panelBounds.Bottom - frameInset);
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(180),
+            IsAntialias = true
+        };
+        canvas.DrawRect(innerBounds, bgPaint);
+
+        // L-corner frame
+        FUIRenderer.DrawLCornerFrame(canvas, panelBounds, FUIColors.Frame, 35f, 10f);
+
+        // Header
+        float titleBarHeight = 32f;
+        var titleBounds = new SKRect(innerBounds.Left, innerBounds.Top, innerBounds.Right, innerBounds.Top + titleBarHeight);
+        FUIRenderer.DrawPanelTitle(canvas, titleBounds, "SC", "STAR CITIZEN BINDINGS");
+
+        // Placeholder text
+        float textY = innerBounds.Top + titleBarHeight + 30f;
+        FUIRenderer.DrawTextCentered(canvas, "Star Citizen Integration",
+            new SKRect(innerBounds.Left, textY, innerBounds.Right, textY + 24f), FUIColors.TextPrimary, 14f);
+
+        textY += 35f;
+        FUIRenderer.DrawTextCentered(canvas, "Import and export actionmaps.xml bindings",
+            new SKRect(innerBounds.Left, textY, innerBounds.Right, textY + 20f), FUIColors.TextDim, 11f);
+
+        textY += 22f;
+        FUIRenderer.DrawTextCentered(canvas, "Coming soon",
+            new SKRect(innerBounds.Left, textY, innerBounds.Right, textY + 20f), FUIColors.TextDim, 11f);
     }
 
     private void DrawSettingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)

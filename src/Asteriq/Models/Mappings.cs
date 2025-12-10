@@ -611,4 +611,87 @@ public class MappingProfile
     {
         return DeviceAssignments.FirstOrDefault(a => a.VJoyDevice == vJoyDevice);
     }
+
+    /// <summary>
+    /// Find the vJoy output for a given physical input.
+    /// Used by SC Bindings to determine what vJoy binding to create when user presses a physical input.
+    /// </summary>
+    /// <param name="deviceId">Physical device ID (GUID or VID:PID)</param>
+    /// <param name="inputType">Type of input (Axis, Button, Hat)</param>
+    /// <param name="inputIndex">Index of the input on the device</param>
+    /// <returns>The vJoy output target if a mapping exists, null otherwise</returns>
+    public OutputTarget? GetVJoyOutputForPhysicalInput(string deviceId, InputType inputType, int inputIndex)
+    {
+        // Search through all mapping types for a match
+        IEnumerable<Mapping> allMappings = inputType switch
+        {
+            InputType.Axis => AxisMappings.Cast<Mapping>().Concat(ButtonToAxisMappings),
+            InputType.Button => ButtonMappings.Cast<Mapping>().Concat(AxisToButtonMappings),
+            InputType.Hat => HatMappings,
+            _ => Enumerable.Empty<Mapping>()
+        };
+
+        foreach (var mapping in allMappings)
+        {
+            if (!mapping.Enabled) continue;
+
+            foreach (var input in mapping.Inputs)
+            {
+                if (input.Type == inputType &&
+                    input.Index == inputIndex &&
+                    (input.DeviceId.Equals(deviceId, StringComparison.OrdinalIgnoreCase) ||
+                     (!string.IsNullOrEmpty(input.DeviceId) && deviceId.Contains(input.DeviceId))))
+                {
+                    // Found a mapping - return the output if it's a vJoy output
+                    if (mapping.Output.Type == OutputType.VJoyAxis ||
+                        mapping.Output.Type == OutputType.VJoyButton ||
+                        mapping.Output.Type == OutputType.VJoyPov)
+                    {
+                        return mapping.Output;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Format a vJoy output as an SC binding string (e.g., "js1_button5", "js2_x")
+    /// </summary>
+    /// <param name="output">The vJoy output target</param>
+    /// <param name="scInstanceId">The SC joystick instance (1-8) that this vJoy device maps to</param>
+    /// <returns>SC-formatted input string</returns>
+    public static string FormatAsSCBinding(OutputTarget output, int scInstanceId)
+    {
+        var prefix = $"js{scInstanceId}";
+
+        return output.Type switch
+        {
+            OutputType.VJoyButton => $"{prefix}_button{output.Index + 1}", // SC uses 1-based
+            OutputType.VJoyAxis => $"{prefix}_{GetSCAxisName(output.Index)}",
+            OutputType.VJoyPov => $"{prefix}_hat{output.Index + 1}_up", // Simplified - would need direction
+            _ => ""
+        };
+    }
+
+    /// <summary>
+    /// Convert vJoy axis index to SC axis name
+    /// </summary>
+    private static string GetSCAxisName(int axisIndex)
+    {
+        // vJoy axis indices: 0=X, 1=Y, 2=Z, 3=RX, 4=RY, 5=RZ, 6=Slider0, 7=Slider1
+        return axisIndex switch
+        {
+            0 => "x",
+            1 => "y",
+            2 => "z",
+            3 => "rotx",
+            4 => "roty",
+            5 => "rotz",
+            6 => "slider1",
+            7 => "slider2",
+            _ => $"axis{axisIndex}"
+        };
+    }
 }

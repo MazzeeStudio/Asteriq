@@ -80,6 +80,32 @@ We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) 
 - SCVirtStick uses this approach in `UnifiedInputManager.cs`
 - We already have `KeyboardService.cs` using these APIs for output; similar code for input detection
 
+### Technical Note: Physical Input → vJoy Output Lookup
+**Critical for SC Bindings:** User presses physical joystick, we need to know the vJoy output to bind.
+
+**Flow:**
+1. User presses physical button/axis on their joystick
+2. Look up the mapping: Physical Input → vJoy Output
+3. Format as SC binding string (e.g., `js1_button5`, `js2_x`)
+
+**Implementation (added to `MappingProfile`):**
+- `GetVJoyOutputForPhysicalInput(deviceId, inputType, inputIndex)` - finds the vJoy output for a physical input
+- `FormatAsSCBinding(output, scInstanceId)` - formats vJoy output as SC binding string
+
+**Example:**
+```csharp
+// User presses Button 3 on device "3344:0194"
+var vjoyOutput = profile.GetVJoyOutputForPhysicalInput("3344:0194", InputType.Button, 3);
+// Returns: OutputTarget { Type=VJoyButton, VJoyDevice=1, Index=5 }
+
+// Format for SC (assuming vJoy1 maps to SC js1)
+var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
+// Returns: "js1_button6"
+```
+
+**Files:**
+- `Models/Mappings.cs` - Added `GetVJoyOutputForPhysicalInput()` and `FormatAsSCBinding()`
+
 ---
 
 ## 1. ACTION LIST DISPLAY

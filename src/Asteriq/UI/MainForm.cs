@@ -2294,12 +2294,6 @@ public class MainForm : Form
         DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1);
         y += arrowButtonSize + 15;
 
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(contentBounds.Left, y),
-            new SKPoint(contentBounds.Right, y),
-            FUIColors.Primary.WithAlpha(80), 1f, 2f);
-        y += 10;
-
         // Scrollable binding rows (filtered by category)
         float listBottom = contentBounds.Bottom - 10;
         DrawBindingsList(canvas, new SKRect(leftMargin - 5, y, rightMargin + 5, listBottom));
@@ -2678,11 +2672,6 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
         y += 35;
 
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(bounds.Left + frameInset, y - 5),
-            new SKPoint(bounds.Right - frameInset, y - 5),
-            FUIColors.Primary.WithAlpha(80), 1f, 2f);
-
         // Show settings for selected row
         if (_selectedMappingRow < 0)
         {
@@ -2850,12 +2839,6 @@ public class MainForm : Form
         FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
             addHovered ? FUIColors.Active : FUIColors.TextPrimary, 11f);
         y += 28 + 15;
-
-        // Separator line before settings
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(leftMargin - 5, y - 5),
-            new SKPoint(rightMargin + 5, y - 5),
-            FUIColors.Frame.WithAlpha(60), 1f, 1f);
 
         return y;
     }
@@ -3350,12 +3333,6 @@ public class MainForm : Form
             }
             y += keyFieldHeight + 15;
         }
-
-        // Separator
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(leftMargin - 5, y - 5),
-            new SKPoint(rightMargin + 5, y - 5),
-            FUIColors.Frame.WithAlpha(60), 1f, 1f);
 
         // Button Mode section
         FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -4149,11 +4126,6 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, $"EDIT: {outputName}", new SKPoint(leftMargin, y),
             FUIColors.Active, 14f, true);
         y += 30;
-
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(bounds.Left + frameInset, y - 10),
-            new SKPoint(bounds.Right - frameInset, y - 10),
-            FUIColors.Active.WithAlpha(80), 1f, 2f);
 
         // INPUT SOURCE section
         FUIRenderer.DrawText(canvas, "INPUT SOURCE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -6017,12 +5989,6 @@ public class MainForm : Form
             DrawProfileSelector(canvas, profileSelectorX, titleBarY + 22);
         }
 
-        // Horizontal base line
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(pad, titleBarY + titleBarHeight + 8),
-            new SKPoint(bounds.Right - pad, titleBarY + titleBarHeight + 8),
-            FUIColors.Frame.WithAlpha(80), 1f, 2f);
-
         // Draw navigation tabs
         float tabX = tabStartX;
         for (int i = 0; i < _tabNames.Length; i++)
@@ -6313,11 +6279,6 @@ public class MainForm : Form
         string categoryName = _deviceCategory == 0 ? "DEVICES" : "DEVICES";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(contentBounds.Left, contentBounds.Top + titleBarHeight),
-            new SKPoint(contentBounds.Right, contentBounds.Top + titleBarHeight),
-            FUIColors.Primary.WithAlpha(100), 1f, 3f);
-
         // Filter devices by category
         var filteredDevices = _deviceCategory == 0
             ? _devices.Where(d => !d.IsVirtual).ToList()
@@ -6505,12 +6466,6 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, "VK01", new SKPoint(bounds.Left + pad, bounds.Top + 20), FUIColors.Active, 12f);
         FUIRenderer.DrawText(canvas, device.Name.Length > 30 ? device.Name.Substring(0, 27) + "..." : device.Name,
             new SKPoint(bounds.Left + pad + 55, bounds.Top + 20), FUIColors.TextBright, 14f);
-
-        // Underline
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(bounds.Left + pad, bounds.Top + 30),
-            new SKPoint(bounds.Left + pad + 220, bounds.Top + 30),
-            FUIColors.Primary.WithAlpha(60), 1f, 2f);
 
         // Device silhouette - fill available space (height-constrained, like mappings view)
         float silhouetteTop = bounds.Top + 45;
@@ -6970,11 +6925,6 @@ public class MainForm : Form
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, "S1", "STATUS");
 
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(contentBounds.Left, contentBounds.Top + titleBarHeight),
-            new SKPoint(contentBounds.Right, contentBounds.Top + titleBarHeight),
-            FUIColors.Primary.WithAlpha(80), 1f, 3f);
-
         // Status items
         float statusItemHeight = 32f;
         float itemY = contentBounds.Top + titleBarHeight + pad;
@@ -6988,15 +6938,8 @@ public class MainForm : Form
         itemY += statusItemHeight + itemGap;
         DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "PROFILE", "DEFAULT", FUIColors.TextPrimary);
 
-        // Separator
-        itemY += statusItemHeight + FUIRenderer.SpaceMD;
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(bounds.Left + pad, itemY),
-            new SKPoint(bounds.Right - pad, itemY),
-            FUIColors.FrameDim, 1f, 2f);
-
         // Active layers
-        itemY += FUIRenderer.SpaceMD;
+        itemY += statusItemHeight + FUIRenderer.SpaceLG;
         FUIRenderer.DrawText(canvas, "ACTIVE LAYERS",
             new SKPoint(bounds.Left + pad, itemY + 12), FUIColors.TextDim, 11f);
         itemY += FUIRenderer.SpaceLG;
@@ -7035,11 +6978,6 @@ public class MainForm : Form
     private void DrawStatusBar(SKCanvas canvas, SKRect bounds)
     {
         float y = bounds.Bottom - 40;
-
-        FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(30, y),
-            new SKPoint(bounds.Right - 30, y),
-            FUIColors.Frame.WithAlpha(100), 1f, 2f);
 
         // Far left: mouse position in viewBox coordinates (for JSON anchor editing)
         // Convert screen coords to viewBox coords

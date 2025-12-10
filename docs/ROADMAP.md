@@ -95,17 +95,17 @@ See `docs/SC_BINDINGS_IMPLEMENTATION.md` for detailed implementation plan.
 - [x] Create `Services/SCProfileCacheService.cs`
 - [x] Test defaultProfile.xml extraction (--scextract CLI)
 
-### Session 3: Schema & Export
-- [ ] Create `Models/SCAction.cs`, `SCExportProfile.cs`
-- [ ] Create `Services/SCSchemaService.cs` (change detection)
-- [ ] Create `Services/SCXmlExportService.cs`
-- [ ] Test export generation
+### Session 3: Schema & Export ✅ COMPLETE
+- [x] Create `Models/SCAction.cs`, `SCExportProfile.cs`
+- [x] Create `Services/SCSchemaService.cs` (change detection)
+- [x] Create `Services/SCXmlExportService.cs`
+- [x] Test export generation (--scschema, --scexport CLI)
 
-### Session 4: UI
-- [ ] Update BINDINGS tab with real UI
-- [ ] Installation selector panel
-- [ ] Export configuration panel
-- [ ] Schema change alert panel
+### Session 4: UI ✅ COMPLETE
+- [x] Update BINDINGS tab with real UI
+- [x] Installation selector panel
+- [x] Export configuration panel (profile name, vJoy-to-SC mapping)
+- [x] Export button with status display
 
 ### Session 5: Integration & Polish
 - [ ] Wire up settings persistence

@@ -455,6 +455,16 @@ public static class FUIRenderer
         DrawText(canvas, text, new SKPoint(x, y), color, size, withGlow, null, scaleFont);
     }
 
+    /// <summary>
+    /// Measures the width of text at the given font size
+    /// </summary>
+    public static float MeasureText(string text, float size = 14f, bool scaleFont = true)
+    {
+        float scaledSize = scaleFont ? ScaleFont(size) : size;
+        using var paint = CreateTextPaint(SKColors.White, scaledSize);
+        return paint.MeasureText(text);
+    }
+
     #endregion
 
     #region Window Controls

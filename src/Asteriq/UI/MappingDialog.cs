@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Asteriq.Models;
 using Asteriq.Services;
 using SkiaSharp;
@@ -56,6 +57,24 @@ public class MappingDialog : Form
     private ButtonMode _selectedButtonMode = ButtonMode.Normal;
     private int _timeoutRemaining = 30; // seconds
 
+    // Output mode state (vJoy vs Keyboard)
+    private bool _keyboardMode = false;
+    private string _selectedKey = "";
+    private List<string> _capturedModifiers = new();  // Stores captured modifiers (LCtrl, RCtrl, LShift, RShift, LAlt, RAlt)
+    private bool _waitingForKeyCapture = false;
+
+    // Windows API for detecting held keys
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    // Virtual key codes for left/right modifiers
+    private const int VK_LSHIFT = 0xA0;
+    private const int VK_RSHIFT = 0xA1;
+    private const int VK_LCONTROL = 0xA2;
+    private const int VK_RCONTROL = 0xA3;
+    private const int VK_LMENU = 0xA4;  // Left Alt
+    private const int VK_RMENU = 0xA5;  // Right Alt
+
     // UI state
     private int _hoveredButton = -1;
     private SKRect[] _buttonBounds = Array.Empty<SKRect>();
@@ -63,6 +82,11 @@ public class MappingDialog : Form
     public MappingDialogResult Result { get; private set; } = new();
 
     public MappingDialog(InputService inputService, VJoyService vjoyService)
+        : this(inputService, vjoyService, null)
+    {
+    }
+
+    public MappingDialog(InputService inputService, VJoyService vjoyService, DetectedInput? preSelectedInput)
     {
         _inputService = inputService;
         _vjoyService = vjoyService;
@@ -73,8 +97,17 @@ public class MappingDialog : Form
         InitializeCanvas();
         InitializeTimers();
 
-        // Start waiting for input
-        StartInputDetection();
+        if (preSelectedInput != null)
+        {
+            // Skip input detection, go straight to output selection
+            _detectedInput = preSelectedInput;
+            _state = MappingDialogState.SelectingOutput;
+        }
+        else
+        {
+            // Start waiting for input
+            StartInputDetection();
+        }
     }
 
     private void InitializeForm()
@@ -133,7 +166,7 @@ public class MappingDialog : Form
         try
         {
             _detectedInput = await _detectionService.WaitForInputAsync(
-                InputDetectionFilter.Buttons | InputDetectionFilter.Axes,
+                InputDetectionFilter.All, // Buttons, Axes, and Hats
                 axisThreshold: 0.5f,
                 timeoutMs: 30000);
 
@@ -171,7 +204,50 @@ public class MappingDialog : Form
 
     private void Complete()
     {
-        if (_detectedInput == null || _vjoyDevices.Count == 0)
+        Console.WriteLine($"[MappingDialog] Complete() called");
+        Console.WriteLine($"[MappingDialog] _detectedInput: {_detectedInput}");
+        Console.WriteLine($"[MappingDialog] _keyboardMode: {_keyboardMode}");
+        Console.WriteLine($"[MappingDialog] _selectedKey: '{_selectedKey}'");
+
+        if (_detectedInput == null)
+        {
+            Console.WriteLine($"[MappingDialog] _detectedInput is null, cancelling");
+            Cancel();
+            return;
+        }
+
+        // Keyboard mode validation
+        if (_keyboardMode)
+        {
+            if (string.IsNullOrEmpty(_selectedKey))
+            {
+                Console.WriteLine($"[MappingDialog] _selectedKey is empty, returning without saving");
+                // No key selected yet
+                return;
+            }
+
+            Console.WriteLine($"[MappingDialog] Creating keyboard mapping with key: {_selectedKey}");
+            Result.Success = true;
+            Result.Input = _detectedInput;
+            Result.Output = new OutputTarget
+            {
+                Type = OutputType.Keyboard,
+                KeyName = _selectedKey,
+                Modifiers = _capturedModifiers.Count > 0 ? _capturedModifiers.ToList() : null
+            };
+            Result.ButtonMode = _selectedButtonMode;
+
+            Result.MappingName = $"{_detectedInput.DeviceName} {_detectedInput.Type} {_detectedInput.Index} -> {GetKeyComboDisplayString()}";
+            Console.WriteLine($"[MappingDialog] MappingName: {Result.MappingName}");
+
+            DialogResult = DialogResult.OK;
+            Console.WriteLine($"[MappingDialog] DialogResult set to OK, closing...");
+            Close();
+            return;
+        }
+
+        // vJoy mode validation
+        if (_vjoyDevices.Count == 0)
         {
             Cancel();
             return;
@@ -181,9 +257,19 @@ public class MappingDialog : Form
 
         Result.Success = true;
         Result.Input = _detectedInput;
+
+        // Determine output type based on input type
+        var outputType = _detectedInput.Type switch
+        {
+            InputType.Button => OutputType.VJoyButton,
+            InputType.Axis => OutputType.VJoyAxis,
+            InputType.Hat => OutputType.VJoyPov,
+            _ => OutputType.VJoyButton
+        };
+
         Result.Output = new OutputTarget
         {
-            Type = _detectedInput.Type == InputType.Button ? OutputType.VJoyButton : OutputType.VJoyAxis,
+            Type = outputType,
             VJoyDevice = vjoyDevice.Id,
             Index = _selectedOutputIndex
         };
@@ -197,6 +283,46 @@ public class MappingDialog : Form
 
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    /// <summary>
+    /// Build display string showing captured key combo (e.g., "LCtrl+LShift+A")
+    /// </summary>
+    private string GetKeyComboDisplayString()
+    {
+        if (string.IsNullOrEmpty(_selectedKey))
+            return "";
+
+        if (_capturedModifiers.Count == 0)
+            return _selectedKey;
+
+        return string.Join("+", _capturedModifiers) + "+" + _selectedKey;
+    }
+
+    /// <summary>
+    /// Check if a key is currently held using GetAsyncKeyState
+    /// </summary>
+    private static bool IsKeyHeld(int vk)
+    {
+        return (GetAsyncKeyState(vk) & 0x8000) != 0;
+    }
+
+    /// <summary>
+    /// Capture currently held modifier keys
+    /// </summary>
+    private List<string> CaptureHeldModifiers()
+    {
+        var mods = new List<string>();
+
+        // Check left/right modifiers separately
+        if (IsKeyHeld(VK_LCONTROL)) mods.Add("LCtrl");
+        if (IsKeyHeld(VK_RCONTROL)) mods.Add("RCtrl");
+        if (IsKeyHeld(VK_LSHIFT)) mods.Add("LShift");
+        if (IsKeyHeld(VK_RSHIFT)) mods.Add("RShift");
+        if (IsKeyHeld(VK_LMENU)) mods.Add("LAlt");
+        if (IsKeyHeld(VK_RMENU)) mods.Add("RAlt");
+
+        return mods;
     }
 
     #region Mouse Handling
@@ -220,6 +346,27 @@ public class MappingDialog : Form
     {
         if (e.Button != MouseButtons.Left) return;
 
+        // Force check which button is under the click (in case hover didn't update)
+        int clickedButton = -1;
+        for (int i = 0; i < _buttonBounds.Length; i++)
+        {
+            if (_buttonBounds[i].Contains(e.X, e.Y))
+            {
+                clickedButton = i;
+                break;
+            }
+        }
+
+        Console.WriteLine($"[MappingDialog] MouseDown at ({e.X}, {e.Y}): state={_state}, hoveredButton={_hoveredButton}, clickedButton={clickedButton}, buttonCount={_buttonBounds.Length}");
+        for (int i = 0; i < _buttonBounds.Length; i++)
+        {
+            var b = _buttonBounds[i];
+            Console.WriteLine($"  Button {i}: ({b.Left}, {b.Top}, {b.Right}, {b.Bottom})");
+        }
+
+        // Use clickedButton instead of _hoveredButton
+        _hoveredButton = clickedButton;
+
         switch (_state)
         {
             case MappingDialogState.WaitingForInput:
@@ -235,30 +382,89 @@ public class MappingDialog : Form
 
     private void HandleOutputSelection()
     {
-        switch (_hoveredButton)
+        bool canUseKeyboard = _detectedInput?.Type == InputType.Button;
+        int buttonOffset = canUseKeyboard ? 2 : 0;
+
+        // Handle mode tabs (only for buttons)
+        if (canUseKeyboard)
         {
-            case 0: // Previous vJoy device
-                if (_selectedVJoyDevice > 0) _selectedVJoyDevice--;
-                break;
-            case 1: // Next vJoy device
-                if (_selectedVJoyDevice < _vjoyDevices.Count - 1) _selectedVJoyDevice++;
-                break;
-            case 2: // Previous output index
-                if (_selectedOutputIndex > 0) _selectedOutputIndex--;
-                break;
-            case 3: // Next output index
-                _selectedOutputIndex++;
-                // Clamp to max available
-                var device = _vjoyDevices[_selectedVJoyDevice];
-                int max = _detectedInput?.Type == InputType.Button ? device.ButtonCount : 8;
-                if (_selectedOutputIndex >= max) _selectedOutputIndex = max - 1;
-                break;
-            case 4: // Cancel
-                Cancel();
-                break;
-            case 5: // Create mapping
-                Complete();
-                break;
+            if (_hoveredButton == 0) // vJoy tab
+            {
+                _keyboardMode = false;
+                _waitingForKeyCapture = false;
+                return;
+            }
+            if (_hoveredButton == 1) // Keyboard tab
+            {
+                _keyboardMode = true;
+                return;
+            }
+        }
+
+        if (_keyboardMode && canUseKeyboard)
+        {
+            Console.WriteLine($"[MappingDialog] HandleOutputSelection keyboard mode: hoveredButton={_hoveredButton}, buttonOffset={buttonOffset}, adjusted={_hoveredButton - buttonOffset}");
+            // Keyboard mode button handling (no more checkboxes - modifiers captured with key)
+            int adjustedButton = _hoveredButton - buttonOffset;
+            switch (adjustedButton)
+            {
+                case 0: // Key capture field
+                    Console.WriteLine($"[MappingDialog] Key capture field clicked");
+                    _waitingForKeyCapture = true;
+                    _selectedKey = "";           // Clear previous selection
+                    _capturedModifiers.Clear();  // Clear previous modifiers
+                    return;
+                case 1: // Cancel
+                    Console.WriteLine($"[MappingDialog] Cancel clicked");
+                    Cancel();
+                    return;
+                case 2: // Create
+                    Console.WriteLine($"[MappingDialog] Create clicked, calling Complete()");
+                    Complete();
+                    return;
+                default:
+                    Console.WriteLine($"[MappingDialog] No match for adjustedButton={adjustedButton}");
+                    break;
+            }
+        }
+        else
+        {
+            // vJoy mode button handling
+            switch (_hoveredButton - buttonOffset)
+            {
+                case 0: // Previous vJoy device
+                    if (_selectedVJoyDevice > 0) _selectedVJoyDevice--;
+                    break;
+                case 1: // Next vJoy device
+                    if (_selectedVJoyDevice < _vjoyDevices.Count - 1) _selectedVJoyDevice++;
+                    break;
+                case 2: // Previous output index
+                    if (_selectedOutputIndex > 0) _selectedOutputIndex--;
+                    break;
+                case 3: // Next output index
+                    _selectedOutputIndex++;
+                    // Clamp to max available based on input type
+                    if (_vjoyDevices.Count > 0)
+                    {
+                        var device = _vjoyDevices[_selectedVJoyDevice];
+                        int max = _detectedInput?.Type switch
+                        {
+                            InputType.Button => device.ButtonCount,
+                            InputType.Axis => 8,
+                            InputType.Hat => Math.Max(device.ContPovCount, device.DiscPovCount),
+                            _ => 1
+                        };
+                        if (max < 1) max = 1;
+                        if (_selectedOutputIndex >= max) _selectedOutputIndex = max - 1;
+                    }
+                    break;
+                case 4: // Cancel
+                    Cancel();
+                    break;
+                case 5: // Create mapping
+                    Complete();
+                    break;
+            }
         }
     }
 
@@ -385,7 +591,7 @@ public class MappingDialog : Form
 
         // Main instruction
         FUIRenderer.DrawTextCentered(canvas,
-            "PRESS A BUTTON OR MOVE AN AXIS",
+            "PRESS A BUTTON, MOVE AN AXIS, OR HAT",
             new SKRect(0, centerY + 50, bounds.Width, centerY + 75),
             FUIColors.TextBright, 14f, true);
 
@@ -412,9 +618,9 @@ public class MappingDialog : Form
 
     private void DrawSelectingOutput(SKCanvas canvas, SKRect bounds)
     {
-        if (_detectedInput == null || _vjoyDevices.Count == 0)
+        if (_detectedInput == null)
         {
-            FUIRenderer.DrawTextCentered(canvas, "No vJoy devices available",
+            FUIRenderer.DrawTextCentered(canvas, "No input detected",
                 new SKRect(0, bounds.Height / 2, bounds.Width, bounds.Height / 2 + 20),
                 FUIColors.Warning, 14f);
             return;
@@ -422,25 +628,30 @@ public class MappingDialog : Form
 
         float y = 60f;
         float pad = 20f;
+        var buttons = new List<SKRect>();
 
         // Detected input info
         FUIRenderer.DrawText(canvas, "INPUT DETECTED", new SKPoint(pad, y), FUIColors.Active, 12f);
         y += 25;
 
         var inputFrame = new SKRect(pad, y, bounds.Width - pad, y + 50);
-        using var inputBgPaint = new SKPaint
+        using (var inputBgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
             Color = FUIColors.Active.WithAlpha(30)
-        };
-        canvas.DrawRect(inputFrame, inputBgPaint);
-        using var inputFramePaint = new SKPaint
+        })
+        {
+            canvas.DrawRect(inputFrame, inputBgPaint);
+        }
+        using (var inputFramePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
             Color = FUIColors.Active,
             StrokeWidth = 1f
-        };
-        canvas.DrawRect(inputFrame, inputFramePaint);
+        })
+        {
+            canvas.DrawRect(inputFrame, inputFramePaint);
+        }
 
         FUIRenderer.DrawText(canvas, _detectedInput.ToString(),
             new SKPoint(pad + 10, y + 20), FUIColors.TextBright, 13f, true);
@@ -452,11 +663,54 @@ public class MappingDialog : Form
 
         y += 70;
 
-        // Output selection
+        // Output mode toggle (only for buttons - axes/hats can only go to vJoy)
+        bool canUseKeyboard = _detectedInput.Type == InputType.Button;
+
         FUIRenderer.DrawText(canvas, "OUTPUT TARGET", new SKPoint(pad, y), FUIColors.Primary, 12f);
         y += 25;
 
-        var buttons = new List<SKRect>();
+        if (canUseKeyboard)
+        {
+            // Mode toggle tabs
+            var vjoyTabBounds = new SKRect(pad, y, pad + 100, y + 28);
+            var keyboardTabBounds = new SKRect(pad + 110, y, pad + 210, y + 28);
+            buttons.Add(vjoyTabBounds);    // Button 0
+            buttons.Add(keyboardTabBounds); // Button 1
+
+            DrawModeTab(canvas, vjoyTabBounds, "vJoy", !_keyboardMode, _hoveredButton == 0);
+            DrawModeTab(canvas, keyboardTabBounds, "Keyboard", _keyboardMode, _hoveredButton == 1);
+
+            y += 40;
+        }
+
+        if (_keyboardMode && canUseKeyboard)
+        {
+            // Keyboard mode UI
+            DrawKeyboardOutput(canvas, bounds, y, pad, buttons, canUseKeyboard ? 2 : 0);
+        }
+        else
+        {
+            // vJoy mode UI
+            DrawVJoyOutput(canvas, bounds, y, pad, buttons, canUseKeyboard ? 2 : 0);
+        }
+
+        _buttonBounds = buttons.ToArray();
+    }
+
+    private void DrawVJoyOutput(SKCanvas canvas, SKRect bounds, float y, float pad, List<SKRect> buttons, int buttonOffset)
+    {
+        if (_vjoyDevices.Count == 0)
+        {
+            FUIRenderer.DrawText(canvas, "No vJoy devices available",
+                new SKPoint(pad, y + 10), FUIColors.Warning, 12f);
+
+            // Still add action buttons at the bottom
+            var noDeviceCancelBounds = new SKRect(bounds.MidX - 120, bounds.Height - 60, bounds.MidX - 20, bounds.Height - 30);
+            buttons.Add(noDeviceCancelBounds);
+            DrawButton(canvas, noDeviceCancelBounds, "CANCEL", _hoveredButton == buttonOffset, false);
+            return;
+        }
+
         var device = _vjoyDevices[_selectedVJoyDevice];
 
         // vJoy device selector
@@ -464,47 +718,153 @@ public class MappingDialog : Form
 
         var prevDeviceBtn = new SKRect(pad + 100, y, pad + 130, y + 28);
         var nextDeviceBtn = new SKRect(pad + 200, y, pad + 230, y + 28);
-        buttons.Add(prevDeviceBtn);
-        buttons.Add(nextDeviceBtn);
+        buttons.Add(prevDeviceBtn);  // buttonOffset + 0
+        buttons.Add(nextDeviceBtn);  // buttonOffset + 1
 
-        DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == 0, _selectedVJoyDevice > 0);
+        DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == buttonOffset, _selectedVJoyDevice > 0);
         FUIRenderer.DrawText(canvas, $"vJoy {device.Id}",
             new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 12f);
-        DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == 1, _selectedVJoyDevice < _vjoyDevices.Count - 1);
+        DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == buttonOffset + 1, _selectedVJoyDevice < _vjoyDevices.Count - 1);
 
         y += 35;
 
-        // Output index selector
-        string outputLabel = _detectedInput.Type == InputType.Button ? "Button:" : "Axis:";
-        int maxIndex = _detectedInput.Type == InputType.Button ? device.ButtonCount : 8;
+        // Output index selector - handle Button, Axis, and Hat types
+        string outputLabel = _detectedInput!.Type switch
+        {
+            InputType.Button => "Button:",
+            InputType.Axis => "Axis:",
+            InputType.Hat => "POV:",
+            _ => "Output:"
+        };
+        int maxIndex = _detectedInput.Type switch
+        {
+            InputType.Button => device.ButtonCount,
+            InputType.Axis => 8,
+            InputType.Hat => Math.Max(device.ContPovCount, device.DiscPovCount),
+            _ => 1
+        };
+        if (maxIndex < 1) maxIndex = 1;
 
         FUIRenderer.DrawText(canvas, outputLabel, new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
 
         var prevIndexBtn = new SKRect(pad + 100, y, pad + 130, y + 28);
         var nextIndexBtn = new SKRect(pad + 200, y, pad + 230, y + 28);
-        buttons.Add(prevIndexBtn);
-        buttons.Add(nextIndexBtn);
+        buttons.Add(prevIndexBtn);  // buttonOffset + 2
+        buttons.Add(nextIndexBtn);  // buttonOffset + 3
 
-        DrawSmallButton(canvas, prevIndexBtn, "<", _hoveredButton == 2, _selectedOutputIndex > 0);
+        DrawSmallButton(canvas, prevIndexBtn, "<", _hoveredButton == buttonOffset + 2, _selectedOutputIndex > 0);
 
-        string indexText = _detectedInput.Type == InputType.Button
-            ? $"Button {_selectedOutputIndex + 1}"
-            : GetAxisName(_selectedOutputIndex);
+        string indexText = _detectedInput.Type switch
+        {
+            InputType.Button => $"Button {_selectedOutputIndex + 1}",
+            InputType.Axis => GetAxisName(_selectedOutputIndex),
+            InputType.Hat => $"POV {_selectedOutputIndex + 1}",
+            _ => $"{_selectedOutputIndex}"
+        };
         FUIRenderer.DrawText(canvas, indexText,
             new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 12f);
 
-        DrawSmallButton(canvas, nextIndexBtn, ">", _hoveredButton == 3, _selectedOutputIndex < maxIndex - 1);
+        DrawSmallButton(canvas, nextIndexBtn, ">", _hoveredButton == buttonOffset + 3, _selectedOutputIndex < maxIndex - 1);
 
         // Action buttons
         var cancelBounds = new SKRect(bounds.MidX - 120, bounds.Height - 60, bounds.MidX - 20, bounds.Height - 30);
         var createBounds = new SKRect(bounds.MidX + 20, bounds.Height - 60, bounds.MidX + 120, bounds.Height - 30);
-        buttons.Add(cancelBounds);
-        buttons.Add(createBounds);
+        buttons.Add(cancelBounds);  // buttonOffset + 4
+        buttons.Add(createBounds);  // buttonOffset + 5
 
-        _buttonBounds = buttons.ToArray();
+        DrawButton(canvas, cancelBounds, "CANCEL", _hoveredButton == buttonOffset + 4, false);
+        DrawButton(canvas, createBounds, "CREATE", _hoveredButton == buttonOffset + 5, true);
+    }
 
-        DrawButton(canvas, cancelBounds, "CANCEL", _hoveredButton == 4, false);
-        DrawButton(canvas, createBounds, "CREATE", _hoveredButton == 5, true);
+    private void DrawKeyboardOutput(SKCanvas canvas, SKRect bounds, float y, float pad, List<SKRect> buttons, int buttonOffset)
+    {
+        // Key capture button/field - now shows full key combo
+        FUIRenderer.DrawText(canvas, "Key Combo:", new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
+
+        var keyCaptureBtn = new SKRect(pad + 85, y, bounds.Width - pad, y + 32);
+        buttons.Add(keyCaptureBtn);  // buttonOffset + 0
+
+        // Draw the key capture field
+        using (var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = _waitingForKeyCapture ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2
+        })
+        {
+            canvas.DrawRect(keyCaptureBtn, bgPaint);
+        }
+        using (var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = _waitingForKeyCapture ? FUIColors.Active : (_hoveredButton == buttonOffset ? FUIColors.FrameBright : FUIColors.Frame),
+            StrokeWidth = 1f
+        })
+        {
+            canvas.DrawRect(keyCaptureBtn, framePaint);
+        }
+
+        // Display key combo (e.g., "LCtrl+LShift+A") or prompt
+        string keyText = _waitingForKeyCapture ? "Press key combo (e.g., Ctrl+A)..." :
+                         string.IsNullOrEmpty(_selectedKey) ? "Click to capture key combo" : GetKeyComboDisplayString();
+        var keyColor = _waitingForKeyCapture ? FUIColors.Active :
+                       string.IsNullOrEmpty(_selectedKey) ? FUIColors.TextDim : FUIColors.TextBright;
+        FUIRenderer.DrawTextCentered(canvas, keyText, keyCaptureBtn, keyColor, 12f);
+
+        y += 45;
+
+        // Help text
+        FUIRenderer.DrawText(canvas, "Hold modifiers (Ctrl, Shift, Alt) when pressing the key",
+            new SKPoint(pad, y + 10), FUIColors.TextDisabled, 10f);
+
+        // Action buttons
+        var cancelBounds = new SKRect(bounds.MidX - 120, bounds.Height - 60, bounds.MidX - 20, bounds.Height - 30);
+        var createBounds = new SKRect(bounds.MidX + 20, bounds.Height - 60, bounds.MidX + 120, bounds.Height - 30);
+        buttons.Add(cancelBounds);  // buttonOffset + 1
+        buttons.Add(createBounds);  // buttonOffset + 2
+
+        DrawButton(canvas, cancelBounds, "CANCEL", _hoveredButton == buttonOffset + 1, false);
+        bool canCreate = !string.IsNullOrEmpty(_selectedKey);
+        DrawButton(canvas, createBounds, "CREATE", _hoveredButton == buttonOffset + 2, canCreate);
+    }
+
+    private void DrawModeTab(SKCanvas canvas, SKRect bounds, string text, bool isActive, bool isHovered)
+    {
+        var bgColor = isActive ? FUIColors.Primary.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+        var frameColor = isActive ? FUIColors.Primary : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = frameColor,
+            StrokeWidth = isActive ? 2f : 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+    }
+
+    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
+    {
+        var bgColor = isChecked ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+        var frameColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var textColor = isChecked ? FUIColors.TextBright : FUIColors.TextDim;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = frameColor,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 10f);
     }
 
     private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
@@ -585,11 +945,140 @@ public class MappingDialog : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        // Key capture mode - capture any key press with its modifiers
+        if (_waitingForKeyCapture && _state == MappingDialogState.SelectingOutput)
+        {
+            // Get the base key without modifiers
+            var baseKey = keyData & Keys.KeyCode;
+
+            // Check if this is a modifier-only key press
+            bool isModifierOnly = baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
+                baseKey == Keys.Menu || baseKey == Keys.Control ||
+                baseKey == Keys.Shift || baseKey == Keys.Alt ||
+                baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
+                baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
+                baseKey == Keys.LMenu || baseKey == Keys.RMenu;
+
+            if (isModifierOnly)
+            {
+                // Capture just the modifier key itself (e.g., just LCtrl or just RShift)
+                _selectedKey = GetModifierKeyName(baseKey);
+                _capturedModifiers.Clear(); // No additional modifiers when capturing a modifier itself
+                _waitingForKeyCapture = false;
+                return true;
+            }
+
+            // Regular key - convert to friendly key name
+            _selectedKey = KeyToString(baseKey);
+
+            // Capture held modifiers using GetAsyncKeyState (detects left/right)
+            _capturedModifiers = CaptureHeldModifiers();
+
+            _waitingForKeyCapture = false;
+
+            return true;
+        }
+
         if (keyData == Keys.Escape)
         {
+            if (_waitingForKeyCapture)
+            {
+                _waitingForKeyCapture = false;
+                return true;
+            }
             Cancel();
             return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <summary>
+    /// Get the specific modifier key name (left/right variant)
+    /// </summary>
+    private string GetModifierKeyName(Keys key)
+    {
+        // Use GetAsyncKeyState to determine if it's left or right variant
+        if (key == Keys.ControlKey || key == Keys.Control)
+        {
+            if (IsKeyHeld(VK_RCONTROL)) return "RCtrl";
+            return "LCtrl";
+        }
+        if (key == Keys.LControlKey) return "LCtrl";
+        if (key == Keys.RControlKey) return "RCtrl";
+
+        if (key == Keys.ShiftKey || key == Keys.Shift)
+        {
+            if (IsKeyHeld(VK_RSHIFT)) return "RShift";
+            return "LShift";
+        }
+        if (key == Keys.LShiftKey) return "LShift";
+        if (key == Keys.RShiftKey) return "RShift";
+
+        if (key == Keys.Menu || key == Keys.Alt)
+        {
+            if (IsKeyHeld(VK_RMENU)) return "RAlt";
+            return "LAlt";
+        }
+        if (key == Keys.LMenu) return "LAlt";
+        if (key == Keys.RMenu) return "RAlt";
+
+        return key.ToString();
+    }
+
+    private static string KeyToString(Keys key)
+    {
+        return key switch
+        {
+            // Letter keys
+            >= Keys.A and <= Keys.Z => key.ToString(),
+
+            // Number keys
+            >= Keys.D0 and <= Keys.D9 => key.ToString().Substring(1), // Remove the 'D' prefix
+
+            // Numpad
+            >= Keys.NumPad0 and <= Keys.NumPad9 => $"Num{(int)key - (int)Keys.NumPad0}",
+            Keys.Multiply => "NumMul",
+            Keys.Add => "NumAdd",
+            Keys.Subtract => "NumSub",
+            Keys.Decimal => "NumDec",
+            Keys.Divide => "NumDiv",
+
+            // Function keys
+            >= Keys.F1 and <= Keys.F24 => key.ToString(),
+
+            // Common keys
+            Keys.Space => "Space",
+            Keys.Enter => "Enter",
+            Keys.Tab => "Tab",
+            Keys.Back => "Backspace",
+            Keys.Delete => "Delete",
+            Keys.Insert => "Insert",
+            Keys.Home => "Home",
+            Keys.End => "End",
+            Keys.PageUp => "PageUp",
+            Keys.PageDown => "PageDown",
+
+            // Arrow keys
+            Keys.Up => "Up",
+            Keys.Down => "Down",
+            Keys.Left => "Left",
+            Keys.Right => "Right",
+
+            // Punctuation
+            Keys.OemMinus => "-",
+            Keys.Oemplus => "=",
+            Keys.OemOpenBrackets => "[",
+            Keys.OemCloseBrackets => "]",
+            Keys.OemPipe => "\\",
+            Keys.OemSemicolon => ";",
+            Keys.OemQuotes => "'",
+            Keys.Oemcomma => ",",
+            Keys.OemPeriod => ".",
+            Keys.OemQuestion => "/",
+            Keys.Oemtilde => "`",
+
+            // Default
+            _ => key.ToString()
+        };
     }
 }

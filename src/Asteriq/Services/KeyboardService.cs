@@ -70,7 +70,7 @@ public class KeyboardService : IDisposable
     #endregion
 
     /// <summary>
-    /// Set a key's pressed state
+    /// Set a key's pressed state using virtual key code
     /// </summary>
     public void SetKey(int virtualKeyCode, bool pressed, int[]? modifiers = null)
     {
@@ -106,6 +106,31 @@ public class KeyboardService : IDisposable
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Set a key's pressed state using key name and modifier names
+    /// </summary>
+    public void SetKey(string? keyName, bool pressed, List<string>? modifierNames = null)
+    {
+        if (string.IsNullOrEmpty(keyName))
+            return;
+
+        var keyCode = GetKeyCode(keyName);
+        if (!keyCode.HasValue)
+            return;
+
+        int[]? modifierCodes = null;
+        if (modifierNames != null && modifierNames.Count > 0)
+        {
+            modifierCodes = modifierNames
+                .Select(GetKeyCode)
+                .Where(c => c.HasValue)
+                .Select(c => c!.Value)
+                .ToArray();
+        }
+
+        SetKey(keyCode.Value, pressed, modifierCodes);
     }
 
     /// <summary>

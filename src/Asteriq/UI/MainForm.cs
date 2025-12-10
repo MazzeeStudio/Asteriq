@@ -6466,10 +6466,10 @@ public class MainForm : Form
         var statusTextColor = status == "ONLINE" ? FUIColors.Success : FUIColors.Warning;
         FUIRenderer.DrawText(canvas, status, new SKPoint(x + 35, y + 45), statusTextColor, 11f);
 
-        // vJoy assignment indicator
+        // vJoy assignment indicator (positioned to avoid chevron overlap)
         if (status == "ONLINE")
         {
-            FUIRenderer.DrawText(canvas, "VJOY:1", new SKPoint(x + width - 65, y + 45),
+            FUIRenderer.DrawText(canvas, "VJOY:1", new SKPoint(x + width - 85, y + 45),
                 FUIColors.TextDim, 11f);
         }
 
@@ -6483,8 +6483,8 @@ public class MainForm : Form
                 StrokeWidth = 2f,
                 IsAntialias = true
             };
-            canvas.DrawLine(x + width - 20, y + 25, x + width - 12, y + 30, chevronPaint);
-            canvas.DrawLine(x + width - 12, y + 30, x + width - 20, y + 35, chevronPaint);
+            canvas.DrawLine(x + width - 18, y + 25, x + width - 10, y + 30, chevronPaint);
+            canvas.DrawLine(x + width - 10, y + 30, x + width - 18, y + 35, chevronPaint);
         }
     }
 

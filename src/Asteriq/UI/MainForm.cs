@@ -69,6 +69,12 @@ public class MainForm : Form
     private SKRect _deviceCategoryD1Bounds;
     private SKRect _deviceCategoryD2Bounds;
 
+    // Mapping category tabs (M1 = Axes, M2 = Buttons)
+    private int _mappingCategory = 0;  // 0 = Axes, 1 = Buttons
+    private int _hoveredMappingCategory = -1;
+    private SKRect _mappingCategoryAxesBounds;
+    private SKRect _mappingCategoryButtonsBounds;
+
     // Tab state
     private int _activeTab = 0;
     private readonly string[] _tabNames = { "DEVICES", "MAPPINGS", "BINDINGS", "SETTINGS" };
@@ -1251,6 +1257,22 @@ public class MainForm : Form
             }
         }
 
+        // Mapping category tabs hover detection (for Mappings tab)
+        _hoveredMappingCategory = -1;
+        if (_activeTab == 1)
+        {
+            if (_mappingCategoryAxesBounds.Contains(e.X, e.Y))
+            {
+                _hoveredMappingCategory = 0;
+                Cursor = Cursors.Hand;
+            }
+            else if (_mappingCategoryButtonsBounds.Contains(e.X, e.Y))
+            {
+                _hoveredMappingCategory = 1;
+                Cursor = Cursors.Hand;
+            }
+        }
+
         // Device list hover detection
         float pad = FUIRenderer.SpaceLG;
         float contentTop = 90;
@@ -1413,6 +1435,16 @@ public class MainForm : Form
             _deviceCategory = _hoveredDeviceCategory;
             _selectedDevice = -1; // Reset selection when switching categories
             _currentInputState = null;
+            return;
+        }
+
+        // Mapping category tab clicks (M1 Axes / M2 Buttons)
+        if (_activeTab == 1 && _hoveredMappingCategory >= 0)
+        {
+            _mappingCategory = _hoveredMappingCategory;
+            _selectedMappingRow = -1; // Reset selection when switching categories
+            _bindingsScrollOffset = 0; // Reset scroll when switching categories
+            CancelInputListening();
             return;
         }
 
@@ -2203,23 +2235,43 @@ public class MainForm : Form
 
     private void DrawBindingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        // Panel background
+        float pad = FUIRenderer.PanelPadding;
+        float itemGap = FUIRenderer.ItemSpacing;
+
+        // Vertical side tabs width
+        float sideTabWidth = 28f;
+
+        // Panel shadow
+        FUIRenderer.DrawPanelShadow(canvas, bounds, 3f, 3f, 10f);
+
+        // Panel background (shifted right to make room for side tabs)
+        var contentBounds = new SKRect(bounds.Left + frameInset + sideTabWidth, bounds.Top + frameInset,
+                                        bounds.Right - frameInset, bounds.Bottom - frameInset);
         using var bgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
             Color = FUIColors.Background1.WithAlpha(140),
             IsAntialias = true
         };
-        canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
-            bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 40f, 10f);
+        canvas.DrawRect(contentBounds, bgPaint);
 
-        float y = bounds.Top + frameInset + 10;
-        float leftMargin = bounds.Left + frameInset + 10;
-        float rightMargin = bounds.Right - frameInset - 10;
+        // Draw vertical side tabs (M1 Axes, M2 Buttons)
+        DrawMappingCategorySideTabs(canvas, bounds.Left + frameInset, bounds.Top + frameInset,
+            sideTabWidth, bounds.Height - frameInset * 2);
 
-        // Title
-        FUIRenderer.DrawText(canvas, "VJOY MAPPINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
+        // L-corner frame (adjusted for side tabs)
+        var frameBounds = new SKRect(bounds.Left + sideTabWidth, bounds.Top, bounds.Right, bounds.Bottom);
+        FUIRenderer.DrawLCornerFrame(canvas, frameBounds, FUIColors.Frame, 40f, 10f);
+
+        float y = contentBounds.Top + 10;
+        float leftMargin = contentBounds.Left + 10;
+        float rightMargin = contentBounds.Right - 10;
+
+        // Header with category code
+        string categoryCode = _mappingCategory == 0 ? "M1" : "M2";
+        string categoryName = "VJOY MAPPINGS";
+        FUIRenderer.DrawText(canvas, categoryCode, new SKPoint(leftMargin, y + 12), FUIColors.Active, 12f);
+        FUIRenderer.DrawText(canvas, categoryName, new SKPoint(leftMargin + 30, y + 12), FUIColors.TextBright, 14f, true);
         y += 30;
 
         // vJoy device selector: [<] vJoy Device 1 [>]
@@ -2239,14 +2291,35 @@ public class MainForm : Form
         y += arrowButtonSize + 15;
 
         FUIRenderer.DrawGlowingLine(canvas,
-            new SKPoint(bounds.Left + frameInset, y),
-            new SKPoint(bounds.Right - frameInset, y),
+            new SKPoint(contentBounds.Left, y),
+            new SKPoint(contentBounds.Right, y),
             FUIColors.Primary.WithAlpha(80), 1f, 2f);
         y += 10;
 
-        // Scrollable binding rows
-        float listBottom = bounds.Bottom - frameInset - 10;
+        // Scrollable binding rows (filtered by category)
+        float listBottom = contentBounds.Bottom - 10;
         DrawBindingsList(canvas, new SKRect(leftMargin - 5, y, rightMargin + 5, listBottom));
+    }
+
+    private void DrawMappingCategorySideTabs(SKCanvas canvas, float x, float y, float width, float height)
+    {
+        // Style matching Device category tabs: narrow vertical tabs with text reading bottom-to-top
+        float tabHeight = 80f;
+        float tabGap = 4f;
+
+        // Calculate total tabs height and start from bottom of available space
+        float totalTabsHeight = tabHeight * 2 + tabGap;
+        float startY = y + height - totalTabsHeight - 10f;
+
+        // M1 Axes tab (bottom)
+        var axesBounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
+        _mappingCategoryAxesBounds = axesBounds;
+        DrawVerticalSideTab(canvas, axesBounds, "AXES_01", _mappingCategory == 0, _hoveredMappingCategory == 0);
+
+        // M2 Buttons tab (above M1)
+        var buttonsBounds = new SKRect(x, startY, x + width, startY + tabHeight);
+        _mappingCategoryButtonsBounds = buttonsBounds;
+        DrawVerticalSideTab(canvas, buttonsBounds, "BUTTONS_02", _mappingCategory == 1, _hoveredMappingCategory == 1);
     }
 
     private void DrawBindingsList(SKCanvas canvas, SKRect bounds)
@@ -2263,16 +2336,15 @@ public class MainForm : Form
 
         float rowHeight = 32f;  // Compact rows
         float rowGap = 4f;
-        float sectionHeaderHeight = 22f;
-        float sectionGap = 8f;
 
-        // Calculate total content height for scrolling
+        // Get counts based on current category
         string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
         int axisCount = hasVJoy ? Math.Min(axisNames.Length, 8) : 0;
         int buttonCount = vjoyDevice?.ButtonCount ?? 0;
 
-        _bindingsContentHeight = sectionHeaderHeight + (axisCount * (rowHeight + rowGap)) +
-                                 sectionGap + sectionHeaderHeight + (buttonCount * (rowHeight + rowGap));
+        // Calculate content height based on selected category (no section headers when filtered)
+        int itemCount = _mappingCategory == 0 ? axisCount : buttonCount;
+        _bindingsContentHeight = itemCount * (rowHeight + rowGap);
 
         // Clamp scroll offset
         float maxScroll = Math.Max(0, _bindingsContentHeight - bounds.Height);
@@ -2285,15 +2357,9 @@ public class MainForm : Form
         float y = bounds.Top - _bindingsScrollOffset;
         int rowIndex = 0;
 
-        // Section: AXES (only if vJoy available)
-        if (hasVJoy && axisCount > 0)
+        // Show AXES when category is 0
+        if (_mappingCategory == 0 && hasVJoy && axisCount > 0)
         {
-            if (y + sectionHeaderHeight > bounds.Top - 20)
-            {
-                FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
-            }
-            y += sectionHeaderHeight;
-
             for (int i = 0; i < axisCount; i++)
             {
                 float rowTop = y;
@@ -2321,16 +2387,9 @@ public class MainForm : Form
             }
         }
 
-        // Section: BUTTONS (only if vJoy available)
-        if (hasVJoy && buttonCount > 0)
+        // Show BUTTONS when category is 1
+        if (_mappingCategory == 1 && hasVJoy && buttonCount > 0)
         {
-            y += sectionGap;
-            if (y + sectionHeaderHeight > bounds.Top && y < bounds.Bottom)
-            {
-                FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
-            }
-            y += sectionHeaderHeight;
-
             for (int i = 0; i < buttonCount; i++)
             {
                 float rowTop = y;

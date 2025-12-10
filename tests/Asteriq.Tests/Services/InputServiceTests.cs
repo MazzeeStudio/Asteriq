@@ -116,6 +116,92 @@ public class InputServiceTests
     }
 }
 
+public class DeviceNameMatchingTests
+{
+    [Theory]
+    [InlineData("VPC Stick MT-50CM2", "VPC Stick MT-50CM2", true)]  // Exact match
+    [InlineData("L-VPC Stick WarBRD", "LEFT VPC Stick WarBRD", true)]  // L- -> LEFT
+    [InlineData("R-VPC Stick WarBRD", "RIGHT VPC Stick WarBRD", true)]  // R- -> RIGHT
+    [InlineData("VPC Stick MT-50CM2", "VPC Stick MT-50CM3", false)]  // Different model
+    [InlineData("  VPC Stick MT-50CM2  ", "VPC Stick MT-50CM2", true)]  // Whitespace trimmed
+    [InlineData("VPC  Stick  MT-50CM2", "VPC Stick MT-50CM2", true)]  // Extra spaces normalized
+    public void DeviceNamesMatch_HandlesVariations(string hidName, string sdlName, bool expected)
+    {
+        bool result = DeviceNamesMatch(hidName, sdlName);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("L-VPC", "LEFT VPC")]
+    [InlineData("R-VPC", "RIGHT VPC")]
+    [InlineData("  Test  Device  ", "Test Device")]
+    [InlineData("Normal Device", "Normal Device")]
+    public void NormalizeDeviceName_NormalizesCorrectly(string input, string expected)
+    {
+        var result = NormalizeDeviceName(input);
+
+        Assert.Equal(expected, result);
+    }
+
+    // Mirror the DeviceNamesMatch logic from InputService
+    private static bool DeviceNamesMatch(string hidName, string sdlName)
+    {
+        if (hidName.Equals(sdlName, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var normalizedHid = NormalizeDeviceName(hidName);
+        var normalizedSdl = NormalizeDeviceName(sdlName);
+
+        return normalizedHid.Equals(normalizedSdl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeDeviceName(string name)
+    {
+        var normalized = name.Trim();
+
+        if (normalized.StartsWith("L-", StringComparison.OrdinalIgnoreCase))
+            normalized = "LEFT " + normalized.Substring(2);
+        else if (normalized.StartsWith("R-", StringComparison.OrdinalIgnoreCase))
+            normalized = "RIGHT " + normalized.Substring(2);
+
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\s+", " ");
+
+        return normalized;
+    }
+}
+
+public class VirtualDeviceDetectionTests
+{
+    [Theory]
+    [InlineData("vJoy Device", true)]
+    [InlineData("VJOY Device", true)]
+    [InlineData("vXBox Controller", true)]
+    [InlineData("ViGEm Virtual Gamepad", true)]
+    [InlineData("Virtual Joystick", true)]
+    [InlineData("Feeder Device", true)]
+    [InlineData("VPC Stick MT-50CM2", false)]  // Virpil physical device
+    [InlineData("VKB Gladiator NXT", false)]  // VKB physical device
+    [InlineData("Thrustmaster Warthog", false)]  // Physical device
+    public void IsVirtualDevice_DetectsCorrectly(string deviceName, bool expectedVirtual)
+    {
+        bool result = IsVirtualDevice(deviceName);
+
+        Assert.Equal(expectedVirtual, result);
+    }
+
+    // Mirror the IsVirtualDevice logic from InputService
+    private static bool IsVirtualDevice(string name)
+    {
+        var upper = name.ToUpperInvariant();
+        return upper.Contains("VJOY") ||
+               upper.Contains("VXBOX") ||
+               upper.Contains("VIGEM") ||
+               upper.Contains("VIRTUAL") ||
+               upper.Contains("FEEDER");
+    }
+}
+
 public class HatConversionTests
 {
     [Theory]

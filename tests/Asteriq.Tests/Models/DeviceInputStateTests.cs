@@ -57,6 +57,45 @@ public class DeviceInputStateTests
         Assert.Equal(0, info.ButtonCount);
         Assert.Equal(0, info.HatCount);
         Assert.Equal(Guid.Empty, info.InstanceGuid);
+        Assert.True(info.IsConnected); // Default should be connected
+        Assert.Equal(string.Empty, info.HidDevicePath);
+    }
+
+    [Fact]
+    public void PhysicalDeviceInfo_IsConnected_DefaultsToTrue()
+    {
+        var info = new PhysicalDeviceInfo();
+
+        Assert.True(info.IsConnected);
+    }
+
+    [Fact]
+    public void PhysicalDeviceInfo_IsConnected_CanBeSetToFalse()
+    {
+        var info = new PhysicalDeviceInfo { IsConnected = false };
+
+        Assert.False(info.IsConnected);
+    }
+
+    [Fact]
+    public void PhysicalDeviceInfo_DeviceIndex_CanBeModified()
+    {
+        var info = new PhysicalDeviceInfo { DeviceIndex = 5 };
+
+        info.DeviceIndex = 10;
+
+        Assert.Equal(10, info.DeviceIndex);
+    }
+
+    [Fact]
+    public void PhysicalDeviceInfo_HidDevicePath_CanBeSet()
+    {
+        var info = new PhysicalDeviceInfo
+        {
+            HidDevicePath = @"\\?\HID#VID_3344&PID_0001"
+        };
+
+        Assert.Equal(@"\\?\HID#VID_3344&PID_0001", info.HidDevicePath);
     }
 
     [Fact]

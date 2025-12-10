@@ -1,6 +1,38 @@
 using Asteriq.Models;
+using System.IO;
 
 namespace Asteriq.Services;
+
+// Simple file logger for input detection debugging
+internal static class InputDetectionLog
+{
+    private static readonly string LogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Asteriq", "input_detection.log");
+
+    static InputDetectionLog()
+    {
+        var dir = Path.GetDirectoryName(LogPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+    }
+
+    public static void Log(string message)
+    {
+        try
+        {
+            var line = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
+            Console.WriteLine(line);
+            File.AppendAllText(LogPath, line + Environment.NewLine);
+        }
+        catch { }
+    }
+
+    public static void Clear()
+    {
+        try { File.WriteAllText(LogPath, ""); } catch { }
+    }
+}
 
 /// <summary>
 /// Result of detecting an input
@@ -94,23 +126,25 @@ public class InputDetectionService : IDisposable
 
     // Track axis movement confirmation - need sustained movement to confirm intentional input
     private Dictionary<Guid, int[]> _axisMovementConfirmCount = new();
-    private const int RequiredConfirmationFrames = 5; // Must maintain movement for 5 frames (increased from 3)
+    private const int RequiredConfirmationFrames = 8; // Must maintain movement for 8 frames to filter out noise spikes
 
-    // Jitter threshold - movements smaller than this are considered noise (5% of axis range)
-    private const float JitterThreshold = 0.05f;
+    // Jitter threshold - movements smaller than this are considered noise (8% of axis range)
+    private const float JitterThreshold = 0.08f;
 
     // High-variance threshold - axes with stdDev above this are completely ignored (noisy/phantom axes)
-    private const float HighVarianceThreshold = 0.10f;
+    // Lowered to 0.03 to catch more noisy axes (3% standard deviation during warmup = noisy)
+    private const float HighVarianceThreshold = 0.03f;
 
     // Track which axes are too noisy to use
     private Dictionary<Guid, bool[]> _noisyAxes = new();
 
     // Warmup configuration
-    private const int RequiredWarmupSamples = 20; // Collect 20 samples for stable baseline (increased)
-    private const int RequiredWarmupPolls = 5;    // Initial settle time (increased)
+    private const int RequiredWarmupSamples = 30; // Collect 30 samples for stable baseline
+    private const int RequiredWarmupPolls = 10;   // Initial settle time before collecting samples
 
-    private bool _baselineCaptured;
-    private int _warmupPolls = 0;
+    // Per-device warmup tracking (each device needs its own warmup)
+    private Dictionary<Guid, int> _deviceWarmupPolls = new();
+    private Dictionary<Guid, bool> _deviceBaselineCaptured = new();
 
     /// <summary>
     /// Event fired when input is detected during waiting
@@ -148,8 +182,8 @@ public class InputDetectionService : IDisposable
             _axisThreshold = axisThreshold;
 
             // Reset all state for new detection session
-            _baselineCaptured = false;
-            _warmupPolls = 0;
+            _deviceWarmupPolls.Clear();
+            _deviceBaselineCaptured.Clear();
             _stableAxisBaseline.Clear();
             _initialButtons.Clear();
             _initialHats.Clear();
@@ -161,6 +195,11 @@ public class InputDetectionService : IDisposable
 
             _currentDetection = new TaskCompletionSource<DetectedInput?>();
             _cancellationSource = new CancellationTokenSource();
+
+            InputDetectionLog.Clear();
+            InputDetectionLog.Log($"Started waiting for input. Filter={filter}, AxisThreshold={axisThreshold:F2}, Timeout={timeoutMs}ms");
+            InputDetectionLog.Log($"[InputDetection] Warmup: {RequiredWarmupPolls} settle polls + {RequiredWarmupSamples} samples");
+            InputDetectionLog.Log($"[InputDetection] Thresholds: Jitter={JitterThreshold:F2}, HighVariance={HighVarianceThreshold:F2}, Confirmation={RequiredConfirmationFrames} frames");
         }
 
         // Subscribe to input events
@@ -211,30 +250,38 @@ public class InputDetectionService : IDisposable
 
             var deviceGuid = state.InstanceGuid;
 
-            // Phase 1: Initial settle - skip first few polls to let device state stabilize
-            if (_warmupPolls < RequiredWarmupPolls)
+            // Get or initialize per-device warmup counter
+            if (!_deviceWarmupPolls.TryGetValue(deviceGuid, out int warmupPolls))
             {
-                _warmupPolls++;
+                warmupPolls = 0;
+                _deviceWarmupPolls[deviceGuid] = 0;
+                InputDetectionLog.Log($"New device detected: {state.DeviceName} ({deviceGuid})");
+            }
+
+            // Phase 1: Initial settle - skip first few polls to let device state stabilize
+            if (warmupPolls < RequiredWarmupPolls)
+            {
+                _deviceWarmupPolls[deviceGuid] = warmupPolls + 1;
                 _previousButtons[deviceGuid] = (bool[])state.Buttons.Clone();
                 _previousHats[deviceGuid] = (int[])state.Hats.Clone();
                 return;
             }
 
             // Phase 2: Collect axis samples for stable baseline computation
-            if (_warmupPolls < RequiredWarmupPolls + RequiredWarmupSamples)
+            if (warmupPolls < RequiredWarmupPolls + RequiredWarmupSamples)
             {
-                _warmupPolls++;
+                _deviceWarmupPolls[deviceGuid] = warmupPolls + 1;
                 CollectAxisWarmupSample(state);
                 _previousButtons[deviceGuid] = (bool[])state.Buttons.Clone();
                 _previousHats[deviceGuid] = (int[])state.Hats.Clone();
                 return;
             }
 
-            // Phase 3: Compute stable baseline from warmup samples (once)
-            if (!_baselineCaptured)
+            // Phase 3: Compute stable baseline from warmup samples (once per device)
+            if (!_deviceBaselineCaptured.TryGetValue(deviceGuid, out bool captured) || !captured)
             {
                 ComputeStableBaseline(state);
-                _baselineCaptured = true;
+                _deviceBaselineCaptured[deviceGuid] = true;
                 return;
             }
 
@@ -275,24 +322,30 @@ public class InputDetectionService : IDisposable
         var baseline = new float[state.Axes.Length];
         var noisyFlags = new bool[state.Axes.Length];
 
-        System.Diagnostics.Debug.WriteLine($"[InputDetection] Computing baseline for {state.DeviceName} with {state.Axes.Length} axes");
+        InputDetectionLog.Log($"[InputDetection] Computing baseline for {state.DeviceName} with {state.Axes.Length} axes");
 
         if (_axisWarmupSamples.TryGetValue(guid, out var samples) && samples.Count > 0)
         {
             for (int axis = 0; axis < state.Axes.Length; axis++)
             {
-                // Compute mean
+                // Compute mean, min, and max
                 float sum = 0f;
+                float minVal = float.MaxValue;
+                float maxVal = float.MinValue;
                 int count = 0;
                 foreach (var sample in samples)
                 {
                     if (axis < sample.Length)
                     {
-                        sum += sample[axis];
+                        float val = sample[axis];
+                        sum += val;
+                        minVal = Math.Min(minVal, val);
+                        maxVal = Math.Max(maxVal, val);
                         count++;
                     }
                 }
                 float mean = count > 0 ? sum / count : 0f;
+                float range = count > 0 ? maxVal - minVal : 0f;
 
                 // Also compute variance to detect noisy axes
                 float varianceSum = 0f;
@@ -307,18 +360,22 @@ public class InputDetectionService : IDisposable
                 float variance = count > 0 ? varianceSum / count : 0f;
                 float stdDev = MathF.Sqrt(variance);
 
-                // Mark axis as noisy if variance is too high - these will be completely ignored
-                if (stdDev > HighVarianceThreshold)
+                // Mark axis as noisy if:
+                // 1. Standard deviation is too high (consistently varying)
+                // 2. Range during warmup exceeds threshold (axis moved or is oscillating)
+                bool isNoisy = stdDev > HighVarianceThreshold || range > JitterThreshold * 2;
+
+                if (isNoisy)
                 {
                     noisyFlags[axis] = true;
                     baseline[axis] = mean;
-                    System.Diagnostics.Debug.WriteLine($"[InputDetection]   Axis {axis}: *** MARKED NOISY *** stdDev={stdDev:F3} > threshold={HighVarianceThreshold:F3}");
+                    InputDetectionLog.Log($"[InputDetection]   Axis {axis}: *** MARKED NOISY *** stdDev={stdDev:F4}, range={range:F4}");
                 }
                 else
                 {
                     noisyFlags[axis] = false;
                     baseline[axis] = mean;
-                    System.Diagnostics.Debug.WriteLine($"[InputDetection]   Axis {axis}: mean={mean:F3}, stdDev={stdDev:F3}, baseline={baseline[axis]:F3}");
+                    InputDetectionLog.Log($"[InputDetection]   Axis {axis}: mean={mean:F4}, stdDev={stdDev:F4}, range={range:F4}");
                 }
             }
         }
@@ -326,7 +383,7 @@ public class InputDetectionService : IDisposable
         {
             // No samples - use current state
             baseline = (float[])state.Axes.Clone();
-            System.Diagnostics.Debug.WriteLine($"[InputDetection] No warmup samples, using current state as baseline");
+            InputDetectionLog.Log($"[InputDetection] No warmup samples, using current state as baseline");
         }
 
         _stableAxisBaseline[guid] = baseline;
@@ -371,7 +428,7 @@ public class InputDetectionService : IDisposable
                 // Detect button press TRANSITION (was not pressed LAST FRAME, now is pressed)
                 if (state.Buttons[i] && !prevButtons[i])
                 {
-                    System.Diagnostics.Debug.WriteLine($"[InputDetection] *** BUTTON {i} DETECTED *** on {state.DeviceName}");
+                    InputDetectionLog.Log($"[InputDetection] *** BUTTON {i} DETECTED *** on {state.DeviceName}");
                     return new DetectedInput
                     {
                         DeviceGuid = guid,
@@ -414,12 +471,12 @@ public class InputDetectionService : IDisposable
                     // Increment confirmation counter
                     confirmCounts[i]++;
 
-                    System.Diagnostics.Debug.WriteLine($"[InputDetection] Axis {i}: delta={delta:F3} >= thresh={_axisThreshold:F3}, confirm={confirmCounts[i]}/{RequiredConfirmationFrames}");
+                    InputDetectionLog.Log($"[InputDetection] Axis {i}: current={currentValue:F4}, baseline={baselineValue:F4}, delta={delta:F4}, confirm={confirmCounts[i]}/{RequiredConfirmationFrames}");
 
                     // Require sustained movement over multiple frames to confirm
                     if (confirmCounts[i] >= RequiredConfirmationFrames)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[InputDetection] *** AXIS {i} DETECTED *** on {state.DeviceName}, value={currentValue:F3}, baseline={baselineValue:F3}");
+                        InputDetectionLog.Log($"[InputDetection] *** AXIS {i} DETECTED *** on {state.DeviceName}, value={currentValue:F4}, baseline={baselineValue:F4}");
                         return new DetectedInput
                         {
                             DeviceGuid = guid,
@@ -447,7 +504,7 @@ public class InputDetectionService : IDisposable
                 // Detect hat movement transition (was centered last frame, now has direction)
                 if (state.Hats[i] >= 0 && prevHats[i] < 0)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[InputDetection] *** HAT {i} DETECTED *** on {state.DeviceName}");
+                    InputDetectionLog.Log($"[InputDetection] *** HAT {i} DETECTED *** on {state.DeviceName}");
                     return new DetectedInput
                     {
                         DeviceGuid = guid,

@@ -279,6 +279,28 @@ public class MainForm : Form
     private List<SKRect> _scVJoyMappingBounds = new();
     private int _hoveredVJoyMapping = -1;
 
+    // SC Bindings table state
+    private List<SCAction>? _scFilteredActions;
+    private string _scActionMapFilter = "";  // Empty = show all, otherwise filter by action map
+    private int _scSelectedActionIndex = -1;
+    private int _scHoveredActionIndex = -1;
+    private float _scBindingsScrollOffset = 0;
+    private float _scBindingsContentHeight = 0;
+    private SKRect _scBindingsListBounds;
+    private List<SKRect> _scActionRowBounds = new();
+    private SKRect _scActionMapFilterBounds;
+    private bool _scActionMapFilterDropdownOpen;
+    private SKRect _scActionMapFilterDropdownBounds;
+    private int _scHoveredActionMapFilter = -1;
+    private List<string> _scActionMaps = new();  // List of unique action maps
+
+    // SC Binding assignment state
+    private bool _scAssigningInput = false;
+    private SKRect _scAssignInputButtonBounds;
+    private bool _scAssignInputButtonHovered;
+    private SKRect _scClearBindingButtonBounds;
+    private bool _scClearBindingButtonHovered;
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -390,6 +412,17 @@ public class MainForm : Form
                 _scActions = _scSchemaService.ParseActions(profile);
                 _scExportProfile.TargetEnvironment = installation.Environment;
                 _scExportProfile.TargetBuildId = installation.BuildId;
+
+                // Build action maps list and filter to joystick-relevant actions
+                _scActionMaps = _scActions
+                    .Select(a => a.ActionMap)
+                    .Distinct()
+                    .OrderBy(m => m)
+                    .ToList();
+
+                // Default: show joystick-relevant actions only
+                RefreshFilteredActions();
+
                 System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded {_scActions.Count} SC actions from {installation.Environment}");
             }
         }
@@ -397,7 +430,31 @@ public class MainForm : Form
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Failed to load SC schema: {ex.Message}");
             _scActions = null;
+            _scFilteredActions = null;
+            _scActionMaps.Clear();
         }
+    }
+
+    private void RefreshFilteredActions()
+    {
+        if (_scActions == null || _scSchemaService == null)
+        {
+            _scFilteredActions = null;
+            return;
+        }
+
+        // Start with joystick-relevant actions
+        var actions = _scSchemaService.FilterJoystickActions(_scActions);
+
+        // Apply action map filter if set
+        if (!string.IsNullOrEmpty(_scActionMapFilter))
+        {
+            actions = actions.Where(a => a.ActionMap == _scActionMapFilter).ToList();
+        }
+
+        _scFilteredActions = actions.OrderBy(a => a.ActionMap).ThenBy(a => a.ActionName).ToList();
+        _scBindingsScrollOffset = 0;  // Reset scroll when filter changes
+        _scSelectedActionIndex = -1;  // Clear selection
     }
 
     private void CreateNewProfilePrompt()
@@ -1589,8 +1646,57 @@ public class MainForm : Form
         // SC Bindings tab hover detection
         if (_activeTab == 2)
         {
-            // vJoy mapping rows
+            // Reset hover states
             _hoveredVJoyMapping = -1;
+            _scHoveredActionIndex = -1;
+            _scHoveredActionMapFilter = -1;
+
+            // Action map filter dropdown hover
+            if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+            {
+                float itemHeight = 24f;
+                int itemIndex = (int)((e.Y - _scActionMapFilterDropdownBounds.Top - 2) / itemHeight) - 1;
+                _scHoveredActionMapFilter = itemIndex >= -1 && itemIndex < _scActionMaps.Count ? itemIndex : -1;
+                Cursor = Cursors.Hand;
+            }
+
+            // Action row hover detection
+            if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions != null)
+            {
+                // Find which row is hovered, accounting for scroll offset and group headers
+                float rowHeight = 24f;
+                float rowGap = 2f;
+                float relativeY = e.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
+
+                string? lastActionMap = null;
+                float currentY = 0;
+
+                for (int i = 0; i < _scFilteredActions.Count; i++)
+                {
+                    var action = _scFilteredActions[i];
+
+                    // Account for group header
+                    if (action.ActionMap != lastActionMap)
+                    {
+                        lastActionMap = action.ActionMap;
+                        currentY += rowHeight;
+                    }
+
+                    float rowTop = currentY;
+                    float rowBottom = currentY + rowHeight;
+
+                    if (relativeY >= rowTop && relativeY < rowBottom)
+                    {
+                        _scHoveredActionIndex = i;
+                        Cursor = Cursors.Hand;
+                        break;
+                    }
+
+                    currentY += rowHeight + rowGap;
+                }
+            }
+
+            // vJoy mapping rows
             for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
             {
                 if (_scVJoyMappingBounds[i].Contains(e.X, e.Y))
@@ -1601,11 +1707,14 @@ public class MainForm : Form
                 }
             }
 
-            // Buttons
+            // Buttons and selectors
             if (_scRefreshButtonBounds.Contains(e.X, e.Y) ||
                 _scExportButtonBounds.Contains(e.X, e.Y) ||
                 _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
-                _scProfileNameBounds.Contains(e.X, e.Y))
+                _scProfileNameBounds.Contains(e.X, e.Y) ||
+                _scActionMapFilterBounds.Contains(e.X, e.Y) ||
+                _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
+                _scClearBindingButtonBounds.Contains(e.X, e.Y))
             {
                 Cursor = Cursors.Hand;
             }
@@ -2168,13 +2277,23 @@ public class MainForm : Form
 
     private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
     {
-        // Only handle scroll on MAPPINGS tab when mouse is over the bindings list
+        // Handle scroll on MAPPINGS tab when mouse is over the bindings list
         if (_activeTab == 1 && _bindingsListBounds.Contains(e.X, e.Y))
         {
             float scrollAmount = -e.Delta / 4f; // Delta is usually ±120, divide for smooth scrolling
             float maxScroll = Math.Max(0, _bindingsContentHeight - _bindingsListBounds.Height);
 
             _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset + scrollAmount, 0, maxScroll);
+            _canvas.Invalidate();
+        }
+
+        // Handle scroll on BINDINGS (SC) tab when mouse is over the SC bindings list
+        if (_activeTab == 2 && _scBindingsListBounds.Contains(e.X, e.Y))
+        {
+            float scrollAmount = -e.Delta / 4f;
+            float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
+
+            _scBindingsScrollOffset = Math.Clamp(_scBindingsScrollOffset + scrollAmount, 0, maxScroll);
             _canvas.Invalidate();
         }
     }
@@ -2306,25 +2425,36 @@ public class MainForm : Form
         float frameInset = 5f;
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
-        // Two-panel layout
-        float leftPanelWidth = 420f;
-        float rightPanelWidth = contentBounds.Width - leftPanelWidth - 15;
+        // Three-panel layout: Left (installation) | Center (bindings table) | Right (export)
+        float leftPanelWidth = 280f;
+        float rightPanelWidth = 260f;
+        float gap = 10f;
+        float centerPanelWidth = contentBounds.Width - leftPanelWidth - rightPanelWidth - gap * 2;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
             contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
-        var rightBounds = new SKRect(leftBounds.Right + 15, contentBounds.Top,
+        var centerBounds = new SKRect(leftBounds.Right + gap, contentBounds.Top,
+            leftBounds.Right + gap + centerPanelWidth, contentBounds.Bottom);
+        var rightBounds = new SKRect(centerBounds.Right + gap, contentBounds.Top,
             contentBounds.Right, contentBounds.Bottom);
 
-        // LEFT PANEL - SC Installation & Export Settings
-        DrawSCInstallationPanel(canvas, leftBounds, frameInset);
+        // LEFT PANEL - SC Installation (condensed)
+        DrawSCInstallationPanelCompact(canvas, leftBounds, frameInset);
+
+        // CENTER PANEL - SC Action Bindings Table
+        DrawSCBindingsTablePanel(canvas, centerBounds, frameInset);
 
         // RIGHT PANEL - vJoy Mapping & Export
-        DrawSCExportPanel(canvas, rightBounds, frameInset);
+        DrawSCExportPanelCompact(canvas, rightBounds, frameInset);
 
-        // Draw SC installation dropdown if open
+        // Draw dropdowns last (on top)
         if (_scInstallationDropdownOpen && _scInstallations.Count > 0)
         {
             DrawSCInstallationDropdown(canvas);
+        }
+        if (_scActionMapFilterDropdownOpen && _scActionMaps.Count > 0)
+        {
+            DrawSCActionMapFilterDropdown(canvas);
         }
     }
 
@@ -2680,6 +2810,479 @@ public class MainForm : Form
         }
     }
 
+    private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+
+        float cornerPadding = 15f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 10;
+        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+
+        // Title
+        FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
+        y += FUIRenderer.ScaleLineHeight(28f);
+
+        // Installation selector
+        float selectorHeight = 26f;
+        _scInstallationSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorHeight);
+
+        string installationText = _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
+            ? _scInstallations[_selectedSCInstallation].DisplayName
+            : "No SC found";
+
+        bool selectorHovered = _scInstallationSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
+        y += selectorHeight + 8f;
+
+        // Brief details
+        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+        {
+            var installation = _scInstallations[_selectedSCInstallation];
+            FUIRenderer.DrawText(canvas, installation.Environment, new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += lineHeight;
+
+            if (_scActions != null)
+            {
+                var joystickActions = _scSchemaService?.FilterJoystickActions(_scActions);
+                FUIRenderer.DrawText(canvas, $"{joystickActions?.Count ?? 0} bindable actions", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+                y += lineHeight;
+            }
+        }
+
+        // Refresh button (compact)
+        y = bounds.Bottom - frameInset - 35f;
+        float buttonWidth = 80f;
+        float buttonHeight = 24f;
+        _scRefreshButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
+        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _scRefreshButtonBounds, "REFRESH",
+            _scRefreshButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+    }
+
+    private void DrawSCBindingsTablePanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+
+        float cornerPadding = 15f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 15;
+        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+
+        // Title and filter
+        FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
+
+        // Filter dropdown (right side of title)
+        float filterWidth = 180f;
+        float filterHeight = 24f;
+        float filterX = rightMargin - filterWidth;
+        _scActionMapFilterBounds = new SKRect(filterX, y - 4f, rightMargin, y - 4f + filterHeight);
+
+        string filterText = string.IsNullOrEmpty(_scActionMapFilter) ? "All Categories" : FormatActionMapName(_scActionMapFilter);
+        bool filterHovered = _scActionMapFilterBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawSelector(canvas, _scActionMapFilterBounds, filterText, filterHovered || _scActionMapFilterDropdownOpen, _scActionMaps.Count > 0);
+
+        y += FUIRenderer.ScaleLineHeight(32f);
+
+        // Table header
+        float colAction = leftMargin;
+        float colType = leftMargin + 250f;
+        float colBinding = rightMargin - 120f;
+
+        using var headerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100), IsAntialias = true };
+        canvas.DrawRect(new SKRect(leftMargin - 5, y - 2, rightMargin + 5, y + lineHeight), headerPaint);
+
+        FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(colAction, y), FUIColors.TextDim, 9f, true);
+        FUIRenderer.DrawText(canvas, "TYPE", new SKPoint(colType, y), FUIColors.TextDim, 9f, true);
+        FUIRenderer.DrawText(canvas, "BINDING", new SKPoint(colBinding, y), FUIColors.TextDim, 9f, true);
+        y += lineHeight + 4f;
+
+        // Scrollable action list
+        float listTop = y;
+        float listBottom = bounds.Bottom - frameInset - 15f;
+        _scBindingsListBounds = new SKRect(leftMargin - 5, listTop, rightMargin + 5, listBottom);
+
+        // Clip to list area
+        canvas.Save();
+        canvas.ClipRect(_scBindingsListBounds);
+
+        _scActionRowBounds.Clear();
+        float rowHeight = 24f;
+        float rowGap = 2f;
+        float scrollY = listTop - _scBindingsScrollOffset;
+
+        if (_scFilteredActions == null || _scFilteredActions.Count == 0)
+        {
+            FUIRenderer.DrawText(canvas, _scActions == null ? "Loading actions..." : "No actions match filter",
+                new SKPoint(leftMargin, scrollY + 20f), FUIColors.TextDim, 11f);
+        }
+        else
+        {
+            string? lastActionMap = null;
+
+            for (int i = 0; i < _scFilteredActions.Count; i++)
+            {
+                var action = _scFilteredActions[i];
+
+                // Group header when action map changes
+                if (action.ActionMap != lastActionMap)
+                {
+                    lastActionMap = action.ActionMap;
+
+                    // Draw group header
+                    if (scrollY >= listTop - rowHeight && scrollY < listBottom)
+                    {
+                        using var groupBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(30), IsAntialias = true };
+                        canvas.DrawRect(new SKRect(leftMargin - 5, scrollY, rightMargin + 5, scrollY + rowHeight - 2), groupBgPaint);
+                        FUIRenderer.DrawText(canvas, FormatActionMapName(action.ActionMap), new SKPoint(leftMargin, scrollY + rowHeight / 2 + 4), FUIColors.Primary, 10f, true);
+                    }
+                    scrollY += rowHeight;
+                }
+
+                var rowBounds = new SKRect(leftMargin - 5, scrollY, rightMargin + 5, scrollY + rowHeight);
+                _scActionRowBounds.Add(rowBounds);
+
+                // Only draw if visible
+                if (scrollY >= listTop - rowHeight && scrollY < listBottom)
+                {
+                    bool isHovered = i == _scHoveredActionIndex;
+                    bool isSelected = i == _scSelectedActionIndex;
+
+                    // Row background
+                    if (isSelected)
+                    {
+                        using var selPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
+                        canvas.DrawRect(rowBounds, selPaint);
+                    }
+                    else if (isHovered)
+                    {
+                        using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(120), IsAntialias = true };
+                        canvas.DrawRect(rowBounds, hoverPaint);
+                    }
+
+                    float textY = scrollY + rowHeight / 2 + 4;
+
+                    // Action name (truncate if needed)
+                    string displayName = action.ActionName;
+                    if (displayName.Length > 35) displayName = displayName.Substring(0, 32) + "...";
+                    var nameColor = isSelected ? FUIColors.Active : FUIColors.TextPrimary;
+                    FUIRenderer.DrawText(canvas, displayName, new SKPoint(colAction, textY), nameColor, 10f);
+
+                    // Input type
+                    var typeColor = action.InputType == SCInputType.Axis ? FUIColors.Warning : FUIColors.TextDim;
+                    FUIRenderer.DrawText(canvas, action.InputType.ToString(), new SKPoint(colType, textY), typeColor, 10f);
+
+                    // Current binding
+                    var existingBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
+                    if (existingBinding != null)
+                    {
+                        string bindingText = $"js{_scExportProfile.GetSCInstance(existingBinding.VJoyDevice)}_{existingBinding.InputName}";
+                        FUIRenderer.DrawText(canvas, bindingText, new SKPoint(colBinding, textY), FUIColors.Success, 10f);
+                    }
+                    else
+                    {
+                        FUIRenderer.DrawText(canvas, "—", new SKPoint(colBinding, textY), FUIColors.TextDim, 10f);
+                    }
+                }
+
+                scrollY += rowHeight + rowGap;
+            }
+
+            _scBindingsContentHeight = scrollY - listTop + _scBindingsScrollOffset;
+        }
+
+        canvas.Restore();
+
+        // Scrollbar if needed
+        if (_scBindingsContentHeight > _scBindingsListBounds.Height)
+        {
+            float scrollbarWidth = 6f;
+            float scrollbarX = rightMargin - scrollbarWidth + 10;
+            float scrollbarHeight = _scBindingsListBounds.Height;
+            float thumbHeight = Math.Max(30f, scrollbarHeight * (_scBindingsListBounds.Height / _scBindingsContentHeight));
+            float thumbY = listTop + (_scBindingsScrollOffset / (_scBindingsContentHeight - _scBindingsListBounds.Height)) * (scrollbarHeight - thumbHeight);
+
+            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRect(scrollbarX, listTop, scrollbarX + scrollbarWidth, listTop + scrollbarHeight), 3f, 3f, trackPaint);
+
+            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(180), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRect(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight), 3f, 3f, thumbPaint);
+        }
+    }
+
+    private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+
+        float cornerPadding = 15f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 10;
+        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+
+        // Title
+        FUIRenderer.DrawText(canvas, "EXPORT", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
+        y += FUIRenderer.ScaleLineHeight(28f);
+
+        // Profile name
+        FUIRenderer.DrawText(canvas, "PROFILE NAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        y += lineHeight - 4f;
+
+        float nameFieldHeight = 24f;
+        _scProfileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameFieldHeight);
+        _scProfileNameHovered = _scProfileNameBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawTextFieldReadOnly(canvas, _scProfileNameBounds, _scExportProfile.ProfileName, _scProfileNameHovered);
+        y += nameFieldHeight + 10f;
+
+        // vJoy mappings (compact)
+        FUIRenderer.DrawText(canvas, "VJOY → SC MAPPING", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        y += lineHeight;
+
+        _scVJoyMappingBounds.Clear();
+        float rowHeight = 24f;
+        var availableVJoy = _vjoyDevices.Where(v => v.Exists).Take(4).ToList();
+
+        if (availableVJoy.Count == 0)
+        {
+            FUIRenderer.DrawText(canvas, "No vJoy devices", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += lineHeight;
+        }
+        else
+        {
+            foreach (var vjoy in availableVJoy)
+            {
+                var rowBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
+                _scVJoyMappingBounds.Add(rowBounds);
+
+                bool isHovered = rowBounds.Contains(_mousePosition.X, _mousePosition.Y);
+                int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
+
+                DrawVJoyMappingRowCompact(canvas, rowBounds, vjoy.Id, scInstance, isHovered);
+                y += rowHeight + 2f;
+            }
+        }
+
+        // Binding count
+        y += 10f;
+        int bindingCount = _scExportProfile.Bindings.Count;
+        FUIRenderer.DrawText(canvas, $"Bindings: {bindingCount}", new SKPoint(leftMargin, y), bindingCount > 0 ? FUIColors.Success : FUIColors.TextDim, 10f);
+        y += lineHeight + 10f;
+
+        // Selected action info
+        if (_scSelectedActionIndex >= 0 && _scFilteredActions != null && _scSelectedActionIndex < _scFilteredActions.Count)
+        {
+            var selectedAction = _scFilteredActions[_scSelectedActionIndex];
+
+            using var selBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30), IsAntialias = true };
+            canvas.DrawRect(new SKRect(leftMargin - 5, y - 2, rightMargin + 5, y + 55f), selBgPaint);
+
+            FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 9f, true);
+            y += lineHeight - 2f;
+
+            string actionDisplay = selectedAction.ActionName;
+            if (actionDisplay.Length > 28) actionDisplay = actionDisplay.Substring(0, 25) + "...";
+            FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 10f);
+            y += lineHeight - 4f;
+
+            FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+            y += lineHeight + 8f;
+
+            // Assign/Clear buttons
+            float btnWidth = (rightMargin - leftMargin - 5) / 2;
+            float btnHeight = 24f;
+
+            _scAssignInputButtonBounds = new SKRect(leftMargin, y, leftMargin + btnWidth, y + btnHeight);
+            _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+            var existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
+
+            if (_scAssigningInput)
+            {
+                // Show "waiting for input" state
+                using var waitBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(80), IsAntialias = true };
+                canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
+                FUIRenderer.DrawTextCentered(canvas, "PRESS INPUT...", _scAssignInputButtonBounds, FUIColors.Warning, 9f);
+            }
+            else
+            {
+                FUIRenderer.DrawButton(canvas, _scAssignInputButtonBounds, "ASSIGN",
+                    _scAssignInputButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            }
+
+            _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 5, y, rightMargin, y + btnHeight);
+            _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+            bool hasBinding = existingBinding != null;
+
+            if (hasBinding)
+            {
+                FUIRenderer.DrawButton(canvas, _scClearBindingButtonBounds, "CLEAR",
+                    _scClearBindingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            }
+            else
+            {
+                // Disabled clear button
+                using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+                canvas.DrawRect(_scClearBindingButtonBounds, disabledPaint);
+                FUIRenderer.DrawTextCentered(canvas, "CLEAR", _scClearBindingButtonBounds, FUIColors.TextDim.WithAlpha(100), 10f);
+            }
+
+            y += btnHeight + 10f;
+        }
+
+        // Export button at bottom
+        y = bounds.Bottom - frameInset - 50f;
+        float buttonWidth = rightMargin - leftMargin;
+        float buttonHeight = 32f;
+        _scExportButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
+        _scExportButtonHovered = _scExportButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+        bool canExport = _scInstallations.Count > 0;
+        DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
+        y += buttonHeight + 5f;
+
+        // Status message
+        if (!string.IsNullOrEmpty(_scExportStatus))
+        {
+            var elapsed = DateTime.Now - _scExportStatusTime;
+            if (elapsed.TotalSeconds < 10)
+            {
+                var statusColor = _scExportStatus.Contains("Success") ? FUIColors.Success : FUIColors.Warning;
+                FUIRenderer.DrawTextCentered(canvas, _scExportStatus,
+                    new SKRect(leftMargin, y, rightMargin, y + 16f), statusColor, 9f);
+            }
+            else
+            {
+                _scExportStatus = null;
+            }
+        }
+    }
+
+    private void DrawVJoyMappingRowCompact(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
+    {
+        if (isHovered)
+        {
+            using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100), IsAntialias = true };
+            canvas.DrawRect(bounds, hoverPaint);
+        }
+
+        float textY = bounds.MidY + 4;
+        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 5, textY), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 60, textY), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 80, textY), FUIColors.Active, 10f, true);
+    }
+
+    private void DrawSCActionMapFilterDropdown(SKCanvas canvas)
+    {
+        float itemHeight = 24f;
+        float dropdownWidth = _scActionMapFilterBounds.Width + 60f;
+        int itemCount = _scActionMaps.Count + 1; // +1 for "All Categories"
+        float dropdownHeight = Math.Min(itemCount * itemHeight + 4, 300f);
+
+        _scActionMapFilterDropdownBounds = new SKRect(
+            _scActionMapFilterBounds.Right - dropdownWidth,
+            _scActionMapFilterBounds.Bottom + 2,
+            _scActionMapFilterBounds.Right,
+            _scActionMapFilterBounds.Bottom + 2 + dropdownHeight);
+
+        // Shadow
+        FUIRenderer.DrawPanelShadow(canvas, _scActionMapFilterDropdownBounds, 2f, 2f, 8f);
+
+        // Background
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(245), IsAntialias = true };
+        canvas.DrawRect(_scActionMapFilterDropdownBounds, bgPaint);
+
+        // Border
+        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
+        canvas.DrawRect(_scActionMapFilterDropdownBounds, borderPaint);
+
+        // Clip for scrolling
+        canvas.Save();
+        canvas.ClipRect(_scActionMapFilterDropdownBounds);
+
+        // Items
+        float y = _scActionMapFilterDropdownBounds.Top + 2;
+
+        // "All Categories" option
+        var allItemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y,
+            _scActionMapFilterDropdownBounds.Right - 2, y + itemHeight);
+
+        bool allHovered = _scHoveredActionMapFilter == -1 && allItemBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        bool allSelected = string.IsNullOrEmpty(_scActionMapFilter);
+
+        if (allHovered || allSelected)
+        {
+            var highlightColor = allSelected ? FUIColors.Active.WithAlpha(50) : FUIColors.Background2.WithAlpha(120);
+            using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
+            canvas.DrawRect(allItemBounds, highlightPaint);
+        }
+
+        var allTextColor = allSelected ? FUIColors.Active : (allHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+        FUIRenderer.DrawText(canvas, "All Categories",
+            new SKPoint(allItemBounds.Left + 8, allItemBounds.MidY + 4), allTextColor, 10f);
+        y += itemHeight;
+
+        // Category items
+        for (int i = 0; i < _scActionMaps.Count; i++)
+        {
+            var itemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y,
+                _scActionMapFilterDropdownBounds.Right - 2, y + itemHeight);
+
+            bool isHovered = i == _scHoveredActionMapFilter;
+            bool isSelected = _scActionMapFilter == _scActionMaps[i];
+
+            if (isHovered || isSelected)
+            {
+                var highlightColor = isSelected ? FUIColors.Active.WithAlpha(50) : FUIColors.Background2.WithAlpha(120);
+                using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
+                canvas.DrawRect(itemBounds, highlightPaint);
+            }
+
+            var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+            FUIRenderer.DrawText(canvas, FormatActionMapName(_scActionMaps[i]),
+                new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4), textColor, 10f);
+
+            y += itemHeight;
+        }
+
+        canvas.Restore();
+    }
+
+    private static string FormatActionMapName(string actionMap)
+    {
+        // Convert "spaceship_movement" to "Spaceship Movement"
+        if (string.IsNullOrEmpty(actionMap)) return actionMap;
+
+        return string.Join(" ", actionMap
+            .Split('_')
+            .Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower()));
+    }
+
     private static string TruncatePath(string path, int maxLength)
     {
         if (string.IsNullOrEmpty(path) || path.Length <= maxLength)
@@ -2715,10 +3318,49 @@ public class MainForm : Form
             }
         }
 
+        // Action map filter dropdown handling
+        if (_scActionMapFilterDropdownOpen)
+        {
+            if (_scActionMapFilterDropdownBounds.Contains(point))
+            {
+                // Calculate which item was clicked
+                float itemHeight = 24f;
+                float relativeY = point.Y - _scActionMapFilterDropdownBounds.Top - 2;
+                int clickedIndex = (int)(relativeY / itemHeight) - 1; // -1 because first item is "All Categories"
+
+                if (clickedIndex < 0)
+                {
+                    // "All Categories" clicked
+                    _scActionMapFilter = "";
+                }
+                else if (clickedIndex < _scActionMaps.Count)
+                {
+                    _scActionMapFilter = _scActionMaps[clickedIndex];
+                }
+                RefreshFilteredActions();
+                _scActionMapFilterDropdownOpen = false;
+                return;
+            }
+            else
+            {
+                _scActionMapFilterDropdownOpen = false;
+                return;
+            }
+        }
+
         // SC Installation selector click (toggle dropdown)
         if (_scInstallationSelectorBounds.Contains(point) && _scInstallations.Count > 0)
         {
             _scInstallationDropdownOpen = !_scInstallationDropdownOpen;
+            _scActionMapFilterDropdownOpen = false;
+            return;
+        }
+
+        // Action map filter selector click
+        if (_scActionMapFilterBounds.Contains(point) && _scActionMaps.Count > 0)
+        {
+            _scActionMapFilterDropdownOpen = !_scActionMapFilterDropdownOpen;
+            _scInstallationDropdownOpen = false;
             return;
         }
 
@@ -2738,12 +3380,28 @@ public class MainForm : Form
             return;
         }
 
+        // Assign input button
+        if (_scAssignInputButtonBounds.Contains(point) && _scSelectedActionIndex >= 0)
+        {
+            AssignSCBinding();
+            return;
+        }
+
+        // Clear binding button
+        if (_scClearBindingButtonBounds.Contains(point) && _scSelectedActionIndex >= 0 && _scFilteredActions != null)
+        {
+            var selectedAction = _scFilteredActions[_scSelectedActionIndex];
+            _scExportProfile.RemoveBinding(selectedAction.ActionMap, selectedAction.ActionName);
+            _scAssigningInput = false;
+            return;
+        }
+
         // vJoy mapping row clicks (cycle through js1-js8)
         for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
         {
             if (_scVJoyMappingBounds[i].Contains(point))
             {
-                var availableVJoy = _vjoyDevices.Where(v => v.Exists).ToList();
+                var availableVJoy = _vjoyDevices.Where(v => v.Exists).Take(4).ToList();
                 if (i < availableVJoy.Count)
                 {
                     var vjoyId = availableVJoy[i].Id;
@@ -2760,6 +3418,43 @@ public class MainForm : Form
         {
             EditSCProfileName();
             return;
+        }
+
+        // Action row clicks (select action)
+        if (_scBindingsListBounds.Contains(point) && _scFilteredActions != null)
+        {
+            // Find which row was clicked accounting for scroll offset
+            float rowHeight = 24f;
+            float rowGap = 2f;
+            float relativeY = point.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
+
+            // We need to account for group headers
+            string? lastActionMap = null;
+            float currentY = 0;
+
+            for (int i = 0; i < _scFilteredActions.Count; i++)
+            {
+                var action = _scFilteredActions[i];
+
+                // Account for group header
+                if (action.ActionMap != lastActionMap)
+                {
+                    lastActionMap = action.ActionMap;
+                    currentY += rowHeight; // Group header height
+                }
+
+                float rowTop = currentY;
+                float rowBottom = currentY + rowHeight;
+
+                if (relativeY >= rowTop && relativeY < rowBottom)
+                {
+                    _scSelectedActionIndex = i;
+                    _scAssigningInput = false; // Reset assignment mode when selecting new action
+                    return;
+                }
+
+                currentY += rowHeight + rowGap;
+            }
         }
     }
 
@@ -2868,6 +3563,154 @@ public class MainForm : Form
         {
             _scExportProfile.ProfileName = textBox.Text.Trim();
         }
+    }
+
+    private void AssignSCBinding()
+    {
+        if (_scSelectedActionIndex < 0 || _scFilteredActions == null || _scSelectedActionIndex >= _scFilteredActions.Count)
+            return;
+
+        var action = _scFilteredActions[_scSelectedActionIndex];
+        var availableVJoy = _vjoyDevices.Where(v => v.Exists).ToList();
+
+        if (availableVJoy.Count == 0)
+        {
+            MessageBox.Show("No vJoy devices available. Please configure vJoy.", "No vJoy", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using var dialog = new Form
+        {
+            Text = $"Assign: {action.ActionName}",
+            Width = 350,
+            Height = 240,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = Color.FromArgb(20, 22, 30)
+        };
+
+        var vjoyLabel = new Label
+        {
+            Text = "vJoy Device:",
+            Left = 15,
+            Top = 15,
+            Width = 100,
+            ForeColor = Color.FromArgb(180, 190, 210)
+        };
+
+        var vjoyCombo = new ComboBox
+        {
+            Left = 15,
+            Top = 35,
+            Width = 300,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            BackColor = Color.FromArgb(30, 35, 45),
+            ForeColor = Color.White
+        };
+        foreach (var vjoy in availableVJoy)
+        {
+            vjoyCombo.Items.Add($"vJoy {vjoy.Id}");
+        }
+        vjoyCombo.SelectedIndex = 0;
+
+        var inputLabel = new Label
+        {
+            Text = action.InputType == SCInputType.Axis ? "Axis:" : "Button:",
+            Left = 15,
+            Top = 70,
+            Width = 100,
+            ForeColor = Color.FromArgb(180, 190, 210)
+        };
+
+        var inputCombo = new ComboBox
+        {
+            Left = 15,
+            Top = 90,
+            Width = 300,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            BackColor = Color.FromArgb(30, 35, 45),
+            ForeColor = Color.White
+        };
+
+        if (action.InputType == SCInputType.Axis)
+        {
+            inputCombo.Items.AddRange(new[] { "x", "y", "z", "rx", "ry", "rz", "slider1", "slider2" });
+        }
+        else
+        {
+            for (int i = 1; i <= 32; i++)
+            {
+                inputCombo.Items.Add($"button{i}");
+            }
+        }
+        inputCombo.SelectedIndex = 0;
+
+        var invertCheck = new CheckBox
+        {
+            Text = "Inverted",
+            Left = 15,
+            Top = 125,
+            Width = 100,
+            ForeColor = Color.FromArgb(180, 190, 210),
+            Visible = action.InputType == SCInputType.Axis
+        };
+
+        var okButton = new Button
+        {
+            Text = "Assign",
+            Left = 150,
+            Top = 160,
+            Width = 80,
+            DialogResult = DialogResult.OK,
+            BackColor = Color.FromArgb(40, 100, 70),
+            ForeColor = Color.White
+        };
+
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            Left = 235,
+            Top = 160,
+            Width = 80,
+            DialogResult = DialogResult.Cancel,
+            BackColor = Color.FromArgb(60, 50, 50),
+            ForeColor = Color.White
+        };
+
+        dialog.Controls.AddRange(new Control[] { vjoyLabel, vjoyCombo, inputLabel, inputCombo, invertCheck, okButton, cancelButton });
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            var vjoyId = availableVJoy[vjoyCombo.SelectedIndex].Id;
+            var inputName = inputCombo.SelectedItem?.ToString() ?? "button1";
+
+            var binding = new SCActionBinding
+            {
+                ActionMap = action.ActionMap,
+                ActionName = action.ActionName,
+                VJoyDevice = vjoyId,
+                InputName = inputName,
+                InputType = action.InputType,
+                Inverted = invertCheck.Checked
+            };
+
+            _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
+
+            // Ensure this vJoy device has an SC instance mapping
+            if (!_scExportProfile.VJoyToSCInstance.ContainsKey(vjoyId))
+            {
+                _scExportProfile.SetSCInstance(vjoyId, (int)vjoyId);
+            }
+
+            _scExportStatus = $"Bound {action.ActionName} to js{_scExportProfile.GetSCInstance(vjoyId)}_{inputName}";
+            _scExportStatusTime = DateTime.Now;
+        }
+
+        _scAssigningInput = false;
     }
 
     private void DrawSettingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)

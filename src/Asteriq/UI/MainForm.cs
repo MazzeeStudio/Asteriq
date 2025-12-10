@@ -299,10 +299,17 @@ public partial class MainForm : Form
     private float _scGridDeviceColWidth = 90f;    // Each device column (KB, Mouse, JS1...)
     private float _scGridHorizontalScroll = 0f;   // Horizontal scroll offset for device columns
     private float _scGridTotalWidth = 0f;         // Total width of all columns
-    private int _scSelectedColumn = -1;           // -1=none, 0=KB, 1=Mouse, 2+=JS columns
-    private int _scHoveredColumn = -1;
-    private (int row, int col) _scSelectedCell = (-1, -1);  // Currently selected cell for editing
-    private (int row, int col) _scHoveredCell = (-1, -1);   // Currently hovered cell
+    private List<SCGridColumn>? _scGridColumns;   // Cached column definitions
+    private float _scDeviceColsStart = 0f;        // X position where device columns start
+    private float _scVisibleDeviceWidth = 0f;     // Width of visible device column area
+
+    // SC Bindings cell interaction state
+    private (int actionIndex, int colIndex) _scSelectedCell = (-1, -1);  // Currently selected cell
+    private (int actionIndex, int colIndex) _scHoveredCell = (-1, -1);   // Currently hovered cell
+    private bool _scIsListeningForInput = false;  // True when waiting for user input
+    private DateTime _scListeningStartTime;       // When listening started (for timeout)
+    private const int SCListeningTimeoutMs = 5000; // 5 second timeout for input listening
+    private SCGridColumn? _scListeningColumn;     // Which column we're listening for
 
     // SC Bindings search and filter state
     private string _scSearchText = "";           // Search text for filtering actions
@@ -1657,6 +1664,7 @@ public partial class MainForm : Form
             _hoveredVJoyMapping = -1;
             _scHoveredActionIndex = -1;
             _scHoveredActionMapFilter = -1;
+            _scHoveredCell = (-1, -1);
 
             // Action map filter dropdown hover
             if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
@@ -1667,12 +1675,13 @@ public partial class MainForm : Form
                 Cursor = Cursors.Hand;
             }
 
-            // Action row hover detection
+            // Action row and cell hover detection
             if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions != null)
             {
                 // Find which row is hovered, accounting for scroll offset and group headers
                 float rowHeight = 24f;
                 float rowGap = 2f;
+                float categoryHeaderHeight = 28f;
                 float relativeY = e.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
 
                 string? lastActionMap = null;
@@ -1682,11 +1691,22 @@ public partial class MainForm : Form
                 {
                     var action = _scFilteredActions[i];
 
-                    // Account for group header
+                    // Account for category header
                     if (action.ActionMap != lastActionMap)
                     {
                         lastActionMap = action.ActionMap;
-                        currentY += rowHeight;
+                        currentY += categoryHeaderHeight;
+
+                        // If collapsed, skip all actions in this category
+                        if (_scCollapsedCategories.Contains(action.ActionMap))
+                        {
+                            while (i < _scFilteredActions.Count - 1 &&
+                                   _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                            {
+                                i++;
+                            }
+                            continue;
+                        }
                     }
 
                     float rowTop = currentY;
@@ -1695,6 +1715,14 @@ public partial class MainForm : Form
                     if (relativeY >= rowTop && relativeY < rowBottom)
                     {
                         _scHoveredActionIndex = i;
+
+                        // Check for cell hover
+                        int hoveredCol = GetHoveredColumnIndex(e.X);
+                        if (hoveredCol >= 0)
+                        {
+                            _scHoveredCell = (i, hoveredCol);
+                        }
+
                         Cursor = Cursors.Hand;
                         break;
                     }
@@ -1724,6 +1752,13 @@ public partial class MainForm : Form
                 _scClearBindingButtonBounds.Contains(e.X, e.Y))
             {
                 Cursor = Cursors.Hand;
+            }
+
+            // Check for listening timeout
+            if (_scIsListeningForInput && (DateTime.Now - _scListeningStartTime).TotalMilliseconds > SCListeningTimeoutMs)
+            {
+                _scIsListeningForInput = false;
+                _scListeningColumn = null;
             }
         }
 
@@ -2323,6 +2358,23 @@ public partial class MainForm : Form
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Gets the column index at the given X coordinate in SC Bindings grid, or -1 if not in a device column
+    /// </summary>
+    private int GetHoveredColumnIndex(float x)
+    {
+        if (_scGridColumns == null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
+            return -1;
+
+        float relativeX = x - _scDeviceColsStart + _scGridHorizontalScroll;
+        int colIndex = (int)(relativeX / _scGridDeviceColWidth);
+
+        if (colIndex >= 0 && colIndex < _scGridColumns.Count)
+            return colIndex;
+
+        return -1;
     }
 
     #endregion

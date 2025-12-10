@@ -5814,6 +5814,7 @@ public class MainForm : Form
         return null;
     }
 
+    [System.Diagnostics.Conditional("DEBUG")]
     private static void LogMapping(string message)
     {
         var logPath = Path.Combine(

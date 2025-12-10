@@ -7,10 +7,21 @@ namespace Asteriq.UI;
 /// </summary>
 public enum FUITheme
 {
+    // Core themes
     Midnight,   // Default blue-white theme
     Matrix,     // Green/terminal theme
     Amber,      // Amber/gold retro theme
-    Ice         // Cyan/frost theme
+    Ice,        // Cyan/frost theme
+
+    // Star Citizen manufacturer themes
+    Drake,      // Orange/industrial - rugged, utilitarian
+    Aegis,      // Military blue - cold, professional
+    Anvil,      // Military green - rugged military
+    Argo,       // Yellow/industrial - work/utility
+    Crusader,   // White/blue - clean, corporate
+    Origin,     // White/gold - luxury, premium
+    MISC,       // Teal/industrial - functional, reliable
+    RSI         // Blue/white - classic Star Citizen
 }
 
 /// <summary>
@@ -64,6 +75,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x40, 0xFF, 0x40),
         FUITheme.Amber => new(0xFF, 0xC0, 0x40),
         FUITheme.Ice => new(0x80, 0xE0, 0xFF),
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0x90, 0x30),      // Industrial orange
+        FUITheme.Aegis => new(0x70, 0xA0, 0xD0),      // Steel blue
+        FUITheme.Anvil => new(0xA0, 0xB0, 0x70),      // Olive/khaki
+        FUITheme.Argo => new(0xFF, 0xD0, 0x20),       // Safety yellow
+        FUITheme.Crusader => new(0xE8, 0xF0, 0xF8),   // Clean white
+        FUITheme.Origin => new(0xF0, 0xE8, 0xE0),     // Pearl white
+        FUITheme.MISC => new(0x50, 0xC0, 0xA0),       // Teal
+        FUITheme.RSI => new(0xD0, 0xE0, 0xF0),        // Light blue-white
         _ => new(0xE0, 0xE6, 0xED)
     };
 
@@ -73,6 +93,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x30, 0xB0, 0x30),
         FUITheme.Amber => new(0xC0, 0x90, 0x30),
         FUITheme.Ice => new(0x60, 0xA0, 0xC0),
+        // Manufacturers
+        FUITheme.Drake => new(0xC0, 0x70, 0x20),      // Dim orange
+        FUITheme.Aegis => new(0x50, 0x70, 0x90),      // Dim steel
+        FUITheme.Anvil => new(0x70, 0x80, 0x50),      // Dim olive
+        FUITheme.Argo => new(0xC0, 0xA0, 0x18),       // Dim yellow
+        FUITheme.Crusader => new(0xA0, 0xB0, 0xC0),   // Dim white-blue
+        FUITheme.Origin => new(0xB0, 0xA0, 0x90),     // Dim cream
+        FUITheme.MISC => new(0x40, 0x90, 0x70),       // Dim teal
+        FUITheme.RSI => new(0x90, 0xA0, 0xB0),        // Dim blue-gray
         _ => new(0xA4, 0xB4, 0xC5)
     };
 
@@ -82,6 +111,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x20, 0x60, 0x20),
         FUITheme.Amber => new(0x80, 0x60, 0x20),
         FUITheme.Ice => new(0x40, 0x70, 0x80),
+        // Manufacturers
+        FUITheme.Drake => new(0x70, 0x50, 0x20),      // Faint orange-brown
+        FUITheme.Aegis => new(0x40, 0x50, 0x60),      // Faint steel
+        FUITheme.Anvil => new(0x50, 0x58, 0x40),      // Faint olive
+        FUITheme.Argo => new(0x70, 0x60, 0x20),       // Faint yellow
+        FUITheme.Crusader => new(0x60, 0x70, 0x80),   // Faint blue-gray
+        FUITheme.Origin => new(0x70, 0x60, 0x50),     // Faint cream
+        FUITheme.MISC => new(0x30, 0x60, 0x50),       // Faint teal
+        FUITheme.RSI => new(0x50, 0x60, 0x70),        // Faint blue
         _ => new(0x60, 0x70, 0x80)
     };
 
@@ -91,6 +129,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x40, 0xFF, 0x40, 0x60),
         FUITheme.Amber => new(0xFF, 0xC0, 0x40, 0x60),
         FUITheme.Ice => new(0x80, 0xE0, 0xFF, 0x60),
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0x80, 0x20, 0x60),
+        FUITheme.Aegis => new(0x60, 0x90, 0xC0, 0x60),
+        FUITheme.Anvil => new(0x90, 0xA0, 0x60, 0x60),
+        FUITheme.Argo => new(0xFF, 0xC0, 0x00, 0x60),
+        FUITheme.Crusader => new(0x80, 0xC0, 0xF0, 0x60),
+        FUITheme.Origin => new(0xD4, 0xAF, 0x60, 0x60),
+        FUITheme.MISC => new(0x40, 0xB0, 0x90, 0x60),
+        FUITheme.RSI => new(0x70, 0xA0, 0xD0, 0x60),
         _ => new(0x80, 0xC0, 0xE0, 0x60)
     };
 
@@ -100,6 +147,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x60, 0xFF, 0x60, 0x90),
         FUITheme.Amber => new(0xFF, 0xD0, 0x60, 0x90),
         FUITheme.Ice => new(0xA0, 0xF0, 0xFF, 0x90),
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0xA0, 0x40, 0x90),
+        FUITheme.Aegis => new(0x80, 0xB0, 0xE0, 0x90),
+        FUITheme.Anvil => new(0xB0, 0xC0, 0x80, 0x90),
+        FUITheme.Argo => new(0xFF, 0xE0, 0x40, 0x90),
+        FUITheme.Crusader => new(0xA0, 0xD0, 0xFF, 0x90),
+        FUITheme.Origin => new(0xE0, 0xC8, 0x80, 0x90),
+        FUITheme.MISC => new(0x60, 0xD0, 0xB0, 0x90),
+        FUITheme.RSI => new(0x90, 0xC0, 0xF0, 0x90),
         _ => new(0xA0, 0xE0, 0xFF, 0x90)
     };
 
@@ -109,6 +165,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x40, 0xFF, 0x40),
         FUITheme.Amber => new(0xFF, 0xA0, 0x40),
         FUITheme.Ice => new(0x40, 0xE0, 0xFF),
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0x80, 0x20),      // Bright orange
+        FUITheme.Aegis => new(0x40, 0x90, 0xE0),      // Bright blue
+        FUITheme.Anvil => new(0x90, 0xC0, 0x40),      // Bright olive
+        FUITheme.Argo => new(0xFF, 0xC0, 0x00),       // Bright yellow
+        FUITheme.Crusader => new(0x40, 0x90, 0xE0),   // Crusader blue
+        FUITheme.Origin => new(0xD4, 0xAF, 0x37),     // Gold accent
+        FUITheme.MISC => new(0x40, 0xC0, 0x90),       // Bright teal
+        FUITheme.RSI => new(0x50, 0xA0, 0xF0),        // RSI blue
         _ => new(0x40, 0xA0, 0xFF)
     };
 
@@ -118,34 +183,70 @@ public static class FUIColors
         FUITheme.Matrix => new(0x40, 0xFF, 0x40, 0x60),
         FUITheme.Amber => new(0xFF, 0xA0, 0x40, 0x60),
         FUITheme.Ice => new(0x40, 0xE0, 0xFF, 0x60),
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0x80, 0x20, 0x60),
+        FUITheme.Aegis => new(0x40, 0x90, 0xE0, 0x60),
+        FUITheme.Anvil => new(0x90, 0xC0, 0x40, 0x60),
+        FUITheme.Argo => new(0xFF, 0xC0, 0x00, 0x60),
+        FUITheme.Crusader => new(0x40, 0x90, 0xE0, 0x60),
+        FUITheme.Origin => new(0xD4, 0xAF, 0x37, 0x60),
+        FUITheme.MISC => new(0x40, 0xC0, 0x90, 0x60),
+        FUITheme.RSI => new(0x50, 0xA0, 0xF0, 0x60),
         _ => new(0x40, 0xA0, 0xFF, 0x60)
     };
 
     // State colors (theme-aware for visual harmony)
     public static SKColor Warning => _currentTheme switch
     {
-        FUITheme.Midnight => new(0xFF, 0xA0, 0x40),  // Orange
-        FUITheme.Matrix => new(0xFF, 0xE0, 0x40),    // Yellow (contrasts with green)
-        FUITheme.Amber => new(0xFF, 0xE0, 0x60),     // Bright yellow
-        FUITheme.Ice => new(0xFF, 0xA0, 0x60),       // Warm orange (contrasts with cyan)
+        FUITheme.Midnight => new(0xE0, 0xC0, 0x50),  // Gold-yellow (neutral warning)
+        FUITheme.Matrix => new(0xFF, 0xFF, 0x60),    // Bright yellow (terminal style)
+        FUITheme.Amber => new(0xFF, 0xF0, 0x80),     // Pale yellow (distinct from amber)
+        FUITheme.Ice => new(0xFF, 0xE0, 0xA0),       // Pale icy yellow
+        // Manufacturers - use theme-appropriate warning colors
+        FUITheme.Drake => new(0xFF, 0xFF, 0x60),     // Bright yellow (contrasts orange)
+        FUITheme.Aegis => new(0xFF, 0xC0, 0x40),     // Orange (contrasts blue)
+        FUITheme.Anvil => new(0xFF, 0xC0, 0x40),     // Orange (contrasts green)
+        FUITheme.Argo => new(0xFF, 0x90, 0x40),      // Orange (contrasts yellow)
+        FUITheme.Crusader => new(0xFF, 0xA0, 0x40),  // Orange
+        FUITheme.Origin => new(0xFF, 0xC0, 0x60),    // Warm gold
+        FUITheme.MISC => new(0xFF, 0xC0, 0x40),      // Orange (contrasts teal)
+        FUITheme.RSI => new(0xFF, 0xA0, 0x40),       // Orange
         _ => new(0xFF, 0xA0, 0x40)
     };
 
     public static SKColor Danger => _currentTheme switch
     {
-        FUITheme.Midnight => new(0xFF, 0x50, 0x50),  // Red
-        FUITheme.Matrix => new(0xFF, 0x60, 0x40),    // Red-orange (avoids green clash)
-        FUITheme.Amber => new(0xFF, 0x50, 0x50),     // Red
+        FUITheme.Midnight => new(0xF0, 0x60, 0x70),  // Coral-red (fits cool palette)
+        FUITheme.Matrix => new(0xFF, 0xFF, 0x40),    // Bright yellow (no red/green clash)
+        FUITheme.Amber => new(0xFF, 0x60, 0x40),     // Warm red-orange (fits palette)
         FUITheme.Ice => new(0xFF, 0x50, 0x80),       // Magenta-red
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0xFF, 0x50),     // Bright yellow (avoids orange clash)
+        FUITheme.Aegis => new(0xFF, 0x50, 0x50),     // Red (contrasts blue)
+        FUITheme.Anvil => new(0xFF, 0x70, 0x50),     // Softer red-orange
+        FUITheme.Argo => new(0xFF, 0x70, 0x70),      // Softer red (less saturated)
+        FUITheme.Crusader => new(0xFF, 0x50, 0x50),  // Red
+        FUITheme.Origin => new(0xFF, 0x60, 0x50),    // Warm red
+        FUITheme.MISC => new(0xF0, 0x60, 0x70),      // Coral (softer against teal)
+        FUITheme.RSI => new(0xFF, 0x50, 0x50),       // Red
         _ => new(0xFF, 0x50, 0x50)
     };
 
     public static SKColor Success => _currentTheme switch
     {
-        FUITheme.Midnight => new(0x40, 0xFF, 0x90),  // Green
+        FUITheme.Midnight => new(0x50, 0xD0, 0xA0),  // Cool blue-green
         FUITheme.Matrix => new(0x80, 0xFF, 0x80),    // Bright green (matches theme)
-        FUITheme.Amber => new(0x40, 0xE0, 0xC0),     // Teal (contrasts with amber)
-        FUITheme.Ice => new(0x40, 0xFF, 0xC0),       // Cyan-green
+        FUITheme.Amber => new(0xFF, 0xD0, 0x60),     // Bright gold (warm, fits theme)
+        FUITheme.Ice => new(0x80, 0xF0, 0xFF),       // Bright ice blue
+        // Manufacturers - use theme's Active color for consistency
+        FUITheme.Drake => new(0xFF, 0xC0, 0x40),     // Bright orange-yellow
+        FUITheme.Aegis => new(0x60, 0xC0, 0xF0),     // Bright blue
+        FUITheme.Anvil => new(0xB0, 0xD0, 0x60),     // Bright olive
+        FUITheme.Argo => new(0xFF, 0xE0, 0x40),      // Bright yellow
+        FUITheme.Crusader => new(0x60, 0xC0, 0xF0),  // Bright blue
+        FUITheme.Origin => new(0xE0, 0xC0, 0x60),    // Bright gold
+        FUITheme.MISC => new(0x60, 0xE0, 0xB0),      // Bright teal
+        FUITheme.RSI => new(0x70, 0xC0, 0xF0),       // Bright blue
         _ => new(0x40, 0xFF, 0x90)
     };
 
@@ -156,6 +257,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0xE0, 0xFF, 0xE0),    // Green-tinted white
         FUITheme.Amber => new(0xFF, 0xF8, 0xF0),     // Warm white
         FUITheme.Ice => new(0xF0, 0xF8, 0xFF),       // Ice white
+        // Manufacturers
+        FUITheme.Drake => new(0xFF, 0xF4, 0xE8),     // Warm industrial white
+        FUITheme.Aegis => new(0xE8, 0xF0, 0xF8),     // Cool military white
+        FUITheme.Anvil => new(0xF0, 0xF4, 0xE8),     // Warm khaki white
+        FUITheme.Argo => new(0xFF, 0xF8, 0xE0),      // Yellow-tinted white
+        FUITheme.Crusader => new(0xF8, 0xFC, 0xFF),  // Pure clean white
+        FUITheme.Origin => new(0xFF, 0xFC, 0xF8),    // Pearl white
+        FUITheme.MISC => new(0xE8, 0xF8, 0xF4),      // Teal-tinted white
+        FUITheme.RSI => new(0xF0, 0xF4, 0xF8),       // Clean white
         _ => new(0xF0, 0xF4, 0xF8)
     };
 
@@ -165,6 +275,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0xA0, 0xD0, 0xA0),    // Light green
         FUITheme.Amber => new(0xE0, 0xD0, 0xB0),     // Cream
         FUITheme.Ice => new(0xB0, 0xD0, 0xE0),       // Pale cyan
+        // Manufacturers
+        FUITheme.Drake => new(0xD0, 0xC0, 0xA0),     // Tan
+        FUITheme.Aegis => new(0xB0, 0xC0, 0xD0),     // Steel gray
+        FUITheme.Anvil => new(0xC0, 0xC8, 0xB0),     // Khaki gray
+        FUITheme.Argo => new(0xD0, 0xC8, 0xA0),      // Yellow-gray
+        FUITheme.Crusader => new(0xC0, 0xC8, 0xD0),  // Blue-gray
+        FUITheme.Origin => new(0xD0, 0xC8, 0xC0),    // Warm gray
+        FUITheme.MISC => new(0xB0, 0xC8, 0xC0),      // Teal-gray
+        FUITheme.RSI => new(0xC0, 0xC8, 0xD0),       // Blue-gray
         _ => new(0xC0, 0xC8, 0xD0)
     };
 
@@ -174,6 +293,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x50, 0x80, 0x50),    // Dark green
         FUITheme.Amber => new(0x90, 0x78, 0x50),     // Brown
         FUITheme.Ice => new(0x60, 0x80, 0x90),       // Steel
+        // Manufacturers
+        FUITheme.Drake => new(0x80, 0x70, 0x50),     // Dim tan
+        FUITheme.Aegis => new(0x60, 0x70, 0x80),     // Dim steel
+        FUITheme.Anvil => new(0x68, 0x70, 0x58),     // Dim olive
+        FUITheme.Argo => new(0x80, 0x78, 0x50),      // Dim yellow
+        FUITheme.Crusader => new(0x68, 0x78, 0x88),  // Dim blue-gray
+        FUITheme.Origin => new(0x78, 0x70, 0x68),    // Dim warm gray
+        FUITheme.MISC => new(0x58, 0x78, 0x70),      // Dim teal
+        FUITheme.RSI => new(0x68, 0x78, 0x88),       // Dim blue
         _ => new(0x70, 0x78, 0x80)
     };
 
@@ -183,6 +311,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x30, 0x48, 0x30),
         FUITheme.Amber => new(0x48, 0x40, 0x30),
         FUITheme.Ice => new(0x38, 0x44, 0x48),
+        // Manufacturers
+        FUITheme.Drake => new(0x48, 0x40, 0x30),
+        FUITheme.Aegis => new(0x38, 0x40, 0x48),
+        FUITheme.Anvil => new(0x40, 0x44, 0x38),
+        FUITheme.Argo => new(0x48, 0x44, 0x30),
+        FUITheme.Crusader => new(0x40, 0x44, 0x48),
+        FUITheme.Origin => new(0x44, 0x40, 0x3C),
+        FUITheme.MISC => new(0x38, 0x44, 0x40),
+        FUITheme.RSI => new(0x40, 0x44, 0x48),
         _ => new(0x40, 0x44, 0x48)
     };
 
@@ -193,6 +330,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x40, 0x60, 0x40),    // Green-gray
         FUITheme.Amber => new(0x64, 0x54, 0x40),     // Brown-gray
         FUITheme.Ice => new(0x48, 0x58, 0x64),       // Cyan-gray
+        // Manufacturers
+        FUITheme.Drake => new(0x60, 0x50, 0x38),     // Industrial brown
+        FUITheme.Aegis => new(0x48, 0x54, 0x60),     // Military steel
+        FUITheme.Anvil => new(0x50, 0x58, 0x48),     // Olive gray
+        FUITheme.Argo => new(0x60, 0x58, 0x38),      // Industrial yellow-brown
+        FUITheme.Crusader => new(0x50, 0x58, 0x64),  // Clean blue-gray
+        FUITheme.Origin => new(0x58, 0x50, 0x48),    // Warm gray
+        FUITheme.MISC => new(0x40, 0x58, 0x50),      // Teal-gray
+        FUITheme.RSI => new(0x48, 0x54, 0x60),       // Blue-gray
         _ => new(0x50, 0x58, 0x64)
     };
 
@@ -202,6 +348,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x70, 0xA0, 0x70),
         FUITheme.Amber => new(0xA8, 0x94, 0x70),
         FUITheme.Ice => new(0x80, 0x9C, 0xA8),
+        // Manufacturers
+        FUITheme.Drake => new(0xA0, 0x88, 0x60),     // Bright tan
+        FUITheme.Aegis => new(0x80, 0x90, 0xA0),     // Bright steel
+        FUITheme.Anvil => new(0x88, 0x98, 0x78),     // Bright olive
+        FUITheme.Argo => new(0xA0, 0x98, 0x60),      // Bright yellow-tan
+        FUITheme.Crusader => new(0x90, 0x9C, 0xA8),  // Bright blue-gray
+        FUITheme.Origin => new(0x98, 0x90, 0x80),    // Bright warm gray
+        FUITheme.MISC => new(0x70, 0x98, 0x88),      // Bright teal
+        FUITheme.RSI => new(0x88, 0x98, 0xA8),       // Bright blue
         _ => new(0x90, 0x9C, 0xA8)
     };
 
@@ -211,6 +366,15 @@ public static class FUIColors
         FUITheme.Matrix => new(0x28, 0x38, 0x28),
         FUITheme.Amber => new(0x3C, 0x34, 0x28),
         FUITheme.Ice => new(0x2C, 0x34, 0x3C),
+        // Manufacturers
+        FUITheme.Drake => new(0x38, 0x30, 0x24),     // Dim brown
+        FUITheme.Aegis => new(0x28, 0x30, 0x38),     // Dim steel
+        FUITheme.Anvil => new(0x30, 0x34, 0x28),     // Dim olive
+        FUITheme.Argo => new(0x38, 0x34, 0x24),      // Dim yellow-brown
+        FUITheme.Crusader => new(0x30, 0x34, 0x3C),  // Dim blue-gray
+        FUITheme.Origin => new(0x34, 0x30, 0x2C),    // Dim warm gray
+        FUITheme.MISC => new(0x28, 0x34, 0x30),      // Dim teal
+        FUITheme.RSI => new(0x2C, 0x34, 0x3C),       // Dim blue
         _ => new(0x30, 0x34, 0x3C)
     };
 }

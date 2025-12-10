@@ -239,7 +239,7 @@ public class MainForm : Form
     private bool _axisInverted = false;
 
     // Theme selector state
-    private SKRect[] _themeButtonBounds = new SKRect[4];
+    private SKRect[] _themeButtonBounds = new SKRect[12];
 
     // Font size selector state
     private SKRect[] _fontSizeButtonBounds = new SKRect[3];
@@ -2504,52 +2504,77 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
 
-        // Theme section
-        FUIRenderer.DrawText(canvas, "Theme", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
+        // Theme section - Core themes
+        FUIRenderer.DrawText(canvas, "Core", new SKPoint(leftMargin, y + 4), FUIColors.TextDim, 9f);
 
-        FUITheme[] themeValues = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
-        string[] themeNames = { "MID", "MTX", "AMB", "ICE" };
-        float themeBtnWidth = 44f;
-        float themeBtnHeight = 24f;
-        float themeBtnGap = 4f;
-        float themeBtnsStartX = rightMargin - (themeBtnWidth * 4 + themeBtnGap * 3);
+        FUITheme[] coreThemes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
+        string[] coreNames = { "MID", "MTX", "AMB", "ICE" };
+        SKColor[] coreColors = {
+            new SKColor(0x40, 0xA0, 0xFF),  // Midnight - blue
+            new SKColor(0x40, 0xFF, 0x40),  // Matrix - green
+            new SKColor(0xFF, 0xA0, 0x40),  // Amber - orange
+            new SKColor(0x40, 0xE0, 0xFF)   // Ice - cyan
+        };
 
-        for (int i = 0; i < themeNames.Length; i++)
+        float themeBtnWidth = 38f;
+        float themeBtnHeight = 20f;
+        float themeBtnGap = 3f;
+        float themeBtnsStartX = leftMargin + 35f;
+
+        for (int i = 0; i < coreThemes.Length; i++)
         {
             var themeBounds = new SKRect(
                 themeBtnsStartX + i * (themeBtnWidth + themeBtnGap), y,
                 themeBtnsStartX + i * (themeBtnWidth + themeBtnGap) + themeBtnWidth, y + themeBtnHeight);
 
             StoreThemeButtonBounds(i, themeBounds);
-
-            bool isActive = FUIColors.CurrentTheme == themeValues[i];
-            var previewColor = i switch
-            {
-                0 => new SKColor(0x40, 0xA0, 0xFF),
-                1 => new SKColor(0x40, 0xFF, 0x40),
-                2 => new SKColor(0xFF, 0xA0, 0x40),
-                3 => new SKColor(0x40, 0xE0, 0xFF),
-                _ => FUIColors.Active
-            };
-
-            var bgColor = isActive ? previewColor.WithAlpha(60) : FUIColors.Background2;
-            var frameColor = isActive ? previewColor : FUIColors.Frame;
-            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
-
-            using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-            canvas.DrawRect(themeBounds, themeBgPaint);
-
-            using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
-            canvas.DrawRect(themeBounds, themeFramePaint);
-
-            FUIRenderer.DrawTextCentered(canvas, themeNames[i], themeBounds, textColor, 9f);
-
-            var indicatorBounds = new SKRect(themeBounds.Left + 3, themeBounds.Bottom - 3,
-                themeBounds.Right - 3, themeBounds.Bottom - 1);
-            using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
-            canvas.DrawRect(indicatorBounds, indicatorPaint);
+            DrawThemeButton(canvas, themeBounds, coreNames[i], coreColors[i], FUIColors.CurrentTheme == coreThemes[i]);
         }
-        y += themeBtnHeight + sectionSpacing + 4;
+        y += themeBtnHeight + 6;
+
+        // Manufacturer themes - Row 1
+        FUIRenderer.DrawText(canvas, "Mfr", new SKPoint(leftMargin, y + 4), FUIColors.TextDim, 9f);
+
+        FUITheme[] mfrThemes1 = { FUITheme.Drake, FUITheme.Aegis, FUITheme.Anvil, FUITheme.Argo };
+        string[] mfrNames1 = { "DRK", "AEG", "ANV", "ARG" };
+        SKColor[] mfrColors1 = {
+            new SKColor(0xFF, 0x80, 0x20),  // Drake - orange
+            new SKColor(0x40, 0x90, 0xE0),  // Aegis - blue
+            new SKColor(0x90, 0xC0, 0x40),  // Anvil - olive
+            new SKColor(0xFF, 0xC0, 0x00)   // Argo - yellow
+        };
+
+        for (int i = 0; i < mfrThemes1.Length; i++)
+        {
+            var themeBounds = new SKRect(
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap), y,
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap) + themeBtnWidth, y + themeBtnHeight);
+
+            StoreThemeButtonBounds(4 + i, themeBounds);
+            DrawThemeButton(canvas, themeBounds, mfrNames1[i], mfrColors1[i], FUIColors.CurrentTheme == mfrThemes1[i]);
+        }
+        y += themeBtnHeight + 4;
+
+        // Manufacturer themes - Row 2
+        FUITheme[] mfrThemes2 = { FUITheme.Crusader, FUITheme.Origin, FUITheme.MISC, FUITheme.RSI };
+        string[] mfrNames2 = { "CRU", "ORI", "MSC", "RSI" };
+        SKColor[] mfrColors2 = {
+            new SKColor(0x40, 0x90, 0xE0),  // Crusader - blue
+            new SKColor(0xD4, 0xAF, 0x37),  // Origin - gold
+            new SKColor(0x40, 0xC0, 0x90),  // MISC - teal
+            new SKColor(0x50, 0xA0, 0xF0)   // RSI - blue
+        };
+
+        for (int i = 0; i < mfrThemes2.Length; i++)
+        {
+            var themeBounds = new SKRect(
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap), y,
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap) + themeBtnWidth, y + themeBtnHeight);
+
+            StoreThemeButtonBounds(8 + i, themeBounds);
+            DrawThemeButton(canvas, themeBounds, mfrNames2[i], mfrColors2[i], FUIColors.CurrentTheme == mfrThemes2[i]);
+        }
+        y += themeBtnHeight + sectionSpacing;
 
         // Background effects section
         FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -2617,6 +2642,26 @@ public class MainForm : Form
         }
     }
 
+    private void DrawThemeButton(SKCanvas canvas, SKRect bounds, string name, SKColor previewColor, bool isActive)
+    {
+        var bgColor = isActive ? previewColor.WithAlpha(60) : FUIColors.Background2;
+        var frameColor = isActive ? previewColor : FUIColors.Frame;
+        var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+        using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, themeBgPaint);
+
+        using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
+        canvas.DrawRect(bounds, themeFramePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 8f);
+
+        var indicatorBounds = new SKRect(bounds.Left + 2, bounds.Bottom - 2,
+            bounds.Right - 2, bounds.Bottom - 1);
+        using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
+        canvas.DrawRect(indicatorBounds, indicatorPaint);
+    }
+
     private void HandleSettingsTabClick(SKPoint pt)
     {
         // Check font size button clicks
@@ -2633,8 +2678,15 @@ public class MainForm : Form
         }
 
         // Check theme button clicks
-        FUITheme[] themes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
-        for (int i = 0; i < _themeButtonBounds.Length; i++)
+        FUITheme[] themes = {
+            // Core themes (0-3)
+            FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice,
+            // Manufacturer themes row 1 (4-7)
+            FUITheme.Drake, FUITheme.Aegis, FUITheme.Anvil, FUITheme.Argo,
+            // Manufacturer themes row 2 (8-11)
+            FUITheme.Crusader, FUITheme.Origin, FUITheme.MISC, FUITheme.RSI
+        };
+        for (int i = 0; i < _themeButtonBounds.Length && i < themes.Length; i++)
         {
             if (_themeButtonBounds[i].Contains(pt))
             {
@@ -7925,7 +7977,7 @@ public class MainForm : Form
         FUIRenderer.DrawFrame(canvas, itemBounds, frameColor, 6f, isSelected ? 1.5f : 1f, isSelected);
 
         // Status indicator dot
-        var statusColor = isDisconnected ? FUIColors.Danger : FUIColors.Success;
+        var statusColor = isDisconnected ? FUIColors.Danger : FUIColors.Active;
         FUIRenderer.DrawGlowingDot(canvas, new SKPoint(x + 18, y + 22), statusColor, 4f,
             isDisconnected ? 4f : 8f);
 
@@ -7937,7 +7989,7 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 35, y + 26), nameColor, 13f, isSelected && !isDisconnected);
 
         // Status text
-        var statusTextColor = isDisconnected ? FUIColors.Danger : FUIColors.Success;
+        var statusTextColor = isDisconnected ? FUIColors.Danger : FUIColors.Active;
         FUIRenderer.DrawText(canvas, status, new SKPoint(x + 35, y + 45), statusTextColor, 11f);
 
         // vJoy assignment indicator (positioned to avoid chevron overlap)
@@ -8022,19 +8074,6 @@ public class MainForm : Form
 
         // Draw dynamic lead-lines for active inputs
         DrawActiveInputLeadLines(canvas, bounds);
-
-        // Connection line from device list (animated)
-        var lineStart = new SKPoint(bounds.Left - 10, bounds.Top + 90);
-        var lineEnd = new SKPoint(bounds.Left + 15, bounds.Top + 90);
-        using var connectorPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active,
-            StrokeWidth = 1f,
-            IsAntialias = true,
-            PathEffect = SKPathEffect.CreateDash(new[] { 6f, 4f }, _dashPhase)
-        };
-        canvas.DrawLine(lineStart, lineEnd, connectorPaint);
     }
 
     private void DrawActiveInputLeadLines(SKCanvas canvas, SKRect panelBounds)
@@ -8593,9 +8632,9 @@ public class MainForm : Form
         // Status items
         float statusItemHeight = 32f;
         float itemY = contentBounds.Top + titleBarHeight + pad;
-        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "VJOY DRIVER", "ACTIVE", FUIColors.Success);
+        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "VJOY DRIVER", "ACTIVE", FUIColors.Active);
         itemY += statusItemHeight + itemGap;
-        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "HIDHIDE", "ENABLED", FUIColors.Success);
+        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "HIDHIDE", "ENABLED", FUIColors.Active);
         itemY += statusItemHeight + itemGap;
         DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "INPUT RATE", "100 HZ", FUIColors.TextPrimary);
         itemY += statusItemHeight + itemGap;
@@ -8619,7 +8658,7 @@ public class MainForm : Form
     {
         FUIRenderer.DrawText(canvas, label, new SKPoint(x, y + 12), FUIColors.TextDim, 11f);
 
-        var dotColor = valueColor == FUIColors.Success ? valueColor : FUIColors.Primary.WithAlpha(100);
+        var dotColor = valueColor == FUIColors.Active ? valueColor : FUIColors.Primary.WithAlpha(100);
         float dotX = x + width - 70;
         FUIRenderer.DrawGlowingDot(canvas, new SKPoint(dotX, y + 8), dotColor, 2f, 4f);
 

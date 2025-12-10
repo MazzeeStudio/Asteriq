@@ -89,6 +89,8 @@ public class MainForm : Form
     private bool _svgMirrored;
     private Dictionary<string, SKRect> _controlBounds = new();
     private Point _mousePosition; // For debug display
+    private DateTime _lastSvgControlClick = DateTime.MinValue;
+    private string? _lastClickedControlId;
 
     // Device mapping and active input tracking
     private DeviceMap? _deviceMap;
@@ -143,6 +145,17 @@ public class MainForm : Form
     private ButtonMode _selectedButtonMode = ButtonMode.Normal;
     private SKRect[] _buttonModeBounds = new SKRect[4];
     private int _hoveredButtonMode = -1;
+
+    // Mapping editor - output type (Button vs Keyboard)
+    private bool _outputTypeIsKeyboard = false;
+    private SKRect _outputTypeBtnBounds;
+    private SKRect _outputTypeKeyBounds;
+    private int _hoveredOutputType = -1; // 0=Button, 1=Keyboard
+    private string _selectedKeyName = "";
+    private List<string>? _selectedModifiers = null;
+    private SKRect _keyCaptureBounds;
+    private bool _keyCaptureBoundsHovered;
+    private bool _isCapturingKey = false;
 
     // Double-click detection for binding rows
     private DateTime _lastRowClickTime = DateTime.MinValue;
@@ -267,6 +280,81 @@ public class MainForm : Form
         {
             _profileService.CreateAndActivateProfile(textBox.Text.Trim());
             RefreshProfileList();
+        }
+    }
+
+    private void ImportProfilePrompt()
+    {
+        using var openDialog = new OpenFileDialog
+        {
+            Title = "Import Profile",
+            Filter = "Asteriq Profile (*.json)|*.json|All Files (*.*)|*.*",
+            DefaultExt = "json",
+            CheckFileExists = true
+        };
+
+        if (openDialog.ShowDialog(this) == DialogResult.OK)
+        {
+            var imported = _profileService.ImportProfile(openDialog.FileName, generateNewId: true);
+            if (imported != null)
+            {
+                _profileService.ActivateProfile(imported.Id);
+                RefreshProfileList();
+            }
+            else
+            {
+                MessageBox.Show(this,
+                    "Failed to import profile. The file may be corrupted or in an invalid format.",
+                    "Import Failed",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    private void ExportActiveProfile()
+    {
+        if (_profileService.ActiveProfile == null)
+        {
+            MessageBox.Show(this,
+                "No profile is currently active. Please select a profile first.",
+                "Export",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        var profile = _profileService.ActiveProfile;
+        string suggestedName = $"{profile.Name.Replace(" ", "_")}.json";
+
+        using var saveDialog = new SaveFileDialog
+        {
+            Title = "Export Profile",
+            Filter = "Asteriq Profile (*.json)|*.json",
+            DefaultExt = "json",
+            FileName = suggestedName,
+            OverwritePrompt = true
+        };
+
+        if (saveDialog.ShowDialog(this) == DialogResult.OK)
+        {
+            bool success = _profileService.ExportProfile(profile.Id, saveDialog.FileName);
+            if (success)
+            {
+                MessageBox.Show(this,
+                    $"Profile '{profile.Name}' exported successfully.",
+                    "Export Complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show(this,
+                    "Failed to export profile.",
+                    "Export Failed",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
         }
     }
 
@@ -571,7 +659,160 @@ public class MainForm : Form
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Color.Black;
         DoubleBuffered = true;
+        KeyPreview = true;
     }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Handle key capture for keyboard output mapping
+        if (_isCapturingKey)
+        {
+            // Extract modifiers and key name
+            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
+            if (!string.IsNullOrEmpty(keyName))
+            {
+                _selectedKeyName = keyName;
+                _selectedModifiers = modifiers.Count > 0 ? modifiers : null;
+                _isCapturingKey = false;
+                UpdateKeyNameForSelected();
+            }
+            return true; // Consume the key
+        }
+
+        // Cancel key capture with Escape
+        if (keyData == Keys.Escape)
+        {
+            if (_isCapturingKey)
+            {
+                _isCapturingKey = false;
+                return true;
+            }
+            if (_isListeningForInput)
+            {
+                CancelInputListening();
+                return true;
+            }
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private static string? GetKeyNameFromKeys(Keys keys)
+    {
+        var (keyName, _) = GetKeyNameAndModifiersFromKeys(keys);
+        return keyName;
+    }
+
+    private static (string? keyName, List<string> modifiers) GetKeyNameAndModifiersFromKeys(Keys keys)
+    {
+        var modifiers = new List<string>();
+
+        // Check for AltGr first - Windows sends LCtrl+RAlt for AltGr
+        // We detect this by checking if both LCtrl and RAlt are held simultaneously
+        bool isAltGr = IsKeyHeld(VK_RMENU) && IsKeyHeld(VK_LCONTROL) && !IsKeyHeld(VK_RCONTROL);
+
+        if (isAltGr)
+        {
+            // AltGr pressed - just add AltGr, skip the phantom LCtrl
+            modifiers.Add("AltGr");
+        }
+        else
+        {
+            // Extract modifiers using GetAsyncKeyState for left/right detection
+            if ((keys & Keys.Control) == Keys.Control)
+            {
+                // Try to detect left vs right using GetAsyncKeyState
+                if (IsKeyHeld(VK_RCONTROL))
+                    modifiers.Add("RCtrl");
+                else if (IsKeyHeld(VK_LCONTROL))
+                    modifiers.Add("LCtrl");
+            }
+            if ((keys & Keys.Alt) == Keys.Alt)
+            {
+                if (IsKeyHeld(VK_RMENU))
+                    modifiers.Add("RAlt");
+                else if (IsKeyHeld(VK_LMENU))
+                    modifiers.Add("LAlt");
+            }
+        }
+
+        // Shift is independent of AltGr
+        if ((keys & Keys.Shift) == Keys.Shift)
+        {
+            if (IsKeyHeld(VK_RSHIFT))
+                modifiers.Add("RShift");
+            else
+                modifiers.Add("LShift");
+        }
+
+        // Remove modifiers to get the base key
+        var baseKey = keys & ~Keys.Modifiers;
+
+        // Skip modifier-only presses
+        if (baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
+            baseKey == Keys.Menu || baseKey == Keys.LWin || baseKey == Keys.RWin ||
+            baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
+            baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
+            baseKey == Keys.LMenu || baseKey == Keys.RMenu)
+            return (null, modifiers);
+
+        var keyName = baseKey switch
+        {
+            Keys.A => "A", Keys.B => "B", Keys.C => "C", Keys.D => "D",
+            Keys.E => "E", Keys.F => "F", Keys.G => "G", Keys.H => "H",
+            Keys.I => "I", Keys.J => "J", Keys.K => "K", Keys.L => "L",
+            Keys.M => "M", Keys.N => "N", Keys.O => "O", Keys.P => "P",
+            Keys.Q => "Q", Keys.R => "R", Keys.S => "S", Keys.T => "T",
+            Keys.U => "U", Keys.V => "V", Keys.W => "W", Keys.X => "X",
+            Keys.Y => "Y", Keys.Z => "Z",
+            Keys.D0 => "0", Keys.D1 => "1", Keys.D2 => "2", Keys.D3 => "3",
+            Keys.D4 => "4", Keys.D5 => "5", Keys.D6 => "6", Keys.D7 => "7",
+            Keys.D8 => "8", Keys.D9 => "9",
+            Keys.F1 => "F1", Keys.F2 => "F2", Keys.F3 => "F3", Keys.F4 => "F4",
+            Keys.F5 => "F5", Keys.F6 => "F6", Keys.F7 => "F7", Keys.F8 => "F8",
+            Keys.F9 => "F9", Keys.F10 => "F10", Keys.F11 => "F11", Keys.F12 => "F12",
+            Keys.Space => "Space",
+            Keys.Enter => "Enter",
+            Keys.Tab => "Tab",
+            Keys.Back => "Backspace",
+            Keys.Delete => "Delete",
+            Keys.Insert => "Insert",
+            Keys.Home => "Home",
+            Keys.End => "End",
+            Keys.PageUp => "PageUp",
+            Keys.PageDown => "PageDown",
+            Keys.Up => "Up",
+            Keys.Down => "Down",
+            Keys.Left => "Left",
+            Keys.Right => "Right",
+            Keys.NumPad0 => "Num0", Keys.NumPad1 => "Num1", Keys.NumPad2 => "Num2",
+            Keys.NumPad3 => "Num3", Keys.NumPad4 => "Num4", Keys.NumPad5 => "Num5",
+            Keys.NumPad6 => "Num6", Keys.NumPad7 => "Num7", Keys.NumPad8 => "Num8",
+            Keys.NumPad9 => "Num9",
+            Keys.Multiply => "Num*",
+            Keys.Add => "Num+",
+            Keys.Subtract => "Num-",
+            Keys.Decimal => "Num.",
+            Keys.Divide => "Num/",
+            _ => null
+        };
+
+        return (keyName, modifiers);
+    }
+
+    // Windows API for detecting held keys
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    // Virtual key codes for left/right modifiers
+    private const int VK_LSHIFT = 0xA0;
+    private const int VK_RSHIFT = 0xA1;
+    private const int VK_LCONTROL = 0xA2;
+    private const int VK_RCONTROL = 0xA3;
+    private const int VK_LMENU = 0xA4;  // Left Alt
+    private const int VK_RMENU = 0xA5;  // Right Alt
+
+    private static bool IsKeyHeld(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
     private void InitializeCanvas()
     {
@@ -779,6 +1020,8 @@ public class MainForm : Form
             _hoveredAddButton = -1;
             _hoveredRemoveButton = -1;
             _hoveredButtonMode = -1;
+            _hoveredOutputType = -1;
+            _keyCaptureBoundsHovered = false;
             _addInputButtonHovered = false;
             _clearAllButtonHovered = false;
             _hoveredInputSourceRemove = -1;
@@ -813,6 +1056,28 @@ public class MainForm : Form
                         Cursor = Cursors.Hand;
                         return;
                     }
+                }
+
+                // Output type buttons
+                if (_outputTypeBtnBounds.Contains(e.X, e.Y))
+                {
+                    _hoveredOutputType = 0;
+                    Cursor = Cursors.Hand;
+                    return;
+                }
+                if (_outputTypeKeyBounds.Contains(e.X, e.Y))
+                {
+                    _hoveredOutputType = 1;
+                    Cursor = Cursors.Hand;
+                    return;
+                }
+
+                // Key capture field
+                if (_outputTypeIsKeyboard && _keyCaptureBounds.Contains(e.X, e.Y))
+                {
+                    _keyCaptureBoundsHovered = true;
+                    Cursor = Cursors.Hand;
+                    return;
                 }
             }
 
@@ -996,6 +1261,20 @@ public class MainForm : Form
                     _profileDropdownOpen = false;
                     return;
                 }
+                else if (_hoveredProfileIndex == _profiles.Count + 1)
+                {
+                    // "Import" clicked
+                    ImportProfilePrompt();
+                    _profileDropdownOpen = false;
+                    return;
+                }
+                else if (_hoveredProfileIndex == _profiles.Count + 2)
+                {
+                    // "Export" clicked
+                    ExportActiveProfile();
+                    _profileDropdownOpen = false;
+                    return;
+                }
             }
             else
             {
@@ -1113,6 +1392,25 @@ public class MainForm : Form
                 return;
             }
 
+            // Right panel: Output type selection
+            if (_selectedMappingRow >= 8 && _hoveredOutputType >= 0)
+            {
+                _outputTypeIsKeyboard = (_hoveredOutputType == 1);
+                if (!_outputTypeIsKeyboard)
+                {
+                    _selectedKeyName = ""; // Clear key when switching to Button mode
+                }
+                UpdateOutputTypeForSelected();
+                return;
+            }
+
+            // Right panel: Key capture field
+            if (_selectedMappingRow >= 8 && _outputTypeIsKeyboard && _keyCaptureBoundsHovered)
+            {
+                _isCapturingKey = true;
+                return;
+            }
+
             // Left panel: vJoy device navigation
             if (_vjoyPrevHovered && _selectedVJoyDeviceIndex > 0)
             {
@@ -1138,8 +1436,14 @@ public class MainForm : Form
                 {
                     // Selecting a different row - cancel listening
                     CancelInputListening();
+                    _selectedMappingRow = _hoveredMappingRow;
+                    // Load output type state for button rows
+                    LoadOutputTypeStateForRow();
                 }
-                _selectedMappingRow = _hoveredMappingRow;
+                else
+                {
+                    _selectedMappingRow = _hoveredMappingRow;
+                }
                 return;
             }
         }
@@ -1147,13 +1451,30 @@ public class MainForm : Form
         // SVG control clicks
         if (_hoveredControlId != null)
         {
-            _selectedControlId = _hoveredControlId;
-            _leadLineProgress = 0f; // Reset animation for new selection
+            // Check for double-click (same control clicked within 500ms)
+            bool isDoubleClick = _lastClickedControlId == _hoveredControlId &&
+                                 (DateTime.Now - _lastSvgControlClick).TotalMilliseconds < 500;
+
+            if (isDoubleClick)
+            {
+                // Double-click - open mapping dialog for this control
+                OpenMappingDialogForControl(_hoveredControlId);
+                _lastClickedControlId = null;
+            }
+            else
+            {
+                // Single click - select the control
+                _selectedControlId = _hoveredControlId;
+                _leadLineProgress = 0f; // Reset animation for new selection
+                _lastClickedControlId = _hoveredControlId;
+                _lastSvgControlClick = DateTime.Now;
+            }
         }
         else if (_silhouetteBounds.Contains(e.X, e.Y))
         {
             // Clicked inside silhouette but not on a control - deselect
             _selectedControlId = null;
+            _lastClickedControlId = null;
         }
     }
 
@@ -1359,15 +1680,10 @@ public class MainForm : Form
         _mappingRemoveButtonBounds.Clear();
         _bindingsListBounds = bounds;
 
-        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
-        {
-            FUIRenderer.DrawText(canvas, "No vJoy devices available",
-                new SKPoint(bounds.Left + 10, bounds.Top + 30), FUIColors.TextDim, 12f);
-            return;
-        }
-
-        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         var profile = _profileService.ActiveProfile;
+
+        bool hasVJoy = _vjoyDevices.Count > 0 && _selectedVJoyDeviceIndex < _vjoyDevices.Count;
+        VJoyDeviceInfo? vjoyDevice = hasVJoy ? _vjoyDevices[_selectedVJoyDeviceIndex] : null;
 
         float rowHeight = 32f;  // Compact rows (bindings shown in right panel now)
         float rowGap = 4f;
@@ -1376,8 +1692,9 @@ public class MainForm : Form
 
         // Calculate total content height for scrolling
         string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
-        int axisCount = Math.Min(axisNames.Length, 8);
-        int buttonCount = vjoyDevice.ButtonCount;
+        int axisCount = hasVJoy ? Math.Min(axisNames.Length, 8) : 0;
+        int buttonCount = vjoyDevice?.ButtonCount ?? 0;
+
         _bindingsContentHeight = sectionHeaderHeight + (axisCount * (rowHeight + rowGap)) +
                                  sectionGap + sectionHeaderHeight + (buttonCount * (rowHeight + rowGap));
 
@@ -1392,70 +1709,77 @@ public class MainForm : Form
         float y = bounds.Top - _bindingsScrollOffset;
         int rowIndex = 0;
 
-        // Section: AXES
-        if (y + sectionHeaderHeight > bounds.Top - 20)
+        // Section: AXES (only if vJoy available)
+        if (hasVJoy && axisCount > 0)
         {
-            FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
+            if (y + sectionHeaderHeight > bounds.Top - 20)
+            {
+                FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
+            }
+            y += sectionHeaderHeight;
+
+            for (int i = 0; i < axisCount; i++)
+            {
+                float rowTop = y;
+                float rowBottom = y + rowHeight;
+
+                // Only draw if visible
+                if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
+                {
+                    var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
+                    string binding = GetAxisBindingText(profile, vjoyDevice!.Id, i);
+                    bool isSelected = rowIndex == _selectedMappingRow;
+                    bool isHovered = rowIndex == _hoveredMappingRow;
+
+                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
+                    _mappingRowBounds.Add(rowBounds);
+                }
+                else
+                {
+                    // Add placeholder bounds for hit testing even when not visible
+                    _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
+                }
+
+                y += rowHeight + rowGap;
+                rowIndex++;
+            }
         }
-        y += sectionHeaderHeight;
 
-        for (int i = 0; i < axisCount; i++)
+        // Section: BUTTONS (only if vJoy available)
+        if (hasVJoy && buttonCount > 0)
         {
-            float rowTop = y;
-            float rowBottom = y + rowHeight;
-
-            // Only draw if visible
-            if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
+            y += sectionGap;
+            if (y + sectionHeaderHeight > bounds.Top && y < bounds.Bottom)
             {
-                var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
-                string binding = GetAxisBindingText(profile, vjoyDevice.Id, i);
-                bool isSelected = rowIndex == _selectedMappingRow;
-                bool isHovered = rowIndex == _hoveredMappingRow;
-
-                DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
-                _mappingRowBounds.Add(rowBounds);
+                FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
             }
-            else
+            y += sectionHeaderHeight;
+
+            for (int i = 0; i < buttonCount; i++)
             {
-                // Add placeholder bounds for hit testing even when not visible
-                _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
+                float rowTop = y;
+                float rowBottom = y + rowHeight;
+
+                // Only draw if visible
+                if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
+                {
+                    var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
+                    string binding = GetButtonBindingText(profile, vjoyDevice!.Id, i);
+                    var keyParts = GetButtonKeyParts(profile, vjoyDevice!.Id, i);
+                    bool isSelected = rowIndex == _selectedMappingRow;
+                    bool isHovered = rowIndex == _hoveredMappingRow;
+
+                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts);
+                    _mappingRowBounds.Add(rowBounds);
+                }
+                else
+                {
+                    _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
+                }
+
+                y += rowHeight + rowGap;
+                rowIndex++;
             }
-
-            y += rowHeight + rowGap;
-            rowIndex++;
-        }
-
-        // Section: BUTTONS
-        y += sectionGap;
-        if (y + sectionHeaderHeight > bounds.Top && y < bounds.Bottom)
-        {
-            FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 12), FUIColors.Active, 10f);
-        }
-        y += sectionHeaderHeight;
-
-        for (int i = 0; i < buttonCount; i++)
-        {
-            float rowTop = y;
-            float rowBottom = y + rowHeight;
-
-            // Only draw if visible
-            if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
-            {
-                var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
-                string binding = GetButtonBindingText(profile, vjoyDevice.Id, i);
-                bool isSelected = rowIndex == _selectedMappingRow;
-                bool isHovered = rowIndex == _hoveredMappingRow;
-
-                DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex);
-                _mappingRowBounds.Add(rowBounds);
-            }
-            else
-            {
-                _mappingRowBounds.Add(new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom));
-            }
-
-            y += rowHeight + rowGap;
-            rowIndex++;
         }
 
         canvas.Restore();
@@ -1465,6 +1789,42 @@ public class MainForm : Form
         {
             DrawScrollIndicator(canvas, bounds, _bindingsScrollOffset, _bindingsContentHeight);
         }
+    }
+
+    /// <summary>
+    /// Get the keyboard key parts for a button mapping (modifiers + key as separate items)
+    /// </summary>
+    private List<string>? GetKeyboardMappingParts(ButtonMapping mapping)
+    {
+        var output = mapping.Output;
+        if (string.IsNullOrEmpty(output.KeyName)) return null;
+
+        var parts = new List<string>();
+        if (output.Modifiers != null && output.Modifiers.Count > 0)
+        {
+            parts.AddRange(output.Modifiers);
+        }
+        parts.Add(output.KeyName);
+        return parts;
+    }
+
+    /// <summary>
+    /// Get the keyboard key parts for a button slot (if it outputs to keyboard)
+    /// Returns list of key parts (e.g., ["LCtrl", "LShift", "A"]) for drawing as separate keycaps
+    /// </summary>
+    private List<string>? GetButtonKeyParts(MappingProfile? profile, uint vjoyId, int buttonIndex)
+    {
+        if (profile == null) return null;
+
+        // Find mapping for this button slot that has keyboard output
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyId &&
+            m.Output.Index == buttonIndex &&
+            !string.IsNullOrEmpty(m.Output.KeyName));
+
+        if (mapping == null) return null;
+
+        return GetKeyboardMappingParts(mapping);
     }
 
     private void DrawScrollIndicator(SKCanvas canvas, SKRect bounds, float scrollOffset, float contentHeight)
@@ -1497,9 +1857,10 @@ public class MainForm : Form
     }
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
-        bool isSelected, bool isHovered, int rowIndex)
+        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
+        bool hasKeyParts = keyParts != null && keyParts.Count > 0;
 
         // Background
         SKColor bgColor;
@@ -1527,9 +1888,57 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftTextX, bounds.MidY + 5),
             isSelected ? FUIColors.Active : FUIColors.TextPrimary, 12f, true);
 
-        // Binding indicator dot on the right (shows if has binding)
-        if (hasBinding)
+        // Right side indicator: keyboard keycaps or binding dot
+        if (hasKeyParts)
         {
+            // Draw each key part as a separate keycap, right-aligned
+            float keycapHeight = 18f;
+            float keycapGap = 3f;
+            float keycapPadding = 6f;
+            float keycapRight = bounds.Right - 10;
+            float keycapTop = bounds.MidY - keycapHeight / 2;
+
+            using var textPaint = new SKPaint { TextSize = 9f, IsAntialias = true };
+
+            // Draw keycaps from right to left (so key is rightmost, then modifiers)
+            for (int i = keyParts!.Count - 1; i >= 0; i--)
+            {
+                string keyText = keyParts[i];
+                float textWidth = textPaint.MeasureText(keyText);
+                float keycapWidth = textWidth + keycapPadding * 2;
+                float keycapLeft = keycapRight - keycapWidth;
+
+                var keycapBounds = new SKRect(keycapLeft, keycapTop, keycapRight, keycapTop + keycapHeight);
+
+                // Keycap background
+                using var keycapBgPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Warning.WithAlpha(40),
+                    IsAntialias = true
+                };
+                canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
+
+                // Keycap frame
+                using var keycapFramePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = FUIColors.Warning.WithAlpha(150),
+                    StrokeWidth = 1f,
+                    IsAntialias = true
+                };
+                canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
+
+                // Keycap text
+                FUIRenderer.DrawTextCentered(canvas, keyText, keycapBounds, FUIColors.Warning, 9f);
+
+                // Move left for next keycap
+                keycapRight = keycapLeft - keycapGap;
+            }
+        }
+        else if (hasBinding)
+        {
+            // Binding indicator dot on the right
             float dotX = bounds.Right - 20;
             float dotY = bounds.MidY;
             using var dotPaint = new SKPaint
@@ -1813,8 +2222,9 @@ public class MainForm : Form
         }
         else
         {
+            // For button rows, find mapping for this vJoy button slot
+            // Check both VJoyButton and Keyboard output types (both map to button slots)
             var mapping = profile.ButtonMappings.FirstOrDefault(m =>
-                m.Output.Type == OutputType.VJoyButton &&
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
             if (mapping != null)
@@ -1899,6 +2309,101 @@ public class MainForm : Form
 
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
     {
+        float width = rightMargin - leftMargin;
+
+        // OUTPUT TYPE section - vJoy Button vs Keyboard
+        FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        // Output type tabs
+        string[] outputTypes = { "Button", "Keyboard" };
+        float typeButtonWidth = (width - 5) / 2;
+        float typeButtonHeight = 28f;
+
+        for (int i = 0; i < 2; i++)
+        {
+            var typeBounds = new SKRect(leftMargin + i * (typeButtonWidth + 5), y,
+                leftMargin + i * (typeButtonWidth + 5) + typeButtonWidth, y + typeButtonHeight);
+
+            if (i == 0) _outputTypeBtnBounds = typeBounds;
+            else _outputTypeKeyBounds = typeBounds;
+
+            bool selected = (i == 0 && !_outputTypeIsKeyboard) || (i == 1 && _outputTypeIsKeyboard);
+            bool hovered = _hoveredOutputType == i;
+
+            var bgColor = selected
+                ? FUIColors.Active.WithAlpha(60)
+                : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+            using var typeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRoundRect(typeBounds, 3, 3, typeBgPaint);
+
+            using var typeFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = selected ? FUIColors.Active : FUIColors.Frame,
+                StrokeWidth = selected ? 2f : 1f
+            };
+            canvas.DrawRoundRect(typeBounds, 3, 3, typeFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, outputTypes[i], typeBounds, textColor, 11f);
+        }
+        y += typeButtonHeight + 15;
+
+        // KEY COMBO section (only when Keyboard is selected)
+        if (_outputTypeIsKeyboard)
+        {
+            FUIRenderer.DrawText(canvas, "KEY COMBO", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 20;
+
+            float keyFieldHeight = 32f;
+            _keyCaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
+
+            // Draw key capture field
+            var keyBgColor = _isCapturingKey
+                ? FUIColors.Warning.WithAlpha(40)
+                : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+
+            using var keyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = keyBgColor };
+            canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyBgPaint);
+
+            var keyFrameColor = _isCapturingKey
+                ? FUIColors.Warning
+                : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
+
+            using var keyFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = keyFrameColor,
+                StrokeWidth = _isCapturingKey ? 2f : 1f
+            };
+            canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyFramePaint);
+
+            // Display key combo or prompt
+            if (_isCapturingKey)
+            {
+                byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
+                FUIRenderer.DrawTextCentered(canvas, "Press key combo...", _keyCaptureBounds, FUIColors.Warning.WithAlpha(alpha), 11f);
+            }
+            else if (!string.IsNullOrEmpty(_selectedKeyName))
+            {
+                // Draw keycaps centered in the field
+                DrawKeycapsInBounds(canvas, _keyCaptureBounds, _selectedKeyName, _selectedModifiers);
+            }
+            else
+            {
+                FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyCaptureBounds, FUIColors.TextDim, 11f);
+            }
+            y += keyFieldHeight + 15;
+        }
+
+        // Separator
+        FUIRenderer.DrawGlowingLine(canvas,
+            new SKPoint(leftMargin - 5, y - 5),
+            new SKPoint(rightMargin + 5, y - 5),
+            FUIColors.Frame.WithAlpha(60), 1f, 1f);
+
         // Button Mode section
         FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += 20;
@@ -1941,18 +2446,109 @@ public class MainForm : Form
         if (y + 40 < bottom)
         {
             var clearBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
-            using var clearBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+            _clearAllButtonBounds = clearBounds;
+
+            using var clearBgPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = _clearAllButtonHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2
+            };
             canvas.DrawRoundRect(clearBounds, 3, 3, clearBgPaint);
 
             using var clearFramePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Warning.WithAlpha(150),
-                StrokeWidth = 1f
+                Color = _clearAllButtonHovered ? FUIColors.Warning : FUIColors.Warning.WithAlpha(150),
+                StrokeWidth = _clearAllButtonHovered ? 2f : 1f
             };
             canvas.DrawRoundRect(clearBounds, 3, 3, clearFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, "Clear Binding", clearBounds, FUIColors.Warning, 11f);
+            FUIRenderer.DrawTextCentered(canvas, "Clear Binding", clearBounds,
+                _clearAllButtonHovered ? FUIColors.Warning : FUIColors.Warning.WithAlpha(200), 11f);
+        }
+    }
+
+    /// <summary>
+    /// Format key combo for display as simple text (used in mapping names)
+    /// </summary>
+    private string FormatKeyComboForDisplay(string keyName, List<string>? modifiers)
+    {
+        if (string.IsNullOrEmpty(keyName)) return "";
+
+        var parts = new List<string>();
+        if (modifiers != null && modifiers.Count > 0)
+        {
+            parts.AddRange(modifiers);
+        }
+        parts.Add(keyName);
+        return string.Join("+", parts);
+    }
+
+    /// <summary>
+    /// Draw keycaps centered within given bounds
+    /// </summary>
+    private void DrawKeycapsInBounds(SKCanvas canvas, SKRect bounds, string keyName, List<string>? modifiers)
+    {
+        // Build list of key parts
+        var parts = new List<string>();
+        if (modifiers != null && modifiers.Count > 0)
+        {
+            parts.AddRange(modifiers);
+        }
+        parts.Add(keyName);
+
+        float keycapHeight = 20f;
+        float keycapGap = 4f;
+        float keycapPadding = 8f;
+
+        using var textPaint = new SKPaint { TextSize = 10f, IsAntialias = true };
+
+        // Calculate total width of all keycaps
+        float totalWidth = 0;
+        var keycapWidths = new List<float>();
+        foreach (var part in parts)
+        {
+            float textWidth = textPaint.MeasureText(part);
+            float keycapWidth = textWidth + keycapPadding * 2;
+            keycapWidths.Add(keycapWidth);
+            totalWidth += keycapWidth;
+        }
+        totalWidth += (parts.Count - 1) * keycapGap;
+
+        // Start position to center the keycaps
+        float startX = bounds.MidX - totalWidth / 2;
+        float keycapTop = bounds.MidY - keycapHeight / 2;
+
+        // Draw each keycap
+        for (int i = 0; i < parts.Count; i++)
+        {
+            string keyText = parts[i];
+            float keycapWidth = keycapWidths[i];
+            var keycapBounds = new SKRect(startX, keycapTop, startX + keycapWidth, keycapTop + keycapHeight);
+
+            // Keycap background
+            using var keycapBgPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Warning.WithAlpha(50),
+                IsAntialias = true
+            };
+            canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
+
+            // Keycap frame
+            using var keycapFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Warning.WithAlpha(180),
+                StrokeWidth = 1f,
+                IsAntialias = true
+            };
+            canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
+
+            // Keycap text
+            FUIRenderer.DrawTextCentered(canvas, keyText, keycapBounds, FUIColors.Warning, 10f);
+
+            startX += keycapWidth + keycapGap;
         }
     }
 
@@ -2084,9 +2680,28 @@ public class MainForm : Form
             y = DrawManualEntrySection(canvas, bounds, y, leftMargin, rightMargin);
         }
 
-        // Button mode section (only for button outputs)
+        // Output type and button mode section (only for button outputs)
         if (!_isEditingAxis)
         {
+            // Output type selector (Button vs Keyboard)
+            y += 10;
+            FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 20;
+            DrawOutputTypeSelector(canvas, leftMargin, y, rightMargin - leftMargin);
+            y += 38;
+
+            // Key capture field (only when Keyboard is selected)
+            if (_outputTypeIsKeyboard)
+            {
+                FUIRenderer.DrawText(canvas, "KEY", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+                y += 20;
+                float keyFieldHeight = 32f;
+                _keyCaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
+                DrawKeyCapture(canvas, _keyCaptureBounds);
+                y += keyFieldHeight + 10;
+            }
+
+            // Button mode selector
             y += 10;
             FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
             y += 20;
@@ -2402,6 +3017,90 @@ public class MainForm : Form
             canvas.DrawRect(modeBounds, framePaint);
 
             FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 10f);
+        }
+    }
+
+    private void DrawOutputTypeSelector(SKCanvas canvas, float x, float y, float width)
+    {
+        string[] labels = { "Button", "Keyboard" };
+        float buttonWidth = (width - 5) / 2;
+        float buttonHeight = 28f;
+
+        for (int i = 0; i < 2; i++)
+        {
+            var typeBounds = new SKRect(x + i * (buttonWidth + 5), y, x + i * (buttonWidth + 5) + buttonWidth, y + buttonHeight);
+            if (i == 0) _outputTypeBtnBounds = typeBounds;
+            else _outputTypeKeyBounds = typeBounds;
+
+            bool selected = (i == 0 && !_outputTypeIsKeyboard) || (i == 1 && _outputTypeIsKeyboard);
+            bool hovered = _hoveredOutputType == i;
+
+            var bgColor = selected
+                ? FUIColors.Active.WithAlpha(60)
+                : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(typeBounds, bgPaint);
+
+            using var framePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = selected ? FUIColors.Active : FUIColors.Frame,
+                StrokeWidth = selected ? 2f : 1f
+            };
+            canvas.DrawRect(typeBounds, framePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, labels[i], typeBounds, textColor, 11f);
+        }
+    }
+
+    private void DrawKeyCapture(SKCanvas canvas, SKRect bounds)
+    {
+        // Background
+        var bgColor = _isCapturingKey
+            ? FUIColors.Warning.WithAlpha(40)
+            : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Frame
+        var frameColor = _isCapturingKey
+            ? FUIColors.Warning
+            : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = frameColor,
+            StrokeWidth = _isCapturingKey ? 2f : 1f
+        };
+        canvas.DrawRect(bounds, framePaint);
+
+        // Text content
+        float textY = bounds.MidY + 5;
+        if (_isCapturingKey)
+        {
+            byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
+            FUIRenderer.DrawText(canvas, "Press a key...",
+                new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 12f);
+        }
+        else if (!string.IsNullOrEmpty(_selectedKeyName))
+        {
+            FUIRenderer.DrawText(canvas, _selectedKeyName,
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 12f);
+        }
+        else
+        {
+            FUIRenderer.DrawText(canvas, "Click to capture key",
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextDisabled, 12f);
+        }
+
+        // Clear button if there's a key
+        if (!string.IsNullOrEmpty(_selectedKeyName) && !_isCapturingKey)
+        {
+            var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
+            DrawSmallIconButton(canvas, clearBounds, "×", false, true);
         }
     }
 
@@ -2983,6 +3682,122 @@ public class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// Check if a physical input is already mapped anywhere in the profile.
+    /// Returns the mapping name if found, null otherwise.
+    /// </summary>
+    private string? FindExistingMappingForInput(MappingProfile profile, InputSource inputToCheck)
+    {
+        // Check axis mappings
+        foreach (var mapping in profile.AxisMappings)
+        {
+            foreach (var input in mapping.Inputs)
+            {
+                if (input.DeviceId == inputToCheck.DeviceId &&
+                    input.Type == inputToCheck.Type &&
+                    input.Index == inputToCheck.Index)
+                {
+                    return mapping.Name;
+                }
+            }
+        }
+
+        // Check button mappings
+        foreach (var mapping in profile.ButtonMappings)
+        {
+            foreach (var input in mapping.Inputs)
+            {
+                if (input.DeviceId == inputToCheck.DeviceId &&
+                    input.Type == inputToCheck.Type &&
+                    input.Index == inputToCheck.Index)
+                {
+                    return mapping.Name;
+                }
+            }
+        }
+
+        // Check hat mappings
+        foreach (var mapping in profile.HatMappings)
+        {
+            foreach (var input in mapping.Inputs)
+            {
+                if (input.DeviceId == inputToCheck.DeviceId &&
+                    input.Type == inputToCheck.Type &&
+                    input.Index == inputToCheck.Index)
+                {
+                    return mapping.Name;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Show a confirmation dialog when a duplicate mapping is detected.
+    /// Returns true if the user wants to proceed and replace the existing mapping.
+    /// </summary>
+    private bool ConfirmDuplicateMapping(string existingMappingName, string newMappingTarget)
+    {
+        var result = MessageBox.Show(
+            $"This input is already mapped to:\n\n{existingMappingName}\n\nDo you want to remove the existing mapping and create a new one for {newMappingTarget}?",
+            "Duplicate Mapping",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+
+        return result == DialogResult.Yes;
+    }
+
+    /// <summary>
+    /// Remove any existing mappings that use the specified input source.
+    /// </summary>
+    private void RemoveExistingMappingsForInput(MappingProfile profile, InputSource inputToRemove)
+    {
+        // Remove from axis mappings
+        foreach (var mapping in profile.AxisMappings.ToList())
+        {
+            mapping.Inputs.RemoveAll(i =>
+                i.DeviceId == inputToRemove.DeviceId &&
+                i.Type == inputToRemove.Type &&
+                i.Index == inputToRemove.Index);
+
+            // If no inputs remain, remove the mapping entirely
+            if (mapping.Inputs.Count == 0)
+            {
+                profile.AxisMappings.Remove(mapping);
+            }
+        }
+
+        // Remove from button mappings
+        foreach (var mapping in profile.ButtonMappings.ToList())
+        {
+            mapping.Inputs.RemoveAll(i =>
+                i.DeviceId == inputToRemove.DeviceId &&
+                i.Type == inputToRemove.Type &&
+                i.Index == inputToRemove.Index);
+
+            if (mapping.Inputs.Count == 0)
+            {
+                profile.ButtonMappings.Remove(mapping);
+            }
+        }
+
+        // Remove from hat mappings
+        foreach (var mapping in profile.HatMappings.ToList())
+        {
+            mapping.Inputs.RemoveAll(i =>
+                i.DeviceId == inputToRemove.DeviceId &&
+                i.Type == inputToRemove.Type &&
+                i.Index == inputToRemove.Index);
+
+            if (mapping.Inputs.Count == 0)
+            {
+                profile.HatMappings.Remove(mapping);
+            }
+        }
+    }
+
     private async void StartInputListening(int rowIndex)
     {
         if (_isListeningForInput) return;
@@ -3007,7 +3822,27 @@ public class MainForm : Form
             if (detected != null && _selectedMappingRow == rowIndex)
             {
                 _pendingInput = detected;
-                // Auto-save the mapping
+                var inputSource = detected.ToInputSource();
+
+                // Check for duplicate mapping
+                var profile = _profileService.ActiveProfile;
+                if (profile != null)
+                {
+                    var existingMapping = FindExistingMappingForInput(profile, inputSource);
+                    if (existingMapping != null)
+                    {
+                        string newTarget = isAxis ? $"vJoy Axis {rowIndex}" : $"vJoy Button {rowIndex - 8 + 1}";
+                        if (!ConfirmDuplicateMapping(existingMapping, newTarget))
+                        {
+                            // User cancelled, don't create the mapping
+                            return;
+                        }
+                        // User confirmed, remove existing mapping first
+                        RemoveExistingMappingsForInput(profile, inputSource);
+                    }
+                }
+
+                // Save the mapping using current panel settings (output type, key combo, button mode)
                 SaveMappingForRow(rowIndex, detected, isAxis);
             }
         }
@@ -3065,9 +3900,8 @@ public class MainForm : Form
         }
         else
         {
-            // Find existing mapping or create new one
+            // Find existing mapping for this button slot (regardless of output type)
             var existingMapping = profile.ButtonMappings.FirstOrDefault(m =>
-                m.Output.Type == OutputType.VJoyButton &&
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
@@ -3075,21 +3909,48 @@ public class MainForm : Form
             {
                 // Add input to existing mapping (support multiple inputs)
                 existingMapping.Inputs.Add(newInputSource);
+
+                // Update with current panel settings
+                existingMapping.Output.Type = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
+                if (_outputTypeIsKeyboard)
+                {
+                    existingMapping.Output.KeyName = _selectedKeyName;
+                    existingMapping.Output.Modifiers = _selectedModifiers?.ToList();
+                }
+                else
+                {
+                    existingMapping.Output.KeyName = null;
+                    existingMapping.Output.Modifiers = null;
+                }
+                existingMapping.Mode = _selectedButtonMode;
                 existingMapping.Name = $"vJoy {vjoyDevice.Id} Button {outputIndex + 1} ({existingMapping.Inputs.Count} inputs)";
             }
             else
             {
-                // Create new mapping
+                // Create new mapping using current panel settings
+                var outputType = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
+                var outputTarget = new OutputTarget
+                {
+                    Type = outputType,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = outputIndex
+                };
+
+                if (_outputTypeIsKeyboard)
+                {
+                    outputTarget.KeyName = _selectedKeyName;
+                    outputTarget.Modifiers = _selectedModifiers?.ToList();
+                }
+
+                string mappingName = _outputTypeIsKeyboard && !string.IsNullOrEmpty(_selectedKeyName)
+                    ? $"{input.DeviceName} Button {input.Index + 1} -> {FormatKeyComboForDisplay(_selectedKeyName, _selectedModifiers)}"
+                    : $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}";
+
                 var mapping = new ButtonMapping
                 {
-                    Name = $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
+                    Name = mappingName,
                     Inputs = new List<InputSource> { newInputSource },
-                    Output = new OutputTarget
-                    {
-                        Type = OutputType.VJoyButton,
-                        VJoyDevice = vjoyDevice.Id,
-                        Index = outputIndex
-                    },
+                    Output = outputTarget,
                     Mode = _selectedButtonMode
                 };
                 profile.ButtonMappings.Add(mapping);
@@ -3152,6 +4013,37 @@ public class MainForm : Form
         _profileService.SaveActiveProfile();
     }
 
+    private void LoadOutputTypeStateForRow()
+    {
+        // Reset state
+        _outputTypeIsKeyboard = false;
+        _selectedKeyName = "";
+        _selectedModifiers = null;
+        _isCapturingKey = false;
+        _selectedButtonMode = ButtonMode.Normal;
+
+        if (_selectedMappingRow < 8) return; // Only for buttons
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow - 8;
+
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping != null)
+        {
+            _outputTypeIsKeyboard = mapping.Output.Type == OutputType.Keyboard;
+            _selectedKeyName = mapping.Output.KeyName ?? "";
+            _selectedModifiers = mapping.Output.Modifiers?.ToList();
+            _selectedButtonMode = mapping.Mode;
+        }
+    }
+
     private void UpdateButtonModeForSelected()
     {
         if (_selectedMappingRow < 8) return; // Only for buttons
@@ -3163,14 +4055,72 @@ public class MainForm : Form
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _selectedMappingRow - 8;
 
+        // Find mapping for this button slot (either VJoyButton or Keyboard output)
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
-            m.Output.Type == OutputType.VJoyButton &&
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
         if (mapping != null)
         {
             mapping.Mode = _selectedButtonMode;
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+        }
+    }
+
+    private void UpdateOutputTypeForSelected()
+    {
+        if (_selectedMappingRow < 8) return; // Only for buttons
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow - 8;
+
+        // Find mapping for this button slot
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping != null)
+        {
+            // Update output type and clear/set key name
+            mapping.Output.Type = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
+            if (!_outputTypeIsKeyboard)
+            {
+                mapping.Output.KeyName = null;
+                mapping.Output.Modifiers = null;
+            }
+            else if (!string.IsNullOrEmpty(_selectedKeyName))
+            {
+                mapping.Output.KeyName = _selectedKeyName;
+            }
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+        }
+    }
+
+    private void UpdateKeyNameForSelected()
+    {
+        if (_selectedMappingRow < 8) return;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow - 8;
+
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping != null)
+        {
+            mapping.Output.KeyName = _selectedKeyName;
+            mapping.Output.Modifiers = _selectedModifiers?.ToList();
             profile.ModifiedAt = DateTime.UtcNow;
             _profileService.SaveActiveProfile();
         }
@@ -3345,10 +4295,142 @@ public class MainForm : Form
                 };
                 _profileService.ActiveProfile!.AxisMappings.Add(mapping);
             }
+            else if (result.Input.Type == InputType.Hat)
+            {
+                var mapping = new HatMapping
+                {
+                    Name = result.MappingName,
+                    Inputs = new List<InputSource> { result.Input.ToInputSource() },
+                    Output = result.Output!,
+                    UseContinuous = true // Default to continuous POV
+                };
+                _profileService.ActiveProfile!.HatMappings.Add(mapping);
+            }
 
             // Save the profile
             _profileService.SaveActiveProfile();
         }
+    }
+
+    private void OpenMappingDialogForControl(string controlId)
+    {
+        // Need device map, selected device, and control info
+        if (_deviceMap == null || _selectedDevice < 0 || _selectedDevice >= _devices.Count)
+            return;
+
+        // Find the control definition in the device map
+        if (!_deviceMap.Controls.TryGetValue(controlId, out var control))
+            return;
+
+        // Get the binding from the control (e.g., "button0", "x", "hat0")
+        if (control.Bindings == null || control.Bindings.Count == 0)
+            return;
+
+        var device = _devices[_selectedDevice];
+        var binding = control.Bindings[0];
+
+        // Parse the binding to determine input type and index
+        var (inputType, inputIndex) = ParseBinding(binding, control.Type);
+        if (inputType == null)
+            return;
+
+        // Ensure we have an active profile
+        if (!_profileService.HasActiveProfile)
+        {
+            CreateNewProfilePrompt();
+            if (!_profileService.HasActiveProfile) return;
+        }
+
+        // Create a pre-selected DetectedInput
+        var preSelectedInput = new DetectedInput
+        {
+            DeviceGuid = device.InstanceGuid,
+            DeviceName = device.Name,
+            Type = inputType.Value,
+            Index = inputIndex,
+            Value = 0
+        };
+
+        // Open dialog with pre-selected input (skips "wait for input" phase)
+        using var dialog = new MappingDialog(_inputService, _vjoyService, preSelectedInput);
+        if (dialog.ShowDialog(this) == DialogResult.OK && dialog.Result.Success)
+        {
+            var result = dialog.Result;
+
+            // Create the mapping based on detected input type
+            if (result.Input!.Type == InputType.Button)
+            {
+                var mapping = new ButtonMapping
+                {
+                    Name = result.MappingName,
+                    Inputs = new List<InputSource> { result.Input.ToInputSource() },
+                    Output = result.Output!,
+                    Mode = result.ButtonMode
+                };
+                _profileService.ActiveProfile!.ButtonMappings.Add(mapping);
+            }
+            else if (result.Input.Type == InputType.Axis)
+            {
+                var mapping = new AxisMapping
+                {
+                    Name = result.MappingName,
+                    Inputs = new List<InputSource> { result.Input.ToInputSource() },
+                    Output = result.Output!,
+                    Curve = result.AxisCurve ?? new AxisCurve()
+                };
+                _profileService.ActiveProfile!.AxisMappings.Add(mapping);
+            }
+            else if (result.Input.Type == InputType.Hat)
+            {
+                var mapping = new HatMapping
+                {
+                    Name = result.MappingName,
+                    Inputs = new List<InputSource> { result.Input.ToInputSource() },
+                    Output = result.Output!,
+                    UseContinuous = true
+                };
+                _profileService.ActiveProfile!.HatMappings.Add(mapping);
+            }
+
+            // Save the profile
+            _profileService.SaveActiveProfile();
+        }
+    }
+
+    private (InputType? type, int index) ParseBinding(string binding, string controlType)
+    {
+        // Handle button bindings: "button0", "button1", etc.
+        if (binding.StartsWith("button", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(binding.Substring(6), out int buttonIndex))
+                return (InputType.Button, buttonIndex);
+        }
+
+        // Handle axis bindings: "x", "y", "z", "rx", "ry", "rz", "slider0", "slider1"
+        var axisMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "x", 0 }, { "y", 1 }, { "z", 2 },
+            { "rx", 3 }, { "ry", 4 }, { "rz", 5 },
+            { "slider0", 6 }, { "slider1", 7 }
+        };
+        if (axisMap.TryGetValue(binding, out int axisIndex))
+            return (InputType.Axis, axisIndex);
+
+        // Handle hat bindings: "hat0", "hat1", etc.
+        if (binding.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(binding.Substring(3), out int hatIndex))
+                return (InputType.Hat, hatIndex);
+        }
+
+        // Fall back to control type if binding doesn't parse
+        return controlType.ToUpperInvariant() switch
+        {
+            "BUTTON" => (InputType.Button, 0),
+            "AXIS" => (InputType.Axis, 0),
+            "HAT" or "POV" => (InputType.Hat, 0),
+            _ => (null, 0)
+        };
     }
 
     private void DrawTitleBar(SKCanvas canvas, SKRect bounds)
@@ -3491,7 +4573,7 @@ public class MainForm : Form
     {
         float itemHeight = 24f;
         float width = 150f;
-        int itemCount = Math.Max(_profiles.Count + 1, 2); // +1 for "New Profile", minimum 2
+        int itemCount = Math.Max(_profiles.Count + 3, 4); // +3 for "New Profile", "Import", "Export", minimum 4
         float height = itemHeight * itemCount + 4;
 
         _profileDropdownBounds = new SKRect(x, y, x + width, y + height);
@@ -3583,7 +4665,7 @@ public class MainForm : Form
             canvas.DrawRect(newItemBounds, hoverPaint);
         }
 
-        // Separator
+        // Separator before actions
         using var sepPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -3592,8 +4674,43 @@ public class MainForm : Form
         };
         canvas.DrawLine(x + 8, itemY, x + width - 8, itemY, sepPaint);
 
+        // "New Profile" option
         FUIRenderer.DrawText(canvas, "+ New Profile", new SKPoint(x + 10, itemY + 16),
             newHovered ? FUIColors.Active : FUIColors.TextDim, 11f);
+        itemY += itemHeight;
+
+        // "Import" option
+        bool importHovered = _hoveredProfileIndex == _profiles.Count + 1;
+        if (importHovered)
+        {
+            using var hoverPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Primary.WithAlpha(40),
+                IsAntialias = true
+            };
+            canvas.DrawRect(new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight), hoverPaint);
+        }
+        FUIRenderer.DrawText(canvas, "↓ Import...", new SKPoint(x + 10, itemY + 16),
+            importHovered ? FUIColors.Active : FUIColors.TextDim, 11f);
+        itemY += itemHeight;
+
+        // "Export" option
+        bool exportHovered = _hoveredProfileIndex == _profiles.Count + 2;
+        if (exportHovered)
+        {
+            using var hoverPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Primary.WithAlpha(40),
+                IsAntialias = true
+            };
+            canvas.DrawRect(new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight), hoverPaint);
+        }
+        // Only enable export if there's an active profile
+        bool canExport = _profileService.ActiveProfile != null;
+        FUIRenderer.DrawText(canvas, "↑ Export...", new SKPoint(x + 10, itemY + 16),
+            canExport ? (exportHovered ? FUIColors.Active : FUIColors.TextDim) : FUIColors.TextDisabled, 11f);
     }
 
     private void DrawDeviceListPanel(SKCanvas canvas, SKRect bounds)

@@ -300,7 +300,7 @@ public class MappingEngine : IDisposable
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
-            _keyboard.SetKey(mapping.Output.Index, outputPressed, mapping.Output.Modifiers);
+            _keyboard.SetKey(mapping.Output.KeyName, outputPressed, mapping.Output.Modifiers);
         }
     }
 
@@ -439,7 +439,7 @@ public class MappingEngine : IDisposable
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
-            _keyboard.SetKey(mapping.Output.Index, outputPressed, mapping.Output.Modifiers);
+            _keyboard.SetKey(mapping.Output.KeyName, outputPressed, mapping.Output.Modifiers);
         }
     }
 

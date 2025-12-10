@@ -114,7 +114,16 @@ public class ProfileService
         try
         {
             var json = File.ReadAllText(filePath);
-            return JsonSerializer.Deserialize<MappingProfile>(json, _jsonOptions);
+            var profile = JsonSerializer.Deserialize<MappingProfile>(json, _jsonOptions);
+            if (profile != null)
+            {
+                Console.WriteLine($"[ProfileService] Loaded profile '{profile.Name}' with {profile.ButtonMappings.Count} button mappings");
+                foreach (var mapping in profile.ButtonMappings)
+                {
+                    Console.WriteLine($"  - {mapping.Name}: Output.Type={mapping.Output.Type}, KeyName={mapping.Output.KeyName}");
+                }
+            }
+            return profile;
         }
         catch (JsonException ex)
         {
@@ -253,7 +262,7 @@ public class ProfileService
                     Type = mapping.Output.Type,
                     VJoyDevice = mapping.Output.VJoyDevice,
                     Index = mapping.Output.Index,
-                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                    Modifiers = mapping.Output.Modifiers?.ToList()
                 },
                 MergeOp = mapping.MergeOp,
                 Invert = mapping.Invert,
@@ -289,7 +298,7 @@ public class ProfileService
                     Type = mapping.Output.Type,
                     VJoyDevice = mapping.Output.VJoyDevice,
                     Index = mapping.Output.Index,
-                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                    Modifiers = mapping.Output.Modifiers?.ToList()
                 },
                 MergeOp = mapping.MergeOp,
                 Invert = mapping.Invert,
@@ -320,7 +329,7 @@ public class ProfileService
                     Type = mapping.Output.Type,
                     VJoyDevice = mapping.Output.VJoyDevice,
                     Index = mapping.Output.Index,
-                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                    Modifiers = mapping.Output.Modifiers?.ToList()
                 },
                 MergeOp = mapping.MergeOp,
                 Invert = mapping.Invert,
@@ -349,7 +358,7 @@ public class ProfileService
                     Type = mapping.Output.Type,
                     VJoyDevice = mapping.Output.VJoyDevice,
                     Index = mapping.Output.Index,
-                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                    Modifiers = mapping.Output.Modifiers?.ToList()
                 },
                 MergeOp = mapping.MergeOp,
                 Invert = mapping.Invert,
@@ -380,7 +389,7 @@ public class ProfileService
                     Type = mapping.Output.Type,
                     VJoyDevice = mapping.Output.VJoyDevice,
                     Index = mapping.Output.Index,
-                    Modifiers = mapping.Output.Modifiers?.ToArray()
+                    Modifiers = mapping.Output.Modifiers?.ToList()
                 },
                 MergeOp = mapping.MergeOp,
                 Invert = mapping.Invert,

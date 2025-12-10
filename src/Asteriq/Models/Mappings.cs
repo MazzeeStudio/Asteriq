@@ -109,17 +109,26 @@ public class OutputTarget
     /// <summary>Axis/button index for vJoy, or virtual key code for keyboard</summary>
     public int Index { get; set; }
 
-    /// <summary>Modifier keys for keyboard output</summary>
-    public int[]? Modifiers { get; set; }
+    /// <summary>Key name for keyboard output (e.g., "Space", "A", "F1")</summary>
+    public string? KeyName { get; set; }
+
+    /// <summary>Modifier key names for keyboard output (e.g., "Ctrl", "Shift", "Alt")</summary>
+    public List<string>? Modifiers { get; set; }
 
     public override string ToString() => Type switch
     {
         OutputType.VJoyAxis => $"vJoy {VJoyDevice} Axis {Index}",
         OutputType.VJoyButton => $"vJoy {VJoyDevice} Button {Index}",
         OutputType.VJoyPov => $"vJoy {VJoyDevice} POV {Index}",
-        OutputType.Keyboard => $"Key {Index}",
+        OutputType.Keyboard => FormatKeyboardOutput(),
         _ => "Unknown"
     };
+
+    private string FormatKeyboardOutput()
+    {
+        var modStr = Modifiers != null && Modifiers.Count > 0 ? string.Join("+", Modifiers) + "+" : "";
+        return $"Key {modStr}{KeyName ?? Index.ToString()}";
+    }
 }
 
 /// <summary>

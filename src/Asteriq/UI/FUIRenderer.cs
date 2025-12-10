@@ -1,3 +1,4 @@
+using Asteriq.Services;
 using SkiaSharp;
 
 namespace Asteriq.UI;
@@ -11,6 +12,46 @@ public static class FUIRenderer
     // Corner style options
     public enum CornerStyle { Rounded, Hard, Chamfered }
     public static CornerStyle CurrentCornerStyle = CornerStyle.Chamfered;
+
+    // Font size scaling for accessibility
+    private static FontSizeOption _fontSizeOption = FontSizeOption.Medium;
+
+    /// <summary>
+    /// Current font size option (Small/Medium/Large)
+    /// </summary>
+    public static FontSizeOption FontSizeOption
+    {
+        get => _fontSizeOption;
+        set => _fontSizeOption = value;
+    }
+
+    /// <summary>
+    /// Get the font size offset based on current setting
+    /// Small = 0, Medium = +2, Large = +4
+    /// </summary>
+    public static float FontSizeOffset => _fontSizeOption switch
+    {
+        FontSizeOption.Small => 0f,
+        FontSizeOption.Medium => 2f,
+        FontSizeOption.Large => 4f,
+        _ => 2f
+    };
+
+    /// <summary>
+    /// Scale a font size according to the current font size setting
+    /// </summary>
+    public static float ScaleFont(float baseSize) => baseSize + FontSizeOffset;
+
+    /// <summary>
+    /// Scale spacing/padding to account for larger fonts
+    /// Uses a smaller multiplier than fonts to avoid excessive spacing
+    /// </summary>
+    public static float ScaleSpacing(float baseSpacing) => baseSpacing + FontSizeOffset * 0.5f;
+
+    /// <summary>
+    /// Scale line height for text rows
+    /// </summary>
+    public static float ScaleLineHeight(float baseHeight) => baseHeight + FontSizeOffset;
 
     // Standard measurements
     public const float CornerRadius = 8f;
@@ -387,27 +428,31 @@ public static class FUIRenderer
     }
 
     public static void DrawText(SKCanvas canvas, string text, SKPoint position,
-        SKColor color, float size = 14f, bool withGlow = false, SKTypeface? typeface = null)
+        SKColor color, float size = 14f, bool withGlow = false, SKTypeface? typeface = null, bool scaleFont = true)
     {
+        float scaledSize = scaleFont ? ScaleFont(size) : size;
+
         if (withGlow)
         {
-            using var glowPaint = CreateTextPaint(color.WithAlpha(80), size, false, true, typeface);
+            using var glowPaint = CreateTextPaint(color.WithAlpha(80), scaledSize, false, true, typeface);
             canvas.DrawText(text, position.X, position.Y, glowPaint);
         }
 
-        using var paint = CreateTextPaint(color, size, false, false, typeface);
+        using var paint = CreateTextPaint(color, scaledSize, false, false, typeface);
         canvas.DrawText(text, position.X, position.Y, paint);
     }
 
     public static void DrawTextCentered(SKCanvas canvas, string text, SKRect bounds,
-        SKColor color, float size = 14f, bool withGlow = false)
+        SKColor color, float size = 14f, bool withGlow = false, bool scaleFont = true)
     {
-        using var paint = CreateTextPaint(color, size);
+        float scaledSize = scaleFont ? ScaleFont(size) : size;
+
+        using var paint = CreateTextPaint(color, scaledSize);
         float textWidth = paint.MeasureText(text);
         float x = bounds.Left + (bounds.Width - textWidth) / 2;
-        float y = bounds.MidY + size / 3;
+        float y = bounds.MidY + scaledSize / 3;
 
-        DrawText(canvas, text, new SKPoint(x, y), color, size, withGlow);
+        DrawText(canvas, text, new SKPoint(x, y), color, size, withGlow, null, scaleFont);
     }
 
     #endregion

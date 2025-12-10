@@ -215,6 +215,9 @@ public class MainForm : Form
     // Theme selector state
     private SKRect[] _themeButtonBounds = new SKRect[4];
 
+    // Font size selector state
+    private SKRect[] _fontSizeButtonBounds = new SKRect[3];
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -242,6 +245,9 @@ public class MainForm : Form
     {
         _profileService.Initialize();
         RefreshProfileList();
+
+        // Apply font size setting
+        FUIRenderer.FontSizeOption = _profileService.FontSize;
     }
 
     private void RefreshProfileList()
@@ -1420,16 +1426,23 @@ public class MainForm : Form
             _activeInputTracker.Clear(); // Clear lead-lines when switching devices
         }
 
-        // Tab clicks
-        float tabStartX = ClientSize.Width - 540;
+        // Tab clicks - match positions calculated in DrawTitleBar
+        float pad = FUIRenderer.SpaceLG;
+        float btnTotalWidth = 28f * 3 + 8f * 2; // Window control buttons
+        float windowControlsX = ClientSize.Width - pad - btnTotalWidth;
+        float tabWindowGap = 40f;
+        float tabSpacing = 90f;
+        float lastTabWidth = 70f; // Approximate width of "SETTINGS"
+        float totalTabsWidth = tabSpacing * (_tabNames.Length - 1) + lastTabWidth;
+        float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
         float tabY = 15;
-        float tabSpacing = 100;
+
         if (e.Y >= tabY + 20 && e.Y <= tabY + 50)
         {
             for (int i = 0; i < _tabNames.Length; i++)
             {
                 float tabX = tabStartX + i * tabSpacing;
-                if (e.X >= tabX && e.X < tabX + 70)
+                if (e.X >= tabX && e.X < tabX + tabSpacing - 10)
                 {
                     _activeTab = i;
                     break;
@@ -1769,14 +1782,18 @@ public class MainForm : Form
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
-        float y = bounds.Top + frameInset + 15;
-        float leftMargin = bounds.Left + frameInset + 15;
+        // Consistent padding from L-corner frame (same for left and top)
+        float cornerPadding = 20f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 15;
         float width = rightMargin - leftMargin;
+        float sectionSpacing = FUIRenderer.ScaleLineHeight(18f);
+        float rowHeight = FUIRenderer.ScaleLineHeight(18f);
 
         // Title
         FUIRenderer.DrawText(canvas, "PROFILE MANAGEMENT", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += 30;
+        y += FUIRenderer.ScaleLineHeight(30f);
 
         // Current profile info
         var profile = _profileService.ActiveProfile;
@@ -1784,52 +1801,55 @@ public class MainForm : Form
         {
             // Active profile header
             FUIRenderer.DrawText(canvas, "ACTIVE PROFILE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += 18;
+            y += sectionSpacing;
 
             // Profile name with highlight
-            var nameBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
+            float nameBoxHeight = FUIRenderer.ScaleLineHeight(32f);
+            var nameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
             using var nameBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30) };
             canvas.DrawRoundRect(nameBounds, 4, 4, nameBgPaint);
 
             using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
             canvas.DrawRoundRect(nameBounds, 4, 4, nameFramePaint);
 
-            FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextBright, 13f, true);
-            y += 45;
+            float nameTextY = y + (nameBoxHeight - FUIRenderer.ScaleFont(13f)) / 2 + FUIRenderer.ScaleFont(13f) - 3;
+            FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, 13f, true);
+            y += nameBoxHeight + FUIRenderer.ScaleLineHeight(12f);
 
             // Profile stats
+            float lineHeight = FUIRenderer.ScaleLineHeight(18f);
             FUIRenderer.DrawText(canvas, "STATISTICS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += 18;
+            y += lineHeight;
 
             DrawProfileStat(canvas, leftMargin, y, "Axis Mappings", profile.AxisMappings.Count.ToString());
-            y += 22;
+            y += lineHeight;
             DrawProfileStat(canvas, leftMargin, y, "Button Mappings", profile.ButtonMappings.Count.ToString());
-            y += 22;
+            y += lineHeight;
             DrawProfileStat(canvas, leftMargin, y, "Hat Mappings", profile.HatMappings.Count.ToString());
-            y += 22;
+            y += lineHeight;
             DrawProfileStat(canvas, leftMargin, y, "Shift Layers", profile.ShiftLayers.Count.ToString());
-            y += 30;
+            y += lineHeight + FUIRenderer.ScaleSpacing(6f);
 
             // Timestamps
             DrawProfileStat(canvas, leftMargin, y, "Created", profile.CreatedAt.ToLocalTime().ToString("g"));
-            y += 22;
+            y += lineHeight;
             DrawProfileStat(canvas, leftMargin, y, "Modified", profile.ModifiedAt.ToLocalTime().ToString("g"));
-            y += 35;
+            y += lineHeight + FUIRenderer.ScaleSpacing(10f);
         }
         else
         {
             // No profile active
             FUIRenderer.DrawText(canvas, "No profile active", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-            y += 40;
+            y += FUIRenderer.ScaleLineHeight(40f);
         }
 
         // Actions section
         FUIRenderer.DrawText(canvas, "ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 20;
+        y += sectionSpacing;
 
-        // Action buttons
-        float buttonHeight = 32f;
-        float buttonGap = 10f;
+        // Action buttons - scale height for larger fonts
+        float buttonHeight = FUIRenderer.ScaleLineHeight(28f);
+        float buttonGap = FUIRenderer.ScaleSpacing(8f);
 
         // New Profile button
         DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "New Profile", false);
@@ -1855,7 +1875,7 @@ public class MainForm : Form
             canvas.DrawRoundRect(deleteBounds, 4, 4, delFramePaint);
 
             FUIRenderer.DrawTextCentered(canvas, "Delete Profile", deleteBounds, FUIColors.Danger, 11f);
-            y += buttonHeight + 25;
+            y += buttonHeight + FUIRenderer.ScaleLineHeight(20f);
 
             // Shift Layers section
             DrawShiftLayersSection(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 15, profile);
@@ -1865,14 +1885,15 @@ public class MainForm : Form
     private void DrawShiftLayersSection(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom, MappingProfile profile)
     {
         float width = rightMargin - leftMargin;
+        float lineHeight = FUIRenderer.ScaleLineHeight(16f);
 
         // Section header
         FUIRenderer.DrawText(canvas, "SHIFT LAYERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 18;
+        y += lineHeight;
 
         // Shift layers explanation
         FUIRenderer.DrawText(canvas, "Hold a button to activate alternative mappings", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-        y += 22;
+        y += lineHeight + 4;
 
         // List existing shift layers
         float layerRowHeight = 36f;
@@ -1924,10 +1945,10 @@ public class MainForm : Form
         }
     }
 
-    private void DrawProfileStat(SKCanvas canvas, float x, float y, string label, string value)
+    private void DrawProfileStat(SKCanvas canvas, float x, float y, string label, string value, float valueOffset = 130f)
     {
         FUIRenderer.DrawText(canvas, label, new SKPoint(x, y), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, value, new SKPoint(x + 120, y), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, value, new SKPoint(x + valueOffset, y), FUIColors.TextPrimary, 10f);
     }
 
     private void DrawSettingsButton(SKCanvas canvas, SKRect bounds, string text, bool disabled)
@@ -1957,27 +1978,63 @@ public class MainForm : Form
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
-        float y = bounds.Top + frameInset + 15;
-        float leftMargin = bounds.Left + frameInset + 15;
+        // Consistent padding from L-corner frame (same for left and top)
+        float cornerPadding = 20f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 15;
+        float sectionSpacing = FUIRenderer.ScaleLineHeight(20f);
+        float rowHeight = FUIRenderer.ScaleLineHeight(24f);
 
         // Title
         FUIRenderer.DrawText(canvas, "APPLICATION SETTINGS", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += 35;
+        y += FUIRenderer.ScaleLineHeight(30f);
 
         // Auto-load setting
-        FUIRenderer.DrawText(canvas, "Auto-load last profile on startup", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
-        DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + 24), _profileService.AutoLoadLastProfile);
-        y += 40;
+        FUIRenderer.DrawText(canvas, "Auto-load last profile on startup", new SKPoint(leftMargin, y + 4), FUIColors.TextPrimary, 11f);
+        DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight), _profileService.AutoLoadLastProfile);
+        y += rowHeight + sectionSpacing;
+
+        // Font size section
+        FUIRenderer.DrawText(canvas, "FONT SIZE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += sectionSpacing;
+
+        FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
+        string[] fontSizeNames = { "SMALL", "MEDIUM", "LARGE" };
+        float fontBtnWidth = (rightMargin - leftMargin - 6) / fontSizeNames.Length;
+        float fontBtnHeight = FUIRenderer.ScaleLineHeight(24f);
+
+        for (int i = 0; i < fontSizeNames.Length; i++)
+        {
+            var fontBounds = new SKRect(
+                leftMargin + i * (fontBtnWidth + 3), y,
+                leftMargin + i * (fontBtnWidth + 3) + fontBtnWidth, y + fontBtnHeight);
+
+            _fontSizeButtonBounds[i] = fontBounds;
+
+            bool isActive = _profileService.FontSize == fontSizeValues[i];
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
+            var frameColor = isActive ? FUIColors.Active : FUIColors.Frame;
+            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+            using var fontBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(fontBounds, fontBgPaint);
+
+            using var fontFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
+            canvas.DrawRect(fontBounds, fontFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, fontSizeNames[i], fontBounds, textColor, 9f);
+        }
+        y += fontBtnHeight + sectionSpacing;
 
         // Theme section
         FUIRenderer.DrawText(canvas, "THEME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 20;
+        y += sectionSpacing;
 
         FUITheme[] themeValues = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
         string[] themeNames = { "MIDNIGHT", "MATRIX", "AMBER", "ICE" };
         float themeButtonWidth = (rightMargin - leftMargin - 9) / themeNames.Length;
-        float themeButtonHeight = 28f;
+        float themeButtonHeight = FUIRenderer.ScaleLineHeight(24f);
 
         for (int i = 0; i < themeNames.Length; i++)
         {
@@ -2018,11 +2075,11 @@ public class MainForm : Form
             using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
             canvas.DrawRect(indicatorBounds, indicatorPaint);
         }
-        y += themeButtonHeight + 25;
+        y += themeButtonHeight + sectionSpacing;
 
         // vJoy section
         FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 20;
+        y += sectionSpacing;
 
         var devices = _vjoyService.EnumerateDevices();
         bool vjoyEnabled = devices.Count > 0;
@@ -2030,26 +2087,29 @@ public class MainForm : Form
         var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
 
         using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
-        canvas.DrawCircle(leftMargin + 5, y + 6, 4, statusDot);
+        float statusDotY = y + FUIRenderer.ScaleFont(11f) / 2 - 2;
+        canvas.DrawCircle(leftMargin + 5, statusDotY, 4, statusDot);
         FUIRenderer.DrawText(canvas, vjoyStatus, new SKPoint(leftMargin + 16, y), vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
-        y += 25;
+        y += rowHeight;
 
         if (vjoyEnabled)
         {
             FUIRenderer.DrawText(canvas, $"Available devices: {devices.Count}", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         }
-        y += 35;
+        y += rowHeight + sectionSpacing;
 
         // Keyboard simulation section
         FUIRenderer.DrawText(canvas, "KEYBOARD OUTPUT", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 20;
+        y += sectionSpacing;
 
-        FUIRenderer.DrawText(canvas, "Key repeat delay (ms)", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
-        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + 26), "50");
-        y += 35;
+        float fieldHeight = FUIRenderer.ScaleLineHeight(26f);
+        float textVerticalOffset = (fieldHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 2;
+        FUIRenderer.DrawText(canvas, "Key repeat delay (ms)", new SKPoint(leftMargin, y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4), FUIColors.TextPrimary, 11f);
+        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + fieldHeight), "50");
+        y += fieldHeight + 8;
 
-        FUIRenderer.DrawText(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
-        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + 26), "30");
+        FUIRenderer.DrawText(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4), FUIColors.TextPrimary, 11f);
+        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + fieldHeight), "30");
     }
 
     private void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
@@ -2073,6 +2133,19 @@ public class MainForm : Form
 
     private void HandleSettingsTabClick(SKPoint pt)
     {
+        // Check font size button clicks
+        FontSizeOption[] fontSizes = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
+        for (int i = 0; i < _fontSizeButtonBounds.Length; i++)
+        {
+            if (_fontSizeButtonBounds[i].Contains(pt))
+            {
+                _profileService.FontSize = fontSizes[i];
+                FUIRenderer.FontSizeOption = fontSizes[i];
+                _canvas.Invalidate();
+                return;
+            }
+        }
+
         // Check theme button clicks
         FUITheme[] themes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
         for (int i = 0; i < _themeButtonBounds.Length; i++)
@@ -2753,32 +2826,41 @@ public class MainForm : Form
 
         // Response Curve header
         FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 18;
+        y += FUIRenderer.ScaleLineHeight(18f);
 
         // Centre and Invert checkboxes on their own row (label on left, checkbox on right)
-        float checkboxSize = 12f;
-        float rowHeight = 16f;
+        float checkboxSize = FUIRenderer.ScaleLineHeight(12f);
+        float rowHeight = FUIRenderer.ScaleLineHeight(16f);
         float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
-        float textY = y + rowHeight / 2 + 3; // Center text baseline (font size 9 has ~6px ascent)
+        float fontSize = 9f;
+        float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
+        float textY = y + (rowHeight / 2) + (scaledFontSize / 3); // Center text baseline
+
+        // Measure label widths for positioning
+        using var labelPaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, scaledFontSize);
+        float invertLabelWidth = labelPaint.MeasureText("Invert");
+        float centreLabelWidth = labelPaint.MeasureText("Centre");
+        float labelGap = FUIRenderer.ScaleSpacing(4f);
+        float checkboxGap = FUIRenderer.ScaleSpacing(12f);
 
         // Invert checkbox (rightmost) - label then checkbox
         float invertCheckX = rightMargin - checkboxSize;
         _invertToggleBounds = new SKRect(invertCheckX, checkboxY, invertCheckX + checkboxSize, checkboxY + checkboxSize);
         DrawCheckbox(canvas, _invertToggleBounds, _axisInverted);
-        FUIRenderer.DrawText(canvas, "Invert", new SKPoint(invertCheckX - 38, textY), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "Invert", new SKPoint(invertCheckX - invertLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
         // Centre checkbox (left of Invert) - label then checkbox
-        float centreCheckX = invertCheckX - 75;
+        float centreCheckX = invertCheckX - invertLabelWidth - labelGap - checkboxGap - checkboxSize;
         _deadzoneCenterCheckboxBounds = new SKRect(centreCheckX, checkboxY, centreCheckX + checkboxSize, checkboxY + checkboxSize);
         DrawCheckbox(canvas, _deadzoneCenterCheckboxBounds, _deadzoneCenterEnabled);
-        FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - 42, textY), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - centreLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
-        y += rowHeight + 6;
+        y += rowHeight + FUIRenderer.ScaleSpacing(6f);
 
         // Curve preset buttons - store bounds for click handling
         string[] presets = { "LINEAR", "S-CURVE", "EXPO", "CUSTOM" };
         float buttonWidth = (width - 9) / presets.Length;
-        float buttonHeight = 22f;
+        float buttonHeight = FUIRenderer.ScaleLineHeight(22f);
 
         for (int i = 0; i < presets.Length; i++)
         {
@@ -2810,13 +2892,13 @@ public class MainForm : Form
 
             FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 8f);
         }
-        y += buttonHeight + 12;
+        y += buttonHeight + FUIRenderer.ScaleSpacing(10f);
 
         // Curve editor visualization
         float curveHeight = 140f;
         _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
         DrawCurveVisualization(canvas, _curveEditorBounds);
-        y += curveHeight + 18;
+        y += curveHeight + FUIRenderer.ScaleLineHeight(16f);
 
         // Deadzone section
         if (y + 100 < bottom)
@@ -2852,13 +2934,13 @@ public class MainForm : Form
                 string selectedName = handleNames[_selectedDeadzoneHandle];
                 FUIRenderer.DrawText(canvas, $"[{selectedName}]", new SKPoint(presetStartX - 45, y), FUIColors.Active, 9f);
             }
-            y += 22;
+            y += FUIRenderer.ScaleLineHeight(20f);
 
             // Dual deadzone slider (always shows min/max, optionally shows center handles)
-            float sliderHeight = 24f;
+            float sliderHeight = FUIRenderer.ScaleLineHeight(24f);
             _deadzoneSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
             DrawDualDeadzoneSlider(canvas, _deadzoneSliderBounds);
-            y += sliderHeight + 8;
+            y += sliderHeight + FUIRenderer.ScaleSpacing(6f);
 
             // Value labels - fixed positions at track edges (prevents collision)
             if (_deadzoneCenterEnabled)
@@ -5753,23 +5835,63 @@ public class MainForm : Form
         // Title text
         FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(pad + 40, titleBarY + 38), FUIColors.Primary, 26f, true);
 
-        // Subtitle
-        float subtitleX = pad + 185;
-        using (var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f,
-            IsAntialias = true
-        })
-        {
-            canvas.DrawLine(subtitleX - 15, titleBarY + 18, subtitleX - 15, titleBarY + 48, sepPaint);
-        }
-        FUIRenderer.DrawText(canvas, "UNIFIED HOTAS MANAGEMENT SYSTEM", new SKPoint(subtitleX, titleBarY + 38),
-            FUIColors.TextDim, 12f);
+        // Window controls - always at fixed position from right edge
+        float btnTotalWidth = 28f * 3 + 8f * 2; // 3 buttons at 28px + 2 gaps at 8px = 100px
+        float windowControlsX = bounds.Right - pad - btnTotalWidth;
 
-        // Profile selector (positioned between subtitle and tabs)
-        DrawProfileSelector(canvas, bounds.Right - 650, titleBarY + 22);
+        // Navigation tabs - positioned with 40px gap from window controls
+        float tabWindowGap = 40f;
+        float tabSpacing = 90f;
+        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
+
+        // Calculate total tabs width
+        float totalTabsWidth = tabSpacing * (_tabNames.Length - 1) + tabMeasurePaint.MeasureText(_tabNames[_tabNames.Length - 1]);
+        float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
+
+        // Left side elements positioning
+        float subtitleX = pad + 185;
+        float profileSelectorWidth = 130f;
+        float profileGap = 15f;
+
+        // Subtitle - show if there's room before tabs
+        bool showSubtitle = subtitleX + 280 < tabStartX - profileSelectorWidth - profileGap - 20;
+
+        // Profile selector position - after subtitle (or after title if no subtitle)
+        float profileSelectorX;
+        if (showSubtitle)
+        {
+            profileSelectorX = subtitleX + 290; // After subtitle
+        }
+        else
+        {
+            profileSelectorX = pad + 185; // After title, where subtitle would be
+        }
+
+        // Check if profile selector fits before tabs
+        bool showProfileSelector = profileSelectorX + profileSelectorWidth + profileGap < tabStartX;
+
+        // Draw subtitle if there's room
+        if (showSubtitle)
+        {
+            using (var sepPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Frame,
+                StrokeWidth = 1f,
+                IsAntialias = true
+            })
+            {
+                canvas.DrawLine(subtitleX - 15, titleBarY + 18, subtitleX - 15, titleBarY + 48, sepPaint);
+            }
+            FUIRenderer.DrawText(canvas, "UNIFIED HOTAS MANAGEMENT SYSTEM", new SKPoint(subtitleX, titleBarY + 38),
+                FUIColors.TextDim, 12f);
+        }
+
+        // Profile selector (on the left, after subtitle or title)
+        if (showProfileSelector)
+        {
+            DrawProfileSelector(canvas, profileSelectorX, titleBarY + 22);
+        }
 
         // Horizontal base line
         FUIRenderer.DrawGlowingLine(canvas,
@@ -5777,11 +5899,8 @@ public class MainForm : Form
             new SKPoint(bounds.Right - pad, titleBarY + titleBarHeight + 8),
             FUIColors.Frame.WithAlpha(80), 1f, 2f);
 
-        // Tab indicators (32px gap after profile dropdown)
-        float tabStartX = bounds.Right - 508;
+        // Draw navigation tabs
         float tabX = tabStartX;
-        float tabSpacing = 100;
-
         for (int i = 0; i < _tabNames.Length; i++)
         {
             bool isActive = i == _activeTab;
@@ -5791,14 +5910,15 @@ public class MainForm : Form
 
             if (isActive)
             {
+                float actualTextWidth = tabMeasurePaint.MeasureText(_tabNames[i]);
+
                 using var paint = new SKPaint
                 {
                     Color = FUIColors.Active,
                     StrokeWidth = 2f,
                     IsAntialias = true
                 };
-                float textWidth = 60f;
-                canvas.DrawLine(tabX, titleBarY + 44, tabX + textWidth, titleBarY + 44, paint);
+                canvas.DrawLine(tabX, titleBarY + 44, tabX + actualTextWidth, titleBarY + 44, paint);
 
                 using var glowPaint = new SKPaint
                 {
@@ -5806,22 +5926,20 @@ public class MainForm : Form
                     StrokeWidth = 6f,
                     ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
                 };
-                canvas.DrawLine(tabX, titleBarY + 44, tabX + textWidth, titleBarY + 44, glowPaint);
+                canvas.DrawLine(tabX, titleBarY + 44, tabX + actualTextWidth, titleBarY + 44, glowPaint);
             }
 
             tabX += tabSpacing;
         }
 
-        // Window controls - aligned with page content (right edge at pad from window edge)
-        float btnTotalWidth = 28f * 3 + 8f * 2; // 3 buttons at 28px + 2 gaps at 8px = 100px
-        float windowControlsX = bounds.Right - pad - btnTotalWidth; // Align right edge with page padding
+        // Window controls - always drawn
         FUIRenderer.DrawWindowControls(canvas, windowControlsX, titleBarY + 12,
             _hoveredWindowControl == 0, _hoveredWindowControl == 1, _hoveredWindowControl == 2);
     }
 
     private void DrawProfileSelector(SKCanvas canvas, float x, float y)
     {
-        float width = 100f;
+        float width = 130f;  // Wider to accommodate longer names
         float height = 26f;
         _profileSelectorBounds = new SKRect(x, y, x + width, y + height);
 
@@ -5830,9 +5948,20 @@ public class MainForm : Form
             ? _profileService.ActiveProfile!.Name
             : "No Profile";
 
-        // Truncate if too long
-        if (profileName.Length > 12)
-            profileName = profileName.Substring(0, 11) + "…";
+        // Measure text to determine truncation
+        float maxTextWidth = width - 25f; // Account for arrow and padding
+        using var measurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, FUIRenderer.ScaleFont(11f));
+        float textWidth = measurePaint.MeasureText(profileName);
+
+        // Truncate if too long (based on actual measurement)
+        if (textWidth > maxTextWidth)
+        {
+            while (profileName.Length > 1 && measurePaint.MeasureText(profileName + "…") > maxTextWidth)
+            {
+                profileName = profileName.Substring(0, profileName.Length - 1);
+            }
+            profileName += "…";
+        }
 
         // Background
         bool isHovered = _profileSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
@@ -5875,23 +6004,32 @@ public class MainForm : Form
 
         _profileDropdownBounds = new SKRect(x, y, x + width, y + height);
 
-        // Shadow
+        // Shadow (offset for depth)
         using var shadowPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = SKColors.Black.WithAlpha(80),
-            ImageFilter = SKImageFilter.CreateBlur(8f, 8f)
+            Color = SKColors.Black.WithAlpha(120),
+            ImageFilter = SKImageFilter.CreateBlur(10f, 10f)
         };
-        canvas.DrawRect(new SKRect(x + 4, y + 4, x + width + 4, y + height + 4), shadowPaint);
+        canvas.DrawRect(new SKRect(x + 3, y + 3, x + width + 3, y + height + 3), shadowPaint);
 
-        // Background
+        // Solid opaque background (no transparency - blocks elements behind)
         using var bgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(240),
+            Color = FUIColors.Background1,  // Fully opaque
             IsAntialias = true
         };
         canvas.DrawRect(_profileDropdownBounds, bgPaint);
+
+        // Inner darker fill for better contrast
+        using var innerBgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Void.WithAlpha(200),
+            IsAntialias = true
+        };
+        canvas.DrawRect(new SKRect(x + 1, y + 1, x + width - 1, y + height - 1), innerBgPaint);
 
         // Border
         using var borderPaint = new SKPaint

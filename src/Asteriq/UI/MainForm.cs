@@ -69,6 +69,10 @@ public class MainForm : Form
     private SKRect _deviceCategoryD1Bounds;
     private SKRect _deviceCategoryD2Bounds;
 
+    // 1:1 Mapping button in device panel
+    private SKRect _map1to1ButtonBounds;
+    private bool _map1to1ButtonHovered;
+
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
     private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
     private int _hoveredMappingCategory = -1;
@@ -188,6 +192,8 @@ public class MainForm : Form
     private int _hoveredCurvePoint = -1;
     private int _draggingCurvePoint = -1;
     private CurveType _selectedCurveType = CurveType.Linear;
+    private bool _curveSymmetrical = false;  // When true, curve points mirror around center
+    private SKRect _curveSymmetricalCheckboxBounds;
 
     // Deadzone state (4-parameter model like JoystickGremlinEx)
     private float _deadzoneMin = -1.0f;        // Left edge (start)
@@ -1324,6 +1330,9 @@ public class MainForm : Form
             _hoveredDevice = -1;
         }
 
+        // Map 1:1 button hover detection
+        _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
+
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
         float btnSize = 28f;
@@ -1476,6 +1485,13 @@ public class MainForm : Form
             // Load device map for the selected device
             LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
             _activeInputTracker.Clear(); // Clear lead-lines when switching devices
+        }
+
+        // Map 1:1 button click
+        if (_map1to1ButtonHovered && !_map1to1ButtonBounds.IsEmpty)
+        {
+            CreateOneToOneMappings();
+            return;
         }
 
         // Tab clicks - match positions calculated in DrawTitleBar
@@ -3002,7 +3018,27 @@ public class MainForm : Form
 
             FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 8f);
         }
-        y += buttonHeight + FUIRenderer.ScaleSpacing(10f);
+        y += buttonHeight + FUIRenderer.ScaleSpacing(6f);
+
+        // Symmetrical checkbox (only shown for Custom curve type)
+        if (_selectedCurveType == CurveType.Custom)
+        {
+            float symCheckboxSize = FUIRenderer.ScaleLineHeight(14f);
+            float symCheckboxY = y;
+            float symCheckX = leftMargin;
+
+            _curveSymmetricalCheckboxBounds = new SKRect(symCheckX, symCheckboxY, symCheckX + symCheckboxSize, symCheckboxY + symCheckboxSize);
+            DrawCheckbox(canvas, _curveSymmetricalCheckboxBounds, _curveSymmetrical);
+
+            float symTextY = symCheckboxY + (symCheckboxSize - fontSize) / 2f + fontSize - 2f;
+            FUIRenderer.DrawText(canvas, "Symmetrical", new SKPoint(symCheckX + symCheckboxSize + labelGap, symTextY), FUIColors.TextDim, fontSize);
+
+            y += symCheckboxSize + FUIRenderer.ScaleSpacing(4f);
+        }
+        else
+        {
+            _curveSymmetricalCheckboxBounds = SKRect.Empty;
+        }
 
         // Curve editor visualization
         float curveHeight = 140f;
@@ -3743,7 +3779,10 @@ public class MainForm : Form
         {
             var pt = _curveControlPoints[i];
             float x = bounds.Left + pt.X * bounds.Width;
-            float y = bounds.Bottom - pt.Y * bounds.Height;
+
+            // Apply inversion to display Y position to match the curve
+            float displayY = _axisInverted ? (1f - pt.Y) : pt.Y;
+            float y = bounds.Bottom - displayY * bounds.Height;
 
             bool isHovered = i == _hoveredCurvePoint;
             bool isDragging = i == _draggingCurvePoint;
@@ -3798,6 +3837,11 @@ public class MainForm : Form
     {
         float x = (screenPt.X - bounds.Left) / bounds.Width;
         float y = (bounds.Bottom - screenPt.Y) / bounds.Height;
+
+        // If inverted, convert screen Y back to graph Y (uninvert)
+        if (_axisInverted)
+            y = 1f - y;
+
         return new SKPoint(Math.Clamp(x, 0, 1), Math.Clamp(y, 0, 1));
     }
 
@@ -3809,7 +3853,10 @@ public class MainForm : Form
         {
             var pt = _curveControlPoints[i];
             float x = bounds.Left + pt.X * bounds.Width;
-            float y = bounds.Bottom - pt.Y * bounds.Height;
+
+            // Apply inversion to display Y position to match the visual
+            float displayY = _axisInverted ? (1f - pt.Y) : pt.Y;
+            float y = bounds.Bottom - displayY * bounds.Height;
 
             float dist = MathF.Sqrt(MathF.Pow(screenPt.X - x, 2) + MathF.Pow(screenPt.Y - y, 2));
             if (dist <= HitRadius)
@@ -3978,10 +4025,135 @@ public class MainForm : Form
         }
 
         _curveControlPoints[_draggingCurvePoint] = graphPt;
+
+        // If symmetrical mode is enabled, mirror the change
+        if (_curveSymmetrical)
+        {
+            UpdateSymmetricalPoint(_draggingCurvePoint, graphPt);
+        }
+    }
+
+    /// <summary>
+    /// Update the symmetrical counterpart of a curve point.
+    /// Points are mirrored around the center (0.5, 0.5).
+    /// </summary>
+    private void UpdateSymmetricalPoint(int pointIndex, SKPoint graphPt)
+    {
+        // Mirror point: (x, y) -> (1-x, 1-y)
+        float mirrorX = 1f - graphPt.X;
+        float mirrorY = 1f - graphPt.Y;
+        var mirrorPt = new SKPoint(mirrorX, mirrorY);
+
+        // Find the corresponding mirror point in the list
+        // Points are stored sorted by X, so we need to find the one with matching mirror X
+        int mirrorIndex = FindMirrorPointIndex(pointIndex, mirrorX);
+
+        if (mirrorIndex >= 0 && mirrorIndex != pointIndex)
+        {
+            // Update mirror point, but constrain to valid range
+            if (mirrorIndex > 0 && mirrorIndex < _curveControlPoints.Count - 1)
+            {
+                // Interior point - constrain X between neighbors
+                float minX = _curveControlPoints[mirrorIndex - 1].X + 0.02f;
+                float maxX = _curveControlPoints[mirrorIndex + 1].X - 0.02f;
+                mirrorPt = new SKPoint(Math.Clamp(mirrorPt.X, minX, maxX), mirrorPt.Y);
+            }
+            else if (mirrorIndex == 0)
+            {
+                mirrorPt = new SKPoint(0, mirrorPt.Y);
+            }
+            else if (mirrorIndex == _curveControlPoints.Count - 1)
+            {
+                mirrorPt = new SKPoint(1, mirrorPt.Y);
+            }
+
+            _curveControlPoints[mirrorIndex] = mirrorPt;
+        }
+    }
+
+    /// <summary>
+    /// Find the index of the mirror point for symmetry.
+    /// Returns -1 if no suitable mirror point exists.
+    /// </summary>
+    private int FindMirrorPointIndex(int sourceIndex, float targetX)
+    {
+        // Special cases for endpoints
+        if (sourceIndex == 0) return _curveControlPoints.Count - 1;
+        if (sourceIndex == _curveControlPoints.Count - 1) return 0;
+
+        // For interior points, find the one closest to the mirror X position
+        int bestIndex = -1;
+        float bestDist = float.MaxValue;
+
+        for (int i = 0; i < _curveControlPoints.Count; i++)
+        {
+            if (i == sourceIndex) continue;
+
+            float dist = Math.Abs(_curveControlPoints[i].X - targetX);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+    }
+
+    /// <summary>
+    /// Make the current curve points symmetrical around the center.
+    /// </summary>
+    private void MakeCurveSymmetrical()
+    {
+        if (_curveControlPoints.Count < 2) return;
+
+        // Create a new symmetrical set of points
+        var newPoints = new List<SKPoint>();
+
+        // Always include start point
+        newPoints.Add(new SKPoint(0, 0));
+
+        // For each point in the left half (X < 0.5), create its mirror
+        var leftHalf = _curveControlPoints
+            .Where(p => p.X > 0 && p.X < 0.5f)
+            .OrderBy(p => p.X)
+            .ToList();
+
+        foreach (var pt in leftHalf)
+        {
+            newPoints.Add(pt);
+        }
+
+        // Add center point if there's one
+        var centerPoint = _curveControlPoints.FirstOrDefault(p => Math.Abs(p.X - 0.5f) < 0.02f);
+        if (centerPoint.X > 0.4f && centerPoint.X < 0.6f)
+        {
+            newPoints.Add(new SKPoint(0.5f, 0.5f)); // Center is always (0.5, 0.5) for perfect symmetry
+        }
+        else if (leftHalf.Count > 0)
+        {
+            // Add a center point if we have left half points
+            newPoints.Add(new SKPoint(0.5f, 0.5f));
+        }
+
+        // Add mirrored points from left half (in reverse order for right half)
+        for (int i = leftHalf.Count - 1; i >= 0; i--)
+        {
+            var pt = leftHalf[i];
+            newPoints.Add(new SKPoint(1f - pt.X, 1f - pt.Y));
+        }
+
+        // Always include end point
+        newPoints.Add(new SKPoint(1, 1));
+
+        _curveControlPoints = newPoints;
     }
 
     private void AddCurveControlPoint(SKPoint graphPt)
     {
+        // Don't add points at exact endpoints
+        if (graphPt.X <= 0.01f || graphPt.X >= 0.99f) return;
+
         // Find insertion position (maintain sorted order by X)
         int insertIndex = 0;
         for (int i = 0; i < _curveControlPoints.Count; i++)
@@ -3991,6 +4163,29 @@ public class MainForm : Form
         }
 
         _curveControlPoints.Insert(insertIndex, graphPt);
+
+        // If symmetrical mode is enabled, also add the mirror point
+        if (_curveSymmetrical)
+        {
+            float mirrorX = 1f - graphPt.X;
+            float mirrorY = 1f - graphPt.Y;
+
+            // Don't add if mirror point would be too close to existing point
+            bool tooClose = _curveControlPoints.Any(p => Math.Abs(p.X - mirrorX) < 0.04f);
+            if (!tooClose && mirrorX > 0.01f && mirrorX < 0.99f)
+            {
+                // Find insertion position for mirror point
+                int mirrorInsertIndex = 0;
+                for (int i = 0; i < _curveControlPoints.Count; i++)
+                {
+                    if (_curveControlPoints[i].X < mirrorX)
+                        mirrorInsertIndex = i + 1;
+                }
+
+                _curveControlPoints.Insert(mirrorInsertIndex, new SKPoint(mirrorX, mirrorY));
+            }
+        }
+
         _selectedCurveType = CurveType.Custom;
         _canvas.Invalidate();
     }
@@ -4031,6 +4226,19 @@ public class MainForm : Form
         if (_invertToggleBounds.Contains(pt))
         {
             _axisInverted = !_axisInverted;
+            _canvas.Invalidate();
+            return true;
+        }
+
+        // Check symmetrical checkbox (only for Custom curve)
+        if (!_curveSymmetricalCheckboxBounds.IsEmpty && _curveSymmetricalCheckboxBounds.Contains(pt))
+        {
+            _curveSymmetrical = !_curveSymmetrical;
+            if (_curveSymmetrical)
+            {
+                // When enabling symmetry, mirror existing points around center
+                MakeCurveSymmetrical();
+            }
             _canvas.Invalidate();
             return true;
         }
@@ -5085,6 +5293,315 @@ public class MainForm : Form
             Index = _selectedSourceControl,
             Value = 0
         };
+    }
+
+    /// <summary>
+    /// Create 1:1 mappings from the selected physical device to the selected vJoy device.
+    /// Maps all axes, buttons, and hats directly without any curves or modifications.
+    /// </summary>
+    private void CreateOneToOneMappings()
+    {
+        // Validate selection
+        if (_selectedDevice < 0 || _selectedDevice >= _devices.Count) return;
+
+        var physicalDevice = _devices[_selectedDevice];
+        if (physicalDevice.IsVirtual) return; // Only map physical devices
+
+        // Check if we have any vJoy devices
+        if (_vjoyDevices.Count == 0)
+        {
+            ShowVJoyConfigurationHelp(physicalDevice, noDevices: true);
+            return;
+        }
+
+        // Find the best vJoy device (one that can accommodate all controls)
+        var vjoyDevice = FindBestVJoyDevice(physicalDevice);
+        if (vjoyDevice == null)
+        {
+            // Use first available vJoy device but warn about capacity
+            vjoyDevice = _vjoyDevices[0];
+            int vjoyAxes = CountVJoyAxes(vjoyDevice);
+            int vjoyButtons = vjoyDevice.ButtonCount;
+            int vjoyPovs = vjoyDevice.ContPovCount + vjoyDevice.DiscPovCount;
+
+            if (vjoyAxes < physicalDevice.AxisCount ||
+                vjoyButtons < physicalDevice.ButtonCount ||
+                vjoyPovs < physicalDevice.HatCount)
+            {
+                var result = MessageBox.Show(this,
+                    $"No vJoy device has enough capacity for {physicalDevice.Name}.\n\n" +
+                    $"Physical device: {physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats\n" +
+                    $"Best vJoy (#{vjoyDevice.Id}): {vjoyAxes} axes, {vjoyButtons} buttons, {vjoyPovs} POVs\n\n" +
+                    "Do you want to create partial mappings with the available capacity?\n\n" +
+                    "Click 'No' to open vJoy configuration help.",
+                    "vJoy Capacity Warning",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Warning);
+
+                if (result == DialogResult.No)
+                {
+                    ShowVJoyConfigurationHelp(physicalDevice, noDevices: false);
+                    return;
+                }
+                else if (result == DialogResult.Cancel)
+                {
+                    return;
+                }
+                // Yes = continue with partial mappings
+            }
+        }
+
+        // Update selected vJoy device index
+        _selectedVJoyDeviceIndex = _vjoyDevices.IndexOf(vjoyDevice);
+
+        // Ensure we have an active profile
+        var profile = _profileService.ActiveProfile;
+        if (profile == null)
+        {
+            profile = _profileService.CreateAndActivateProfile($"1:1 - {physicalDevice.Name}");
+        }
+
+        // Build device ID for InputSource (using GUID)
+        string deviceId = physicalDevice.InstanceGuid.ToString();
+
+        // Remove any existing mappings from this device to this vJoy device
+        profile.AxisMappings.RemoveAll(m =>
+            m.Inputs.Any(i => i.DeviceId == deviceId) &&
+            m.Output.VJoyDevice == vjoyDevice.Id);
+        profile.ButtonMappings.RemoveAll(m =>
+            m.Inputs.Any(i => i.DeviceId == deviceId) &&
+            m.Output.VJoyDevice == vjoyDevice.Id);
+        profile.HatMappings.RemoveAll(m =>
+            m.Inputs.Any(i => i.DeviceId == deviceId) &&
+            m.Output.VJoyDevice == vjoyDevice.Id);
+
+        // Create axis mappings (map up to the number of axes on the vJoy device)
+        int vJoyAxisCount = CountVJoyAxes(vjoyDevice);
+        int axesToMap = Math.Min(physicalDevice.AxisCount, vJoyAxisCount);
+
+        for (int i = 0; i < axesToMap; i++)
+        {
+            var mapping = new AxisMapping
+            {
+                Name = $"{physicalDevice.Name} Axis {i} -> vJoy {vjoyDevice.Id} Axis {i}",
+                Inputs = new List<InputSource>
+                {
+                    new InputSource
+                    {
+                        DeviceId = deviceId,
+                        DeviceName = physicalDevice.Name,
+                        Type = InputType.Axis,
+                        Index = i
+                    }
+                },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyAxis,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = i
+                },
+                Curve = new AxisCurve { Type = CurveType.Linear }
+            };
+            profile.AxisMappings.Add(mapping);
+        }
+
+        // Create button mappings
+        int buttonsToMap = Math.Min(physicalDevice.ButtonCount, vjoyDevice.ButtonCount);
+
+        for (int i = 0; i < buttonsToMap; i++)
+        {
+            var mapping = new ButtonMapping
+            {
+                Name = $"{physicalDevice.Name} Btn {i + 1} -> vJoy {vjoyDevice.Id} Btn {i + 1}",
+                Inputs = new List<InputSource>
+                {
+                    new InputSource
+                    {
+                        DeviceId = deviceId,
+                        DeviceName = physicalDevice.Name,
+                        Type = InputType.Button,
+                        Index = i
+                    }
+                },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyButton,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = i
+                },
+                Mode = ButtonMode.Normal
+            };
+            profile.ButtonMappings.Add(mapping);
+        }
+
+        // Create hat/POV mappings
+        int hatsToMap = Math.Min(physicalDevice.HatCount, vjoyDevice.ContPovCount + vjoyDevice.DiscPovCount);
+
+        for (int i = 0; i < hatsToMap; i++)
+        {
+            var mapping = new HatMapping
+            {
+                Name = $"{physicalDevice.Name} Hat {i} -> vJoy {vjoyDevice.Id} POV {i}",
+                Inputs = new List<InputSource>
+                {
+                    new InputSource
+                    {
+                        DeviceId = deviceId,
+                        DeviceName = physicalDevice.Name,
+                        Type = InputType.Hat,
+                        Index = i
+                    }
+                },
+                Output = new OutputTarget
+                {
+                    Type = OutputType.VJoyPov,
+                    VJoyDevice = vjoyDevice.Id,
+                    Index = i
+                },
+                UseContinuous = vjoyDevice.ContPovCount > i
+            };
+            profile.HatMappings.Add(mapping);
+        }
+
+        // Save the profile
+        _profileService.SaveActiveProfile();
+
+        // Refresh profiles list
+        _profiles = _profileService.ListProfiles();
+
+        // Switch to Mappings tab to show the new mappings
+        _activeTab = 1;
+        _canvas.Invalidate();
+    }
+
+    /// <summary>
+    /// Count the number of axes configured on a vJoy device
+    /// </summary>
+    private int CountVJoyAxes(VJoyDeviceInfo vjoy)
+    {
+        int count = 0;
+        if (vjoy.HasAxisX) count++;
+        if (vjoy.HasAxisY) count++;
+        if (vjoy.HasAxisZ) count++;
+        if (vjoy.HasAxisRX) count++;
+        if (vjoy.HasAxisRY) count++;
+        if (vjoy.HasAxisRZ) count++;
+        if (vjoy.HasSlider0) count++;
+        if (vjoy.HasSlider1) count++;
+        return count;
+    }
+
+    /// <summary>
+    /// Find the best vJoy device that can accommodate all controls from the physical device
+    /// </summary>
+    private VJoyDeviceInfo? FindBestVJoyDevice(PhysicalDeviceInfo physical)
+    {
+        VJoyDeviceInfo? best = null;
+        int bestScore = -1;
+
+        foreach (var vjoy in _vjoyDevices)
+        {
+            int axes = CountVJoyAxes(vjoy);
+            int buttons = vjoy.ButtonCount;
+            int povs = vjoy.ContPovCount + vjoy.DiscPovCount;
+
+            // Check if this vJoy can accommodate all controls
+            if (axes >= physical.AxisCount &&
+                buttons >= physical.ButtonCount &&
+                povs >= physical.HatCount)
+            {
+                // Score based on how close the match is (lower excess = better)
+                int excess = (axes - physical.AxisCount) +
+                            (buttons - physical.ButtonCount) +
+                            (povs - physical.HatCount);
+                int score = 1000 - excess; // Higher score = better match
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = vjoy;
+                }
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Show help dialog for vJoy configuration with recommended settings
+    /// </summary>
+    private void ShowVJoyConfigurationHelp(PhysicalDeviceInfo physical, bool noDevices)
+    {
+        string message;
+        if (noDevices)
+        {
+            message = "No vJoy devices are configured.\n\n";
+        }
+        else
+        {
+            message = "No vJoy device has enough capacity for this physical device.\n\n";
+        }
+
+        message += $"To create a 1:1 mapping for {physical.Name}, configure a vJoy device with:\n\n" +
+                   $"  Axes: {physical.AxisCount} (X, Y, Z, Rx, Ry, Rz, Slider, Dial)\n" +
+                   $"  Buttons: {physical.ButtonCount}\n" +
+                   $"  POV Hats: {physical.HatCount} (Continuous recommended)\n\n" +
+                   "Would you like to open the vJoy Configuration utility?";
+
+        var result = MessageBox.Show(this, message, "vJoy Configuration Required",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+        if (result == DialogResult.Yes)
+        {
+            LaunchVJoyConfigurator();
+        }
+    }
+
+    /// <summary>
+    /// Attempt to launch the vJoy configuration utility
+    /// </summary>
+    private void LaunchVJoyConfigurator()
+    {
+        // Common vJoy installation paths
+        string[] possiblePaths = new[]
+        {
+            @"C:\Program Files\vJoy\x64\vJoyConf.exe",
+            @"C:\Program Files\vJoy\x86\vJoyConf.exe",
+            @"C:\Program Files (x86)\vJoy\x64\vJoyConf.exe",
+            @"C:\Program Files (x86)\vJoy\x86\vJoyConf.exe"
+        };
+
+        string? vjoyConfPath = possiblePaths.FirstOrDefault(File.Exists);
+
+        if (vjoyConfPath != null)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = vjoyConfPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this,
+                    $"Failed to launch vJoy Configurator:\n{ex.Message}",
+                    "Launch Failed",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+        else
+        {
+            MessageBox.Show(this,
+                "vJoy Configuration utility (vJoyConf.exe) was not found.\n\n" +
+                "Please install vJoy from:\nhttps://github.com/jshafer817/vJoy/releases\n\n" +
+                "Or manually run vJoyConf.exe from your vJoy installation folder.",
+                "vJoy Not Found",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
     }
 
     private void CreateBindingForRow(int rowIndex, DetectedInput input)
@@ -6344,6 +6861,44 @@ public class MainForm : Form
                     filteredDevices[i].Name, "ONLINE", actualIndex == _selectedDevice, actualIndex == _hoveredDevice);
                 itemY += itemHeight + itemGap;
             }
+        }
+
+        // "Map 1:1 to vJoy" button (only for physical devices with a device selected)
+        if (_deviceCategory == 0 && _selectedDevice >= 0 && _selectedDevice < _devices.Count && !_devices[_selectedDevice].IsVirtual)
+        {
+            float buttonY = bounds.Bottom - pad - 65;
+            float buttonWidth = contentBounds.Width - pad * 2;
+            float buttonHeight = 32f;
+            _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, buttonY, contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
+
+            // Button background
+            var buttonBgColor = _map1to1ButtonHovered ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2.WithAlpha(80);
+            using var buttonBgPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = buttonBgColor,
+                IsAntialias = true
+            };
+            canvas.DrawRect(_map1to1ButtonBounds, buttonBgPaint);
+
+            // Button border
+            var buttonBorderColor = _map1to1ButtonHovered ? FUIColors.Active : FUIColors.Frame;
+            using var buttonBorderPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = buttonBorderColor,
+                StrokeWidth = 1f,
+                IsAntialias = true
+            };
+            canvas.DrawRect(_map1to1ButtonBounds, buttonBorderPaint);
+
+            // Button text
+            var buttonTextColor = _map1to1ButtonHovered ? FUIColors.Active : FUIColors.TextPrimary;
+            FUIRenderer.DrawTextCentered(canvas, "MAP 1:1 TO VJOY", _map1to1ButtonBounds, buttonTextColor, 11f);
+        }
+        else
+        {
+            _map1to1ButtonBounds = SKRect.Empty;
         }
 
         // "Scan for devices" prompt

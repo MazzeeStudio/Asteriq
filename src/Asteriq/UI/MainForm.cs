@@ -176,6 +176,45 @@ public class MainForm : Form
     private bool _saveButtonHovered;
     private bool _cancelButtonHovered;
 
+    // Curve editor state
+    private SKRect _curveEditorBounds;
+    private List<SKPoint> _curveControlPoints = new() { new(0, 0), new(1, 1) };
+    private int _hoveredCurvePoint = -1;
+    private int _draggingCurvePoint = -1;
+    private CurveType _selectedCurveType = CurveType.Linear;
+
+    // Deadzone state (4-parameter model like JoystickGremlinEx)
+    private float _deadzoneMin = -1.0f;        // Left edge (start)
+    private float _deadzoneCenterMin = 0.0f;   // Center left (start of center deadzone)
+    private float _deadzoneCenterMax = 0.0f;   // Center right (end of center deadzone)
+    private float _deadzoneMax = 1.0f;         // Right edge (end)
+    private bool _deadzoneCenterEnabled = false; // Whether center deadzone handles are shown
+
+    // Deadzone UI bounds
+    private SKRect _deadzoneSliderBounds;
+    private SKRect _deadzoneCenterCheckboxBounds; // "Centre" toggle checkbox
+    private SKRect[] _deadzonePresetBounds = new SKRect[4]; // Presets: 0%, 2%, 5%, 10%
+    private int _draggingDeadzoneHandle = -1; // 0=min, 1=centerMin, 2=centerMax, 3=max
+    private int _selectedDeadzoneHandle = -1; // Currently selected handle for preset application
+
+    // Legacy compatibility
+    private float _axisDeadzone
+    {
+        get => Math.Max(Math.Abs(_deadzoneCenterMin), Math.Abs(_deadzoneCenterMax));
+        set
+        {
+            _deadzoneCenterMin = -Math.Abs(value);
+            _deadzoneCenterMax = Math.Abs(value);
+        }
+    }
+
+    private SKRect[] _curvePresetBounds = new SKRect[4]; // Bounds for Linear, S-Curve, Expo, Custom buttons
+    private SKRect _invertToggleBounds;
+    private bool _axisInverted = false;
+
+    // Theme selector state
+    private SKRect[] _themeButtonBounds = new SKRect[4];
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -823,6 +862,7 @@ public class MainForm : Form
         _canvas.PaintSurface += OnPaintSurface;
         _canvas.MouseMove += OnCanvasMouseMove;
         _canvas.MouseDown += OnCanvasMouseDown;
+        _canvas.MouseUp += OnCanvasMouseUp;
         _canvas.MouseLeave += OnCanvasMouseLeave;
         _canvas.MouseWheel += OnCanvasMouseWheel;
         Controls.Add(_canvas);
@@ -1078,6 +1118,43 @@ public class MainForm : Form
                     _keyCaptureBoundsHovered = true;
                     Cursor = Cursors.Hand;
                     return;
+                }
+            }
+
+            // Right panel: Curve editor handling (for axis rows)
+            if (_selectedMappingRow >= 0 && _selectedMappingRow < 8)
+            {
+                var pt = new SKPoint(e.X, e.Y);
+
+                // Handle dragging operations
+                if (_draggingCurvePoint >= 0)
+                {
+                    UpdateDraggedCurvePoint(pt);
+                    _canvas.Invalidate();
+                    return;
+                }
+                if (_draggingDeadzoneHandle >= 0)
+                {
+                    UpdateDraggedDeadzoneHandle(pt);
+                    _canvas.Invalidate();
+                    return;
+                }
+                // Check curve point hover
+                if (_selectedCurveType == CurveType.Custom && _curveEditorBounds.Contains(pt))
+                {
+                    int newHovered = FindCurvePointAt(pt, _curveEditorBounds);
+                    if (newHovered != _hoveredCurvePoint)
+                    {
+                        _hoveredCurvePoint = newHovered;
+                        Cursor = newHovered >= 0 ? Cursors.Hand : Cursors.Cross;
+                        _canvas.Invalidate();
+                    }
+                    return;
+                }
+                else if (_hoveredCurvePoint >= 0)
+                {
+                    _hoveredCurvePoint = -1;
+                    _canvas.Invalidate();
                 }
             }
 
@@ -1360,6 +1437,12 @@ public class MainForm : Form
             }
         }
 
+        // Settings tab click handling
+        if (_activeTab == 3)
+        {
+            HandleSettingsTabClick(new SKPoint(e.X, e.Y));
+        }
+
         // Mappings tab click handling
         if (_activeTab == 1)
         {
@@ -1409,6 +1492,51 @@ public class MainForm : Form
             {
                 _isCapturingKey = true;
                 return;
+            }
+
+            // Right panel: Axis settings - curve type selection
+            if (_selectedMappingRow >= 0 && _selectedMappingRow < 8)
+            {
+                // Check curve preset clicks
+                var pt = new SKPoint(e.X, e.Y);
+                if (HandleCurvePresetClick(pt))
+                    return;
+
+                // Check for curve control point drag start
+                if (_selectedCurveType == CurveType.Custom && _curveEditorBounds.Contains(pt))
+                {
+                    int pointIndex = FindCurvePointAt(pt, _curveEditorBounds);
+                    if (pointIndex >= 0)
+                    {
+                        _draggingCurvePoint = pointIndex;
+                        return;
+                    }
+                    else
+                    {
+                        // Click in curve area but not on point - add new point
+                        var graphPt = CurveScreenToGraph(pt, _curveEditorBounds);
+                        AddCurveControlPoint(graphPt);
+                        return;
+                    }
+                }
+
+                // Check deadzone handle click - select and start drag
+                int dzHandle = FindDeadzoneHandleAt(pt);
+                if (dzHandle >= 0)
+                {
+                    _selectedDeadzoneHandle = dzHandle;
+                    _draggingDeadzoneHandle = dzHandle;
+                    _canvas.Invalidate();
+                    return;
+                }
+
+                // Click on slider background (not on handle) - deselect
+                if (_deadzoneSliderBounds.Contains(pt))
+                {
+                    _selectedDeadzoneHandle = -1;
+                    _canvas.Invalidate();
+                    return;
+                }
             }
 
             // Left panel: vJoy device navigation
@@ -1483,6 +1611,18 @@ public class MainForm : Form
         _hoveredDevice = -1;
         _hoveredWindowControl = -1;
         _hoveredControlId = null;
+        _draggingCurvePoint = -1;
+        _draggingDeadzoneHandle = -1;
+    }
+
+    private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
+    {
+        if (_draggingCurvePoint >= 0 || _draggingDeadzoneHandle >= 0)
+        {
+            _draggingCurvePoint = -1;
+            _draggingDeadzoneHandle = -1;
+            _canvas.Invalidate();
+        }
     }
 
     private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
@@ -1572,6 +1712,10 @@ public class MainForm : Form
         {
             DrawMappingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
         }
+        else if (_activeTab == 3) // SETTINGS tab
+        {
+            DrawSettingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
+        }
         else
         {
             // Default: Device tab layout
@@ -1590,6 +1734,356 @@ public class MainForm : Form
 
         // Status bar
         DrawStatusBar(canvas, bounds);
+    }
+
+    private void DrawSettingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
+    {
+        float frameInset = 5f;
+        var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
+
+        // Two-panel layout: Left (profile management) | Right (application settings)
+        float leftPanelWidth = 400f;
+        float rightPanelWidth = contentBounds.Width - leftPanelWidth - 15;
+
+        var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
+            contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
+        var rightBounds = new SKRect(leftBounds.Right + 15, contentBounds.Top,
+            contentBounds.Right, contentBounds.Bottom);
+
+        // LEFT PANEL - Profile Management
+        DrawProfileManagementPanel(canvas, leftBounds, frameInset);
+
+        // RIGHT PANEL - Application Settings
+        DrawApplicationSettingsPanel(canvas, rightBounds, frameInset);
+    }
+
+    private void DrawProfileManagementPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+
+        float y = bounds.Top + frameInset + 15;
+        float leftMargin = bounds.Left + frameInset + 15;
+        float rightMargin = bounds.Right - frameInset - 15;
+        float width = rightMargin - leftMargin;
+
+        // Title
+        FUIRenderer.DrawText(canvas, "PROFILE MANAGEMENT", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += 30;
+
+        // Current profile info
+        var profile = _profileService.ActiveProfile;
+        if (profile != null)
+        {
+            // Active profile header
+            FUIRenderer.DrawText(canvas, "ACTIVE PROFILE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 18;
+
+            // Profile name with highlight
+            var nameBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
+            using var nameBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30) };
+            canvas.DrawRoundRect(nameBounds, 4, 4, nameBgPaint);
+
+            using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
+            canvas.DrawRoundRect(nameBounds, 4, 4, nameFramePaint);
+
+            FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextBright, 13f, true);
+            y += 45;
+
+            // Profile stats
+            FUIRenderer.DrawText(canvas, "STATISTICS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 18;
+
+            DrawProfileStat(canvas, leftMargin, y, "Axis Mappings", profile.AxisMappings.Count.ToString());
+            y += 22;
+            DrawProfileStat(canvas, leftMargin, y, "Button Mappings", profile.ButtonMappings.Count.ToString());
+            y += 22;
+            DrawProfileStat(canvas, leftMargin, y, "Hat Mappings", profile.HatMappings.Count.ToString());
+            y += 22;
+            DrawProfileStat(canvas, leftMargin, y, "Shift Layers", profile.ShiftLayers.Count.ToString());
+            y += 30;
+
+            // Timestamps
+            DrawProfileStat(canvas, leftMargin, y, "Created", profile.CreatedAt.ToLocalTime().ToString("g"));
+            y += 22;
+            DrawProfileStat(canvas, leftMargin, y, "Modified", profile.ModifiedAt.ToLocalTime().ToString("g"));
+            y += 35;
+        }
+        else
+        {
+            // No profile active
+            FUIRenderer.DrawText(canvas, "No profile active", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+            y += 40;
+        }
+
+        // Actions section
+        FUIRenderer.DrawText(canvas, "ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        // Action buttons
+        float buttonHeight = 32f;
+        float buttonGap = 10f;
+
+        // New Profile button
+        DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "New Profile", false);
+        // Duplicate button
+        DrawSettingsButton(canvas, new SKRect(rightMargin - (width - buttonGap) / 2, y, rightMargin, y + buttonHeight),
+            profile != null ? "Duplicate" : "---", profile == null);
+        y += buttonHeight + buttonGap;
+
+        // Import/Export buttons
+        DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "Import", false);
+        DrawSettingsButton(canvas, new SKRect(rightMargin - (width - buttonGap) / 2, y, rightMargin, y + buttonHeight),
+            profile != null ? "Export" : "---", profile == null);
+        y += buttonHeight + buttonGap;
+
+        // Delete button (danger)
+        if (profile != null)
+        {
+            var deleteBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
+            using var delBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(30) };
+            canvas.DrawRoundRect(deleteBounds, 4, 4, delBgPaint);
+
+            using var delFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Danger.WithAlpha(150), StrokeWidth = 1f };
+            canvas.DrawRoundRect(deleteBounds, 4, 4, delFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, "Delete Profile", deleteBounds, FUIColors.Danger, 11f);
+            y += buttonHeight + 25;
+
+            // Shift Layers section
+            DrawShiftLayersSection(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 15, profile);
+        }
+    }
+
+    private void DrawShiftLayersSection(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom, MappingProfile profile)
+    {
+        float width = rightMargin - leftMargin;
+
+        // Section header
+        FUIRenderer.DrawText(canvas, "SHIFT LAYERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 18;
+
+        // Shift layers explanation
+        FUIRenderer.DrawText(canvas, "Hold a button to activate alternative mappings", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        y += 22;
+
+        // List existing shift layers
+        float layerRowHeight = 36f;
+        foreach (var layer in profile.ShiftLayers)
+        {
+            if (y + layerRowHeight > bottom - 50) break;
+
+            // Layer row background
+            var rowBounds = new SKRect(leftMargin, y, rightMargin, y + layerRowHeight - 4);
+            using var rowBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+            canvas.DrawRoundRect(rowBounds, 4, 4, rowBgPaint);
+
+            using var rowFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+            canvas.DrawRoundRect(rowBounds, 4, 4, rowFramePaint);
+
+            // Layer name
+            FUIRenderer.DrawText(canvas, layer.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextPrimary, 11f);
+
+            // Activator button info
+            string activatorText = layer.ActivatorButton != null
+                ? $"Button {layer.ActivatorButton.Index + 1} on {layer.ActivatorButton.DeviceName}"
+                : "Not assigned";
+            FUIRenderer.DrawText(canvas, activatorText, new SKPoint(leftMargin + 100, y + 11),
+                layer.ActivatorButton != null ? FUIColors.TextDim : FUIColors.Warning.WithAlpha(150), 9f);
+
+            // Delete button
+            float delSize = 20f;
+            var delBounds = new SKRect(rightMargin - delSize - 8, y + (layerRowHeight - delSize) / 2 - 2,
+                rightMargin - 8, y + (layerRowHeight + delSize) / 2 - 2);
+
+            using var delPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(60) };
+            canvas.DrawRoundRect(delBounds, 2, 2, delPaint);
+            FUIRenderer.DrawTextCentered(canvas, "x", delBounds, FUIColors.Danger, 12f);
+
+            y += layerRowHeight;
+        }
+
+        // Add new layer button
+        if (y + 35 < bottom)
+        {
+            var addBounds = new SKRect(leftMargin, y, rightMargin, y + 30);
+            using var addBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Success.WithAlpha(20) };
+            canvas.DrawRoundRect(addBounds, 4, 4, addBgPaint);
+
+            using var addFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Success.WithAlpha(100), StrokeWidth = 1f };
+            canvas.DrawRoundRect(addBounds, 4, 4, addFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, "+ Add Shift Layer", addBounds, FUIColors.Success, 11f);
+        }
+    }
+
+    private void DrawProfileStat(SKCanvas canvas, float x, float y, string label, string value)
+    {
+        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, value, new SKPoint(x + 120, y), FUIColors.TextPrimary, 10f);
+    }
+
+    private void DrawSettingsButton(SKCanvas canvas, SKRect bounds, string text, bool disabled)
+    {
+        var bgColor = disabled ? FUIColors.Background2.WithAlpha(100) : FUIColors.Background2;
+        var frameColor = disabled ? FUIColors.Frame.WithAlpha(80) : FUIColors.Frame;
+        var textColor = disabled ? FUIColors.TextDim.WithAlpha(100) : FUIColors.TextPrimary;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
+
+        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
+        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+    }
+
+    private void DrawApplicationSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+
+        float y = bounds.Top + frameInset + 15;
+        float leftMargin = bounds.Left + frameInset + 15;
+        float rightMargin = bounds.Right - frameInset - 15;
+
+        // Title
+        FUIRenderer.DrawText(canvas, "APPLICATION SETTINGS", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += 35;
+
+        // Auto-load setting
+        FUIRenderer.DrawText(canvas, "Auto-load last profile on startup", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
+        DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + 24), _profileService.AutoLoadLastProfile);
+        y += 40;
+
+        // Theme section
+        FUIRenderer.DrawText(canvas, "THEME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        FUITheme[] themeValues = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
+        string[] themeNames = { "MIDNIGHT", "MATRIX", "AMBER", "ICE" };
+        float themeButtonWidth = (rightMargin - leftMargin - 9) / themeNames.Length;
+        float themeButtonHeight = 28f;
+
+        for (int i = 0; i < themeNames.Length; i++)
+        {
+            var themeBounds = new SKRect(
+                leftMargin + i * (themeButtonWidth + 3), y,
+                leftMargin + i * (themeButtonWidth + 3) + themeButtonWidth, y + themeButtonHeight);
+
+            // Store bounds for click handling
+            StoreThemeButtonBounds(i, themeBounds);
+
+            bool isActive = FUIColors.CurrentTheme == themeValues[i];
+
+            // Theme preview colors
+            var previewColor = i switch
+            {
+                0 => new SKColor(0x40, 0xA0, 0xFF), // Midnight - blue
+                1 => new SKColor(0x40, 0xFF, 0x40), // Matrix - green
+                2 => new SKColor(0xFF, 0xA0, 0x40), // Amber - orange
+                3 => new SKColor(0x40, 0xE0, 0xFF), // Ice - cyan
+                _ => FUIColors.Active
+            };
+
+            var bgColor = isActive ? previewColor.WithAlpha(60) : FUIColors.Background2;
+            var frameColor = isActive ? previewColor : FUIColors.Frame;
+            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+            using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(themeBounds, themeBgPaint);
+
+            using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
+            canvas.DrawRect(themeBounds, themeFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, themeNames[i], themeBounds, textColor, 9f);
+
+            // Color indicator bar
+            var indicatorBounds = new SKRect(themeBounds.Left + 5, themeBounds.Bottom - 4,
+                themeBounds.Right - 5, themeBounds.Bottom - 2);
+            using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
+            canvas.DrawRect(indicatorBounds, indicatorPaint);
+        }
+        y += themeButtonHeight + 25;
+
+        // vJoy section
+        FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        var devices = _vjoyService.EnumerateDevices();
+        bool vjoyEnabled = devices.Count > 0;
+        string vjoyStatus = vjoyEnabled ? "Driver installed and active" : "Driver not available";
+        var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
+
+        using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
+        canvas.DrawCircle(leftMargin + 5, y + 6, 4, statusDot);
+        FUIRenderer.DrawText(canvas, vjoyStatus, new SKPoint(leftMargin + 16, y), vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
+        y += 25;
+
+        if (vjoyEnabled)
+        {
+            FUIRenderer.DrawText(canvas, $"Available devices: {devices.Count}", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        }
+        y += 35;
+
+        // Keyboard simulation section
+        FUIRenderer.DrawText(canvas, "KEYBOARD OUTPUT", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 20;
+
+        FUIRenderer.DrawText(canvas, "Key repeat delay (ms)", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
+        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + 26), "50");
+        y += 35;
+
+        FUIRenderer.DrawText(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
+        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + 26), "30");
+    }
+
+    private void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
+    {
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRoundRect(bounds, 3, 3, bgPaint);
+
+        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        canvas.DrawRoundRect(bounds, 3, 3, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, value, bounds, FUIColors.TextPrimary, 11f);
+    }
+
+    private void StoreThemeButtonBounds(int index, SKRect bounds)
+    {
+        if (index >= 0 && index < _themeButtonBounds.Length)
+        {
+            _themeButtonBounds[index] = bounds;
+        }
+    }
+
+    private void HandleSettingsTabClick(SKPoint pt)
+    {
+        // Check theme button clicks
+        FUITheme[] themes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
+        for (int i = 0; i < _themeButtonBounds.Length; i++)
+        {
+            if (_themeButtonBounds[i].Contains(pt))
+            {
+                FUIColors.SetTheme(themes[i]);
+                _canvas.Invalidate();
+                return;
+            }
+        }
     }
 
     private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
@@ -2257,58 +2751,336 @@ public class MainForm : Form
     {
         float width = rightMargin - leftMargin;
 
-        // Response Curve section
+        // Response Curve header
         FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += 20;
+        y += 18;
 
-        // Curve type selector with arrows
-        float curveSelectWidth = width;
-        float arrowSize = 28f;
-        var prevCurveBounds = new SKRect(leftMargin, y, leftMargin + arrowSize, y + arrowSize);
-        var nextCurveBounds = new SKRect(rightMargin - arrowSize, y, rightMargin, y + arrowSize);
+        // Centre and Invert checkboxes on their own row (label on left, checkbox on right)
+        float checkboxSize = 12f;
+        float rowHeight = 16f;
+        float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
+        float textY = y + rowHeight / 2 + 3; // Center text baseline (font size 9 has ~6px ascent)
 
-        DrawArrowButton(canvas, prevCurveBounds, "◀", false, true);
-        DrawArrowButton(canvas, nextCurveBounds, "▶", false, true);
+        // Invert checkbox (rightmost) - label then checkbox
+        float invertCheckX = rightMargin - checkboxSize;
+        _invertToggleBounds = new SKRect(invertCheckX, checkboxY, invertCheckX + checkboxSize, checkboxY + checkboxSize);
+        DrawCheckbox(canvas, _invertToggleBounds, _axisInverted);
+        FUIRenderer.DrawText(canvas, "Invert", new SKPoint(invertCheckX - 38, textY), FUIColors.TextDim, 9f);
 
-        // Curve name in center
-        string curveName = "Linear";  // Would come from selected mapping
-        FUIRenderer.DrawTextCentered(canvas, curveName,
-            new SKRect(leftMargin + arrowSize + 5, y, rightMargin - arrowSize - 5, y + arrowSize),
-            FUIColors.TextPrimary, 12f);
-        y += arrowSize + 15;
+        // Centre checkbox (left of Invert) - label then checkbox
+        float centreCheckX = invertCheckX - 75;
+        _deadzoneCenterCheckboxBounds = new SKRect(centreCheckX, checkboxY, centreCheckX + checkboxSize, checkboxY + checkboxSize);
+        DrawCheckbox(canvas, _deadzoneCenterCheckboxBounds, _deadzoneCenterEnabled);
+        FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - 42, textY), FUIColors.TextDim, 9f);
 
-        // Curve visualization
-        float curveHeight = 120f;
-        var curveBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
-        DrawCurveVisualization(canvas, curveBounds);
-        y += curveHeight + 20;
+        y += rowHeight + 6;
 
-        // Deadzone slider
-        if (y + 50 < bottom)
+        // Curve preset buttons - store bounds for click handling
+        string[] presets = { "LINEAR", "S-CURVE", "EXPO", "CUSTOM" };
+        float buttonWidth = (width - 9) / presets.Length;
+        float buttonHeight = 22f;
+
+        for (int i = 0; i < presets.Length; i++)
         {
+            var presetBounds = new SKRect(
+                leftMargin + i * (buttonWidth + 3), y,
+                leftMargin + i * (buttonWidth + 3) + buttonWidth, y + buttonHeight);
+
+            // Store bounds for click detection
+            _curvePresetBounds[i] = presetBounds;
+
+            CurveType presetType = i switch
+            {
+                0 => CurveType.Linear,
+                1 => CurveType.SCurve,
+                2 => CurveType.Exponential,
+                _ => CurveType.Custom
+            };
+
+            bool isActive = _selectedCurveType == presetType;
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
+            var frameColor = isActive ? FUIColors.Active : FUIColors.Frame;
+            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(presetBounds, bgPaint);
+
+            using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
+            canvas.DrawRect(presetBounds, framePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 8f);
+        }
+        y += buttonHeight + 12;
+
+        // Curve editor visualization
+        float curveHeight = 140f;
+        _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
+        DrawCurveVisualization(canvas, _curveEditorBounds);
+        y += curveHeight + 18;
+
+        // Deadzone section
+        if (y + 100 < bottom)
+        {
+            // Header row: "DEADZONE" label + preset buttons + selected handle indicator
             FUIRenderer.DrawText(canvas, "DEADZONE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            FUIRenderer.DrawText(canvas, "5%", new SKPoint(rightMargin - 25, y), FUIColors.TextPrimary, 10f);
-            y += 18;
-            DrawSlider(canvas, new SKRect(leftMargin, y, rightMargin, y + 8), 0.05f);
-            y += 25;
+
+            // Preset buttons - always visible, apply to selected handle
+            string[] presetLabels = { "0%", "2%", "5%", "10%" };
+            float presetBtnWidth = 32f;
+            float presetStartX = rightMargin - (presetBtnWidth * 4 + 9);
+
+            for (int col = 0; col < 4; col++)
+            {
+                var btnBounds = new SKRect(
+                    presetStartX + col * (presetBtnWidth + 3), y - 2,
+                    presetStartX + col * (presetBtnWidth + 3) + presetBtnWidth, y + 14);
+                _deadzonePresetBounds[col] = btnBounds;
+
+                // Dim buttons if no handle selected
+                bool enabled = _selectedDeadzoneHandle >= 0;
+                using var btnBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+                canvas.DrawRect(btnBounds, btnBg);
+                using var btnFrame = new SKPaint { Style = SKPaintStyle.Stroke, Color = enabled ? FUIColors.Frame : FUIColors.Frame.WithAlpha(100), StrokeWidth = 1f };
+                canvas.DrawRect(btnBounds, btnFrame);
+                FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 9f);
+            }
+
+            // Show which handle is selected (if any)
+            if (_selectedDeadzoneHandle >= 0)
+            {
+                string[] handleNames = { "Start", "Ctr-", "Ctr+", "End" };
+                string selectedName = handleNames[_selectedDeadzoneHandle];
+                FUIRenderer.DrawText(canvas, $"[{selectedName}]", new SKPoint(presetStartX - 45, y), FUIColors.Active, 9f);
+            }
+            y += 22;
+
+            // Dual deadzone slider (always shows min/max, optionally shows center handles)
+            float sliderHeight = 24f;
+            _deadzoneSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
+            DrawDualDeadzoneSlider(canvas, _deadzoneSliderBounds);
+            y += sliderHeight + 8;
+
+            // Value labels - fixed positions at track edges (prevents collision)
+            if (_deadzoneCenterEnabled)
+            {
+                // Two-track layout - fixed positions at each track edge
+                float gap = 24f;
+                float centerX = _deadzoneSliderBounds.MidX;
+                float leftTrackRight = centerX - gap / 2;
+                float rightTrackLeft = centerX + gap / 2;
+
+                // Min at left edge, CtrMin at right edge of left track
+                // CtrMax at left edge of right track, Max at right edge
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMin:F2}", new SKPoint(leftTrackRight - 25, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMax:F2}", new SKPoint(rightTrackLeft, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 9f);
+            }
+            else
+            {
+                // Single track - just show start and end at edges
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 9f);
+            }
+        }
+    }
+
+    private void DrawDualDeadzoneSlider(SKCanvas canvas, SKRect bounds)
+    {
+        // Convert -1..1 values to 0..1 for display
+        float minPos = (_deadzoneMin + 1f) / 2f;
+        float centerMinPos = (_deadzoneCenterMin + 1f) / 2f;
+        float centerMaxPos = (_deadzoneCenterMax + 1f) / 2f;
+        float maxPos = (_deadzoneMax + 1f) / 2f;
+
+        float handleRadius = 8f;
+        float trackHeight = 8f;
+        float trackY = bounds.MidY - trackHeight / 2;
+
+        using var trackBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var trackFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        using var activePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(150) };
+
+        if (_deadzoneCenterEnabled)
+        {
+            // Two physically separate tracks like JoystickGremlinEx
+            // Gap must be > 2 * handleRadius so handles never overlap when both at center
+            float gap = 24f;
+            float centerX = bounds.MidX;
+
+            // Left track: from bounds.Left to centerX - gap/2
+            var leftTrack = new SKRect(bounds.Left, trackY, centerX - gap / 2, trackY + trackHeight);
+            canvas.DrawRoundRect(leftTrack, 4, 4, trackBgPaint);
+            canvas.DrawRoundRect(leftTrack, 4, 4, trackFramePaint);
+
+            // Right track: from centerX + gap/2 to bounds.Right
+            var rightTrack = new SKRect(centerX + gap / 2, trackY, bounds.Right, trackY + trackHeight);
+            canvas.DrawRoundRect(rightTrack, 4, 4, trackBgPaint);
+            canvas.DrawRoundRect(rightTrack, 4, 4, trackFramePaint);
+
+            // Active fill on left track (from min handle to center-min handle)
+            float leftTrackWidth = leftTrack.Width;
+            float minPosInLeft = (minPos - 0f) / 0.5f; // Map 0..0.5 to 0..1 for left track
+            float ctrMinPosInLeft = (centerMinPos - 0f) / 0.5f;
+            minPosInLeft = Math.Clamp(minPosInLeft, 0f, 1f);
+            ctrMinPosInLeft = Math.Clamp(ctrMinPosInLeft, 0f, 1f);
+
+            float leftFillStart = leftTrack.Left + minPosInLeft * leftTrackWidth;
+            float leftFillEnd = leftTrack.Left + ctrMinPosInLeft * leftTrackWidth;
+            if (leftFillEnd > leftFillStart + 1)
+            {
+                var leftFill = new SKRect(leftFillStart, trackY + 1, leftFillEnd, trackY + trackHeight - 1);
+                canvas.DrawRoundRect(leftFill, 3, 3, activePaint);
+            }
+
+            // Active fill on right track (from center-max handle to max handle)
+            float rightTrackWidth = rightTrack.Width;
+            float ctrMaxPosInRight = (centerMaxPos - 0.5f) / 0.5f; // Map 0.5..1 to 0..1 for right track
+            float maxPosInRight = (maxPos - 0.5f) / 0.5f;
+            ctrMaxPosInRight = Math.Clamp(ctrMaxPosInRight, 0f, 1f);
+            maxPosInRight = Math.Clamp(maxPosInRight, 0f, 1f);
+
+            float rightFillStart = rightTrack.Left + ctrMaxPosInRight * rightTrackWidth;
+            float rightFillEnd = rightTrack.Left + maxPosInRight * rightTrackWidth;
+            if (rightFillEnd > rightFillStart + 1)
+            {
+                var rightFill = new SKRect(rightFillStart, trackY + 1, rightFillEnd, trackY + trackHeight - 1);
+                canvas.DrawRoundRect(rightFill, 3, 3, activePaint);
+            }
+
+            // Draw handles - all same size
+            // Min handle on left edge of left track
+            float minHandleX = leftTrack.Left + minPosInLeft * leftTrackWidth;
+            DrawDeadzoneHandle(canvas, bounds.MidY, minHandleX, 0, FUIColors.Active, handleRadius);
+
+            // CtrMin handle on right edge of left track
+            float ctrMinHandleX = leftTrack.Left + ctrMinPosInLeft * leftTrackWidth;
+            DrawDeadzoneHandle(canvas, bounds.MidY, ctrMinHandleX, 1, FUIColors.Active, handleRadius);
+
+            // CtrMax handle on left edge of right track
+            float ctrMaxHandleX = rightTrack.Left + ctrMaxPosInRight * rightTrackWidth;
+            DrawDeadzoneHandle(canvas, bounds.MidY, ctrMaxHandleX, 2, FUIColors.Active, handleRadius);
+
+            // Max handle on right edge of right track
+            float maxHandleX = rightTrack.Left + maxPosInRight * rightTrackWidth;
+            DrawDeadzoneHandle(canvas, bounds.MidY, maxHandleX, 3, FUIColors.Active, handleRadius);
+        }
+        else
+        {
+            // Single track spanning full width
+            var track = new SKRect(bounds.Left, trackY, bounds.Right, trackY + trackHeight);
+            canvas.DrawRoundRect(track, 4, 4, trackBgPaint);
+            canvas.DrawRoundRect(track, 4, 4, trackFramePaint);
+
+            // Active fill from min to max
+            float fillStart = bounds.Left + minPos * bounds.Width;
+            float fillEnd = bounds.Left + maxPos * bounds.Width;
+            if (fillEnd > fillStart + 1)
+            {
+                var fill = new SKRect(fillStart, trackY + 1, fillEnd, trackY + trackHeight - 1);
+                canvas.DrawRoundRect(fill, 3, 3, activePaint);
+            }
+
+            // Draw handles - same size
+            float minHandleX = bounds.Left + minPos * bounds.Width;
+            float maxHandleX = bounds.Left + maxPos * bounds.Width;
+            DrawDeadzoneHandle(canvas, bounds.MidY, minHandleX, 0, FUIColors.Active, handleRadius);
+            DrawDeadzoneHandle(canvas, bounds.MidY, maxHandleX, 3, FUIColors.Active, handleRadius);
+        }
+    }
+
+    private void DrawDeadzoneHandle(SKCanvas canvas, float centerY, float x, int handleIndex, SKColor color, float radius)
+    {
+        bool isDragging = _draggingDeadzoneHandle == handleIndex;
+        bool isSelected = _selectedDeadzoneHandle == handleIndex;
+        float drawRadius = isDragging ? radius + 2f : radius;
+
+        // Selected handles get a highlighted fill
+        SKColor fillColor = isDragging ? color : (isSelected ? color.WithAlpha(200) : FUIColors.TextPrimary);
+
+        using var fillPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = fillColor,
+            IsAntialias = true
+        };
+        canvas.DrawCircle(x, centerY, drawRadius, fillPaint);
+
+        using var strokePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = color,
+            StrokeWidth = isSelected ? 2.5f : 1.5f,
+            IsAntialias = true
+        };
+        canvas.DrawCircle(x, centerY, drawRadius, strokePaint);
+    }
+
+    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked)
+    {
+        // Box background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = isChecked ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2
+        };
+        canvas.DrawRoundRect(bounds, 2, 2, bgPaint);
+
+        // Box frame
+        using var framePaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = isChecked ? FUIColors.Active : FUIColors.Frame,
+            StrokeWidth = 1f
+        };
+        canvas.DrawRoundRect(bounds, 2, 2, framePaint);
+
+        // Checkmark
+        if (isChecked)
+        {
+            using var checkPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active,
+                StrokeWidth = 2f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            };
+            float cx = bounds.MidX;
+            float cy = bounds.MidY;
+            float s = bounds.Width * 0.3f;
+            canvas.DrawLine(cx - s, cy, cx - s * 0.3f, cy + s * 0.7f, checkPaint);
+            canvas.DrawLine(cx - s * 0.3f, cy + s * 0.7f, cx + s, cy - s * 0.5f, checkPaint);
+        }
+    }
+
+    private void DrawInteractiveSlider(SKCanvas canvas, SKRect bounds, float value, SKColor color, bool dragging)
+    {
+        // Track background
+        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
+
+        // Track frame
+        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+
+        // Fill
+        float fillWidth = bounds.Width * Math.Clamp(value, 0, 1);
+        if (fillWidth > 2)
+        {
+            var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(100) };
+            canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
         }
 
-        // Saturation slider
-        if (y + 50 < bottom)
-        {
-            FUIRenderer.DrawText(canvas, "SATURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            FUIRenderer.DrawText(canvas, "100%", new SKPoint(rightMargin - 30, y), FUIColors.TextPrimary, 10f);
-            y += 18;
-            DrawSlider(canvas, new SKRect(leftMargin, y, rightMargin, y + 8), 1.0f);
-            y += 25;
-        }
+        // Handle
+        float handleX = bounds.Left + fillWidth;
+        float handleRadius = dragging ? 8f : 6f;
+        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = dragging ? color : FUIColors.TextPrimary, IsAntialias = true };
+        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
 
-        // Invert toggle
-        if (y + 30 < bottom)
-        {
-            FUIRenderer.DrawText(canvas, "Invert Axis", new SKPoint(leftMargin, y + 8), FUIColors.TextPrimary, 11f);
-            DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + 24), false);
-        }
+        using var handleStroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = color, StrokeWidth = 1.5f, IsAntialias = true };
+        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
     }
 
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
@@ -2563,17 +3335,51 @@ public class MainForm : Form
         using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
         canvas.DrawRect(bounds, bgPaint);
 
-        // Grid
+        // Grid lines
         using var gridPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Grid.WithAlpha(50),
-            StrokeWidth = 1f
+            Color = FUIColors.Grid.WithAlpha(40),
+            StrokeWidth = 0.5f
         };
-        // Vertical center
-        canvas.DrawLine(bounds.MidX, bounds.Top, bounds.MidX, bounds.Bottom, gridPaint);
-        // Horizontal center
-        canvas.DrawLine(bounds.Left, bounds.MidY, bounds.Right, bounds.MidY, gridPaint);
+
+        // Draw quarter grid lines
+        for (float t = 0.25f; t < 1f; t += 0.25f)
+        {
+            float x = bounds.Left + t * bounds.Width;
+            float y = bounds.Bottom - t * bounds.Height;
+            canvas.DrawLine(x, bounds.Top, x, bounds.Bottom, gridPaint);
+            canvas.DrawLine(bounds.Left, y, bounds.Right, y, gridPaint);
+        }
+
+        // Center lines (brighter)
+        using var centerPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.GridAccent.WithAlpha(60),
+            StrokeWidth = 0.75f
+        };
+        canvas.DrawLine(bounds.MidX, bounds.Top, bounds.MidX, bounds.Bottom, centerPaint);
+        canvas.DrawLine(bounds.Left, bounds.MidY, bounds.Right, bounds.MidY, centerPaint);
+
+        // Reference linear line (dashed)
+        using var refPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Frame.WithAlpha(60),
+            StrokeWidth = 1f,
+            PathEffect = SKPathEffect.CreateDash(new[] { 4f, 4f }, 0)
+        };
+        canvas.DrawLine(bounds.Left, bounds.Bottom, bounds.Right, bounds.Top, refPaint);
+
+        // Draw the curve
+        DrawCurvePath(canvas, bounds);
+
+        // Draw control points (only for custom curve)
+        if (_selectedCurveType == CurveType.Custom)
+        {
+            DrawCurveControlPoints(canvas, bounds);
+        }
 
         // Frame
         using var framePaint = new SKPaint
@@ -2584,15 +3390,503 @@ public class MainForm : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        // Draw linear curve (diagonal line)
-        using var curvePaint = new SKPaint
+        // Axis labels
+        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 12), FUIColors.TextDim, 8f);
+
+        // Rotated "OUT" label
+        canvas.Save();
+        canvas.Translate(bounds.Left - 14, bounds.MidY + 8);
+        canvas.RotateDegrees(-90);
+        FUIRenderer.DrawText(canvas, "OUT", new SKPoint(0, 0), FUIColors.TextDim, 8f);
+        canvas.Restore();
+    }
+
+    private void DrawCurvePath(SKCanvas canvas, SKRect bounds)
+    {
+        using var path = new SKPath();
+        bool first = true;
+
+        // Sample the curve at many points
+        for (float t = 0; t <= 1.001f; t += 0.01f)
+        {
+            float input = Math.Min(t, 1f);
+            float output = ComputeCurveValue(input);
+
+            float x = bounds.Left + input * bounds.Width;
+            float y = bounds.Bottom - output * bounds.Height;
+
+            if (first)
+            {
+                path.MoveTo(x, y);
+                first = false;
+            }
+            else
+            {
+                path.LineTo(x, y);
+            }
+        }
+
+        // Glow
+        using var glowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Active.WithAlpha(50),
+            StrokeWidth = 5f,
+            IsAntialias = true,
+            ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
+        };
+        canvas.DrawPath(path, glowPaint);
+
+        // Main line
+        using var linePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
             Color = FUIColors.Active,
             StrokeWidth = 2f,
-            IsAntialias = true
+            IsAntialias = true,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round
         };
-        canvas.DrawLine(bounds.Left, bounds.Bottom, bounds.Right, bounds.Top, curvePaint);
+        canvas.DrawPath(path, linePaint);
+    }
+
+    private float ComputeCurveValue(float input)
+    {
+        // Apply curve type only - deadzone is handled separately
+        float output = _selectedCurveType switch
+        {
+            CurveType.Linear => input,
+            CurveType.SCurve => ApplySCurve(input),
+            CurveType.Exponential => ApplyExponential(input),
+            CurveType.Custom => InterpolateControlPoints(input),
+            _ => input
+        };
+
+        output = Math.Clamp(output, 0f, 1f);
+
+        // Apply inversion
+        if (_axisInverted)
+            output = 1f - output;
+
+        return output;
+    }
+
+    private float ApplySCurve(float x)
+    {
+        // S-curve using smoothstep-like function
+        return x * x * (3f - 2f * x);
+    }
+
+    private float ApplyExponential(float x)
+    {
+        // Exponential curve (steeper at the end)
+        return x * x;
+    }
+
+    private float InterpolateControlPoints(float x)
+    {
+        if (_curveControlPoints.Count < 2) return x;
+
+        // Find segment containing x
+        for (int i = 0; i < _curveControlPoints.Count - 1; i++)
+        {
+            var p1 = _curveControlPoints[i];
+            var p2 = _curveControlPoints[i + 1];
+
+            if (x >= p1.X && x <= p2.X)
+            {
+                if (Math.Abs(p2.X - p1.X) < 0.001f) return p1.Y;
+                float t = (x - p1.X) / (p2.X - p1.X);
+
+                // Use Catmull-Rom spline interpolation for smooth curves
+                // Need 4 points: p0, p1, p2, p3
+                var p0 = i > 0 ? _curveControlPoints[i - 1] : new SKPoint(p1.X - (p2.X - p1.X), p1.Y - (p2.Y - p1.Y));
+                var p3 = i < _curveControlPoints.Count - 2 ? _curveControlPoints[i + 2] : new SKPoint(p2.X + (p2.X - p1.X), p2.Y + (p2.Y - p1.Y));
+
+                return CatmullRomInterpolate(p0.Y, p1.Y, p2.Y, p3.Y, t);
+            }
+        }
+
+        // Extrapolate
+        return x < _curveControlPoints[0].X ? _curveControlPoints[0].Y : _curveControlPoints[^1].Y;
+    }
+
+    /// <summary>
+    /// Catmull-Rom spline interpolation for smooth curves through control points.
+    /// t ranges from 0 to 1, output is between p1 and p2.
+    /// </summary>
+    private static float CatmullRomInterpolate(float p0, float p1, float p2, float p3, float t)
+    {
+        // Catmull-Rom spline formula with tension = 0.5 (centripetal)
+        float t2 = t * t;
+        float t3 = t2 * t;
+
+        return 0.5f * (
+            (2f * p1) +
+            (-p0 + p2) * t +
+            (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+            (-p0 + 3f * p1 - 3f * p2 + p3) * t3
+        );
+    }
+
+    private void DrawCurveControlPoints(SKCanvas canvas, SKRect bounds)
+    {
+        const float PointRadius = 7f;
+
+        for (int i = 0; i < _curveControlPoints.Count; i++)
+        {
+            var pt = _curveControlPoints[i];
+            float x = bounds.Left + pt.X * bounds.Width;
+            float y = bounds.Bottom - pt.Y * bounds.Height;
+
+            bool isHovered = i == _hoveredCurvePoint;
+            bool isDragging = i == _draggingCurvePoint;
+            bool isEndpoint = i == 0 || i == _curveControlPoints.Count - 1;
+
+            float radius = (isHovered || isDragging) ? PointRadius + 2 : PointRadius;
+            var color = isDragging ? FUIColors.Warning : (isHovered ? FUIColors.TextBright : FUIColors.Active);
+
+            // Glow
+            using var glowPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = color.WithAlpha(40),
+                IsAntialias = true,
+                ImageFilter = SKImageFilter.CreateBlur(5f, 5f)
+            };
+            canvas.DrawCircle(x, y, radius + 4, glowPaint);
+
+            // Fill
+            using var fillPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = isEndpoint ? FUIColors.Background1 : color.WithAlpha(60),
+                IsAntialias = true
+            };
+            canvas.DrawCircle(x, y, radius, fillPaint);
+
+            // Stroke
+            using var strokePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = color,
+                StrokeWidth = isEndpoint ? 2f : 1.5f,
+                IsAntialias = true
+            };
+            canvas.DrawCircle(x, y, radius, strokePaint);
+
+            // Value label when hovered/dragged
+            if (isHovered || isDragging)
+            {
+                string label = $"({pt.X:F2}, {pt.Y:F2})";
+                float labelY = y - radius - 10;
+                if (labelY < bounds.Top + 10)
+                    labelY = y + radius + 14;
+
+                FUIRenderer.DrawText(canvas, label, new SKPoint(x - 22, labelY), FUIColors.TextBright, 8f);
+            }
+        }
+    }
+
+    private SKPoint CurveScreenToGraph(SKPoint screenPt, SKRect bounds)
+    {
+        float x = (screenPt.X - bounds.Left) / bounds.Width;
+        float y = (bounds.Bottom - screenPt.Y) / bounds.Height;
+        return new SKPoint(Math.Clamp(x, 0, 1), Math.Clamp(y, 0, 1));
+    }
+
+    private int FindCurvePointAt(SKPoint screenPt, SKRect bounds)
+    {
+        const float HitRadius = 12f;
+
+        for (int i = 0; i < _curveControlPoints.Count; i++)
+        {
+            var pt = _curveControlPoints[i];
+            float x = bounds.Left + pt.X * bounds.Width;
+            float y = bounds.Bottom - pt.Y * bounds.Height;
+
+            float dist = MathF.Sqrt(MathF.Pow(screenPt.X - x, 2) + MathF.Pow(screenPt.Y - y, 2));
+            if (dist <= HitRadius)
+                return i;
+        }
+        return -1;
+    }
+
+    private int FindDeadzoneHandleAt(SKPoint screenPt)
+    {
+        const float HitRadius = 12f;
+        var bounds = _deadzoneSliderBounds;
+        if (bounds.Width <= 0) return -1;
+
+        // Convert deadzone values to 0..1 range
+        float minPos = (_deadzoneMin + 1f) / 2f;
+        float centerMinPos = (_deadzoneCenterMin + 1f) / 2f;
+        float centerMaxPos = (_deadzoneCenterMax + 1f) / 2f;
+        float maxPos = (_deadzoneMax + 1f) / 2f;
+
+        if (_deadzoneCenterEnabled)
+        {
+            // Two separate tracks - must calculate handle positions on each track
+            // Gap must match DrawDualDeadzoneSlider
+            float gap = 24f;
+            float centerX = bounds.MidX;
+
+            // Left track: from bounds.Left to centerX - gap/2
+            float leftTrackLeft = bounds.Left;
+            float leftTrackRight = centerX - gap / 2;
+            float leftTrackWidth = leftTrackRight - leftTrackLeft;
+
+            // Right track: from centerX + gap/2 to bounds.Right
+            float rightTrackLeft = centerX + gap / 2;
+            float rightTrackRight = bounds.Right;
+            float rightTrackWidth = rightTrackRight - rightTrackLeft;
+
+            // Map positions to track coordinates
+            float minPosInLeft = Math.Clamp((minPos - 0f) / 0.5f, 0f, 1f);
+            float ctrMinPosInLeft = Math.Clamp((centerMinPos - 0f) / 0.5f, 0f, 1f);
+            float ctrMaxPosInRight = Math.Clamp((centerMaxPos - 0.5f) / 0.5f, 0f, 1f);
+            float maxPosInRight = Math.Clamp((maxPos - 0.5f) / 0.5f, 0f, 1f);
+
+            // Calculate screen positions for each handle
+            float minHandleX = leftTrackLeft + minPosInLeft * leftTrackWidth;
+            float ctrMinHandleX = leftTrackLeft + ctrMinPosInLeft * leftTrackWidth;
+            float ctrMaxHandleX = rightTrackLeft + ctrMaxPosInRight * rightTrackWidth;
+            float maxHandleX = rightTrackLeft + maxPosInRight * rightTrackWidth;
+
+            // Check each handle (check all 4)
+            float[] handleXs = { minHandleX, ctrMinHandleX, ctrMaxHandleX, maxHandleX };
+            for (int i = 0; i < 4; i++)
+            {
+                float dist = MathF.Sqrt(MathF.Pow(screenPt.X - handleXs[i], 2) + MathF.Pow(screenPt.Y - bounds.MidY, 2));
+                if (dist <= HitRadius)
+                    return i;
+            }
+        }
+        else
+        {
+            // Single track - only min (0) and max (3) handles
+            float minHandleX = bounds.Left + minPos * bounds.Width;
+            float maxHandleX = bounds.Left + maxPos * bounds.Width;
+
+            float distMin = MathF.Sqrt(MathF.Pow(screenPt.X - minHandleX, 2) + MathF.Pow(screenPt.Y - bounds.MidY, 2));
+            if (distMin <= HitRadius) return 0;
+
+            float distMax = MathF.Sqrt(MathF.Pow(screenPt.X - maxHandleX, 2) + MathF.Pow(screenPt.Y - bounds.MidY, 2));
+            if (distMax <= HitRadius) return 3;
+        }
+
+        return -1;
+    }
+
+    private void UpdateDraggedDeadzoneHandle(SKPoint screenPt)
+    {
+        if (_draggingDeadzoneHandle < 0) return;
+        var bounds = _deadzoneSliderBounds;
+        if (bounds.Width <= 0) return;
+
+        float value;
+
+        if (_deadzoneCenterEnabled)
+        {
+            // Two-track layout - convert screen position to value based on which track
+            // Gap must match DrawDualDeadzoneSlider
+            float gap = 24f;
+            float centerX = bounds.MidX;
+
+            // Left track: maps to -1..0 (handles 0 and 1)
+            float leftTrackLeft = bounds.Left;
+            float leftTrackRight = centerX - gap / 2;
+            float leftTrackWidth = leftTrackRight - leftTrackLeft;
+
+            // Right track: maps to 0..1 (handles 2 and 3)
+            float rightTrackLeft = centerX + gap / 2;
+            float rightTrackRight = bounds.Right;
+            float rightTrackWidth = rightTrackRight - rightTrackLeft;
+
+            switch (_draggingDeadzoneHandle)
+            {
+                case 0: // Min handle on left track
+                    float normLeft0 = Math.Clamp((screenPt.X - leftTrackLeft) / leftTrackWidth, 0f, 1f);
+                    value = normLeft0 - 1f; // Maps 0..1 to -1..0
+                    value = Math.Clamp(value, -1f, _deadzoneCenterMin - 0.02f);
+                    _deadzoneMin = value;
+                    break;
+                case 1: // CenterMin handle on left track (right edge)
+                    float normLeft1 = Math.Clamp((screenPt.X - leftTrackLeft) / leftTrackWidth, 0f, 1f);
+                    value = normLeft1 - 1f; // Maps 0..1 to -1..0
+                    value = Math.Clamp(value, _deadzoneMin + 0.02f, 0f);
+                    _deadzoneCenterMin = value;
+                    break;
+                case 2: // CenterMax handle on right track (left edge)
+                    float normRight2 = Math.Clamp((screenPt.X - rightTrackLeft) / rightTrackWidth, 0f, 1f);
+                    value = normRight2; // Maps 0..1 to 0..1
+                    value = Math.Clamp(value, 0f, _deadzoneMax - 0.02f);
+                    _deadzoneCenterMax = value;
+                    break;
+                case 3: // Max handle on right track
+                    float normRight3 = Math.Clamp((screenPt.X - rightTrackLeft) / rightTrackWidth, 0f, 1f);
+                    value = normRight3; // Maps 0..1 to 0..1
+                    value = Math.Clamp(value, _deadzoneCenterMax + 0.02f, 1f);
+                    _deadzoneMax = value;
+                    break;
+            }
+        }
+        else
+        {
+            // Single track layout - convert screen X to -1..1 range
+            float normalized = (screenPt.X - bounds.Left) / bounds.Width;
+            value = normalized * 2f - 1f;
+
+            switch (_draggingDeadzoneHandle)
+            {
+                case 0: // Min handle
+                    value = Math.Clamp(value, -1f, _deadzoneMax - 0.1f);
+                    _deadzoneMin = value;
+                    break;
+                case 3: // Max handle
+                    value = Math.Clamp(value, _deadzoneMin + 0.1f, 1f);
+                    _deadzoneMax = value;
+                    break;
+            }
+        }
+    }
+
+    private void UpdateDraggedCurvePoint(SKPoint screenPt)
+    {
+        if (_draggingCurvePoint < 0 || _draggingCurvePoint >= _curveControlPoints.Count)
+            return;
+
+        var graphPt = CurveScreenToGraph(screenPt, _curveEditorBounds);
+
+        // Constrain endpoints to X edges
+        if (_draggingCurvePoint == 0)
+            graphPt.X = 0;
+        else if (_draggingCurvePoint == _curveControlPoints.Count - 1)
+            graphPt.X = 1;
+        else
+        {
+            // Interior points: constrain X between neighbors
+            float minX = _curveControlPoints[_draggingCurvePoint - 1].X + 0.02f;
+            float maxX = _curveControlPoints[_draggingCurvePoint + 1].X - 0.02f;
+            graphPt.X = Math.Clamp(graphPt.X, minX, maxX);
+        }
+
+        _curveControlPoints[_draggingCurvePoint] = graphPt;
+    }
+
+    private void AddCurveControlPoint(SKPoint graphPt)
+    {
+        // Find insertion position (maintain sorted order by X)
+        int insertIndex = 0;
+        for (int i = 0; i < _curveControlPoints.Count; i++)
+        {
+            if (_curveControlPoints[i].X < graphPt.X)
+                insertIndex = i + 1;
+        }
+
+        _curveControlPoints.Insert(insertIndex, graphPt);
+        _selectedCurveType = CurveType.Custom;
+        _canvas.Invalidate();
+    }
+
+    private bool HandleCurvePresetClick(SKPoint pt)
+    {
+        // Check each stored preset button bound
+        for (int i = 0; i < _curvePresetBounds.Length; i++)
+        {
+            if (_curvePresetBounds[i].Contains(pt))
+            {
+                _selectedCurveType = i switch
+                {
+                    0 => CurveType.Linear,
+                    1 => CurveType.SCurve,
+                    2 => CurveType.Exponential,
+                    _ => CurveType.Custom
+                };
+
+                // Reset control points when switching to custom
+                if (_selectedCurveType == CurveType.Custom && _curveControlPoints.Count == 2)
+                {
+                    // Add a middle point for custom curve
+                    _curveControlPoints = new List<SKPoint>
+                    {
+                        new(0, 0),
+                        new(0.5f, 0.5f),
+                        new(1, 1)
+                    };
+                }
+
+                _canvas.Invalidate();
+                return true;
+            }
+        }
+
+        // Check invert checkbox
+        if (_invertToggleBounds.Contains(pt))
+        {
+            _axisInverted = !_axisInverted;
+            _canvas.Invalidate();
+            return true;
+        }
+
+        // Check centre checkbox and deadzone presets
+        if (HandleDeadzonePresetClick(pt))
+            return true;
+
+        return false;
+    }
+
+    private bool HandleDeadzonePresetClick(SKPoint pt)
+    {
+        // Centre checkbox click
+        if (_deadzoneCenterCheckboxBounds.Contains(pt))
+        {
+            _deadzoneCenterEnabled = !_deadzoneCenterEnabled;
+            // When disabling center, reset center values and clear selection if center handle was selected
+            if (!_deadzoneCenterEnabled)
+            {
+                _deadzoneCenterMin = 0.0f;
+                _deadzoneCenterMax = 0.0f;
+                if (_selectedDeadzoneHandle == 1 || _selectedDeadzoneHandle == 2)
+                    _selectedDeadzoneHandle = -1;
+            }
+            _canvas.Invalidate();
+            return true;
+        }
+
+        // Preset buttons - apply to selected handle
+        if (_selectedDeadzoneHandle >= 0)
+        {
+            // Preset values: 0%, 2%, 5%, 10%
+            float[] presetValues = { 0.0f, 0.02f, 0.05f, 0.10f };
+
+            for (int i = 0; i < _deadzonePresetBounds.Length; i++)
+            {
+                if (!_deadzonePresetBounds[i].IsEmpty && _deadzonePresetBounds[i].Contains(pt))
+                {
+                    float presetVal = presetValues[i];
+
+                    switch (_selectedDeadzoneHandle)
+                    {
+                        case 0: // Min (Start) - set distance from -1
+                            _deadzoneMin = -1.0f + presetVal;
+                            break;
+                        case 1: // CenterMin - set negative offset from 0
+                            _deadzoneCenterMin = -presetVal;
+                            break;
+                        case 2: // CenterMax - set positive offset from 0
+                            _deadzoneCenterMax = presetVal;
+                            break;
+                        case 3: // Max (End) - set distance from 1
+                            _deadzoneMax = 1.0f - presetVal;
+                            break;
+                    }
+                    _canvas.Invalidate();
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void DrawSlider(SKCanvas canvas, SKRect bounds, float value)

@@ -161,6 +161,14 @@ public class MainForm : Form
     private SKRect[] _buttonModeBounds = new SKRect[4];
     private int _hoveredButtonMode = -1;
 
+    // Button mode duration settings
+    private int _pulseDurationMs = 100;      // Duration for Pulse mode (100-1000ms)
+    private int _holdDurationMs = 500;       // Duration for HoldToActivate mode (200-2000ms)
+    private SKRect _pulseDurationSliderBounds;
+    private SKRect _holdDurationSliderBounds;
+    private bool _draggingPulseDuration = false;
+    private bool _draggingHoldDuration = false;
+
     // Mapping editor - output type (Button vs Keyboard)
     private bool _outputTypeIsKeyboard = false;
     private SKRect _outputTypeBtnBounds;
@@ -1304,6 +1312,20 @@ public class MainForm : Form
             // Right panel: Button mode buttons (for button category)
             if (_mappingCategory == 0 && _selectedMappingRow >= 0)
             {
+                // Handle duration slider dragging
+                if (_draggingPulseDuration)
+                {
+                    UpdatePulseDurationFromMouse(e.X);
+                    _canvas.Invalidate();
+                    return;
+                }
+                if (_draggingHoldDuration)
+                {
+                    UpdateHoldDurationFromMouse(e.X);
+                    _canvas.Invalidate();
+                    return;
+                }
+
                 for (int i = 0; i < _buttonModeBounds.Length; i++)
                 {
                     if (_buttonModeBounds[i].Contains(e.X, e.Y))
@@ -1770,6 +1792,30 @@ public class MainForm : Form
                 return;
             }
 
+            // Right panel: Pulse duration slider (button category, Pulse mode)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectedButtonMode == ButtonMode.Pulse)
+            {
+                var pt = new SKPoint(e.X, e.Y);
+                if (_pulseDurationSliderBounds.Contains(pt))
+                {
+                    _draggingPulseDuration = true;
+                    UpdatePulseDurationFromMouse(e.X);
+                    return;
+                }
+            }
+
+            // Right panel: Hold duration slider (button category, HoldToActivate mode)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectedButtonMode == ButtonMode.HoldToActivate)
+            {
+                var pt = new SKPoint(e.X, e.Y);
+                if (_holdDurationSliderBounds.Contains(pt))
+                {
+                    _draggingHoldDuration = true;
+                    UpdateHoldDurationFromMouse(e.X);
+                    return;
+                }
+            }
+
             // Right panel: Output type selection (button category)
             if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredOutputType >= 0)
             {
@@ -1916,6 +1962,15 @@ public class MainForm : Form
         {
             _draggingCurvePoint = -1;
             _draggingDeadzoneHandle = -1;
+            _canvas.Invalidate();
+        }
+
+        // Release duration slider dragging
+        if (_draggingPulseDuration || _draggingHoldDuration)
+        {
+            _draggingPulseDuration = false;
+            _draggingHoldDuration = false;
+            UpdateDurationForSelectedMapping();
             _canvas.Invalidate();
         }
     }
@@ -3521,6 +3576,37 @@ public class MainForm : Form
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
     }
 
+    private void DrawDurationSlider(SKCanvas canvas, SKRect bounds, float value, bool dragging)
+    {
+        value = Math.Clamp(value, 0f, 1f);
+
+        // Track background
+        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
+
+        // Track frame
+        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+
+        // Fill
+        float fillWidth = bounds.Width * value;
+        if (fillWidth > 2)
+        {
+            var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80) };
+            canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
+        }
+
+        // Handle
+        float handleX = bounds.Left + fillWidth;
+        float handleRadius = dragging ? 8f : 6f;
+        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = dragging ? FUIColors.Active : FUIColors.TextPrimary, IsAntialias = true };
+        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
+
+        using var handleStroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1.5f, IsAntialias = true };
+        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
+    }
+
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
     {
         float width = rightMargin - leftMargin;
@@ -3649,7 +3735,47 @@ public class MainForm : Form
 
             _buttonModeBounds[i] = modeBounds;
         }
-        y += buttonHeight + 15;
+        y += buttonHeight + 12;
+
+        // Duration slider for Pulse mode
+        if (_selectedButtonMode == ButtonMode.Pulse && y + 50 < bottom)
+        {
+            FUIRenderer.DrawText(canvas, "PULSE DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 18;
+
+            float sliderHeight = 24f;
+            _pulseDurationSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
+
+            // Normalize value: 100-1000ms mapped to 0-1
+            float normalizedPulse = (_pulseDurationMs - 100f) / 900f;
+            DrawDurationSlider(canvas, _pulseDurationSliderBounds, normalizedPulse, _draggingPulseDuration);
+
+            // Value label
+            FUIRenderer.DrawText(canvas, $"{_pulseDurationMs}ms",
+                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 10f);
+
+            y += sliderHeight + 12;
+        }
+
+        // Duration slider for Hold mode
+        if (_selectedButtonMode == ButtonMode.HoldToActivate && y + 50 < bottom)
+        {
+            FUIRenderer.DrawText(canvas, "HOLD DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += 18;
+
+            float sliderHeight = 24f;
+            _holdDurationSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
+
+            // Normalize value: 200-2000ms mapped to 0-1
+            float normalizedHold = (_holdDurationMs - 200f) / 1800f;
+            DrawDurationSlider(canvas, _holdDurationSliderBounds, normalizedHold, _draggingHoldDuration);
+
+            // Value label
+            FUIRenderer.DrawText(canvas, $"{_holdDurationMs}ms",
+                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 10f);
+
+            y += sliderHeight + 12;
+        }
 
         // Clear binding button
         if (y + 40 < bottom)
@@ -6586,6 +6712,8 @@ public class MainForm : Form
         _selectedModifiers = null;
         _isCapturingKey = false;
         _selectedButtonMode = ButtonMode.Normal;
+        _pulseDurationMs = 100;
+        _holdDurationMs = 500;
 
         // Only for button category
         if (_mappingCategory != 0) return;
@@ -6608,6 +6736,8 @@ public class MainForm : Form
             _selectedKeyName = mapping.Output.KeyName ?? "";
             _selectedModifiers = mapping.Output.Modifiers?.ToList();
             _selectedButtonMode = mapping.Mode;
+            _pulseDurationMs = mapping.PulseDurationMs;
+            _holdDurationMs = mapping.HoldDurationMs;
         }
     }
 
@@ -6694,6 +6824,54 @@ public class MainForm : Form
         {
             mapping.Output.KeyName = _selectedKeyName;
             mapping.Output.Modifiers = _selectedModifiers?.ToList();
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+        }
+    }
+
+    private void UpdatePulseDurationFromMouse(float mouseX)
+    {
+        if (_pulseDurationSliderBounds.Width <= 0) return;
+
+        float normalized = (mouseX - _pulseDurationSliderBounds.Left) / _pulseDurationSliderBounds.Width;
+        normalized = Math.Clamp(normalized, 0f, 1f);
+
+        // Map 0-1 to 100-1000ms
+        _pulseDurationMs = (int)(100f + normalized * 900f);
+    }
+
+    private void UpdateHoldDurationFromMouse(float mouseX)
+    {
+        if (_holdDurationSliderBounds.Width <= 0) return;
+
+        float normalized = (mouseX - _holdDurationSliderBounds.Left) / _holdDurationSliderBounds.Width;
+        normalized = Math.Clamp(normalized, 0f, 1f);
+
+        // Map 0-1 to 200-2000ms
+        _holdDurationMs = (int)(200f + normalized * 1800f);
+    }
+
+    private void UpdateDurationForSelectedMapping()
+    {
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow;
+
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping != null)
+        {
+            mapping.PulseDurationMs = _pulseDurationMs;
+            mapping.HoldDurationMs = _holdDurationMs;
             profile.ModifiedAt = DateTime.UtcNow;
             _profileService.SaveActiveProfile();
         }

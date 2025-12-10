@@ -367,6 +367,75 @@ public class MappingModelTests
     }
 
     [Fact]
+    public void ButtonMapping_PulseDuration_CanBeSet()
+    {
+        var mapping = new ButtonMapping
+        {
+            Mode = ButtonMode.Pulse,
+            PulseDurationMs = 250
+        };
+
+        Assert.Equal(ButtonMode.Pulse, mapping.Mode);
+        Assert.Equal(250, mapping.PulseDurationMs);
+    }
+
+    [Fact]
+    public void ButtonMapping_HoldDuration_CanBeSet()
+    {
+        var mapping = new ButtonMapping
+        {
+            Mode = ButtonMode.HoldToActivate,
+            HoldDurationMs = 1000
+        };
+
+        Assert.Equal(ButtonMode.HoldToActivate, mapping.Mode);
+        Assert.Equal(1000, mapping.HoldDurationMs);
+    }
+
+    [Theory]
+    [InlineData(100)]   // Minimum typical value
+    [InlineData(500)]   // Mid-range
+    [InlineData(1000)]  // Maximum typical value
+    public void ButtonMapping_PulseDuration_AcceptsValidRange(int duration)
+    {
+        var mapping = new ButtonMapping { PulseDurationMs = duration };
+        Assert.Equal(duration, mapping.PulseDurationMs);
+    }
+
+    [Theory]
+    [InlineData(200)]   // Minimum typical value
+    [InlineData(1000)]  // Mid-range
+    [InlineData(2000)]  // Maximum typical value
+    public void ButtonMapping_HoldDuration_AcceptsValidRange(int duration)
+    {
+        var mapping = new ButtonMapping { HoldDurationMs = duration };
+        Assert.Equal(duration, mapping.HoldDurationMs);
+    }
+
+    [Fact]
+    public void ButtonMapping_DurationValues_IndependentOfMode()
+    {
+        // Duration values should be stored regardless of mode
+        var mapping = new ButtonMapping
+        {
+            Mode = ButtonMode.Normal,
+            PulseDurationMs = 300,
+            HoldDurationMs = 800
+        };
+
+        // Values should persist even though mode is Normal
+        Assert.Equal(300, mapping.PulseDurationMs);
+        Assert.Equal(800, mapping.HoldDurationMs);
+
+        // Changing mode shouldn't affect stored duration values
+        mapping.Mode = ButtonMode.Pulse;
+        Assert.Equal(300, mapping.PulseDurationMs);
+
+        mapping.Mode = ButtonMode.HoldToActivate;
+        Assert.Equal(800, mapping.HoldDurationMs);
+    }
+
+    [Fact]
     public void MappingProfile_NewProfile_HasUniqueId()
     {
         var profile1 = new MappingProfile();

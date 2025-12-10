@@ -523,6 +523,31 @@ public class ProfileService
     public event EventHandler<FUITheme>? ThemeChanged;
 
     /// <summary>
+    /// Load background settings from app settings
+    /// </summary>
+    public (int gridStrength, int glowIntensity, int noiseIntensity, int scanlineIntensity, int vignetteStrength, bool vignetteEnabled) LoadBackgroundSettings()
+    {
+        var settings = LoadSettings();
+        return (settings.GridStrength, settings.GlowIntensity, settings.NoiseIntensity,
+                settings.ScanlineIntensity, settings.VignetteStrength, settings.VignetteEnabled);
+    }
+
+    /// <summary>
+    /// Save background settings to app settings
+    /// </summary>
+    public void SaveBackgroundSettings(int gridStrength, int glowIntensity, int noiseIntensity, int scanlineIntensity, int vignetteStrength, bool vignetteEnabled)
+    {
+        var settings = LoadSettings();
+        settings.GridStrength = gridStrength;
+        settings.GlowIntensity = glowIntensity;
+        settings.NoiseIntensity = noiseIntensity;
+        settings.ScanlineIntensity = scanlineIntensity;
+        settings.VignetteStrength = vignetteStrength;
+        settings.VignetteEnabled = vignetteEnabled;
+        SaveSettings(settings);
+    }
+
+    /// <summary>
     /// Load the last used profile if auto-load is enabled
     /// </summary>
     public MappingProfile? LoadLastProfileIfEnabled()
@@ -677,6 +702,14 @@ public class AppSettings
     public bool AutoLoadLastProfile { get; set; } = true;
     public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
     public FUITheme Theme { get; set; } = FUITheme.Midnight;
+
+    // Background effect settings (0-100 intensity scale)
+    public int GridStrength { get; set; } = 50;
+    public int GlowIntensity { get; set; } = 40;
+    public int NoiseIntensity { get; set; } = 8;
+    public int ScanlineIntensity { get; set; } = 0;
+    public int VignetteStrength { get; set; } = 50;
+    public bool VignetteEnabled { get; set; } = true;
 }
 
 /// <summary>

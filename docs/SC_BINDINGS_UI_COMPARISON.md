@@ -34,8 +34,9 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 
 ### The Gap:
 We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) but we're not displaying it in the UI. The UI should show:
-- What the SC defaults are (KB/Mouse) - read-only info
-- What joystick bindings the user has configured
+- **KB column**: SC defaults pre-populated, user can add/edit keyboard bindings
+- **Mouse column**: SC defaults pre-populated, user can add/edit mouse bindings
+- **JS1/JS2/etc columns**: User-configured vJoy bindings for export to SC
 
 ---
 
@@ -53,8 +54,9 @@ We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) 
 ```
 
 ### Key Visual Features Observed:
-1. **Columns**: Action + KB + Mouse + [Device names from connected hardware]
-2. **Device names**: Uses ACTUAL device names ("L-Virpil Stick") not generic "JS1"
+1. **Columns**: Action + KB + Mouse + [Device columns]
+2. **Device names**: SCVirtStick uses actual names ("L-Virpil Stick")
+   - **Asteriq approach**: Use JS1/JS2/JS3 (vJoy device IDs) since we map to vJoy, not physical devices
 3. **Keycap badges**: Bindings shown as styled button badges (`Btn24`, `Sl1`)
 4. **Modifier display**: Shown as separate badge before main key (`Ctrl` `Btn12`)
 5. **Empty cells**: Show "—" dash, not blank
@@ -64,6 +66,11 @@ We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) 
 9. **Alternating rows**: Subtle color alternation for readability
 10. **Header bar**: Environment dropdown, Profile dropdown, +New, Clear All, Reset buttons
 11. **Filter bar**: "Bound only" checkbox + search box (top right)
+
+### Asteriq Design Notes:
+- **Maintain FUI styling/motif** - dark futuristic theme, not SCVirtStick's exact look
+- **Use JS1/JS2/JS3 for device columns** - we're mapping vJoy outputs to SC, not physical devices
+- **Keycap badges should follow FUI colors** - use our theme colors, corner accents, etc.
 
 ---
 
@@ -79,15 +86,16 @@ We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) 
 | Dynamic action column width | Min 180px, max 320px, calculated | Fixed width | ❌ |
 
 ### Grid Columns
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Multiple device columns | Yes: Action + KB + Mouse + [connected devices] | Single binding display | ❌ |
-| KB column for keyboard defaults | Yes, shows SC defaults from p4k | No | ❌ |
-| Mouse column for mouse defaults | Yes, shows SC defaults from p4k | No | ❌ |
-| Per-device joystick columns | Yes, uses actual device names ("L-Virpil Stick") | No | ❌ |
-| Device column headers | Actual device names, not "JS1/JS2" | N/A | ❌ |
-| Column width (devices) | Fixed 120px each | N/A | ❌ |
-| Horizontal scrolling for devices | Yes, custom scrollbar | No | ❌ |
+| Feature | SCVirtStick | Asteriq | Asteriq Target | Status |
+|---------|-------------|---------|----------------|--------|
+| Multiple device columns | Yes: Action + KB + Mouse + devices | Single binding | Action + KB + Mouse + JS1-JSn | ❌ |
+| KB column | Shows/edits keyboard bindings | No | Editable - user can add/edit KB bindings | ❌ |
+| Mouse column | Shows/edits mouse bindings | No | Editable - user can add/edit mouse bindings | ❌ |
+| Joystick columns | Per physical device | No | Per vJoy device (JS1, JS2...) | ❌ |
+| Device column headers | Actual device names | N/A | "KB", "Mouse", "JS1", "JS2", etc. | ❌ |
+| Column width (devices) | Fixed 120px each | N/A | ~100px, FUI styled | ❌ |
+| Horizontal scrolling for devices | Yes, custom scrollbar | No | Yes, if needed | ❌ |
+| Default bindings from p4k | Pre-populated in cells | Parsed but not shown | Show as initial values, user can override | ❌ |
 
 ### Binding Display in Cells
 | Feature | SCVirtStick | Asteriq | Status |
@@ -310,13 +318,14 @@ This is the foundation - without this, the UI is fundamentally different from SC
 
 1. ❌ **Redesign grid to multi-column layout**:
    - Column 0: Action name (wide, ~200px)
-   - Column 1: KB (keyboard defaults from p4k)
-   - Column 2: Mouse (mouse defaults from p4k)
-   - Column 3+: Connected joystick devices (using actual device names)
-2. ❌ Display default bindings from `SCAction.DefaultBindings` in KB/Mouse columns
-3. ❌ Get connected device names from InputService for JS column headers
-4. ❌ Horizontal scrolling when many devices connected
-5. ❌ Empty cell "—" indicator
+   - Column 1: KB (keyboard) - **editable**, pre-populated with SC defaults
+   - Column 2: Mouse - **editable**, pre-populated with SC defaults
+   - Column 3+: JS1, JS2, JS3... (vJoy devices) - **editable**
+2. ❌ Pre-populate KB/Mouse columns with defaults from `SCAction.DefaultBindings`
+3. ❌ User can add/edit bindings in any column (KB, Mouse, JS)
+4. ❌ Use "JS1", "JS2", etc. as column headers (vJoy device IDs)
+5. ❌ Horizontal scrolling when many vJoy devices configured
+6. ❌ Empty cell "—" indicator
 
 ### Phase 2: Keycap Badge Rendering (High Priority)
 The visual treatment of bindings is a key UX element.

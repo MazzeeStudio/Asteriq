@@ -1995,20 +1995,22 @@ public class MainForm : Form
         DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight), _profileService.AutoLoadLastProfile);
         y += rowHeight + sectionSpacing;
 
-        // Font size section
-        FUIRenderer.DrawText(canvas, "FONT SIZE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += sectionSpacing;
+        // Font size section - label and buttons on same line
+        FUIRenderer.DrawText(canvas, "Font Size", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
 
+        // Fixed-width font size buttons with "aA" in respective sizes (right-aligned, fixed total width)
         FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
-        string[] fontSizeNames = { "SMALL", "MEDIUM", "LARGE" };
-        float fontBtnWidth = (rightMargin - leftMargin - 6) / fontSizeNames.Length;
-        float fontBtnHeight = FUIRenderer.ScaleLineHeight(24f);
+        float[] fontSizePreviews = { 9f, 11f, 13f }; // Actual font sizes for "aA" preview
+        float fontBtnWidth = 36f; // Fixed width per button
+        float fontBtnHeight = 24f;
+        float fontBtnGap = 3f;
+        float fontBtnsStartX = rightMargin - (fontBtnWidth * 3 + fontBtnGap * 2);
 
-        for (int i = 0; i < fontSizeNames.Length; i++)
+        for (int i = 0; i < fontSizeValues.Length; i++)
         {
             var fontBounds = new SKRect(
-                leftMargin + i * (fontBtnWidth + 3), y,
-                leftMargin + i * (fontBtnWidth + 3) + fontBtnWidth, y + fontBtnHeight);
+                fontBtnsStartX + i * (fontBtnWidth + fontBtnGap), y,
+                fontBtnsStartX + i * (fontBtnWidth + fontBtnGap) + fontBtnWidth, y + fontBtnHeight);
 
             _fontSizeButtonBounds[i] = fontBounds;
 
@@ -2020,27 +2022,29 @@ public class MainForm : Form
             using var fontBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
             canvas.DrawRect(fontBounds, fontBgPaint);
 
-            using var fontFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
+            using var fontFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
             canvas.DrawRect(fontBounds, fontFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, fontSizeNames[i], fontBounds, textColor, 9f);
+            // Draw "aA" in the respective font size (not scaled by global setting)
+            FUIRenderer.DrawTextCentered(canvas, "aA", fontBounds, textColor, fontSizePreviews[i], scaleFont: false);
         }
         y += fontBtnHeight + sectionSpacing;
 
-        // Theme section
-        FUIRenderer.DrawText(canvas, "THEME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += sectionSpacing;
+        // Theme section - label and buttons on same line
+        FUIRenderer.DrawText(canvas, "Theme", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
 
         FUITheme[] themeValues = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
-        string[] themeNames = { "MIDNIGHT", "MATRIX", "AMBER", "ICE" };
-        float themeButtonWidth = (rightMargin - leftMargin - 9) / themeNames.Length;
-        float themeButtonHeight = FUIRenderer.ScaleLineHeight(24f);
+        string[] themeNames = { "MID", "MTX", "AMB", "ICE" }; // Shortened names for compact buttons
+        float themeBtnWidth = 40f; // Fixed width per button
+        float themeBtnHeight = 24f;
+        float themeBtnGap = 3f;
+        float themeBtnsStartX = rightMargin - (themeBtnWidth * 4 + themeBtnGap * 3);
 
         for (int i = 0; i < themeNames.Length; i++)
         {
             var themeBounds = new SKRect(
-                leftMargin + i * (themeButtonWidth + 3), y,
-                leftMargin + i * (themeButtonWidth + 3) + themeButtonWidth, y + themeButtonHeight);
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap), y,
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap) + themeBtnWidth, y + themeBtnHeight);
 
             // Store bounds for click handling
             StoreThemeButtonBounds(i, themeBounds);
@@ -2064,18 +2068,18 @@ public class MainForm : Form
             using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
             canvas.DrawRect(themeBounds, themeBgPaint);
 
-            using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
+            using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
             canvas.DrawRect(themeBounds, themeFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, themeNames[i], themeBounds, textColor, 9f);
+            FUIRenderer.DrawTextCentered(canvas, themeNames[i], themeBounds, textColor, 8f);
 
-            // Color indicator bar
-            var indicatorBounds = new SKRect(themeBounds.Left + 5, themeBounds.Bottom - 4,
-                themeBounds.Right - 5, themeBounds.Bottom - 2);
+            // Color indicator bar at bottom
+            var indicatorBounds = new SKRect(themeBounds.Left + 3, themeBounds.Bottom - 3,
+                themeBounds.Right - 3, themeBounds.Bottom - 1);
             using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
             canvas.DrawRect(indicatorBounds, indicatorPaint);
         }
-        y += themeButtonHeight + sectionSpacing;
+        y += themeBtnHeight + sectionSpacing;
 
         // vJoy section
         FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -2086,10 +2090,15 @@ public class MainForm : Form
         string vjoyStatus = vjoyEnabled ? "Driver installed and active" : "Driver not available";
         var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
 
+        // Measure text height for proper vertical centering of dot
+        float statusTextSize = FUIRenderer.ScaleFont(11f);
+        float statusLineHeight = statusTextSize + 4; // Approximate line height
+        float statusDotRadius = 4f;
+        float statusDotY = y + (statusLineHeight / 2); // Center dot vertically with text
+
         using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
-        float statusDotY = y + FUIRenderer.ScaleFont(11f) / 2 - 2;
-        canvas.DrawCircle(leftMargin + 5, statusDotY, 4, statusDot);
-        FUIRenderer.DrawText(canvas, vjoyStatus, new SKPoint(leftMargin + 16, y), vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
+        canvas.DrawCircle(leftMargin + statusDotRadius + 1, statusDotY, statusDotRadius, statusDot);
+        FUIRenderer.DrawText(canvas, vjoyStatus, new SKPoint(leftMargin + statusDotRadius * 2 + 8, y), vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
         y += rowHeight;
 
         if (vjoyEnabled)

@@ -1782,6 +1782,19 @@ public class MainForm : Form
 
         // Status bar
         DrawStatusBar(canvas, bounds);
+
+        // Draw dropdowns last (on top of everything)
+        DrawOpenDropdowns(canvas);
+    }
+
+    private void DrawOpenDropdowns(SKCanvas canvas)
+    {
+        // Profile dropdown (rendered on top of all panels)
+        if (_profileDropdownOpen)
+        {
+            // Get position from profile selector bounds
+            DrawProfileDropdown(canvas, _profileSelectorBounds.Left, _profileSelectorBounds.Bottom);
+        }
     }
 
     private void DrawSettingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
@@ -6066,164 +6079,177 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, y + 17),
             _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 11f);
 
-        // Draw dropdown if open
-        if (_profileDropdownOpen)
-        {
-            DrawProfileDropdown(canvas, x, y + height);
-        }
+        // Note: Dropdown is drawn separately in DrawOpenDropdowns() to render on top of all panels
     }
 
     private void DrawProfileDropdown(SKCanvas canvas, float x, float y)
     {
-        float itemHeight = 24f;
+        float itemHeight = 26f;
         float width = 150f;
+        float padding = 8f;
         int itemCount = Math.Max(_profiles.Count + 3, 4); // +3 for "New Profile", "Import", "Export", minimum 4
-        float height = itemHeight * itemCount + 4;
+        float height = itemHeight * itemCount + padding * 2 + 2; // Extra for separator
 
         _profileDropdownBounds = new SKRect(x, y, x + width, y + height);
 
-        // Shadow (offset for depth)
-        using var shadowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = SKColors.Black.WithAlpha(120),
-            ImageFilter = SKImageFilter.CreateBlur(10f, 10f)
-        };
-        canvas.DrawRect(new SKRect(x + 3, y + 3, x + width + 3, y + height + 3), shadowPaint);
+        // Drop shadow with glow effect
+        FUIRenderer.DrawPanelShadow(canvas, _profileDropdownBounds, 4f, 4f, 15f);
 
-        // Solid opaque background (no transparency - blocks elements behind)
+        // Outer glow (subtle)
+        using var glowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Active.WithAlpha(30),
+            StrokeWidth = 3f,
+            IsAntialias = true,
+            ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
+        };
+        canvas.DrawRect(_profileDropdownBounds, glowPaint);
+
+        // Solid opaque background
         using var bgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1,  // Fully opaque
+            Color = FUIColors.Void,
             IsAntialias = true
         };
         canvas.DrawRect(_profileDropdownBounds, bgPaint);
 
-        // Inner darker fill for better contrast
+        // Inner background with slight gradient feel
         using var innerBgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = FUIColors.Void.WithAlpha(200),
+            Color = FUIColors.Background0,
             IsAntialias = true
         };
-        canvas.DrawRect(new SKRect(x + 1, y + 1, x + width - 1, y + height - 1), innerBgPaint);
+        canvas.DrawRect(new SKRect(x + 2, y + 2, x + width - 2, y + height - 2), innerBgPaint);
 
-        // Border
-        using var borderPaint = new SKPaint
+        // L-corner frame (FUI style)
+        FUIRenderer.DrawLCornerFrame(canvas, _profileDropdownBounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
+
+        // Draw profile items
+        float itemY = y + padding;
+        for (int i = 0; i < _profiles.Count; i++)
+        {
+            var profile = _profiles[i];
+            var itemBounds = new SKRect(x + 4, itemY, x + width - 4, itemY + itemHeight);
+            bool isHovered = _hoveredProfileIndex == i;
+            bool isActive = _profileService.ActiveProfile?.Id == profile.Id;
+
+            // Hover background with FUI glow
+            if (isHovered)
+            {
+                using var hoverPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Active.WithAlpha(40),
+                    IsAntialias = true
+                };
+                canvas.DrawRect(itemBounds, hoverPaint);
+
+                // Left accent bar on hover
+                using var accentPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Active,
+                    IsAntialias = true
+                };
+                canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), accentPaint);
+            }
+
+            // Active indicator (always show for active profile)
+            if (isActive && !isHovered)
+            {
+                using var activePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Active.WithAlpha(60),
+                    IsAntialias = true
+                };
+                canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), activePaint);
+            }
+
+            // Profile name
+            string name = profile.Name;
+            if (name.Length > 14)
+                name = name.Substring(0, 13) + "…";
+
+            var color = isActive ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+            FUIRenderer.DrawText(canvas, name, new SKPoint(x + 12, itemY + 17), color, 11f);
+
+            itemY += itemHeight;
+        }
+
+        // Separator line before actions (FUI style)
+        float sepY = itemY + 1;
+        using var sepPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
             Color = FUIColors.Frame,
             StrokeWidth = 1f,
             IsAntialias = true
         };
-        canvas.DrawRect(_profileDropdownBounds, borderPaint);
+        canvas.DrawLine(x + 12, sepY, x + width - 12, sepY, sepPaint);
 
-        // Draw profile items
-        float itemY = y + 2;
-        for (int i = 0; i < _profiles.Count; i++)
-        {
-            var profile = _profiles[i];
-            var itemBounds = new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight);
-            bool isHovered = _hoveredProfileIndex == i;
-            bool isActive = _profileService.ActiveProfile?.Id == profile.Id;
-
-            // Hover background
-            if (isHovered)
-            {
-                using var hoverPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Primary.WithAlpha(40),
-                    IsAntialias = true
-                };
-                canvas.DrawRect(itemBounds, hoverPaint);
-            }
-
-            // Active indicator
-            if (isActive)
-            {
-                using var activePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Active,
-                    IsAntialias = true
-                };
-                canvas.DrawRect(new SKRect(x + 2, itemY, x + 4, itemY + itemHeight), activePaint);
-            }
-
-            // Profile name
-            string name = profile.Name;
-            if (name.Length > 16)
-                name = name.Substring(0, 15) + "…";
-
-            var color = isActive ? FUIColors.Active : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-            FUIRenderer.DrawText(canvas, name, new SKPoint(x + 10, itemY + 16), color, 11f);
-
-            itemY += itemHeight;
-        }
-
-        // "New Profile" option
-        var newItemBounds = new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight);
-        bool newHovered = _hoveredProfileIndex == _profiles.Count;
-
-        if (newHovered)
-        {
-            using var hoverPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Primary.WithAlpha(40),
-                IsAntialias = true
-            };
-            canvas.DrawRect(newItemBounds, hoverPaint);
-        }
-
-        // Separator before actions
-        using var sepPaint = new SKPaint
+        // Corner accents on separator
+        using var accentLinePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame.WithAlpha(100),
-            StrokeWidth = 1f
+            Color = FUIColors.Active.WithAlpha(120),
+            StrokeWidth = 1f,
+            IsAntialias = true
         };
-        canvas.DrawLine(x + 8, itemY, x + width - 8, itemY, sepPaint);
+        canvas.DrawLine(x + 8, sepY, x + 12, sepY, accentLinePaint);
+        canvas.DrawLine(x + width - 12, sepY, x + width - 8, sepY, accentLinePaint);
+
+        itemY += 4;
 
         // "New Profile" option
-        FUIRenderer.DrawText(canvas, "+ New Profile", new SKPoint(x + 10, itemY + 16),
-            newHovered ? FUIColors.Active : FUIColors.TextDim, 11f);
+        DrawDropdownItem(canvas, x, itemY, width, itemHeight, "+ New Profile",
+            _hoveredProfileIndex == _profiles.Count, false, true);
         itemY += itemHeight;
 
         // "Import" option
-        bool importHovered = _hoveredProfileIndex == _profiles.Count + 1;
-        if (importHovered)
-        {
-            using var hoverPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Primary.WithAlpha(40),
-                IsAntialias = true
-            };
-            canvas.DrawRect(new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight), hoverPaint);
-        }
-        FUIRenderer.DrawText(canvas, "↓ Import...", new SKPoint(x + 10, itemY + 16),
-            importHovered ? FUIColors.Active : FUIColors.TextDim, 11f);
+        DrawDropdownItem(canvas, x, itemY, width, itemHeight, "↓ Import...",
+            _hoveredProfileIndex == _profiles.Count + 1, false, true);
         itemY += itemHeight;
 
         // "Export" option
-        bool exportHovered = _hoveredProfileIndex == _profiles.Count + 2;
-        if (exportHovered)
+        bool canExport = _profileService.ActiveProfile != null;
+        DrawDropdownItem(canvas, x, itemY, width, itemHeight, "↑ Export...",
+            _hoveredProfileIndex == _profiles.Count + 2, false, canExport);
+    }
+
+    private void DrawDropdownItem(SKCanvas canvas, float x, float itemY, float width, float itemHeight,
+        string text, bool isHovered, bool isActive, bool isEnabled)
+    {
+        var itemBounds = new SKRect(x + 4, itemY, x + width - 4, itemY + itemHeight);
+
+        if (isHovered && isEnabled)
         {
+            // Hover background
             using var hoverPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = FUIColors.Primary.WithAlpha(40),
+                Color = FUIColors.Active.WithAlpha(40),
                 IsAntialias = true
             };
-            canvas.DrawRect(new SKRect(x + 2, itemY, x + width - 2, itemY + itemHeight), hoverPaint);
+            canvas.DrawRect(itemBounds, hoverPaint);
+
+            // Left accent bar
+            using var accentPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Active,
+                IsAntialias = true
+            };
+            canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), accentPaint);
         }
-        // Only enable export if there's an active profile
-        bool canExport = _profileService.ActiveProfile != null;
-        FUIRenderer.DrawText(canvas, "↑ Export...", new SKPoint(x + 10, itemY + 16),
-            canExport ? (exportHovered ? FUIColors.Active : FUIColors.TextDim) : FUIColors.TextDisabled, 11f);
+
+        var color = !isEnabled ? FUIColors.TextDisabled
+            : isHovered ? FUIColors.TextBright
+            : FUIColors.TextDim;
+        FUIRenderer.DrawText(canvas, text, new SKPoint(x + 12, itemY + 17), color, 11f);
     }
 
     private void DrawDeviceListPanel(SKCanvas canvas, SKRect bounds)

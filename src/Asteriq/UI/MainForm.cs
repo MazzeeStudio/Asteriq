@@ -61,6 +61,7 @@ public class MainForm : Form
     private int _hoveredDevice = -1;
     private int _selectedDevice = -1;  // Start with no selection, will be set in RefreshDevices
     private List<PhysicalDeviceInfo> _devices = new();
+    private List<PhysicalDeviceInfo> _disconnectedDevices = new(); // Devices that were seen but are now disconnected
     private DeviceInputState? _currentInputState;
 
     // Device category tabs (D1 = Physical, D2 = Virtual)
@@ -74,6 +75,8 @@ public class MainForm : Form
     private bool _map1to1ButtonHovered;
     private SKRect _clearMappingsButtonBounds;
     private bool _clearMappingsButtonHovered;
+    private SKRect _removeDeviceButtonBounds;
+    private bool _removeDeviceButtonHovered;
 
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
     private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
@@ -888,7 +891,9 @@ public class MainForm : Form
         }
 
         _inputService.InputReceived += OnInputReceived;
+        _inputService.DeviceConnected += OnDeviceConnected;
         _inputService.DeviceDisconnected += OnDeviceDisconnected;
+        LoadDisconnectedDevices();
         RefreshDevices();
         _inputService.StartPolling(100);
     }
@@ -927,7 +932,24 @@ public class MainForm : Form
 
     private void RefreshDevices()
     {
-        _devices = _inputService.EnumerateDevices();
+        var connectedDevices = _inputService.EnumerateDevices();
+
+        // Mark all connected devices
+        foreach (var device in connectedDevices)
+        {
+            device.IsConnected = true;
+        }
+
+        // Add disconnected devices that aren't currently connected
+        // Only show disconnected physical devices (not virtual)
+        var disconnectedToShow = _disconnectedDevices
+            .Where(d => !d.IsVirtual && !connectedDevices.Any(c =>
+                c.InstanceGuid == d.InstanceGuid ||
+                (c.Name == d.Name && c.AxisCount == d.AxisCount && c.ButtonCount == d.ButtonCount)))
+            .ToList();
+
+        // Combine connected and disconnected devices
+        _devices = connectedDevices.Concat(disconnectedToShow).ToList();
 
         // Auto-select first device in current category if nothing selected
         if (_selectedDevice < 0 && _devices.Count > 0)
@@ -1003,19 +1025,183 @@ public class MainForm : Form
         };
     }
 
+    private void OnDeviceConnected(object? sender, PhysicalDeviceInfo newDevice)
+    {
+        BeginInvoke(() =>
+        {
+            // Remember currently selected device by identity
+            Guid? selectedGuid = null;
+            string? selectedName = null;
+            if (_selectedDevice >= 0 && _selectedDevice < _devices.Count)
+            {
+                selectedGuid = _devices[_selectedDevice].InstanceGuid;
+                selectedName = _devices[_selectedDevice].Name;
+            }
+
+            // Check if this device was previously disconnected
+            var disconnected = _disconnectedDevices.FirstOrDefault(d =>
+                d.InstanceGuid == newDevice.InstanceGuid ||
+                (d.Name == newDevice.Name && d.AxisCount == newDevice.AxisCount && d.ButtonCount == newDevice.ButtonCount));
+
+            if (disconnected != null)
+            {
+                // Device reconnected - remove from disconnected list
+                _disconnectedDevices.Remove(disconnected);
+                SaveDisconnectedDevices();
+            }
+
+            RefreshDevices();
+
+            // Restore selection by identity
+            RestoreDeviceSelection(selectedGuid, selectedName);
+
+            _canvas.Invalidate();
+        });
+    }
+
     private void OnDeviceDisconnected(object? sender, int deviceIndex)
     {
         BeginInvoke(() =>
         {
-            RefreshDevices();
-            if (_selectedDevice >= _devices.Count)
+            // Remember currently selected device by identity
+            Guid? selectedGuid = null;
+            string? selectedName = null;
+            if (_selectedDevice >= 0 && _selectedDevice < _devices.Count)
             {
-                _selectedDevice = Math.Max(0, _devices.Count - 1);
-                // Load device map for the new selected device
-                if (_devices.Count > 0)
-                    LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+                selectedGuid = _devices[_selectedDevice].InstanceGuid;
+                selectedName = _devices[_selectedDevice].Name;
             }
+
+            // Find the device that was disconnected before we refresh
+            var disconnectedDevice = _devices.FirstOrDefault(d => d.DeviceIndex == deviceIndex);
+
+            if (disconnectedDevice != null && !disconnectedDevice.IsVirtual)
+            {
+                // Always track physical devices when they disconnect
+                // Mark as disconnected and add to tracked list
+                disconnectedDevice.IsConnected = false;
+                disconnectedDevice.DeviceIndex = -1; // No longer valid
+
+                // Check if we already track this device
+                if (!_disconnectedDevices.Any(d => d.InstanceGuid == disconnectedDevice.InstanceGuid))
+                {
+                    _disconnectedDevices.Add(disconnectedDevice);
+                    SaveDisconnectedDevices();
+                }
+            }
+
+            RefreshDevices();
+
+            // Restore selection by identity
+            RestoreDeviceSelection(selectedGuid, selectedName);
+
+            _canvas.Invalidate();
         });
+    }
+
+    private void RestoreDeviceSelection(Guid? selectedGuid, string? selectedName)
+    {
+        if (selectedGuid == null && selectedName == null)
+            return;
+
+        // Try to find the device by GUID first, then by name
+        int newIndex = -1;
+        for (int i = 0; i < _devices.Count; i++)
+        {
+            if (_devices[i].InstanceGuid == selectedGuid ||
+                (selectedName != null && _devices[i].Name == selectedName))
+            {
+                newIndex = i;
+                break;
+            }
+        }
+
+        if (newIndex >= 0)
+        {
+            _selectedDevice = newIndex;
+        }
+        else if (_selectedDevice >= _devices.Count)
+        {
+            _selectedDevice = Math.Max(0, _devices.Count - 1);
+        }
+
+        // Load device map for the selected device
+        if (_selectedDevice >= 0 && _selectedDevice < _devices.Count)
+        {
+            LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+        }
+    }
+
+    private void LoadDisconnectedDevices()
+    {
+        // Load disconnected devices from settings
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Asteriq", "disconnected_devices.json");
+
+        if (File.Exists(path))
+        {
+            try
+            {
+                var json = File.ReadAllText(path);
+                var devices = System.Text.Json.JsonSerializer.Deserialize<List<DisconnectedDeviceInfo>>(json);
+                if (devices != null)
+                {
+                    _disconnectedDevices = devices.Select(d => new PhysicalDeviceInfo
+                    {
+                        DeviceIndex = -1,
+                        Name = d.Name,
+                        InstanceGuid = d.InstanceGuid,
+                        AxisCount = d.AxisCount,
+                        ButtonCount = d.ButtonCount,
+                        HatCount = d.HatCount,
+                        IsVirtual = false,
+                        IsConnected = false
+                    }).ToList();
+                }
+            }
+            catch
+            {
+                // Ignore errors loading disconnected devices
+            }
+        }
+    }
+
+    private void SaveDisconnectedDevices()
+    {
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Asteriq", "disconnected_devices.json");
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var devices = _disconnectedDevices.Select(d => new DisconnectedDeviceInfo
+            {
+                Name = d.Name,
+                InstanceGuid = d.InstanceGuid,
+                AxisCount = d.AxisCount,
+                ButtonCount = d.ButtonCount,
+                HatCount = d.HatCount
+            }).ToList();
+
+            var json = System.Text.Json.JsonSerializer.Serialize(devices,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json);
+        }
+        catch
+        {
+            // Ignore errors saving disconnected devices
+        }
+    }
+
+    private record DisconnectedDeviceInfo
+    {
+        public string Name { get; init; } = string.Empty;
+        public Guid InstanceGuid { get; init; }
+        public int AxisCount { get; init; }
+        public int ButtonCount { get; init; }
+        public int HatCount { get; init; }
     }
 
     #region Window Chrome
@@ -1327,6 +1513,7 @@ public class MainForm : Form
         // Device action button hover detection
         _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
         _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
+        _removeDeviceButtonHovered = !_removeDeviceButtonBounds.IsEmpty && _removeDeviceButtonBounds.Contains(e.X, e.Y);
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
@@ -1491,6 +1678,11 @@ public class MainForm : Form
         if (_clearMappingsButtonHovered && !_clearMappingsButtonBounds.IsEmpty)
         {
             ClearDeviceMappings();
+            return;
+        }
+        if (_removeDeviceButtonHovered && !_removeDeviceButtonBounds.IsEmpty)
+        {
+            RemoveDisconnectedDevice();
             return;
         }
 
@@ -5796,6 +5988,58 @@ public class MainForm : Form
         _canvas.Invalidate();
     }
 
+    /// <summary>
+    /// Remove a disconnected device completely from the app's data.
+    /// This clears all mappings and removes it from the disconnected devices list.
+    /// </summary>
+    private void RemoveDisconnectedDevice()
+    {
+        if (_selectedDevice < 0 || _selectedDevice >= _devices.Count) return;
+
+        var device = _devices[_selectedDevice];
+        if (device.IsConnected || device.IsVirtual) return; // Only works for disconnected physical devices
+
+        var result = FUIMessageBox.ShowQuestion(this,
+            $"Permanently remove {device.Name}?\n\n" +
+            "This will:\n" +
+            "• Clear all axis, button, and hat mappings\n" +
+            "• Remove the device from the disconnected list\n\n" +
+            "This cannot be undone.",
+            "Remove Device");
+
+        if (!result) return;
+
+        var profile = _profileService.ActiveProfile;
+        string deviceId = device.InstanceGuid.ToString();
+
+        // Remove all mappings from this device
+        int axisRemoved = 0, buttonRemoved = 0, hatRemoved = 0;
+        if (profile != null)
+        {
+            axisRemoved = profile.AxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+            buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+            hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+            _profileService.SaveActiveProfile();
+        }
+
+        // Remove from disconnected devices list
+        _disconnectedDevices.RemoveAll(d => d.InstanceGuid == device.InstanceGuid);
+        SaveDisconnectedDevices();
+
+        // Refresh and update selection
+        RefreshDevices();
+        if (_selectedDevice >= _devices.Count)
+        {
+            _selectedDevice = Math.Max(0, _devices.Count - 1);
+        }
+
+        FUIMessageBox.ShowInfo(this,
+            $"Device removed.\n\nCleared {axisRemoved} axis, {buttonRemoved} button, and {hatRemoved} hat mappings.",
+            "Device Removed");
+
+        _canvas.Invalidate();
+    }
+
     private void CreateBindingForRow(int rowIndex, DetectedInput input)
     {
         var profile = _profileService.ActiveProfile;
@@ -7049,8 +7293,9 @@ public class MainForm : Form
             {
                 // Find the actual device index in _devices
                 int actualIndex = _devices.IndexOf(filteredDevices[i]);
+                string status = filteredDevices[i].IsConnected ? "ONLINE" : "DISCONNECTED";
                 DrawDeviceListItem(canvas, contentBounds.Left + pad - 10, itemY, contentBounds.Width - pad,
-                    filteredDevices[i].Name, "ONLINE", actualIndex == _selectedDevice, actualIndex == _hoveredDevice);
+                    filteredDevices[i].Name, status, actualIndex == _selectedDevice, actualIndex == _hoveredDevice);
                 itemY += itemHeight + itemGap;
             }
         }
@@ -7143,34 +7388,41 @@ public class MainForm : Form
         string name, string status, bool isSelected, bool isHovered)
     {
         var itemBounds = new SKRect(x, y, x + width, y + 60);
+        bool isDisconnected = status == "DISCONNECTED";
 
         // Selection/hover background
         if (isSelected || isHovered)
         {
-            var bgColor = isSelected ? FUIColors.Active.WithAlpha(30) : FUIColors.Primary.WithAlpha(15);
+            var bgColor = isSelected
+                ? (isDisconnected ? FUIColors.Danger.WithAlpha(20) : FUIColors.Active.WithAlpha(30))
+                : FUIColors.Primary.WithAlpha(15);
             FUIRenderer.FillFrame(canvas, itemBounds, bgColor, 6f);
         }
 
         // Item frame
-        var frameColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.FrameDim);
+        var frameColor = isSelected
+            ? (isDisconnected ? FUIColors.Danger : FUIColors.Active)
+            : (isHovered ? FUIColors.FrameBright : FUIColors.FrameDim);
         FUIRenderer.DrawFrame(canvas, itemBounds, frameColor, 6f, isSelected ? 1.5f : 1f, isSelected);
 
         // Status indicator dot
-        var statusColor = status == "ONLINE" ? FUIColors.Success : FUIColors.Warning;
+        var statusColor = isDisconnected ? FUIColors.Danger : FUIColors.Success;
         FUIRenderer.DrawGlowingDot(canvas, new SKPoint(x + 18, y + 22), statusColor, 4f,
-            status == "ONLINE" ? 8f : 4f);
+            isDisconnected ? 4f : 8f);
 
-        // Device name (truncate if needed)
+        // Device name (truncate if needed) - dim for disconnected
         string displayName = name.Length > 28 ? name.Substring(0, 25) + "..." : name;
-        var nameColor = isSelected ? FUIColors.TextBright : FUIColors.TextPrimary;
-        FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 35, y + 26), nameColor, 13f, isSelected);
+        var nameColor = isDisconnected
+            ? FUIColors.TextDim
+            : (isSelected ? FUIColors.TextBright : FUIColors.TextPrimary);
+        FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 35, y + 26), nameColor, 13f, isSelected && !isDisconnected);
 
         // Status text
-        var statusTextColor = status == "ONLINE" ? FUIColors.Success : FUIColors.Warning;
+        var statusTextColor = isDisconnected ? FUIColors.Danger : FUIColors.Success;
         FUIRenderer.DrawText(canvas, status, new SKPoint(x + 35, y + 45), statusTextColor, 11f);
 
         // vJoy assignment indicator (positioned to avoid chevron overlap)
-        if (status == "ONLINE")
+        if (!isDisconnected)
         {
             FUIRenderer.DrawText(canvas, "VJOY:1", new SKPoint(x + width - 85, y + 45),
                 FUIColors.TextDim, 11f);
@@ -7182,7 +7434,7 @@ public class MainForm : Form
             using var chevronPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active,
+                Color = isDisconnected ? FUIColors.Danger : FUIColors.Active,
                 StrokeWidth = 2f,
                 IsAntialias = true
             };
@@ -7698,13 +7950,16 @@ public class MainForm : Form
         if (hasPhysicalDevice)
         {
             var device = _devices[_selectedDevice];
+            bool isDisconnected = !device.IsConnected;
 
             // Device info
-            FUIRenderer.DrawText(canvas, "SELECTED DEVICE", new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+            FUIRenderer.DrawText(canvas, isDisconnected ? "DISCONNECTED DEVICE" : "SELECTED DEVICE",
+                new SKPoint(contentBounds.Left + pad, y), isDisconnected ? FUIColors.Danger : FUIColors.TextDim, 9f);
             y += 16f;
 
             string shortName = device.Name.Length > 22 ? device.Name.Substring(0, 20) + "..." : device.Name;
-            FUIRenderer.DrawText(canvas, shortName, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextPrimary, 11f);
+            FUIRenderer.DrawText(canvas, shortName, new SKPoint(contentBounds.Left + pad, y),
+                isDisconnected ? FUIColors.TextDim : FUIColors.TextPrimary, 11f);
             y += 20f;
 
             // Device stats
@@ -7712,21 +7967,43 @@ public class MainForm : Form
                 new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
             y += 24f;
 
-            // Map 1:1 to vJoy button
             float buttonWidth = contentBounds.Width - pad * 2;
-            _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-            DrawDeviceActionButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", _map1to1ButtonHovered);
-            y += buttonHeight + buttonGap;
 
-            // Clear mappings button
-            _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-            DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDestructive: true);
+            if (isDisconnected)
+            {
+                // Disconnected device: Show Clear Mappings and Remove Device buttons
+                _map1to1ButtonBounds = SKRect.Empty;
+
+                // Clear mappings button
+                _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDestructive: true);
+                y += buttonHeight + buttonGap;
+
+                // Remove device button (dangerous - removes all trace)
+                _removeDeviceButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                DrawDeviceActionButton(canvas, _removeDeviceButtonBounds, "REMOVE DEVICE", _removeDeviceButtonHovered, isDangerous: true);
+            }
+            else
+            {
+                // Connected device: Show Map 1:1 and Clear Mappings buttons
+                _removeDeviceButtonBounds = SKRect.Empty;
+
+                // Map 1:1 to vJoy button
+                _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                DrawDeviceActionButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", _map1to1ButtonHovered);
+                y += buttonHeight + buttonGap;
+
+                // Clear mappings button
+                _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDestructive: true);
+            }
         }
         else
         {
             // No device selected
             _map1to1ButtonBounds = SKRect.Empty;
             _clearMappingsButtonBounds = SKRect.Empty;
+            _removeDeviceButtonBounds = SKRect.Empty;
 
             FUIRenderer.DrawText(canvas, "Select a physical device",
                 new SKPoint(contentBounds.Left + pad, y + 20), FUIColors.TextDim, 10f);
@@ -7735,12 +8012,16 @@ public class MainForm : Form
         }
     }
 
-    private void DrawDeviceActionButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isDestructive = false)
+    private void DrawDeviceActionButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered,
+        bool isDestructive = false, bool isDangerous = false)
     {
+        // isDangerous uses Danger (red/orange) color, isDestructive uses Warning (yellow)
+        var accentColor = isDangerous ? FUIColors.Danger : (isDestructive ? FUIColors.Warning : FUIColors.Active);
+
         // Button background
         var bgColor = isHovered
-            ? (isDestructive ? FUIColors.Warning.WithAlpha(40) : FUIColors.Active.WithAlpha(40))
-            : FUIColors.Background2.WithAlpha(80);
+            ? accentColor.WithAlpha(40)
+            : (isDangerous ? FUIColors.Danger.WithAlpha(15) : FUIColors.Background2.WithAlpha(80));
         using var bgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
@@ -7750,9 +8031,7 @@ public class MainForm : Form
         canvas.DrawRect(bounds, bgPaint);
 
         // Button border
-        var borderColor = isHovered
-            ? (isDestructive ? FUIColors.Warning : FUIColors.Active)
-            : FUIColors.Frame;
+        var borderColor = isHovered ? accentColor : (isDangerous ? FUIColors.Danger.WithAlpha(100) : FUIColors.Frame);
         using var borderPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -7763,9 +8042,7 @@ public class MainForm : Form
         canvas.DrawRect(bounds, borderPaint);
 
         // Button text
-        var textColor = isHovered
-            ? (isDestructive ? FUIColors.Warning : FUIColors.Active)
-            : FUIColors.TextPrimary;
+        var textColor = isHovered ? accentColor : (isDangerous ? FUIColors.Danger : FUIColors.TextPrimary);
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 10f);
     }
 

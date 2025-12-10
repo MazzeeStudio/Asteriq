@@ -90,7 +90,7 @@ public class AxisInfo
 /// </summary>
 public class PhysicalDeviceInfo
 {
-    public int DeviceIndex { get; init; }
+    public int DeviceIndex { get; set; }
     public string Name { get; init; } = string.Empty;
     public Guid InstanceGuid { get; init; }
     public int AxisCount { get; init; }
@@ -101,6 +101,12 @@ public class PhysicalDeviceInfo
     /// Whether this is a virtual device (vJoy, vXBox, etc.)
     /// </summary>
     public bool IsVirtual { get; init; }
+
+    /// <summary>
+    /// Whether the device is currently connected.
+    /// Disconnected devices are shown but cannot be used until reconnected.
+    /// </summary>
+    public bool IsConnected { get; set; } = true;
 
     /// <summary>
     /// Unique HID device path (used for reliable device identification).

@@ -9,9 +9,12 @@ namespace Asteriq.Services;
 /// </summary>
 public class InputService : IDisposable
 {
+    // Keyed by SDL instance ID (stable) rather than device index (can shift)
     private readonly ConcurrentDictionary<int, IntPtr> _openJoysticks = new();
     private readonly ConcurrentDictionary<int, PhysicalDeviceInfo> _deviceInfo = new();
     private readonly ConcurrentDictionary<int, DeviceInputState> _lastState = new();
+    // Track which SDL instance IDs we've opened to detect new devices
+    private readonly HashSet<int> _knownInstanceIds = new();
     private volatile bool _isPolling;
     private Task? _pollTask;
     private bool _isInitialized;
@@ -83,7 +86,7 @@ public class InputService : IDisposable
 
         for (int i = 0; i < numJoysticks; i++)
         {
-            var info = GetDeviceInfo(i);
+            var (info, _) = GetDeviceInfo(i);
             if (info != null)
                 devices.Add(info);
         }
@@ -92,9 +95,9 @@ public class InputService : IDisposable
     }
 
     /// <summary>
-    /// Get info about a specific device by index
+    /// Get info about a specific device by index. Returns the SDL instance ID.
     /// </summary>
-    private PhysicalDeviceInfo? GetDeviceInfo(int deviceIndex)
+    private (PhysicalDeviceInfo? info, int instanceId) GetDeviceInfo(int deviceIndex)
     {
         string name = SDL.SDL_JoystickNameForIndex(deviceIndex) ?? $"Unknown Device {deviceIndex}";
         Guid sdlGuid = SDL.SDL_JoystickGetDeviceGUID(deviceIndex);
@@ -102,9 +105,9 @@ public class InputService : IDisposable
         // Need to open the joystick to get axis/button counts
         IntPtr joystick = SDL.SDL_JoystickOpen(deviceIndex);
         if (joystick == IntPtr.Zero)
-            return null;
+            return (null, -1);
 
-        // Get the instance ID for matching with DirectInput
+        // Get the instance ID - this is stable and unique per connected device
         var instanceId = SDL.SDL_JoystickInstanceID(joystick);
 
         var info = new PhysicalDeviceInfo
@@ -121,11 +124,12 @@ public class InputService : IDisposable
         // Try to get axis type information from DirectInput
         PopulateAxisTypes(info);
 
-        // Keep joystick open for polling
-        _openJoysticks[deviceIndex] = joystick;
-        _deviceInfo[deviceIndex] = info;
+        // Keep joystick open for polling - keyed by instance ID (stable)
+        _openJoysticks[instanceId] = joystick;
+        _deviceInfo[instanceId] = info;
+        _knownInstanceIds.Add(instanceId);
 
-        return info;
+        return (info, instanceId);
     }
 
     /// <summary>
@@ -194,14 +198,26 @@ public class InputService : IDisposable
         }
     }
 
+    private static readonly object _logLock = new();
+
     [System.Diagnostics.Conditional("DEBUG")]
     private static void LogAxisTypes(string message)
     {
-        var logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Asteriq", "axis_types.log");
-        Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
-        File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+        try
+        {
+            lock (_logLock)
+            {
+                var logPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Asteriq", "axis_types.log");
+                Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+                File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+            }
+        }
+        catch
+        {
+            // Ignore logging errors - don't crash the app for debug logging
+        }
     }
 
     /// <summary>
@@ -290,31 +306,36 @@ public class InputService : IDisposable
     private void PollAllDevices()
     {
         // Process SDL events (needed for hot-plug detection)
+        // SDL_PumpEvents updates the internal device list for hot-plug detection
+        SDL.SDL_PumpEvents();
         SDL.SDL_JoystickUpdate();
+
+        // Check for newly connected devices
+        CheckForNewDevices();
 
         foreach (var kvp in _openJoysticks)
         {
-            int deviceIndex = kvp.Key;
+            int instanceId = kvp.Key;
             IntPtr joystick = kvp.Value;
 
             if (SDL.SDL_JoystickGetAttached(joystick) == SDL.SDL_bool.SDL_FALSE)
             {
                 // Device disconnected
-                HandleDeviceDisconnected(deviceIndex);
+                HandleDeviceDisconnected(instanceId);
                 continue;
             }
 
-            if (!_deviceInfo.TryGetValue(deviceIndex, out var info))
+            if (!_deviceInfo.TryGetValue(instanceId, out var info))
                 continue;
 
             var state = ReadDeviceState(joystick, info);
 
             if (OnlyFireOnChange)
             {
-                if (_lastState.TryGetValue(deviceIndex, out var last) && !HasStateChanged(last, state))
+                if (_lastState.TryGetValue(instanceId, out var last) && !HasStateChanged(last, state))
                     continue;
 
-                _lastState[deviceIndex] = state;
+                _lastState[instanceId] = state;
             }
 
             InputReceived?.Invoke(this, state);
@@ -409,15 +430,74 @@ public class InputService : IDisposable
         };
     }
 
-    private void HandleDeviceDisconnected(int deviceIndex)
+    /// <summary>
+    /// Check for newly connected devices and open them
+    /// </summary>
+    private void CheckForNewDevices()
     {
-        if (_openJoysticks.TryRemove(deviceIndex, out var joystick))
+        int numJoysticks = SDL.SDL_NumJoysticks();
+
+        for (int i = 0; i < numJoysticks; i++)
+        {
+            // Get the instance ID for this device index (without opening)
+            // We need to check if this instance ID is already known
+            // Unfortunately, SDL2 requires opening the joystick to get instance ID
+            // So we open it, check, and close if already known
+
+            IntPtr joystick = SDL.SDL_JoystickOpen(i);
+            if (joystick == IntPtr.Zero)
+                continue;
+
+            int instanceId = SDL.SDL_JoystickInstanceID(joystick);
+
+            // Check if we already have this device open
+            if (_knownInstanceIds.Contains(instanceId))
+            {
+                // Already tracked - close and continue
+                SDL.SDL_JoystickClose(joystick);
+                continue;
+            }
+
+            // Close temporarily - GetDeviceInfo will reopen and track it
+            SDL.SDL_JoystickClose(joystick);
+
+            LogAxisTypes($"CheckForNewDevices: Found new device at index {i}, instanceId={instanceId}, numJoysticks={numJoysticks}");
+
+            // New device found - open and track it properly
+            var (info, newInstanceId) = GetDeviceInfo(i);
+            if (info != null)
+            {
+                LogAxisTypes($"CheckForNewDevices: Opened device '{info.Name}' at index {i}, instanceId={newInstanceId}, firing DeviceConnected");
+                DeviceConnected?.Invoke(this, info);
+            }
+        }
+    }
+
+    private void HandleDeviceDisconnected(int instanceId)
+    {
+        // Get device info before removing so we can clean up HID matching
+        if (_deviceInfo.TryRemove(instanceId, out var info))
+        {
+            // Remove from matched HID paths so it can be re-matched on reconnect
+            if (!string.IsNullOrEmpty(info.HidDevicePath))
+            {
+                _matchedHidDevicePaths.Remove(info.HidDevicePath);
+            }
+        }
+
+        if (_openJoysticks.TryRemove(instanceId, out var joystick))
         {
             SDL.SDL_JoystickClose(joystick);
         }
-        _deviceInfo.TryRemove(deviceIndex, out _);
 
-        DeviceDisconnected?.Invoke(this, deviceIndex);
+        // Remove from known instance IDs so it can be detected again on reconnect
+        _knownInstanceIds.Remove(instanceId);
+
+        // Clear HID cache so devices are re-enumerated on reconnect
+        _hidDevicesCache = null;
+
+        // Fire event with the device index from info (for UI tracking)
+        DeviceDisconnected?.Invoke(this, info?.DeviceIndex ?? -1);
     }
 
     public void Dispose()
@@ -431,6 +511,7 @@ public class InputService : IDisposable
         _openJoysticks.Clear();
         _deviceInfo.Clear();
         _lastState.Clear();
+        _knownInstanceIds.Clear();
 
         _hidDeviceService = null;
         _hidDevicesCache = null;

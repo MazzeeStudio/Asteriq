@@ -28,15 +28,14 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 1. ✅ Extracts defaultProfile.xml from p4k
 2. ✅ Parses actions with `SCSchemaService.ParseActions()`
 3. ✅ Stores default bindings in `SCAction.DefaultBindings` list
-4. ❌ Only shows action name + single "user binding" column
-5. ❌ Does NOT display KB/Mouse defaults from p4k
-6. ❌ Does NOT show separate columns per device
+4. ✅ Multi-column grid: ACTION + KB + Mouse + JS1 + JS2...
+5. ✅ Displays KB/Mouse defaults from p4k in respective columns
+6. ✅ Shows separate columns per vJoy device (dynamic)
 
-### The Gap:
-We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) but we're not displaying it in the UI. The UI should show:
-- **KB column**: SC defaults pre-populated, user can add/edit keyboard bindings
-- **Mouse column**: SC defaults pre-populated, user can add/edit mouse bindings
-- **JS1/JS2/etc columns**: User-configured vJoy bindings for export to SC
+### Remaining Gap:
+The multi-column grid is now implemented. What's still needed:
+- **KB/Mouse editing**: Click to add/edit keyboard and mouse bindings (UI displays, but no edit mode yet)
+- **Input listening**: Real-time input capture when cell is clicked (currently uses dialog)
 
 ---
 
@@ -113,34 +112,34 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 ### Action Name Formatting
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Text truncation with ellipsis | `StringTrimming.EllipsisCharacter` | Basic substring truncation | 🔶 |
+| Text truncation with ellipsis | `StringTrimming.EllipsisCharacter` | Binary search truncation with "..." | ✅ |
 | "○" prefix for actions not in user profile | Yes | No | ❌ |
 | Type indicators ("⟷" axis, "✛" hat) | Yes, at end of action name | No | ❌ |
-| Indentation by hierarchy level | 0/16/32px based on level | No indentation | ❌ |
-| Dynamic action column width | Min 180px, max 320px, calculated | Fixed width | ❌ |
+| Indentation by hierarchy level | 0/16/32px based on level | 18px indent under category | 🔶 |
+| Dynamic action column width | Min 180px, max 320px, calculated | 280px base, dynamic max 45% | ✅ |
 
 ### Grid Columns
 | Feature | SCVirtStick | Asteriq | Asteriq Target | Status |
 |---------|-------------|---------|----------------|--------|
-| Multiple device columns | Yes: Action + KB + Mouse + devices | Single binding | Action + KB + Mouse + JS1-JSn | ❌ |
-| KB column | Shows/edits keyboard bindings | No | Editable - user can add/edit KB bindings | ❌ |
-| Mouse column | Shows/edits mouse bindings | No | Editable - user can add/edit mouse bindings | ❌ |
-| Joystick columns | Per physical device | No | Per vJoy device (JS1, JS2...) | ❌ |
-| Device column headers | Actual device names | N/A | "KB", "Mouse", "JS1", "JS2", etc. | ❌ |
-| Column width (devices) | Fixed 120px each | N/A | ~100px, FUI styled | ❌ |
-| Horizontal scrolling for devices | Yes, custom scrollbar | No | Yes, if needed | ❌ |
-| Default bindings from p4k | Pre-populated in cells | Parsed but not shown | Show as initial values, user can override | ❌ |
+| Multiple device columns | Yes: Action + KB + Mouse + devices | Action + KB + Mouse + JS1-JSn | Action + KB + Mouse + JS1-JSn | ✅ |
+| KB column | Shows/edits keyboard bindings | Shows defaults, edit pending | Editable - user can add/edit KB bindings | 🔶 |
+| Mouse column | Shows/edits mouse bindings | Shows defaults, edit pending | Editable - user can add/edit mouse bindings | 🔶 |
+| Joystick columns | Per physical device | Per vJoy device (JS1, JS2...) | Per vJoy device (JS1, JS2...) | ✅ |
+| Device column headers | Actual device names | "KB", "Mouse", "JS1", "JS2"... | "KB", "Mouse", "JS1", "JS2", etc. | ✅ |
+| Column width (devices) | Fixed 120px each | 90px each | ~100px, FUI styled | ✅ |
+| Horizontal scrolling for devices | Yes, custom scrollbar | Yes, auto horizontal scrollbar | Yes, if needed | ✅ |
+| Default bindings from p4k | Pre-populated in cells | Pre-populated from SCAction.DefaultBindings | Show as initial values, user can override | ✅ |
 
 ### Binding Display in Cells
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Empty cell indicator | "—" dash in dim color | No indicator | ❌ |
-| Keycap-style visualization | Styled button badges (`Btn24`, `Sl1`) | Plain text | ❌ |
-| Modifier keys display | Separate badge before main key (`Ctrl` `Btn12`) | Not shown | ❌ |
+| Empty cell indicator | "—" dash in dim color | "—" dash in muted color | ✅ |
+| Keycap-style visualization | Styled button badges (`Btn24`, `Sl1`) | Rounded badge with color border | ✅ |
+| Modifier keys display | Separate badge before main key (`Ctrl` `Btn12`) | Combined format (`SHFT+Btn1`) | ✅ |
 | Double-tap indicator | `2xctrl+Btn 26` format | Not supported | ❌ |
-| Axis inputs | Shown as `Sl1`, `X`, `Y` badges | Plain text | ❌ |
-| Fallback to compact text | When keycaps too wide | N/A | ❌ |
-| "Press..." listening state | Animated progress bar | Static text | 🔶 |
+| Axis inputs | Shown as `Sl1`, `X`, `Y` badges | `Sl1`, `X`, `MX`, `MY` badges | ✅ |
+| Fallback to compact text | When keycaps too wide | Truncation with ellipsis | ✅ |
+| "Press..." listening state | Animated progress bar | Not implemented | ❌ |
 
 ### Row Styling
 | Feature | SCVirtStick | Asteriq | Status |

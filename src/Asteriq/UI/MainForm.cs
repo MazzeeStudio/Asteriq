@@ -1554,6 +1554,25 @@ public class MainForm : Form
 
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
     {
+        // Handle right-click to remove curve control points
+        if (e.Button == MouseButtons.Right)
+        {
+            if (_activeTab == 1 && _mappingCategory == 1 && _selectedCurveType == CurveType.Custom)
+            {
+                var pt = new SKPoint(e.X, e.Y);
+                if (_curveEditorBounds.Contains(pt))
+                {
+                    int pointIndex = FindCurvePointAt(pt, _curveEditorBounds);
+                    if (pointIndex >= 0)
+                    {
+                        RemoveCurveControlPoint(pointIndex);
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+
         if (e.Button != MouseButtons.Left) return;
 
         // Profile dropdown clicks (must be handled first when dropdown is open)
@@ -1669,21 +1688,24 @@ public class MainForm : Form
             _activeInputTracker.Clear(); // Clear lead-lines when switching devices
         }
 
-        // Device action button clicks
-        if (_map1to1ButtonHovered && !_map1to1ButtonBounds.IsEmpty)
+        // Device action button clicks (only on Devices tab)
+        if (_activeTab == 0)
         {
-            CreateOneToOneMappings();
-            return;
-        }
-        if (_clearMappingsButtonHovered && !_clearMappingsButtonBounds.IsEmpty)
-        {
-            ClearDeviceMappings();
-            return;
-        }
-        if (_removeDeviceButtonHovered && !_removeDeviceButtonBounds.IsEmpty)
-        {
-            RemoveDisconnectedDevice();
-            return;
+            if (_map1to1ButtonHovered && !_map1to1ButtonBounds.IsEmpty)
+            {
+                CreateOneToOneMappings();
+                return;
+            }
+            if (_clearMappingsButtonHovered && !_clearMappingsButtonBounds.IsEmpty)
+            {
+                ClearDeviceMappings();
+                return;
+            }
+            if (_removeDeviceButtonHovered && !_removeDeviceButtonBounds.IsEmpty)
+            {
+                RemoveDisconnectedDevice();
+                return;
+            }
         }
 
         // Tab clicks - match positions calculated in DrawTitleBar
@@ -3155,7 +3177,8 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += FUIRenderer.ScaleLineHeight(18f);
 
-        // Centre and Invert checkboxes on their own row (label on left, checkbox on right)
+        // Symmetrical, Centre, and Invert checkboxes on their own row
+        // Symmetrical on left, Centre and Invert on right
         float checkboxSize = FUIRenderer.ScaleLineHeight(12f);
         float rowHeight = FUIRenderer.ScaleLineHeight(16f);
         float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
@@ -3167,8 +3190,14 @@ public class MainForm : Form
         using var labelPaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, scaledFontSize);
         float invertLabelWidth = labelPaint.MeasureText("Invert");
         float centreLabelWidth = labelPaint.MeasureText("Centre");
+        float symmetricalLabelWidth = labelPaint.MeasureText("Symmetrical");
         float labelGap = FUIRenderer.ScaleSpacing(4f);
         float checkboxGap = FUIRenderer.ScaleSpacing(12f);
+
+        // Symmetrical checkbox (leftmost) - checkbox then label
+        _curveSymmetricalCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
+        DrawCheckbox(canvas, _curveSymmetricalCheckboxBounds, _curveSymmetrical);
+        FUIRenderer.DrawText(canvas, "Symmetrical", new SKPoint(leftMargin + checkboxSize + labelGap, textY), FUIColors.TextDim, fontSize);
 
         // Invert checkbox (rightmost) - label then checkbox
         float invertCheckX = rightMargin - checkboxSize;
@@ -3220,26 +3249,6 @@ public class MainForm : Form
             FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 8f);
         }
         y += buttonHeight + FUIRenderer.ScaleSpacing(6f);
-
-        // Symmetrical checkbox (only shown for Custom curve type)
-        if (_selectedCurveType == CurveType.Custom)
-        {
-            float symCheckboxSize = FUIRenderer.ScaleLineHeight(14f);
-            float symCheckboxY = y;
-            float symCheckX = leftMargin;
-
-            _curveSymmetricalCheckboxBounds = new SKRect(symCheckX, symCheckboxY, symCheckX + symCheckboxSize, symCheckboxY + symCheckboxSize);
-            DrawCheckbox(canvas, _curveSymmetricalCheckboxBounds, _curveSymmetrical);
-
-            float symTextY = symCheckboxY + (symCheckboxSize - fontSize) / 2f + fontSize - 2f;
-            FUIRenderer.DrawText(canvas, "Symmetrical", new SKPoint(symCheckX + symCheckboxSize + labelGap, symTextY), FUIColors.TextDim, fontSize);
-
-            y += symCheckboxSize + FUIRenderer.ScaleSpacing(4f);
-        }
-        else
-        {
-            _curveSymmetricalCheckboxBounds = SKRect.Empty;
-        }
 
         // Curve editor visualization
         float curveHeight = 140f;
@@ -3774,42 +3783,44 @@ public class MainForm : Form
 
     private void DrawCurveVisualization(SKCanvas canvas, SKRect bounds)
     {
-        // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        // Background - darker than the panel
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0 };
         canvas.DrawRect(bounds, bgPaint);
 
-        // Grid lines
+        // Grid lines (10% increments) - visible but subtle
         using var gridPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Grid.WithAlpha(40),
-            StrokeWidth = 0.5f
+            Color = new SKColor(60, 70, 80), // Visible gray grid lines
+            StrokeWidth = 1f
         };
 
-        // Draw quarter grid lines
-        for (float t = 0.25f; t < 1f; t += 0.25f)
+        for (float t = 0.1f; t < 1f; t += 0.1f)
         {
+            // Skip 50% line - we'll draw it brighter
+            if (Math.Abs(t - 0.5f) < 0.01f) continue;
+
             float x = bounds.Left + t * bounds.Width;
             float y = bounds.Bottom - t * bounds.Height;
             canvas.DrawLine(x, bounds.Top, x, bounds.Bottom, gridPaint);
             canvas.DrawLine(bounds.Left, y, bounds.Right, y, gridPaint);
         }
 
-        // Center lines (brighter)
+        // Center lines (brighter, 50% mark)
         using var centerPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.GridAccent.WithAlpha(60),
-            StrokeWidth = 0.75f
+            Color = new SKColor(80, 95, 110), // More visible center lines
+            StrokeWidth = 1f
         };
         canvas.DrawLine(bounds.MidX, bounds.Top, bounds.MidX, bounds.Bottom, centerPaint);
         canvas.DrawLine(bounds.Left, bounds.MidY, bounds.Right, bounds.MidY, centerPaint);
 
-        // Reference linear line (dashed)
+        // Reference linear line (dashed diagonal)
         using var refPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame.WithAlpha(60),
+            Color = FUIColors.Frame.WithAlpha(50),
             StrokeWidth = 1f,
             PathEffect = SKPathEffect.CreateDash(new[] { 4f, 4f }, 0)
         };
@@ -3833,12 +3844,55 @@ public class MainForm : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
+        // Tick marks and labels on edges
+        using var tickPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Frame.WithAlpha(150),
+            StrokeWidth = 1f
+        };
+
+        float tickLen = 4f;
+        float labelOffset = 3f;
+
+        // Draw tick marks at 0%, 50%, 100% on bottom edge (IN axis)
+        float[] tickPositions = { 0f, 0.5f, 1f };
+        string[] tickLabels = { "0", "50", "100" };
+
+        for (int i = 0; i < tickPositions.Length; i++)
+        {
+            float t = tickPositions[i];
+            float x = bounds.Left + t * bounds.Width;
+
+            // Bottom tick
+            canvas.DrawLine(x, bounds.Bottom, x, bounds.Bottom + tickLen, tickPaint);
+
+            // Label below tick
+            float labelX = x - (t == 0 ? 0 : (t == 1 ? 12 : 6));
+            FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, bounds.Bottom + tickLen + labelOffset + 7), FUIColors.TextDim, 7f);
+        }
+
+        // Draw tick marks at 0%, 50%, 100% on left edge (OUT axis)
+        for (int i = 0; i < tickPositions.Length; i++)
+        {
+            float t = tickPositions[i];
+            float y = bounds.Bottom - t * bounds.Height;
+
+            // Left tick
+            canvas.DrawLine(bounds.Left - tickLen, y, bounds.Left, y, tickPaint);
+
+            // Label left of tick
+            float labelY = y + (t == 0 ? 3 : (t == 1 ? 7 : 3));
+            float labelX = bounds.Left - tickLen - labelOffset - (tickLabels[i].Length > 1 ? 12 : 6);
+            FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, labelY), FUIColors.TextDim, 7f);
+        }
+
         // Axis labels
-        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 12), FUIColors.TextDim, 8f);
+        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 22), FUIColors.TextDim, 8f);
 
         // Rotated "OUT" label
         canvas.Save();
-        canvas.Translate(bounds.Left - 14, bounds.MidY + 8);
+        canvas.Translate(bounds.Left - 24, bounds.MidY + 8);
         canvas.RotateDegrees(-90);
         FUIRenderer.DrawText(canvas, "OUT", new SKPoint(0, 0), FUIColors.TextDim, 8f);
         canvas.Restore();
@@ -3975,6 +4029,7 @@ public class MainForm : Form
     private void DrawCurveControlPoints(SKCanvas canvas, SKRect bounds)
     {
         const float PointRadius = 7f;
+        const float CenterPointRadius = 3.5f; // Half size for center point
 
         for (int i = 0; i < _curveControlPoints.Count; i++)
         {
@@ -3988,25 +4043,31 @@ public class MainForm : Form
             bool isHovered = i == _hoveredCurvePoint;
             bool isDragging = i == _draggingCurvePoint;
             bool isEndpoint = i == 0 || i == _curveControlPoints.Count - 1;
+            bool isCenterPoint = Math.Abs(pt.X - 0.5f) < 0.01f && Math.Abs(pt.Y - 0.5f) < 0.01f;
 
-            float radius = (isHovered || isDragging) ? PointRadius + 2 : PointRadius;
-            var color = isDragging ? FUIColors.Warning : (isHovered ? FUIColors.TextBright : FUIColors.Active);
+            // Center point is smaller and not interactive
+            float baseRadius = isCenterPoint ? CenterPointRadius : PointRadius;
+            float radius = (isHovered || isDragging) && !isCenterPoint ? baseRadius + 2 : baseRadius;
+            var color = isDragging ? FUIColors.Warning : (isHovered && !isCenterPoint ? FUIColors.TextBright : FUIColors.Active);
 
-            // Glow
-            using var glowPaint = new SKPaint
+            // Glow (skip for center point)
+            if (!isCenterPoint)
             {
-                Style = SKPaintStyle.Fill,
-                Color = color.WithAlpha(40),
-                IsAntialias = true,
-                ImageFilter = SKImageFilter.CreateBlur(5f, 5f)
-            };
-            canvas.DrawCircle(x, y, radius + 4, glowPaint);
+                using var glowPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = color.WithAlpha(40),
+                    IsAntialias = true,
+                    ImageFilter = SKImageFilter.CreateBlur(5f, 5f)
+                };
+                canvas.DrawCircle(x, y, radius + 4, glowPaint);
+            }
 
             // Fill
             using var fillPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = isEndpoint ? FUIColors.Background1 : color.WithAlpha(60),
+                Color = isEndpoint || isCenterPoint ? FUIColors.Background1 : color.WithAlpha(60),
                 IsAntialias = true
             };
             canvas.DrawCircle(x, y, radius, fillPaint);
@@ -4015,14 +4076,14 @@ public class MainForm : Form
             using var strokePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = color,
-                StrokeWidth = isEndpoint ? 2f : 1.5f,
+                Color = isCenterPoint ? FUIColors.Frame : color,
+                StrokeWidth = isEndpoint ? 2f : (isCenterPoint ? 1f : 1.5f),
                 IsAntialias = true
             };
             canvas.DrawCircle(x, y, radius, strokePaint);
 
-            // Value label when hovered/dragged
-            if (isHovered || isDragging)
+            // Value label when hovered/dragged (not for center point)
+            if ((isHovered || isDragging) && !isCenterPoint)
             {
                 string label = $"({pt.X:F2}, {pt.Y:F2})";
                 float labelY = y - radius - 10;
@@ -4053,6 +4114,12 @@ public class MainForm : Form
         for (int i = 0; i < _curveControlPoints.Count; i++)
         {
             var pt = _curveControlPoints[i];
+
+            // Skip center point - it's not selectable
+            bool isCenterPoint = Math.Abs(pt.X - 0.5f) < 0.01f && Math.Abs(pt.Y - 0.5f) < 0.01f;
+            if (isCenterPoint)
+                continue;
+
             float x = bounds.Left + pt.X * bounds.Width;
 
             // Apply inversion to display Y position to match the visual
@@ -4388,6 +4455,52 @@ public class MainForm : Form
         }
 
         _selectedCurveType = CurveType.Custom;
+        _canvas.Invalidate();
+    }
+
+    private void RemoveCurveControlPoint(int pointIndex)
+    {
+        if (pointIndex < 0 || pointIndex >= _curveControlPoints.Count)
+            return;
+
+        var pt = _curveControlPoints[pointIndex];
+
+        // Don't remove endpoints (0,0) or (1,1)
+        bool isEndpoint = pointIndex == 0 || pointIndex == _curveControlPoints.Count - 1;
+        if (isEndpoint)
+            return;
+
+        // Don't remove center point (0.5, 0.5)
+        bool isCenterPoint = Math.Abs(pt.X - 0.5f) < 0.01f && Math.Abs(pt.Y - 0.5f) < 0.01f;
+        if (isCenterPoint)
+            return;
+
+        // Remove the point
+        _curveControlPoints.RemoveAt(pointIndex);
+
+        // If symmetrical mode is enabled, also remove the mirror point
+        if (_curveSymmetrical)
+        {
+            float mirrorX = 1f - pt.X;
+
+            // Find and remove the mirror point
+            for (int i = _curveControlPoints.Count - 1; i >= 0; i--)
+            {
+                var mirrorPt = _curveControlPoints[i];
+                // Skip endpoints and center
+                if (i == 0 || i == _curveControlPoints.Count - 1)
+                    continue;
+                if (Math.Abs(mirrorPt.X - 0.5f) < 0.01f && Math.Abs(mirrorPt.Y - 0.5f) < 0.01f)
+                    continue;
+
+                if (Math.Abs(mirrorPt.X - mirrorX) < 0.02f)
+                {
+                    _curveControlPoints.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
         _canvas.Invalidate();
     }
 

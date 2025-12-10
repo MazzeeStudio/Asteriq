@@ -291,17 +291,17 @@ public string SCExportProfileName { get; set; }      // Default: "asteriq"
 
 ## Implementation Order
 
-### Session 1: Foundation
-- [ ] Add NuGet packages (SharpZipLib, ZstdSharp)
-- [ ] Create `Models/SCInstallation.cs`
-- [ ] Create `Services/SCInstallationService.cs`
-- [ ] Test installation detection
+### Session 1: Foundation ✅ COMPLETE
+- [x] Add NuGet packages (SharpZipLib, ZstdSharp)
+- [x] Create `Models/SCInstallation.cs`
+- [x] Create `Services/SCInstallationService.cs`
+- [x] Test installation detection (--scdetect CLI command added)
 
-### Session 2: P4K Extraction
-- [ ] Create `Services/P4kExtractorService.cs`
-- [ ] Create `Services/CryXmlService.cs` (CryXmlB parsing)
-- [ ] Create `Services/SCProfileCacheService.cs`
-- [ ] Test defaultProfile.xml extraction
+### Session 2: P4K Extraction ✅ COMPLETE
+- [x] Create `Services/P4kExtractorService.cs`
+- [x] Create `Services/CryXmlService.cs` (CryXmlB parsing)
+- [x] Create `Services/SCProfileCacheService.cs`
+- [x] Test defaultProfile.xml extraction (--scextract CLI command added)
 
 ### Session 3: Schema & Export
 - [ ] Create `Models/SCAction.cs`, `SCExportProfile.cs`

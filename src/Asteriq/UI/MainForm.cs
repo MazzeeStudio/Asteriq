@@ -249,7 +249,7 @@ public class MainForm : Form
     private SKRect _bgGlowSliderBounds;
     private SKRect _bgNoiseSliderBounds;
     private SKRect _bgScanlineSliderBounds;
-    private SKRect _bgVignetteToggleBounds;
+    private SKRect _bgVignetteSliderBounds;
     private SKRect _autoLoadToggleBounds;
     private string? _draggingBgSlider;  // Which slider is being dragged
 
@@ -294,7 +294,6 @@ public class MainForm : Form
         _background.NoiseIntensity = bgSettings.noiseIntensity;
         _background.ScanlineIntensity = bgSettings.scanlineIntensity;
         _background.VignetteStrength = bgSettings.vignetteStrength;
-        _background.EnableVignette = bgSettings.vignetteEnabled;
     }
 
     private void RefreshProfileList()
@@ -2592,10 +2591,11 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, _background.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
-        // Vignette toggle
-        FUIRenderer.DrawText(canvas, "Vignette", new SKPoint(leftMargin, y + 4), FUIColors.TextPrimary, 11f);
-        _bgVignetteToggleBounds = new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight);
-        DrawToggleSwitch(canvas, _bgVignetteToggleBounds, _background.EnableVignette);
+        // Vignette intensity slider
+        FUIRenderer.DrawText(canvas, "Vignette", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        _bgVignetteSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        DrawSettingsSlider(canvas, _bgVignetteSliderBounds, _background.VignetteStrength, 100);
+        FUIRenderer.DrawText(canvas, _background.VignetteStrength.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
     }
 
     private void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
@@ -2678,11 +2678,10 @@ public class MainForm : Form
             UpdateBgSliderFromPoint(pt.X);
             return;
         }
-        if (_bgVignetteToggleBounds.Contains(pt))
+        if (_bgVignetteSliderBounds.Contains(pt))
         {
-            _background.EnableVignette = !_background.EnableVignette;
-            SaveBackgroundSettings();
-            _canvas.Invalidate();
+            _draggingBgSlider = "vignette";
+            UpdateBgSliderFromPoint(pt.X);
             return;
         }
     }
@@ -2696,6 +2695,7 @@ public class MainForm : Form
             case "glow": bounds = _bgGlowSliderBounds; break;
             case "noise": bounds = _bgNoiseSliderBounds; break;
             case "scanline": bounds = _bgScanlineSliderBounds; break;
+            case "vignette": bounds = _bgVignetteSliderBounds; break;
             default: return;
         }
 
@@ -2708,6 +2708,7 @@ public class MainForm : Form
             case "glow": _background.GlowIntensity = value; break;
             case "noise": _background.NoiseIntensity = value; break;
             case "scanline": _background.ScanlineIntensity = value; break;
+            case "vignette": _background.VignetteStrength = value; break;
         }
 
         _canvas.Invalidate();
@@ -2720,8 +2721,7 @@ public class MainForm : Form
             _background.GlowIntensity,
             _background.NoiseIntensity,
             _background.ScanlineIntensity,
-            _background.VignetteStrength,
-            _background.EnableVignette);
+            _background.VignetteStrength);
     }
 
     private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float sideTabPad, float contentTop, float contentBottom)

@@ -17,15 +17,12 @@ public class FUIBackground : IDisposable
 
     private readonly Random _random = new();
 
-    // Settings - intensity values 0-100 for UI, converted to 0-1 internally
-    public bool EnableVignette { get; set; } = true;
-
     // Intensity controls (0-100 scale for UI)
-    public int GridStrength { get; set; } = 50;        // 0 = off, 100 = max
-    public int GlowIntensity { get; set; } = 40;       // 0 = off, 100 = max
-    public int NoiseIntensity { get; set; } = 8;       // 0 = off, 100 = max (subtle by default)
-    public int ScanlineIntensity { get; set; } = 0;    // 0 = off, 100 = max
-    public int VignetteStrength { get; set; } = 50;    // 0 = off, 100 = max
+    public int GridStrength { get; set; } = 35;        // 0 = off, 100 = max
+    public int GlowIntensity { get; set; } = 45;       // 0 = off, 100 = max
+    public int NoiseIntensity { get; set; } = 45;      // 0 = off, 100 = max
+    public int ScanlineIntensity { get; set; } = 60;   // 0 = off, 100 = max
+    public int VignetteStrength { get; set; } = 15;    // 0 = off, 100 = max
 
     // Derived properties for rendering
     private float GridOpacity => GridStrength / 100f;
@@ -91,8 +88,8 @@ public class FUIBackground : IDisposable
             DrawScanlines(canvas, bounds);
         }
 
-        // Layer 5: Vignette
-        if (EnableVignette && VignetteStrength > 0 && _vignetteBitmap != null)
+        // Layer 5: Vignette (intensity-based)
+        if (VignetteStrength > 0 && _vignetteBitmap != null)
         {
             using var vignettePaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(255 * VignetteOpacity)) };
             canvas.DrawBitmap(_vignetteBitmap, bounds.Left, bounds.Top, vignettePaint);
@@ -237,19 +234,19 @@ public class FUIBackground : IDisposable
         float intensityScale = GlowOpacity;  // 0-1 based on GlowIntensity setting
 
         // Create several ambient glow spots
-        // Center glow is largest and brightest
-        float centerRadius = MathF.Max(bounds.Width, bounds.Height) * 0.5f;
+        // Center glow sized relative to screen but capped for visibility
+        float centerRadius = MathF.Min(bounds.Width, bounds.Height) * 0.35f;
         var glowSpots = new[]
         {
-            (x: bounds.Left + bounds.Width * 0.33f, y: bounds.Top + bounds.Height * 0.8f, r: 120f, opacity: 0.35f),
-            (x: bounds.Left + bounds.Width * 0.70f, y: bounds.Top + bounds.Height * 0.15f, r: 80f, opacity: 0.30f),
-            (x: bounds.Left + bounds.Width * 0.5f, y: bounds.Top + bounds.Height * 0.5f, r: centerRadius, opacity: 0.45f),  // Center - large and bright
+            (x: bounds.Left + bounds.Width * 0.25f, y: bounds.Top + bounds.Height * 0.75f, r: 100f, opacity: 0.30f),
+            (x: bounds.Left + bounds.Width * 0.75f, y: bounds.Top + bounds.Height * 0.20f, r: 70f, opacity: 0.25f),
+            (x: bounds.Left + bounds.Width * 0.5f, y: bounds.Top + bounds.Height * 0.5f, r: centerRadius, opacity: 0.35f),  // Center
         };
 
         foreach (var spot in glowSpots)
         {
-            // Apply intensity scale to opacity
-            byte alpha = (byte)(100 * spot.opacity * intensityScale);
+            // Apply intensity scale to opacity (doubled for better visibility at mid-range)
+            byte alpha = (byte)(400 * spot.opacity * intensityScale);
             using var shader = SKShader.CreateRadialGradient(
                 new SKPoint(spot.x, spot.y),
                 spot.r,

@@ -67,16 +67,22 @@
 ## Phase 7: Configuration UI (Current)
 **Goal**: FUI (Futuristic User Interface) for device mapping and configuration
 
-- [ ] FUI theme system (slate, amber, magenta, acidgreen, etc. color schemes)
-- [ ] Custom window chrome (borderless, FUI styling)
-- [ ] Tab navigation (Devices, Mappings, SC Bindings, Settings)
-- [ ] Device list panel with live input visualization
-- [ ] vJoy slot assignment UI
-- [ ] Axis/button/hat mapping editor
-- [ ] Curve editor with visual preview
+- [x] FUI theme system (slate primary color scheme)
+- [x] Custom window chrome (borderless, FUI styling)
+- [x] Tab navigation (Devices, Mappings, SC Bindings, Settings)
+- [x] Device list panel with live input visualization
+- [x] vJoy slot assignment UI (MAPPINGS tab)
+- [x] Axis/button/hat mapping editor
+- [x] Curve editor with visual preview
 - [ ] Shift layer configuration
-- [ ] Profile management UI
-- [ ] Device silhouette display (SVG-based)
+- [x] Profile management UI (dropdown in title bar)
+- [x] Device silhouette display (SVG-based with lead-lines)
+- [x] Code refactoring: Split MainForm.cs into partial classes
+  - MainForm.cs: Core form logic (2,800 lines)
+  - MainForm.Mappings.cs: Mappings tab (4,699 lines)
+  - MainForm.Devices.cs: Devices tab (850 lines)
+  - MainForm.SCBindings.cs: SC Bindings tab (1,388 lines)
+  - MainForm.Settings.cs: Settings tab (646 lines)
 
 ## Phase 8: Star Citizen Integration
 **Goal**: Export vJoy mappings as SC actionmaps.xml (export-only, never modify user's files)

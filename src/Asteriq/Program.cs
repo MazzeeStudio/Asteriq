@@ -159,6 +159,22 @@ static class Program
             return;
         }
 
+        if (args.Contains("--scschema"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunSCSchema(args);
+            return;
+        }
+
+        if (args.Contains("--scexport"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunSCExport(args);
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new UI.MainForm());
     }
@@ -240,6 +256,13 @@ Star Citizen Integration:
                       Extracts and caches the default profile from the specified
                       SC environment (LIVE, PTU, etc.). Uses preferred if not specified.
                       Example: Asteriq.exe --scextract LIVE
+
+  --scschema [env]    Parse SC action schema from defaultProfile.xml
+                      Shows all action maps and actions available for binding.
+                      Use --scschema LIVE --filter spaceship to filter results.
+
+  --scexport [env]    Test SC XML export functionality
+                      Generates a sample export file showing the output format.
 
 Examples:
   Asteriq.exe                     Launch GUI
@@ -1727,6 +1750,362 @@ Examples:
         // Update cache info
         cacheInfo = cacheService.GetCacheInfo();
         Console.WriteLine($"\nUpdated cache: {cacheInfo.CachedProfileCount} profiles ({cacheInfo.FormattedSize})");
+
+        Console.WriteLine("\n(Press Enter to continue...)");
+        Console.ReadLine();
+    }
+
+    private static void RunSCSchema(string[] args)
+    {
+        Console.WriteLine("=== Asteriq SC Schema Parser ===\n");
+
+        // Parse optional environment and filter arguments
+        string? targetEnv = null;
+        string? filter = null;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--scschema" && i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+            {
+                targetEnv = args[i + 1].ToUpperInvariant();
+            }
+            if (args[i] == "--filter" && i + 1 < args.Length)
+            {
+                filter = args[i + 1].ToLowerInvariant();
+            }
+        }
+
+        var scService = new SCInstallationService();
+        var cacheService = new SCProfileCacheService();
+        var schemaService = new SCSchemaService();
+
+        Console.WriteLine("Scanning for Star Citizen installations...\n");
+
+        var installations = scService.Installations;
+
+        if (installations.Count == 0)
+        {
+            Console.WriteLine("No Star Citizen installations found.");
+            Console.WriteLine("\n(Press Enter to continue...)");
+            Console.ReadLine();
+            return;
+        }
+
+        // Select target installation
+        Models.SCInstallation? target;
+        if (!string.IsNullOrEmpty(targetEnv))
+        {
+            target = scService.GetInstallation(targetEnv);
+            if (target == null)
+            {
+                Console.WriteLine($"ERROR: Installation '{targetEnv}' not found.");
+                Console.WriteLine("\n(Press Enter to continue...)");
+                Console.ReadLine();
+                return;
+            }
+        }
+        else
+        {
+            target = scService.GetPreferredInstallation();
+            if (target == null)
+            {
+                Console.WriteLine("ERROR: No preferred installation found.");
+                Console.WriteLine("\n(Press Enter to continue...)");
+                Console.ReadLine();
+                return;
+            }
+        }
+
+        Console.WriteLine($"Target: {target.DisplayName}");
+        Console.WriteLine($"  BuildId: {target.BuildId}");
+
+        // Get or extract profile
+        Console.WriteLine("\nLoading defaultProfile.xml...");
+        var profile = cacheService.GetOrExtractProfile(target);
+
+        if (profile == null)
+        {
+            Console.WriteLine("ERROR: Failed to load profile.");
+            Console.WriteLine("\n(Press Enter to continue...)");
+            Console.ReadLine();
+            return;
+        }
+
+        // Parse actions
+        Console.WriteLine("Parsing action schema...\n");
+        var actions = schemaService.ParseActions(profile);
+
+        Console.WriteLine($"Total actions: {actions.Count}");
+
+        // Apply filter if specified
+        if (!string.IsNullOrEmpty(filter))
+        {
+            actions = actions.Where(a =>
+                a.ActionMap.ToLower().Contains(filter) ||
+                a.ActionName.ToLower().Contains(filter) ||
+                a.Category.ToLower().Contains(filter)).ToList();
+            Console.WriteLine($"Filtered to: {actions.Count} actions (filter: {filter})");
+        }
+
+        // Group by action map
+        var byMap = schemaService.GroupByActionMap(actions);
+
+        Console.WriteLine($"\n=== Action Maps ({byMap.Count}) ===\n");
+
+        foreach (var kvp in byMap)
+        {
+            var mapName = kvp.Key;
+            var mapActions = kvp.Value;
+
+            // Count by type
+            var buttons = mapActions.Count(a => a.InputType == Models.SCInputType.Button);
+            var axes = mapActions.Count(a => a.InputType == Models.SCInputType.Axis);
+            var hats = mapActions.Count(a => a.InputType == Models.SCInputType.Hat);
+
+            Console.WriteLine($"{mapName}:");
+            Console.WriteLine($"  Actions: {mapActions.Count} ({buttons} buttons, {axes} axes, {hats} hats)");
+
+            // Show sample actions
+            foreach (var action in mapActions.Take(5))
+            {
+                var typeStr = action.InputType.ToString().ToLower();
+                var defaultStr = action.DefaultBindings.Count > 0
+                    ? $" [{string.Join(", ", action.DefaultBindings.Take(2).Select(b => b.FullInput))}]"
+                    : "";
+                Console.WriteLine($"    - {action.ActionName} ({typeStr}){defaultStr}");
+            }
+
+            if (mapActions.Count > 5)
+            {
+                Console.WriteLine($"    ... and {mapActions.Count - 5} more");
+            }
+            Console.WriteLine();
+        }
+
+        // Filter to joystick actions
+        var joystickActions = schemaService.FilterJoystickActions(actions);
+        Console.WriteLine($"Joystick-relevant actions: {joystickActions.Count}");
+
+        Console.WriteLine("\n(Press Enter to continue...)");
+        Console.ReadLine();
+    }
+
+    private static void RunSCExport(string[] args)
+    {
+        Console.WriteLine("=== Asteriq SC Export Test ===\n");
+
+        // Parse optional environment argument
+        string? targetEnv = null;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--scexport" && i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+            {
+                targetEnv = args[i + 1].ToUpperInvariant();
+            }
+        }
+
+        var scService = new SCInstallationService();
+        var cacheService = new SCProfileCacheService();
+        var schemaService = new SCSchemaService();
+        var exportService = new SCXmlExportService();
+
+        Console.WriteLine("Scanning for Star Citizen installations...\n");
+
+        var installations = scService.Installations;
+
+        if (installations.Count == 0)
+        {
+            Console.WriteLine("No Star Citizen installations found.");
+            Console.WriteLine("\n(Press Enter to continue...)");
+            Console.ReadLine();
+            return;
+        }
+
+        // Select target installation
+        Models.SCInstallation? target;
+        if (!string.IsNullOrEmpty(targetEnv))
+        {
+            target = scService.GetInstallation(targetEnv);
+            if (target == null)
+            {
+                Console.WriteLine($"ERROR: Installation '{targetEnv}' not found.");
+                Console.WriteLine("\n(Press Enter to continue...)");
+                Console.ReadLine();
+                return;
+            }
+        }
+        else
+        {
+            target = scService.GetPreferredInstallation();
+            if (target == null)
+            {
+                Console.WriteLine("ERROR: No preferred installation found.");
+                Console.WriteLine("\n(Press Enter to continue...)");
+                Console.ReadLine();
+                return;
+            }
+        }
+
+        Console.WriteLine($"Target: {target.DisplayName}");
+        Console.WriteLine($"  BuildId: {target.BuildId}");
+
+        // Create a test export profile
+        Console.WriteLine("\nCreating test export profile...\n");
+
+        var exportProfile = new Models.SCExportProfile
+        {
+            ProfileName = "asteriq_test",
+            TargetEnvironment = target.Environment,
+            TargetBuildId = target.BuildId
+        };
+
+        // Map vJoy 1 -> js1, vJoy 2 -> js2
+        exportProfile.SetSCInstance(1, 1);
+        exportProfile.SetSCInstance(2, 2);
+
+        // Add some sample bindings
+        var testBindings = new[]
+        {
+            // Flight movement axes
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_movement",
+                ActionName = "v_strafe_forward",
+                VJoyDevice = 1,
+                InputName = "y",
+                InputType = Models.SCInputType.Axis
+            },
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_movement",
+                ActionName = "v_strafe_lateral",
+                VJoyDevice = 1,
+                InputName = "x",
+                InputType = Models.SCInputType.Axis
+            },
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_movement",
+                ActionName = "v_strafe_vertical",
+                VJoyDevice = 1,
+                InputName = "z",
+                InputType = Models.SCInputType.Axis
+            },
+            // Flight rotation
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_movement",
+                ActionName = "v_pitch",
+                VJoyDevice = 2,
+                InputName = "y",
+                InputType = Models.SCInputType.Axis,
+                Inverted = true
+            },
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_movement",
+                ActionName = "v_yaw",
+                VJoyDevice = 2,
+                InputName = "x",
+                InputType = Models.SCInputType.Axis
+            },
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_movement",
+                ActionName = "v_roll",
+                VJoyDevice = 2,
+                InputName = "z",
+                InputType = Models.SCInputType.Axis
+            },
+            // Weapon buttons
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_weapons",
+                ActionName = "v_attack1",
+                VJoyDevice = 2,
+                InputName = "button1",
+                InputType = Models.SCInputType.Button
+            },
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_weapons",
+                ActionName = "v_attack2",
+                VJoyDevice = 2,
+                InputName = "button2",
+                InputType = Models.SCInputType.Button
+            },
+            // Targeting
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_targeting",
+                ActionName = "v_target_cycle_hostile_fwd",
+                VJoyDevice = 1,
+                InputName = "button5",
+                InputType = Models.SCInputType.Button,
+                ActivationMode = Models.SCActivationMode.Press
+            },
+            new Models.SCActionBinding
+            {
+                ActionMap = "spaceship_targeting",
+                ActionName = "v_target_cycle_hostile_back",
+                VJoyDevice = 1,
+                InputName = "button5",
+                InputType = Models.SCInputType.Button,
+                ActivationMode = Models.SCActivationMode.DoubleTap
+            }
+        };
+
+        foreach (var binding in testBindings)
+        {
+            exportProfile.Bindings.Add(binding);
+        }
+
+        Console.WriteLine($"Profile: {exportProfile.ProfileName}");
+        Console.WriteLine($"vJoy mappings: {string.Join(", ", exportProfile.VJoyToSCInstance.Select(kv => $"vJoy{kv.Key}=js{kv.Value}"))}");
+        Console.WriteLine($"Bindings: {exportProfile.Bindings.Count}");
+
+        // Validate
+        Console.WriteLine("\nValidating profile...");
+        var validation = exportService.Validate(exportProfile);
+        Console.WriteLine($"Valid: {validation.IsValid}");
+        if (validation.Errors.Count > 0)
+        {
+            Console.WriteLine("Errors:");
+            foreach (var error in validation.Errors)
+                Console.WriteLine($"  - {error}");
+        }
+        if (validation.Warnings.Count > 0)
+        {
+            Console.WriteLine("Warnings:");
+            foreach (var warning in validation.Warnings)
+                Console.WriteLine($"  - {warning}");
+        }
+
+        // Generate export
+        Console.WriteLine("\nGenerating XML...\n");
+        var doc = exportService.Export(exportProfile);
+
+        // Display the XML
+        Console.WriteLine("=== Generated XML ===\n");
+        using (var sw = new System.IO.StringWriter())
+        {
+            var settings = new System.Xml.XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "  ",
+                OmitXmlDeclaration = true
+            };
+            using (var xw = System.Xml.XmlWriter.Create(sw, settings))
+            {
+                doc.WriteTo(xw);
+            }
+            Console.WriteLine(sw.ToString());
+        }
+
+        // Show export path
+        var exportPath = exportService.GetExportPath(exportProfile, target);
+        Console.WriteLine($"\n=== Export Info ===");
+        Console.WriteLine($"Filename: {exportProfile.GetExportFileName()}");
+        Console.WriteLine($"Export path: {exportPath}");
 
         Console.WriteLine("\n(Press Enter to continue...)");
         Console.ReadLine();

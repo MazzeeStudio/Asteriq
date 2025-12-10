@@ -273,6 +273,9 @@ public class MainForm : Form
 
         // Apply font size setting
         FUIRenderer.FontSizeOption = _profileService.FontSize;
+
+        // Apply theme setting
+        FUIColors.SetTheme(_profileService.Theme);
     }
 
     private void RefreshProfileList()
@@ -2523,6 +2526,7 @@ public class MainForm : Form
             if (_themeButtonBounds[i].Contains(pt))
             {
                 FUIColors.SetTheme(themes[i]);
+                _profileService.Theme = themes[i];
                 _canvas.Invalidate();
                 return;
             }

@@ -79,14 +79,41 @@
 - [ ] Device silhouette display (SVG-based)
 
 ## Phase 8: Star Citizen Integration
-**Goal**: Read and visualize SC bindings
+**Goal**: Export vJoy mappings as SC actionmaps.xml (export-only, never modify user's files)
 
-- [ ] P4K reader (extract default actionmaps)
-- [ ] User actionmaps.xml parser
-- [ ] Binding data model
-- [ ] Device → SC instance mapping (js1, js2, etc.)
-- [ ] Binding visualization on device silhouette
-- [ ] Export to actionmaps.xml format
+See `docs/SC_BINDINGS_IMPLEMENTATION.md` for detailed implementation plan.
+
+### Session 1: Foundation
+- [ ] Add NuGet packages (SharpZipLib, ZstdSharp)
+- [ ] Create `Models/SCInstallation.cs`
+- [ ] Create `Services/SCInstallationService.cs`
+- [ ] Test installation detection
+
+### Session 2: P4K Extraction
+- [ ] Create `Services/P4kExtractorService.cs`
+- [ ] Create `Services/CryXmlService.cs` (CryXmlB binary parsing)
+- [ ] Create `Services/SCProfileCacheService.cs`
+- [ ] Test defaultProfile.xml extraction
+
+### Session 3: Schema & Export
+- [ ] Create `Models/SCAction.cs`, `SCExportProfile.cs`
+- [ ] Create `Services/SCSchemaService.cs` (change detection)
+- [ ] Create `Services/SCXmlExportService.cs`
+- [ ] Test export generation
+
+### Session 4: UI
+- [ ] Update BINDINGS tab with real UI
+- [ ] Installation selector panel
+- [ ] Export configuration panel
+- [ ] Schema change alert panel
+
+### Session 5: Integration & Polish
+- [ ] Wire up settings persistence
+- [ ] Add export success/error notifications
+- [ ] Test full workflow
+- [ ] Handle edge cases (no SC installed, corrupt p4k, etc.)
+
+Reference implementation: `C:\Users\mhams\source\repos\SCVirtStick\SCVirtStick\Core\`
 
 ## Phase 9: Polish and Release
 **Goal**: Production-ready application

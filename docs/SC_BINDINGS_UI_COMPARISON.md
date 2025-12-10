@@ -72,6 +72,14 @@ We have the data (`SCDefaultBinding` with `DevicePrefix`, `Input`, `Modifiers`) 
 - **Use JS1/JS2/JS3 for device columns** - we're mapping vJoy outputs to SC, not physical devices
 - **Keycap badges should follow FUI colors** - use our theme colors, corner accents, etc.
 
+### Technical Note: KB/Mouse Input Detection
+- **No SDL2 or DirectInput needed** for keyboard/mouse
+- Use **Windows API directly** (`user32.dll`):
+  - `GetAsyncKeyState(int vKey)` - for keyboard keys and mouse buttons
+  - `GetCursorPos` - for mouse position (if needed for axis-like mouse input)
+- SCVirtStick uses this approach in `UnifiedInputManager.cs`
+- We already have `KeyboardService.cs` using these APIs for output; similar code for input detection
+
 ---
 
 ## 1. ACTION LIST DISPLAY

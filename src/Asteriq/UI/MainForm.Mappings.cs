@@ -3796,8 +3796,11 @@ public partial class MainForm
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        bool isAxis = rowIndex < 8;
-        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+        // Use current mapping category to determine axis vs button
+        // Category 0 = Buttons, Category 1 = Axes
+        bool isAxis = _mappingCategory == 1;
+        // rowIndex is already the correct index within the current category
+        int outputIndex = rowIndex;
 
         // Remove existing binding for this output
         RemoveBindingAtRow(rowIndex, save: false);
@@ -3844,8 +3847,11 @@ public partial class MainForm
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        bool isAxis = rowIndex < 8;
-        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+        // Use current mapping category to determine axis vs button
+        // Category 0 = Buttons, Category 1 = Axes
+        bool isAxis = _mappingCategory == 1;
+        // rowIndex is already the correct index within the current category
+        int outputIndex = rowIndex;
 
         if (isAxis)
         {
@@ -4007,8 +4013,9 @@ public partial class MainForm
         _isListeningForInput = true;
         _pendingInput = null;
 
-        // Determine input type based on row (first 8 are axes)
-        bool isAxis = rowIndex < 8;
+        // Determine input type based on current mapping category tab
+        // Category 0 = Buttons, Category 1 = Axes
+        bool isAxis = _mappingCategory == 1;
         var filter = isAxis ? InputDetectionFilter.Axes : InputDetectionFilter.Buttons;
 
         _inputDetectionService ??= new InputDetectionService(_inputService);
@@ -4032,7 +4039,7 @@ public partial class MainForm
                     var existingMapping = FindExistingMappingForInput(profile, inputSource);
                     if (existingMapping != null)
                     {
-                        string newTarget = isAxis ? $"vJoy Axis {rowIndex}" : $"vJoy Button {rowIndex - 8 + 1}";
+                        string newTarget = isAxis ? $"vJoy Axis {rowIndex}" : $"vJoy Button {rowIndex + 1}";
                         if (!ConfirmDuplicateMapping(existingMapping, newTarget))
                         {
                             // User cancelled, don't create the mapping
@@ -4064,7 +4071,8 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        int outputIndex = isAxis ? rowIndex : rowIndex - 8;
+        // rowIndex is already the correct index within the current category (axes or buttons)
+        int outputIndex = rowIndex;
         var newInputSource = input.ToInputSource();
 
         if (isAxis)

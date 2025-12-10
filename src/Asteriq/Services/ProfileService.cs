@@ -559,6 +559,42 @@ public class ProfileService
     }
 
     /// <summary>
+    /// Get or set the last used SC export profile name
+    /// </summary>
+    public string? LastSCExportProfile
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.LastSCExportProfile;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.LastSCExportProfile = value;
+            SaveSettings(settings);
+        }
+    }
+
+    /// <summary>
+    /// Get or set auto-load setting for SC export profiles
+    /// </summary>
+    public bool AutoLoadLastSCExportProfile
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.AutoLoadLastSCExportProfile;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.AutoLoadLastSCExportProfile = value;
+            SaveSettings(settings);
+        }
+    }
+
+    /// <summary>
     /// Activate a profile by ID, making it the current active profile
     /// </summary>
     public bool ActivateProfile(Guid profileId)
@@ -708,6 +744,10 @@ public class AppSettings
     public int NoiseIntensity { get; set; } = 45;
     public int ScanlineIntensity { get; set; } = 60;
     public int VignetteStrength { get; set; } = 15;
+
+    // SC Export profile settings
+    public string? LastSCExportProfile { get; set; }
+    public bool AutoLoadLastSCExportProfile { get; set; } = true;
 }
 
 /// <summary>

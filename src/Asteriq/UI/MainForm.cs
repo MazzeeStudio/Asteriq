@@ -294,12 +294,38 @@ public partial class MainForm : Form
     private int _scHoveredActionMapFilter = -1;
     private List<string> _scActionMaps = new();  // List of unique action maps
 
+    // SC Bindings search and filter state
+    private string _scSearchText = "";           // Search text for filtering actions
+    private bool _scShowBoundOnly = false;       // Show only actions with bindings
+    private SKRect _scSearchBoxBounds;
+    private bool _scSearchBoxFocused = false;
+    private SKRect _scShowBoundOnlyBounds;
+    private bool _scShowBoundOnlyHovered = false;
+
+    // SC Category collapse state
+    private HashSet<string> _scCollapsedCategories = new();  // Action maps that are collapsed
+    private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();  // Bounds for category headers
+
     // SC Binding assignment state
     private bool _scAssigningInput = false;
     private SKRect _scAssignInputButtonBounds;
     private bool _scAssignInputButtonHovered;
     private SKRect _scClearBindingButtonBounds;
     private bool _scClearBindingButtonHovered;
+
+    // SC Export profile management
+    private SCExportProfileService? _scExportProfileService;
+    private List<SCExportProfileInfo> _scExportProfiles = new();
+    private SKRect _scProfileDropdownBounds;
+    private bool _scProfileDropdownOpen;
+    private SKRect _scProfileDropdownListBounds;
+    private int _scHoveredProfileIndex = -1;
+    private SKRect _scNewProfileButtonBounds;
+    private bool _scNewProfileButtonHovered;
+    private SKRect _scSaveProfileButtonBounds;
+    private bool _scSaveProfileButtonHovered;
+    private SKRect _scDeleteProfileButtonBounds;
+    private bool _scDeleteProfileButtonHovered;
 
     public MainForm()
     {
@@ -811,6 +837,12 @@ public partial class MainForm : Form
             return true; // Consume the key
         }
 
+        // Handle SC Bindings search box input
+        if (_scSearchBoxFocused && _activeTab == 2)
+        {
+            return HandleSearchBoxKey(keyData);
+        }
+
         // Cancel key capture with Escape
         if (keyData == Keys.Escape)
         {
@@ -824,9 +856,81 @@ public partial class MainForm : Form
                 CancelInputListening();
                 return true;
             }
+            if (_scSearchBoxFocused)
+            {
+                _scSearchBoxFocused = false;
+                return true;
+            }
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private bool HandleSearchBoxKey(Keys keyData)
+    {
+        // Remove modifiers for comparison
+        var key = keyData & Keys.KeyCode;
+
+        if (key == Keys.Escape)
+        {
+            _scSearchBoxFocused = false;
+            return true;
+        }
+
+        if (key == Keys.Back)
+        {
+            if (_scSearchText.Length > 0)
+            {
+                _scSearchText = _scSearchText.Substring(0, _scSearchText.Length - 1);
+                RefreshFilteredActions();
+            }
+            return true;
+        }
+
+        if (key == Keys.Delete)
+        {
+            _scSearchText = "";
+            RefreshFilteredActions();
+            return true;
+        }
+
+        // Allow alphanumeric and common characters
+        char c = KeyToChar(key, (keyData & Keys.Shift) == Keys.Shift);
+        if (c != '\0' && _scSearchText.Length < 50)
+        {
+            _scSearchText += c;
+            RefreshFilteredActions();
+            return true;
+        }
+
+        return false; // Let other keys pass through
+    }
+
+    private static char KeyToChar(Keys key, bool shift)
+    {
+        // Letters
+        if (key >= Keys.A && key <= Keys.Z)
+        {
+            char c = (char)('a' + (key - Keys.A));
+            return shift ? char.ToUpper(c) : c;
+        }
+
+        // Numbers
+        if (key >= Keys.D0 && key <= Keys.D9)
+        {
+            return (char)('0' + (key - Keys.D0));
+        }
+
+        // Space and common characters
+        return key switch
+        {
+            Keys.Space => ' ',
+            Keys.OemMinus => shift ? '_' : '-',
+            Keys.Oemplus => shift ? '+' : '=',
+            Keys.OemPeriod => '.',
+            Keys.Oemcomma => ',',
+            _ => '\0'
+        };
     }
 
     private static string? GetKeyNameFromKeys(Keys keys)

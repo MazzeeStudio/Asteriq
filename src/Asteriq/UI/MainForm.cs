@@ -294,6 +294,16 @@ public partial class MainForm : Form
     private int _scHoveredActionMapFilter = -1;
     private List<string> _scActionMaps = new();  // List of unique action maps
 
+    // SC Bindings grid column state
+    private float _scGridActionColWidth = 280f;   // Action name column (wider for long action names)
+    private float _scGridDeviceColWidth = 90f;    // Each device column (KB, Mouse, JS1...)
+    private float _scGridHorizontalScroll = 0f;   // Horizontal scroll offset for device columns
+    private float _scGridTotalWidth = 0f;         // Total width of all columns
+    private int _scSelectedColumn = -1;           // -1=none, 0=KB, 1=Mouse, 2+=JS columns
+    private int _scHoveredColumn = -1;
+    private (int row, int col) _scSelectedCell = (-1, -1);  // Currently selected cell for editing
+    private (int row, int col) _scHoveredCell = (-1, -1);   // Currently hovered cell
+
     // SC Bindings search and filter state
     private string _scSearchText = "";           // Search text for filtering actions
     private bool _scShowBoundOnly = false;       // Show only actions with bindings

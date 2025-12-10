@@ -67,6 +67,51 @@ public partial class MainForm
         _scExportProfiles = _scExportProfileService.ListProfiles();
     }
 
+    /// <summary>
+    /// Gets the list of device columns for the SC bindings grid.
+    /// Returns: KB, Mouse, plus one column per configured vJoy device.
+    /// </summary>
+    private List<SCGridColumn> GetSCGridColumns()
+    {
+        var columns = new List<SCGridColumn>
+        {
+            new SCGridColumn { Id = "kb", Header = "KB", DevicePrefix = "kb1", IsKeyboard = true },
+            new SCGridColumn { Id = "mouse", Header = "Mouse", DevicePrefix = "mo1", IsMouse = true }
+        };
+
+        // Add a column for each vJoy device that exists and is mapped in the export profile
+        foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+        {
+            int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
+            columns.Add(new SCGridColumn
+            {
+                Id = $"js{scInstance}",
+                Header = $"JS{scInstance}",
+                DevicePrefix = $"js{scInstance}",
+                VJoyDeviceId = vjoy.Id,
+                SCInstance = scInstance,
+                IsJoystick = true
+            });
+        }
+
+        return columns;
+    }
+
+    /// <summary>
+    /// Represents a column in the SC bindings grid
+    /// </summary>
+    private class SCGridColumn
+    {
+        public string Id { get; set; } = "";
+        public string Header { get; set; } = "";
+        public string DevicePrefix { get; set; } = "";
+        public uint VJoyDeviceId { get; set; }
+        public int SCInstance { get; set; }
+        public bool IsKeyboard { get; set; }
+        public bool IsMouse { get; set; }
+        public bool IsJoystick { get; set; }
+    }
+
     private void RefreshSCInstallations()
     {
         if (_scInstallationService == null) return;
@@ -557,14 +602,14 @@ public partial class MainForm
         y += FUIRenderer.ScaleLineHeight(28f);
 
         // Search box and "Show Bound Only" checkbox row
-        float searchWidth = bounds.Width * 0.45f;
+        float searchWidth = bounds.Width * 0.35f;
         float searchHeight = 24f;
         _scSearchBoxBounds = new SKRect(leftMargin, y, leftMargin + searchWidth, y + searchHeight);
         DrawSearchBox(canvas, _scSearchBoxBounds, _scSearchText, _scSearchBoxFocused);
 
         // "Show Bound Only" checkbox (to the right of search)
         float checkboxSize = 16f;
-        float checkboxX = _scSearchBoxBounds.Right + 20f;
+        float checkboxX = _scSearchBoxBounds.Right + 15f;
         _scShowBoundOnlyBounds = new SKRect(checkboxX, y + (searchHeight - checkboxSize) / 2,
             checkboxX + checkboxSize, y + (searchHeight + checkboxSize) / 2);
         _scShowBoundOnlyHovered = _scShowBoundOnlyBounds.Contains(_mousePosition.X, _mousePosition.Y);
@@ -578,24 +623,89 @@ public partial class MainForm
         string countText = $"{actionCount} actions, {boundCount} bound";
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - 120, y + searchHeight / 2 + 4), FUIColors.TextDim, 9f);
 
-        y += searchHeight + 10f;
+        y += searchHeight + 12f;
 
-        // Table header
-        float colAction = leftMargin;
-        float colType = leftMargin + 250f;
-        float colBinding = rightMargin - 120f;
+        // Get dynamic columns
+        var columns = GetSCGridColumns();
 
-        using var headerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100), IsAntialias = true };
-        canvas.DrawRect(new SKRect(leftMargin - 5, y - 2, rightMargin + 5, y + lineHeight), headerPaint);
+        // Column layout - calculate widths based on available space
+        float totalWidth = rightMargin - leftMargin;
+        float deviceColWidth = _scGridDeviceColWidth;
+        float totalDeviceColsWidth = columns.Count * deviceColWidth;
 
-        FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(colAction, y), FUIColors.TextDim, 9f, true);
-        FUIRenderer.DrawText(canvas, "TYPE", new SKPoint(colType, y), FUIColors.TextDim, 9f, true);
-        FUIRenderer.DrawText(canvas, "BINDING", new SKPoint(colBinding, y), FUIColors.TextDim, 9f, true);
-        y += lineHeight + 4f;
+        // Action column gets remaining space after device columns, with minimum width
+        float actionColWidth = Math.Max(_scGridActionColWidth, totalWidth - totalDeviceColsWidth - 15f);
+        // But cap it so we don't squeeze device columns too much
+        actionColWidth = Math.Min(actionColWidth, totalWidth * 0.45f);
+
+        float availableWidth = totalWidth - actionColWidth - 10f;
+
+        // Calculate if horizontal scrolling is needed
+        bool needsHorizontalScroll = totalDeviceColsWidth > availableWidth;
+        float visibleDeviceWidth = needsHorizontalScroll ? availableWidth : totalDeviceColsWidth;
+        _scGridTotalWidth = totalDeviceColsWidth;
+
+        // Clamp horizontal scroll
+        if (needsHorizontalScroll)
+        {
+            float maxHScroll = totalDeviceColsWidth - visibleDeviceWidth;
+            _scGridHorizontalScroll = Math.Clamp(_scGridHorizontalScroll, 0, maxHScroll);
+        }
+        else
+        {
+            _scGridHorizontalScroll = 0;
+        }
+
+        float deviceColsStart = leftMargin + actionColWidth + 5f;
+
+        // Table header row
+        float headerRowHeight = 22f;
+        float headerTextY = y + headerRowHeight / 2 + 4f;  // Vertically centered
+
+        // Table header background
+        using var headerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(120), IsAntialias = true };
+        canvas.DrawRect(new SKRect(leftMargin - 5, y, rightMargin + 5, y + headerRowHeight), headerPaint);
+
+        // Draw ACTION column header
+        FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(leftMargin + 18f, headerTextY), FUIColors.TextDim, 9f, true);
+
+        // Draw separator after ACTION column
+        using var actionSepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(80), StrokeWidth = 1 };
+        canvas.DrawLine(deviceColsStart - 3, y, deviceColsStart - 3, y + headerRowHeight, actionSepPaint);
+
+        // Clip device columns to available area
+        canvas.Save();
+        var deviceColsClipRect = new SKRect(deviceColsStart, y, deviceColsStart + visibleDeviceWidth, bounds.Bottom);
+        canvas.ClipRect(deviceColsClipRect);
+
+        // Draw device column headers
+        for (int c = 0; c < columns.Count; c++)
+        {
+            float colX = deviceColsStart + c * deviceColWidth - _scGridHorizontalScroll;
+            if (colX + deviceColWidth > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
+            {
+                var col = columns[c];
+                var headerColor = col.IsKeyboard ? FUIColors.Primary :
+                                  col.IsMouse ? FUIColors.Warning :
+                                  FUIColors.Success;
+
+                // Center the header text in the column
+                float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
+                float centeredX = colX + (deviceColWidth - headerTextWidth) / 2;
+                FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), headerColor, 9f, true);
+
+                // Draw column separator on left edge
+                using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(50), StrokeWidth = 1 };
+                canvas.DrawLine(colX, y, colX, y + headerRowHeight, sepPaint);
+            }
+        }
+        canvas.Restore();
+
+        y += headerRowHeight + 2f;
 
         // Scrollable action list
         float listTop = y;
-        float listBottom = bounds.Bottom - frameInset - 15f;
+        float listBottom = bounds.Bottom - frameInset - (needsHorizontalScroll ? 20f : 15f);
         _scBindingsListBounds = new SKRect(leftMargin - 5, listTop, rightMargin + 5, listBottom);
 
         // Clip to list area
@@ -664,7 +774,7 @@ public partial class MainForm
                             ? $"({categoryBoundCount}/{categoryActionCount})"
                             : $"({categoryActionCount})";
                         FUIRenderer.DrawText(canvas, countStr,
-                            new SKPoint(rightMargin - 60, scrollY + categoryHeaderHeight / 2 + 4),
+                            new SKPoint(leftMargin + actionColWidth - 60, scrollY + categoryHeaderHeight / 2 + 4),
                             FUIColors.TextDim, 9f);
                     }
                     scrollY += categoryHeaderHeight;
@@ -705,28 +815,75 @@ public partial class MainForm
 
                     float textY = scrollY + rowHeight / 2 + 4;
 
-                    // Indent action name
+                    // Draw action name with ellipsis if too long
                     float actionIndent = 18f;
                     string displayName = action.ActionName;
-                    if (displayName.Length > 32) displayName = displayName.Substring(0, 29) + "...";
+                    float maxNameWidth = actionColWidth - actionIndent - 10f;
+                    displayName = TruncateTextToWidth(displayName, maxNameWidth, 10f);
                     var nameColor = isSelected ? FUIColors.Active : FUIColors.TextPrimary;
-                    FUIRenderer.DrawText(canvas, displayName, new SKPoint(colAction + actionIndent, textY), nameColor, 10f);
+                    FUIRenderer.DrawText(canvas, displayName, new SKPoint(leftMargin + actionIndent, textY), nameColor, 10f);
 
-                    // Input type
-                    var typeColor = action.InputType == SCInputType.Axis ? FUIColors.Warning : FUIColors.TextDim;
-                    FUIRenderer.DrawText(canvas, action.InputType.ToString(), new SKPoint(colType, textY), typeColor, 10f);
+                    // Draw device column cells (clipped)
+                    canvas.Save();
+                    canvas.ClipRect(new SKRect(deviceColsStart, scrollY, deviceColsStart + visibleDeviceWidth, scrollY + rowHeight));
 
-                    // Current binding
-                    var existingBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
-                    if (existingBinding != null)
+                    for (int c = 0; c < columns.Count; c++)
                     {
-                        string bindingText = $"js{_scExportProfile.GetSCInstance(existingBinding.VJoyDevice)}_{existingBinding.InputName}";
-                        FUIRenderer.DrawText(canvas, bindingText, new SKPoint(colBinding, textY), FUIColors.Success, 10f);
+                        float colX = deviceColsStart + c * deviceColWidth - _scGridHorizontalScroll;
+                        if (colX + deviceColWidth > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
+                        {
+                            var col = columns[c];
+                            string? bindingText = null;
+                            SKColor textColor = FUIColors.TextDim;
+                            bool isDefault = false;
+
+                            // Check for user binding (from export profile) for joystick columns
+                            if (col.IsJoystick)
+                            {
+                                var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
+                                if (userBinding != null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
+                                {
+                                    bindingText = FormatBindingForCell(userBinding.InputName, userBinding.Modifiers);
+                                    textColor = FUIColors.Success;
+                                }
+                            }
+
+                            // Check for default binding (from SC's defaultProfile.xml)
+                            if (bindingText == null && action.DefaultBindings.Count > 0)
+                            {
+                                var defaultBinding = action.DefaultBindings.FirstOrDefault(b =>
+                                    b.DevicePrefix.StartsWith(col.DevicePrefix, StringComparison.OrdinalIgnoreCase) ||
+                                    (col.IsKeyboard && b.DevicePrefix.StartsWith("kb", StringComparison.OrdinalIgnoreCase)) ||
+                                    (col.IsMouse && b.DevicePrefix.StartsWith("mo", StringComparison.OrdinalIgnoreCase)));
+
+                                if (defaultBinding != null)
+                                {
+                                    bindingText = FormatBindingForCell(defaultBinding.Input, defaultBinding.Modifiers);
+                                    textColor = col.IsKeyboard ? FUIColors.Primary.WithAlpha(180) :
+                                               col.IsMouse ? FUIColors.Warning.WithAlpha(180) :
+                                               FUIColors.TextDim;
+                                    isDefault = true;
+                                }
+                            }
+
+                            // Draw cell content
+                            if (!string.IsNullOrEmpty(bindingText))
+                            {
+                                // Draw keycap-style badge for binding
+                                DrawBindingBadge(canvas, colX + 3, textY - 10, deviceColWidth - 6, bindingText, textColor, isDefault);
+                            }
+                            else
+                            {
+                                // Draw empty indicator
+                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + deviceColWidth / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 10f);
+                            }
+
+                            // Draw column separator
+                            using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1 };
+                            canvas.DrawLine(colX, scrollY, colX, scrollY + rowHeight, sepPaint);
+                        }
                     }
-                    else
-                    {
-                        FUIRenderer.DrawText(canvas, "—", new SKPoint(colBinding, textY), FUIColors.TextDim, 10f);
-                    }
+                    canvas.Restore();
                 }
 
                 scrollY += rowHeight + rowGap;
@@ -737,7 +894,7 @@ public partial class MainForm
 
         canvas.Restore();
 
-        // Scrollbar if needed
+        // Vertical scrollbar if needed
         if (_scBindingsContentHeight > _scBindingsListBounds.Height)
         {
             float scrollbarWidth = 6f;
@@ -752,6 +909,206 @@ public partial class MainForm
             using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(180), IsAntialias = true };
             canvas.DrawRoundRect(new SKRect(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight), 3f, 3f, thumbPaint);
         }
+
+        // Horizontal scrollbar if needed
+        if (needsHorizontalScroll)
+        {
+            float scrollbarHeight = 6f;
+            float scrollbarY = listBottom + 5f;
+            float scrollbarWidth = visibleDeviceWidth;
+            float thumbWidth = Math.Max(30f, scrollbarWidth * (visibleDeviceWidth / totalDeviceColsWidth));
+            float maxHScroll = totalDeviceColsWidth - visibleDeviceWidth;
+            float thumbX = deviceColsStart + (_scGridHorizontalScroll / maxHScroll) * (scrollbarWidth - thumbWidth);
+
+            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRect(deviceColsStart, scrollbarY, deviceColsStart + scrollbarWidth, scrollbarY + scrollbarHeight), 3f, 3f, trackPaint);
+
+            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(180), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRect(thumbX, scrollbarY, thumbX + thumbWidth, scrollbarY + scrollbarHeight), 3f, 3f, thumbPaint);
+        }
+    }
+
+    /// <summary>
+    /// Formats a binding input for display in a grid cell (with modifiers)
+    /// </summary>
+    private string FormatBindingForCell(string input, List<string>? modifiers)
+    {
+        if (modifiers == null || modifiers.Count == 0)
+            return FormatInputName(input);
+
+        var modStr = string.Join("+", modifiers
+            .Select(m => FormatModifierName(m))
+            .Where(m => !string.IsNullOrEmpty(m)));
+
+        if (string.IsNullOrEmpty(modStr))
+            return FormatInputName(input);
+
+        return $"{modStr}+{FormatInputName(input)}";
+    }
+
+    /// <summary>
+    /// Formats a modifier name for display (e.g., "lshift" -> "SHFT", "lctrl" -> "CTRL")
+    /// </summary>
+    private string FormatModifierName(string modifier)
+    {
+        if (string.IsNullOrEmpty(modifier))
+            return "";
+
+        // Remove left/right prefix and uppercase
+        var cleaned = modifier
+            .Replace("lshift", "SHFT")
+            .Replace("rshift", "SHFT")
+            .Replace("lctrl", "CTRL")
+            .Replace("rctrl", "CTRL")
+            .Replace("lalt", "ALT")
+            .Replace("ralt", "ALT");
+
+        // If no known replacement matched, try generic cleanup
+        if (cleaned == modifier)
+        {
+            cleaned = modifier.TrimStart('l', 'r').ToUpper();
+            if (cleaned.Length > 4)
+                cleaned = cleaned.Substring(0, 4);
+        }
+
+        return cleaned;
+    }
+
+    /// <summary>
+    /// Formats an input name for display (e.g., "button1" -> "Btn1", "x" -> "X")
+    /// </summary>
+    private string FormatInputName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        // Handle button inputs
+        if (input.StartsWith("button", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = input.Substring(6);
+            return $"Btn{num}";
+        }
+
+        // Handle mouse wheel inputs (mwheel_up, mwheel_down)
+        if (input.StartsWith("mwheel_", StringComparison.OrdinalIgnoreCase))
+        {
+            var dir = input.Substring(7);
+            return dir.ToLower() switch
+            {
+                "up" => "WhlUp",
+                "down" => "WhlDn",
+                _ => $"Whl{char.ToUpper(dir[0])}"
+            };
+        }
+
+        // Handle mouse axis inputs (maxis_x, maxis_y)
+        if (input.StartsWith("maxis_", StringComparison.OrdinalIgnoreCase))
+        {
+            var axis = input.Substring(6).ToUpper();
+            return $"M{axis}";
+        }
+
+        // Handle mouse button inputs (mouse1, mouse2, etc.)
+        if (input.StartsWith("mouse", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = input.Substring(5);
+            return $"M{num}";
+        }
+
+        // Handle single letter axis inputs (x, y, z, etc.)
+        if (input.Length == 1)
+            return input.ToUpper();
+
+        // Handle hat inputs (hat1_up -> H1UP)
+        if (input.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
+        {
+            return input.ToUpper().Replace("HAT", "H").Replace("_", "");
+        }
+
+        // Handle rotational axes (rx, ry, rz -> RX, RY, RZ)
+        if (input.Length == 2 && input[0] == 'r' && char.IsLetter(input[1]))
+        {
+            return input.ToUpper();
+        }
+
+        // Handle slider inputs
+        if (input.StartsWith("slider", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = input.Substring(6);
+            return $"Sl{num}";
+        }
+
+        // Default: capitalize and truncate if too long
+        var result = char.ToUpper(input[0]) + (input.Length > 1 ? input.Substring(1) : "");
+        if (result.Length > 8)
+            result = result.Substring(0, 8);
+        return result;
+    }
+
+    /// <summary>
+    /// Draws a keycap-style badge for a binding
+    /// </summary>
+    private void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth, string text, SKColor color, bool isDefault)
+    {
+        // Measure text to determine badge width
+        float fontSize = 9f;
+        float textWidth = FUIRenderer.MeasureText(text, fontSize);
+        float badgeWidth = Math.Min(maxWidth - 2, textWidth + 10);
+        float badgeHeight = 16f;
+
+        var badgeBounds = new SKRect(x, y, x + badgeWidth, y + badgeHeight);
+
+        // Badge background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
+            IsAntialias = true
+        };
+        canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
+
+        // Badge border
+        using var borderPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
+
+        // Badge text (truncate if needed)
+        string displayText = text;
+        if (textWidth > badgeWidth - 8)
+        {
+            displayText = TruncateTextToWidth(text, badgeWidth - 12, fontSize);
+        }
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, y + badgeHeight / 2 + 3), color, fontSize);
+    }
+
+    /// <summary>
+    /// Truncates text to fit within a specified width, adding ellipsis if needed
+    /// </summary>
+    private string TruncateTextToWidth(string text, float maxWidth, float fontSize)
+    {
+        float textWidth = FUIRenderer.MeasureText(text, fontSize);
+        if (textWidth <= maxWidth)
+            return text;
+
+        // Binary search for best fit
+        int low = 0;
+        int high = text.Length;
+        while (low < high)
+        {
+            int mid = (low + high + 1) / 2;
+            string testText = text.Substring(0, mid) + "...";
+            if (FUIRenderer.MeasureText(testText, fontSize) <= maxWidth)
+                low = mid;
+            else
+                high = mid - 1;
+        }
+
+        return low > 0 ? text.Substring(0, low) + "..." : "...";
     }
 
     private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)

@@ -525,17 +525,17 @@ public class ProfileService
     /// <summary>
     /// Load background settings from app settings
     /// </summary>
-    public (int gridStrength, int glowIntensity, int noiseIntensity, int scanlineIntensity, int vignetteStrength, bool vignetteEnabled) LoadBackgroundSettings()
+    public (int gridStrength, int glowIntensity, int noiseIntensity, int scanlineIntensity, int vignetteStrength) LoadBackgroundSettings()
     {
         var settings = LoadSettings();
         return (settings.GridStrength, settings.GlowIntensity, settings.NoiseIntensity,
-                settings.ScanlineIntensity, settings.VignetteStrength, settings.VignetteEnabled);
+                settings.ScanlineIntensity, settings.VignetteStrength);
     }
 
     /// <summary>
     /// Save background settings to app settings
     /// </summary>
-    public void SaveBackgroundSettings(int gridStrength, int glowIntensity, int noiseIntensity, int scanlineIntensity, int vignetteStrength, bool vignetteEnabled)
+    public void SaveBackgroundSettings(int gridStrength, int glowIntensity, int noiseIntensity, int scanlineIntensity, int vignetteStrength)
     {
         var settings = LoadSettings();
         settings.GridStrength = gridStrength;
@@ -543,7 +543,6 @@ public class ProfileService
         settings.NoiseIntensity = noiseIntensity;
         settings.ScanlineIntensity = scanlineIntensity;
         settings.VignetteStrength = vignetteStrength;
-        settings.VignetteEnabled = vignetteEnabled;
         SaveSettings(settings);
     }
 
@@ -704,12 +703,11 @@ public class AppSettings
     public FUITheme Theme { get; set; } = FUITheme.Midnight;
 
     // Background effect settings (0-100 intensity scale)
-    public int GridStrength { get; set; } = 50;
-    public int GlowIntensity { get; set; } = 40;
-    public int NoiseIntensity { get; set; } = 8;
-    public int ScanlineIntensity { get; set; } = 0;
-    public int VignetteStrength { get; set; } = 50;
-    public bool VignetteEnabled { get; set; } = true;
+    public int GridStrength { get; set; } = 35;
+    public int GlowIntensity { get; set; } = 45;
+    public int NoiseIntensity { get; set; } = 45;
+    public int ScanlineIntensity { get; set; } = 60;
+    public int VignetteStrength { get; set; } = 15;
 }
 
 /// <summary>

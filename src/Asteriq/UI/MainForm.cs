@@ -54,6 +54,7 @@ public class MainForm : Form
     // UI State
     private SKControl _canvas = null!;
     private System.Windows.Forms.Timer _renderTimer = null!;
+    private FUIBackground _background = new();
     private float _scanLineProgress = 0f;
     private float _dashPhase = 0f;
     private float _pulsePhase = 0f;
@@ -243,6 +244,15 @@ public class MainForm : Form
     // Font size selector state
     private SKRect[] _fontSizeButtonBounds = new SKRect[3];
 
+    // Background settings slider bounds
+    private SKRect _bgGridSliderBounds;
+    private SKRect _bgGlowSliderBounds;
+    private SKRect _bgNoiseSliderBounds;
+    private SKRect _bgScanlineSliderBounds;
+    private SKRect _bgVignetteToggleBounds;
+    private SKRect _autoLoadToggleBounds;
+    private string? _draggingBgSlider;  // Which slider is being dragged
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -276,6 +286,15 @@ public class MainForm : Form
 
         // Apply theme setting
         FUIColors.SetTheme(_profileService.Theme);
+
+        // Apply background settings
+        var bgSettings = _profileService.LoadBackgroundSettings();
+        _background.GridStrength = bgSettings.gridStrength;
+        _background.GlowIntensity = bgSettings.glowIntensity;
+        _background.NoiseIntensity = bgSettings.noiseIntensity;
+        _background.ScanlineIntensity = bgSettings.scanlineIntensity;
+        _background.VignetteStrength = bgSettings.vignetteStrength;
+        _background.EnableVignette = bgSettings.vignetteEnabled;
     }
 
     private void RefreshProfileList()
@@ -938,6 +957,9 @@ public class MainForm : Form
         // Update active input animations (~16ms per tick = 0.016s)
         _activeInputTracker.UpdateAnimations(0.016f);
 
+        // Update background animations
+        _background.Update(0.016f);
+
         _canvas.Invalidate();
     }
 
@@ -1276,6 +1298,13 @@ public class MainForm : Form
     {
         // Store mouse position for debug display
         _mousePosition = e.Location;
+
+        // Handle background slider dragging (works across all tabs since it's global)
+        if (_draggingBgSlider != null)
+        {
+            UpdateBgSliderFromPoint(e.X);
+            return;
+        }
 
         // Mappings tab hover handling
         if (_activeTab == 1)
@@ -1976,6 +2005,14 @@ public class MainForm : Form
             UpdateDurationForSelectedMapping();
             _canvas.Invalidate();
         }
+
+        // Release background slider dragging
+        if (_draggingBgSlider != null)
+        {
+            _draggingBgSlider = null;
+            SaveBackgroundSettings();
+            _canvas.Invalidate();
+        }
     }
 
     private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
@@ -2035,12 +2072,8 @@ public class MainForm : Form
 
     private void DrawBackgroundLayer(SKCanvas canvas, SKRect bounds)
     {
-        // Subtle dot grid across entire surface
-        FUIRenderer.DrawDotGrid(canvas, bounds, 30f, FUIColors.Grid.WithAlpha(40));
-
-        // Slightly brighter grid in main work area
-        var workArea = new SKRect(20, 80, bounds.Right - 20, bounds.Bottom - 50);
-        FUIRenderer.DrawLineGrid(canvas, workArea, 60f, FUIColors.Grid.WithAlpha(25));
+        // Render FUI background with all effects
+        _background.Render(canvas, bounds);
     }
 
     private void DrawStructureLayer(SKCanvas canvas, SKRect bounds)
@@ -2332,6 +2365,23 @@ public class MainForm : Form
 
     private void DrawApplicationSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
+        // Split into left (system settings) and right (visual settings) sub-panels
+        float gap = 10f;
+        float leftWidth = (bounds.Width - gap) * 0.45f;  // System settings - narrower
+        float rightWidth = (bounds.Width - gap) * 0.55f; // Visual settings - wider for sliders
+
+        var leftBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + leftWidth, bounds.Bottom);
+        var rightBounds = new SKRect(bounds.Left + leftWidth + gap, bounds.Top, bounds.Right, bounds.Bottom);
+
+        // LEFT: System Settings
+        DrawSystemSettingsSubPanel(canvas, leftBounds, frameInset);
+
+        // RIGHT: Visual Settings (Theme, Background)
+        DrawVisualSettingsSubPanel(canvas, rightBounds, frameInset);
+    }
+
+    private void DrawSystemSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
         // Panel background
         using var bgPaint = new SKPaint
         {
@@ -2342,7 +2392,6 @@ public class MainForm : Form
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
-        // Consistent padding from L-corner frame (same for left and top)
         float cornerPadding = 20f;
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
@@ -2351,21 +2400,21 @@ public class MainForm : Form
         float rowHeight = FUIRenderer.ScaleLineHeight(24f);
 
         // Title
-        FUIRenderer.DrawText(canvas, "APPLICATION SETTINGS", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "SYSTEM", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
 
         // Auto-load setting
-        FUIRenderer.DrawText(canvas, "Auto-load last profile on startup", new SKPoint(leftMargin, y + 4), FUIColors.TextPrimary, 11f);
-        DrawToggleSwitch(canvas, new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight), _profileService.AutoLoadLastProfile);
+        FUIRenderer.DrawText(canvas, "Auto-load last profile", new SKPoint(leftMargin, y + 4), FUIColors.TextPrimary, 11f);
+        _autoLoadToggleBounds = new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight);
+        DrawToggleSwitch(canvas, _autoLoadToggleBounds, _profileService.AutoLoadLastProfile);
         y += rowHeight + sectionSpacing;
 
-        // Font size section - label and buttons on same line
+        // Font size section
         FUIRenderer.DrawText(canvas, "Font Size", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
 
-        // Fixed-width font size buttons with "aA" in respective sizes (right-aligned, fixed total width)
         FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
-        float[] fontSizePreviews = { 9f, 11f, 13f }; // Actual font sizes for "aA" preview
-        float fontBtnWidth = 36f; // Fixed width per button
+        float[] fontSizePreviews = { 9f, 11f, 13f };
+        float fontBtnWidth = 36f;
         float fontBtnHeight = 24f;
         float fontBtnGap = 3f;
         float fontBtnsStartX = rightMargin - (fontBtnWidth * 3 + fontBtnGap * 2);
@@ -2389,61 +2438,9 @@ public class MainForm : Form
             using var fontFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
             canvas.DrawRect(fontBounds, fontFramePaint);
 
-            // Draw "aA" in the respective font size (not scaled by global setting)
             FUIRenderer.DrawTextCentered(canvas, "aA", fontBounds, textColor, fontSizePreviews[i], scaleFont: false);
         }
         y += fontBtnHeight + sectionSpacing;
-
-        // Theme section - label and buttons on same line
-        FUIRenderer.DrawText(canvas, "Theme", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
-
-        FUITheme[] themeValues = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
-        string[] themeNames = { "MID", "MTX", "AMB", "ICE" }; // Shortened names for compact buttons
-        float themeBtnWidth = 40f; // Fixed width per button
-        float themeBtnHeight = 24f;
-        float themeBtnGap = 3f;
-        float themeBtnsStartX = rightMargin - (themeBtnWidth * 4 + themeBtnGap * 3);
-
-        for (int i = 0; i < themeNames.Length; i++)
-        {
-            var themeBounds = new SKRect(
-                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap), y,
-                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap) + themeBtnWidth, y + themeBtnHeight);
-
-            // Store bounds for click handling
-            StoreThemeButtonBounds(i, themeBounds);
-
-            bool isActive = FUIColors.CurrentTheme == themeValues[i];
-
-            // Theme preview colors
-            var previewColor = i switch
-            {
-                0 => new SKColor(0x40, 0xA0, 0xFF), // Midnight - blue
-                1 => new SKColor(0x40, 0xFF, 0x40), // Matrix - green
-                2 => new SKColor(0xFF, 0xA0, 0x40), // Amber - orange
-                3 => new SKColor(0x40, 0xE0, 0xFF), // Ice - cyan
-                _ => FUIColors.Active
-            };
-
-            var bgColor = isActive ? previewColor.WithAlpha(60) : FUIColors.Background2;
-            var frameColor = isActive ? previewColor : FUIColors.Frame;
-            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
-
-            using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-            canvas.DrawRect(themeBounds, themeBgPaint);
-
-            using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
-            canvas.DrawRect(themeBounds, themeFramePaint);
-
-            FUIRenderer.DrawTextCentered(canvas, themeNames[i], themeBounds, textColor, 8f);
-
-            // Color indicator bar at bottom
-            var indicatorBounds = new SKRect(themeBounds.Left + 3, themeBounds.Bottom - 3,
-                themeBounds.Right - 3, themeBounds.Bottom - 1);
-            using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
-            canvas.DrawRect(indicatorBounds, indicatorPaint);
-        }
-        y += themeBtnHeight + sectionSpacing;
 
         // vJoy section
         FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -2483,6 +2480,122 @@ public class MainForm : Form
 
         FUIRenderer.DrawText(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4), FUIColors.TextPrimary, 11f);
         DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + fieldHeight), "30");
+    }
+
+    private void DrawVisualSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+
+        float cornerPadding = 20f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 15;
+        float sectionSpacing = FUIRenderer.ScaleLineHeight(16f);
+        float rowHeight = FUIRenderer.ScaleLineHeight(24f);
+
+        // Title
+        FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += FUIRenderer.ScaleLineHeight(30f);
+
+        // Theme section
+        FUIRenderer.DrawText(canvas, "Theme", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
+
+        FUITheme[] themeValues = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
+        string[] themeNames = { "MID", "MTX", "AMB", "ICE" };
+        float themeBtnWidth = 44f;
+        float themeBtnHeight = 24f;
+        float themeBtnGap = 4f;
+        float themeBtnsStartX = rightMargin - (themeBtnWidth * 4 + themeBtnGap * 3);
+
+        for (int i = 0; i < themeNames.Length; i++)
+        {
+            var themeBounds = new SKRect(
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap), y,
+                themeBtnsStartX + i * (themeBtnWidth + themeBtnGap) + themeBtnWidth, y + themeBtnHeight);
+
+            StoreThemeButtonBounds(i, themeBounds);
+
+            bool isActive = FUIColors.CurrentTheme == themeValues[i];
+            var previewColor = i switch
+            {
+                0 => new SKColor(0x40, 0xA0, 0xFF),
+                1 => new SKColor(0x40, 0xFF, 0x40),
+                2 => new SKColor(0xFF, 0xA0, 0x40),
+                3 => new SKColor(0x40, 0xE0, 0xFF),
+                _ => FUIColors.Active
+            };
+
+            var bgColor = isActive ? previewColor.WithAlpha(60) : FUIColors.Background2;
+            var frameColor = isActive ? previewColor : FUIColors.Frame;
+            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+            using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(themeBounds, themeBgPaint);
+
+            using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
+            canvas.DrawRect(themeBounds, themeFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, themeNames[i], themeBounds, textColor, 9f);
+
+            var indicatorBounds = new SKRect(themeBounds.Left + 3, themeBounds.Bottom - 3,
+                themeBounds.Right - 3, themeBounds.Bottom - 1);
+            using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
+            canvas.DrawRect(indicatorBounds, indicatorPaint);
+        }
+        y += themeBtnHeight + sectionSpacing + 4;
+
+        // Background effects section
+        FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += sectionSpacing;
+
+        // Slider layout with more space
+        float labelWidth = 70f;
+        float valueWidth = 28f;
+        float sliderLeft = leftMargin + labelWidth;
+        float sliderRight = rightMargin - valueWidth - 8;
+        float sliderRowHeight = 22f;
+        float sliderRowGap = 8f;
+
+        // Grid strength slider
+        FUIRenderer.DrawText(canvas, "Grid", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        _bgGridSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        DrawSettingsSlider(canvas, _bgGridSliderBounds, _background.GridStrength, 100);
+        FUIRenderer.DrawText(canvas, _background.GridStrength.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        y += sliderRowHeight + sliderRowGap;
+
+        // Glow intensity slider
+        FUIRenderer.DrawText(canvas, "Glow", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        _bgGlowSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        DrawSettingsSlider(canvas, _bgGlowSliderBounds, _background.GlowIntensity, 100);
+        FUIRenderer.DrawText(canvas, _background.GlowIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        y += sliderRowHeight + sliderRowGap;
+
+        // Noise intensity slider
+        FUIRenderer.DrawText(canvas, "Noise", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        _bgNoiseSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        DrawSettingsSlider(canvas, _bgNoiseSliderBounds, _background.NoiseIntensity, 100);
+        FUIRenderer.DrawText(canvas, _background.NoiseIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        y += sliderRowHeight + sliderRowGap;
+
+        // Scanline intensity slider
+        FUIRenderer.DrawText(canvas, "Scanlines", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        _bgScanlineSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        DrawSettingsSlider(canvas, _bgScanlineSliderBounds, _background.ScanlineIntensity, 100);
+        FUIRenderer.DrawText(canvas, _background.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        y += sliderRowHeight + sliderRowGap;
+
+        // Vignette toggle
+        FUIRenderer.DrawText(canvas, "Vignette", new SKPoint(leftMargin, y + 4), FUIColors.TextPrimary, 11f);
+        _bgVignetteToggleBounds = new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight);
+        DrawToggleSwitch(canvas, _bgVignetteToggleBounds, _background.EnableVignette);
     }
 
     private void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
@@ -2531,6 +2644,84 @@ public class MainForm : Form
                 return;
             }
         }
+
+        // Check auto-load toggle click
+        if (_autoLoadToggleBounds.Contains(pt))
+        {
+            _profileService.AutoLoadLastProfile = !_profileService.AutoLoadLastProfile;
+            _canvas.Invalidate();
+            return;
+        }
+
+        // Check background slider clicks (start drag)
+        if (_bgGridSliderBounds.Contains(pt))
+        {
+            _draggingBgSlider = "grid";
+            UpdateBgSliderFromPoint(pt.X);
+            return;
+        }
+        if (_bgGlowSliderBounds.Contains(pt))
+        {
+            _draggingBgSlider = "glow";
+            UpdateBgSliderFromPoint(pt.X);
+            return;
+        }
+        if (_bgNoiseSliderBounds.Contains(pt))
+        {
+            _draggingBgSlider = "noise";
+            UpdateBgSliderFromPoint(pt.X);
+            return;
+        }
+        if (_bgScanlineSliderBounds.Contains(pt))
+        {
+            _draggingBgSlider = "scanline";
+            UpdateBgSliderFromPoint(pt.X);
+            return;
+        }
+        if (_bgVignetteToggleBounds.Contains(pt))
+        {
+            _background.EnableVignette = !_background.EnableVignette;
+            SaveBackgroundSettings();
+            _canvas.Invalidate();
+            return;
+        }
+    }
+
+    private void UpdateBgSliderFromPoint(float x)
+    {
+        SKRect bounds;
+        switch (_draggingBgSlider)
+        {
+            case "grid": bounds = _bgGridSliderBounds; break;
+            case "glow": bounds = _bgGlowSliderBounds; break;
+            case "noise": bounds = _bgNoiseSliderBounds; break;
+            case "scanline": bounds = _bgScanlineSliderBounds; break;
+            default: return;
+        }
+
+        float ratio = Math.Clamp((x - bounds.Left) / bounds.Width, 0f, 1f);
+        int value = (int)(ratio * 100);
+
+        switch (_draggingBgSlider)
+        {
+            case "grid": _background.GridStrength = value; break;
+            case "glow": _background.GlowIntensity = value; break;
+            case "noise": _background.NoiseIntensity = value; break;
+            case "scanline": _background.ScanlineIntensity = value; break;
+        }
+
+        _canvas.Invalidate();
+    }
+
+    private void SaveBackgroundSettings()
+    {
+        _profileService.SaveBackgroundSettings(
+            _background.GridStrength,
+            _background.GlowIntensity,
+            _background.NoiseIntensity,
+            _background.ScanlineIntensity,
+            _background.VignetteStrength,
+            _background.EnableVignette);
     }
 
     private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float sideTabPad, float contentTop, float contentBottom)
@@ -4787,6 +4978,39 @@ public class MainForm : Form
         float knobX = on ? bounds.Right - knobRadius - 3 : bounds.Left + knobRadius + 3;
         using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
         canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
+    }
+
+    private void DrawSettingsSlider(SKCanvas canvas, SKRect bounds, int value, int maxValue)
+    {
+        float trackHeight = 4f;
+        float trackY = bounds.MidY - trackHeight / 2;
+        var trackRect = new SKRect(bounds.Left, trackY, bounds.Right, trackY + trackHeight);
+
+        // Track background
+        using var trackBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRoundRect(trackRect, 2, 2, trackBgPaint);
+
+        // Track frame
+        using var trackFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        canvas.DrawRoundRect(trackRect, 2, 2, trackFramePaint);
+
+        // Filled portion
+        float fillWidth = (bounds.Width - 6) * (value / (float)maxValue);
+        if (fillWidth > 0)
+        {
+            var fillRect = new SKRect(bounds.Left + 2, trackY + 1, bounds.Left + 2 + fillWidth, trackY + trackHeight - 1);
+            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
+            canvas.DrawRoundRect(fillRect, 1, 1, fillPaint);
+        }
+
+        // Knob
+        float knobX = bounds.Left + 3 + (bounds.Width - 6) * (value / (float)maxValue);
+        float knobRadius = 6f;
+        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright, IsAntialias = true };
+        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
+
+        using var knobFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f, IsAntialias = true };
+        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobFramePaint);
     }
 
     private void DrawMappingEditorPanel(SKCanvas canvas, SKRect bounds, float frameInset)

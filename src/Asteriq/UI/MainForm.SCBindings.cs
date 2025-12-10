@@ -625,8 +625,9 @@ public partial class MainForm
 
         y += searchHeight + 12f;
 
-        // Get dynamic columns
+        // Get dynamic columns and cache them for mouse handling
         var columns = GetSCGridColumns();
+        _scGridColumns = columns;
 
         // Column layout - calculate widths based on available space
         float totalWidth = rightMargin - leftMargin;
@@ -644,6 +645,7 @@ public partial class MainForm
         bool needsHorizontalScroll = totalDeviceColsWidth > availableWidth;
         float visibleDeviceWidth = needsHorizontalScroll ? availableWidth : totalDeviceColsWidth;
         _scGridTotalWidth = totalDeviceColsWidth;
+        _scVisibleDeviceWidth = visibleDeviceWidth;
 
         // Clamp horizontal scroll
         if (needsHorizontalScroll)
@@ -657,6 +659,7 @@ public partial class MainForm
         }
 
         float deviceColsStart = leftMargin + actionColWidth + 5f;
+        _scDeviceColsStart = deviceColsStart;
 
         // Table header row
         float headerRowHeight = 22f;
@@ -833,6 +836,32 @@ public partial class MainForm
                         if (colX + deviceColWidth > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
                         {
                             var col = columns[c];
+                            var cellBounds = new SKRect(colX, scrollY, colX + deviceColWidth, scrollY + rowHeight);
+
+                            // Check cell state
+                            bool isCellHovered = _scHoveredCell == (i, c);
+                            bool isCellSelected = _scSelectedCell == (i, c);
+                            bool isCellListening = _scIsListeningForInput && _scSelectedCell == (i, c);
+
+                            // Draw cell background for hover/selection/listening states
+                            if (isCellListening)
+                            {
+                                // Listening state - pulsing warning color
+                                float pulse = (float)(0.5 + 0.3 * Math.Sin((DateTime.Now - _scListeningStartTime).TotalMilliseconds / 200.0));
+                                using var listeningPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha((byte)(80 * pulse)), IsAntialias = true };
+                                canvas.DrawRect(cellBounds, listeningPaint);
+                            }
+                            else if (isCellSelected)
+                            {
+                                using var selectedPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(50), IsAntialias = true };
+                                canvas.DrawRect(cellBounds, selectedPaint);
+                            }
+                            else if (isCellHovered)
+                            {
+                                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(30), IsAntialias = true };
+                                canvas.DrawRect(cellBounds, hoverPaint);
+                            }
+
                             string? bindingText = null;
                             SKColor textColor = FUIColors.TextDim;
                             bool isDefault = false;
@@ -867,7 +896,12 @@ public partial class MainForm
                             }
 
                             // Draw cell content
-                            if (!string.IsNullOrEmpty(bindingText))
+                            if (isCellListening)
+                            {
+                                // Show "Press..." text when listening
+                                FUIRenderer.DrawText(canvas, "Press...", new SKPoint(colX + 5, textY), FUIColors.Warning, 9f);
+                            }
+                            else if (!string.IsNullOrEmpty(bindingText))
                             {
                                 // Draw keycap-style badge for binding
                                 DrawBindingBadge(canvas, colX + 3, textY - 10, deviceColWidth - 6, bindingText, textColor, isDefault);
@@ -881,6 +915,13 @@ public partial class MainForm
                             // Draw column separator
                             using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1 };
                             canvas.DrawLine(colX, scrollY, colX, scrollY + rowHeight, sepPaint);
+
+                            // Draw selection border for selected cell
+                            if (isCellSelected && !isCellListening)
+                            {
+                                using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1.5f, IsAntialias = true };
+                                canvas.DrawRect(cellBounds.Inset(1, 1), borderPaint);
+                            }
                         }
                     }
                     canvas.Restore();
@@ -1680,7 +1721,7 @@ public partial class MainForm
             }
         }
 
-        // Action row clicks (select action)
+        // Action row and cell clicks
         if (_scBindingsListBounds.Contains(point) && _scFilteredActions != null)
         {
             // Find which row was clicked accounting for scroll offset and collapsed categories
@@ -1720,13 +1761,75 @@ public partial class MainForm
                 if (relativeY >= rowTop && relativeY < rowBottom)
                 {
                     _scSelectedActionIndex = i;
-                    _scAssigningInput = false; // Reset assignment mode when selecting new action
+
+                    // Check if click was in a device column cell
+                    int clickedCol = GetClickedColumnIndex(point.X);
+                    if (clickedCol >= 0 && _scGridColumns != null && clickedCol < _scGridColumns.Count)
+                    {
+                        // Cell was clicked - enter listening mode
+                        HandleCellClick(i, clickedCol);
+                    }
+                    else
+                    {
+                        // Action name area clicked - just select the row
+                        _scSelectedCell = (-1, -1);
+                        _scIsListeningForInput = false;
+                    }
                     return;
                 }
 
                 currentY += rowHeight + rowGap;
             }
+
+            // Click was in list area but not on a row - clear selection
+            _scSelectedCell = (-1, -1);
+            _scIsListeningForInput = false;
         }
+    }
+
+    /// <summary>
+    /// Gets the column index at the given X coordinate, or -1 if not in a device column
+    /// </summary>
+    private int GetClickedColumnIndex(float x)
+    {
+        if (_scGridColumns == null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
+            return -1;
+
+        float relativeX = x - _scDeviceColsStart + _scGridHorizontalScroll;
+        int colIndex = (int)(relativeX / _scGridDeviceColWidth);
+
+        if (colIndex >= 0 && colIndex < _scGridColumns.Count)
+            return colIndex;
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Handles a click on a binding cell - enters listening mode for input
+    /// </summary>
+    private void HandleCellClick(int actionIndex, int colIndex)
+    {
+        if (_scGridColumns == null || colIndex < 0 || colIndex >= _scGridColumns.Count)
+            return;
+
+        var col = _scGridColumns[colIndex];
+
+        // If already listening for this cell, cancel
+        if (_scIsListeningForInput && _scSelectedCell == (actionIndex, colIndex))
+        {
+            _scIsListeningForInput = false;
+            _scSelectedCell = (-1, -1);
+            _scListeningColumn = null;
+            return;
+        }
+
+        // Start listening for input
+        _scSelectedCell = (actionIndex, colIndex);
+        _scIsListeningForInput = true;
+        _scListeningStartTime = DateTime.Now;
+        _scListeningColumn = col;
+
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
     }
 
     #endregion

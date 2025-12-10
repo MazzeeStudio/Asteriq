@@ -253,6 +253,32 @@ public class MainForm : Form
     private SKRect _autoLoadToggleBounds;
     private string? _draggingBgSlider;  // Which slider is being dragged
 
+    // Star Citizen bindings tab state
+    private SCInstallationService? _scInstallationService;
+    private SCProfileCacheService? _scProfileCacheService;
+    private SCSchemaService? _scSchemaService;
+    private SCXmlExportService? _scExportService;
+    private List<SCInstallation> _scInstallations = new();
+    private int _selectedSCInstallation = 0;
+    private SCExportProfile _scExportProfile = new();
+    private List<SCAction>? _scActions;
+    private string? _scExportStatus;
+    private DateTime _scExportStatusTime;
+
+    // SC Bindings tab UI bounds
+    private SKRect _scInstallationSelectorBounds;
+    private bool _scInstallationDropdownOpen;
+    private SKRect _scInstallationDropdownBounds;
+    private int _hoveredSCInstallation = -1;
+    private SKRect _scExportButtonBounds;
+    private bool _scExportButtonHovered;
+    private SKRect _scRefreshButtonBounds;
+    private bool _scRefreshButtonHovered;
+    private SKRect _scProfileNameBounds;
+    private bool _scProfileNameHovered;
+    private List<SKRect> _scVJoyMappingBounds = new();
+    private int _hoveredVJoyMapping = -1;
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -266,6 +292,7 @@ public class MainForm : Form
         InitializeRenderLoop();
         LoadSvgAssets();
         InitializeProfiles();
+        InitializeSCBindings();
     }
 
     private void InitializeVJoy()
@@ -299,6 +326,78 @@ public class MainForm : Form
     private void RefreshProfileList()
     {
         _profiles = _profileService.ListProfiles();
+    }
+
+    private void InitializeSCBindings()
+    {
+        try
+        {
+            _scInstallationService = new SCInstallationService();
+            _scProfileCacheService = new SCProfileCacheService();
+            _scSchemaService = new SCSchemaService();
+            _scExportService = new SCXmlExportService();
+
+            RefreshSCInstallations();
+
+            // Initialize export profile with default name
+            _scExportProfile = new SCExportProfile
+            {
+                ProfileName = "asteriq"
+            };
+
+            // Set up default vJoy mappings based on available vJoy devices
+            foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+            {
+                _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstallations.Count} installations found");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings init failed: {ex.Message}");
+        }
+    }
+
+    private void RefreshSCInstallations()
+    {
+        if (_scInstallationService == null) return;
+
+        _scInstallations = _scInstallationService.Installations.ToList();
+
+        // Select preferred installation if none selected
+        if (_selectedSCInstallation >= _scInstallations.Count)
+        {
+            _selectedSCInstallation = 0;
+        }
+
+        // Load schema for selected installation
+        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+        {
+            LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+        }
+    }
+
+    private void LoadSCSchema(SCInstallation installation)
+    {
+        if (_scProfileCacheService == null || _scSchemaService == null) return;
+
+        try
+        {
+            var profile = _scProfileCacheService.GetOrExtractProfile(installation);
+            if (profile != null)
+            {
+                _scActions = _scSchemaService.ParseActions(profile);
+                _scExportProfile.TargetEnvironment = installation.Environment;
+                _scExportProfile.TargetBuildId = installation.BuildId;
+                System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded {_scActions.Count} SC actions from {installation.Environment}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Failed to load SC schema: {ex.Message}");
+            _scActions = null;
+        }
     }
 
     private void CreateNewProfilePrompt()
@@ -1473,6 +1572,45 @@ public class MainForm : Form
             _hoveredProfileIndex = -1;
         }
 
+        // SC Installation dropdown hover detection (Bindings tab)
+        if (_activeTab == 2 && _scInstallationDropdownOpen && _scInstallationDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemHeight = 28f;
+            int itemIndex = (int)((e.Y - _scInstallationDropdownBounds.Top - 2) / itemHeight);
+            _hoveredSCInstallation = itemIndex >= 0 && itemIndex < _scInstallations.Count ? itemIndex : -1;
+            Cursor = Cursors.Hand;
+            return;
+        }
+        else if (_activeTab == 2)
+        {
+            _hoveredSCInstallation = -1;
+        }
+
+        // SC Bindings tab hover detection
+        if (_activeTab == 2)
+        {
+            // vJoy mapping rows
+            _hoveredVJoyMapping = -1;
+            for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
+            {
+                if (_scVJoyMappingBounds[i].Contains(e.X, e.Y))
+                {
+                    _hoveredVJoyMapping = i;
+                    Cursor = Cursors.Hand;
+                    break;
+                }
+            }
+
+            // Buttons
+            if (_scRefreshButtonBounds.Contains(e.X, e.Y) ||
+                _scExportButtonBounds.Contains(e.X, e.Y) ||
+                _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
+                _scProfileNameBounds.Contains(e.X, e.Y))
+            {
+                Cursor = Cursors.Hand;
+            }
+        }
+
         // Update cursor based on hit test (for resize feedback)
         int hitResult = HitTest(e.Location);
         switch (hitResult)
@@ -1798,6 +1936,13 @@ public class MainForm : Form
             HandleSettingsTabClick(new SKPoint(e.X, e.Y));
         }
 
+        // Bindings (SC) tab click handling
+        if (_activeTab == 2)
+        {
+            HandleBindingsTabClick(new SKPoint(e.X, e.Y));
+            return;
+        }
+
         // Mappings tab click handling
         if (_activeTab == 1)
         {
@@ -2106,9 +2251,9 @@ public class MainForm : Form
         {
             DrawMappingsTabContent(canvas, bounds, sideTabPad, contentTop, contentBottom);
         }
-        else if (_activeTab == 2) // BINDINGS tab (Star Citizen integration - placeholder)
+        else if (_activeTab == 2) // BINDINGS tab (Star Citizen integration)
         {
-            DrawBindingsTabPlaceholder(canvas, bounds, pad, contentTop, contentBottom);
+            DrawBindingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
         }
         else if (_activeTab == 3) // SETTINGS tab
         {
@@ -2156,52 +2301,573 @@ public class MainForm : Form
         }
     }
 
-    private void DrawBindingsTabPlaceholder(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
+    private void DrawBindingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
     {
         float frameInset = 5f;
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
-        // Single centered panel
-        float panelWidth = 500f;
-        float panelHeight = 200f;
-        float panelX = contentBounds.Left + (contentBounds.Width - panelWidth) / 2;
-        float panelY = contentBounds.Top + (contentBounds.Height - panelHeight) / 2;
-        var panelBounds = new SKRect(panelX, panelY, panelX + panelWidth, panelY + panelHeight);
+        // Two-panel layout
+        float leftPanelWidth = 420f;
+        float rightPanelWidth = contentBounds.Width - leftPanelWidth - 15;
 
-        // Panel shadow
-        FUIRenderer.DrawPanelShadow(canvas, panelBounds, 3f, 3f, 10f);
+        var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
+            contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
+        var rightBounds = new SKRect(leftBounds.Right + 15, contentBounds.Top,
+            contentBounds.Right, contentBounds.Bottom);
 
+        // LEFT PANEL - SC Installation & Export Settings
+        DrawSCInstallationPanel(canvas, leftBounds, frameInset);
+
+        // RIGHT PANEL - vJoy Mapping & Export
+        DrawSCExportPanel(canvas, rightBounds, frameInset);
+
+        // Draw SC installation dropdown if open
+        if (_scInstallationDropdownOpen && _scInstallations.Count > 0)
+        {
+            DrawSCInstallationDropdown(canvas);
+        }
+    }
+
+    private void DrawSCInstallationPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
         // Panel background
-        var innerBounds = new SKRect(panelBounds.Left + frameInset, panelBounds.Top + frameInset,
-            panelBounds.Right - frameInset, panelBounds.Bottom - frameInset);
         using var bgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(180),
+            Color = FUIColors.Background1.WithAlpha(160),
             IsAntialias = true
         };
-        canvas.DrawRect(innerBounds, bgPaint);
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
-        // L-corner frame
-        FUIRenderer.DrawLCornerFrame(canvas, panelBounds, FUIColors.Frame, 35f, 10f);
+        float cornerPadding = 20f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 15;
+        float lineHeight = FUIRenderer.ScaleLineHeight(20f);
 
-        // Header
-        float titleBarHeight = 32f;
-        var titleBounds = new SKRect(innerBounds.Left, innerBounds.Top, innerBounds.Right, innerBounds.Top + titleBarHeight);
-        FUIRenderer.DrawPanelTitle(canvas, titleBounds, "SC", "STAR CITIZEN BINDINGS");
+        // Title
+        FUIRenderer.DrawText(canvas, "STAR CITIZEN INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += FUIRenderer.ScaleLineHeight(35f);
 
-        // Placeholder text
-        float textY = innerBounds.Top + titleBarHeight + 30f;
-        FUIRenderer.DrawTextCentered(canvas, "Star Citizen Integration",
-            new SKRect(innerBounds.Left, textY, innerBounds.Right, textY + 24f), FUIColors.TextPrimary, 14f);
+        // Installation selector
+        FUIRenderer.DrawText(canvas, "INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += lineHeight;
 
-        textY += 35f;
-        FUIRenderer.DrawTextCentered(canvas, "Import and export actionmaps.xml bindings",
-            new SKRect(innerBounds.Left, textY, innerBounds.Right, textY + 20f), FUIColors.TextDim, 11f);
+        float selectorHeight = 28f;
+        _scInstallationSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorHeight);
 
-        textY += 22f;
-        FUIRenderer.DrawTextCentered(canvas, "Coming soon",
-            new SKRect(innerBounds.Left, textY, innerBounds.Right, textY + 20f), FUIColors.TextDim, 11f);
+        string installationText = _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
+            ? _scInstallations[_selectedSCInstallation].DisplayName
+            : "No SC installation found";
+
+        bool selectorHovered = _scInstallationSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
+        y += selectorHeight + lineHeight;
+
+        // Installation details
+        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+        {
+            var installation = _scInstallations[_selectedSCInstallation];
+
+            FUIRenderer.DrawText(canvas, "DETAILS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += lineHeight;
+
+            DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "Environment", installation.Environment);
+            DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "BuildId", installation.BuildId ?? "Unknown");
+            DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "Path", TruncatePath(installation.InstallPath, 40));
+
+            y += 10f;
+
+            // Schema info
+            if (_scActions != null)
+            {
+                DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "Actions", _scActions.Count.ToString());
+                var joystickActions = _scSchemaService?.FilterJoystickActions(_scActions);
+                DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "Joystick Actions", joystickActions?.Count.ToString() ?? "0");
+            }
+            else
+            {
+                FUIRenderer.DrawText(canvas, "Schema not loaded", new SKPoint(leftMargin, y), FUIColors.Warning, 11f);
+                y += lineHeight;
+            }
+        }
+        else
+        {
+            y += 10f;
+            FUIRenderer.DrawText(canvas, "Star Citizen not detected.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+            y += lineHeight;
+            FUIRenderer.DrawText(canvas, "Install SC or check the installation path.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+            y += lineHeight * 2;
+        }
+
+        // Refresh button
+        y += 15f;
+        float buttonWidth = 120f;
+        float buttonHeight = 28f;
+        _scRefreshButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
+        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _scRefreshButtonBounds, "REFRESH",
+            _scRefreshButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+
+        // Export Profile Name section
+        y += buttonHeight + 30f;
+        FUIRenderer.DrawText(canvas, "EXPORT PROFILE", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += FUIRenderer.ScaleLineHeight(30f);
+
+        FUIRenderer.DrawText(canvas, "PROFILE NAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += lineHeight;
+
+        float nameFieldHeight = 28f;
+        _scProfileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameFieldHeight);
+        _scProfileNameHovered = _scProfileNameBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawTextFieldReadOnly(canvas, _scProfileNameBounds, _scExportProfile.ProfileName, _scProfileNameHovered);
+        y += nameFieldHeight + 10f;
+
+        // Export filename preview
+        FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += lineHeight;
+        FUIRenderer.DrawText(canvas, _scExportProfile.GetExportFileName(), new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+    }
+
+    private void DrawSCExportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+
+        float cornerPadding = 20f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 15;
+        float lineHeight = FUIRenderer.ScaleLineHeight(20f);
+
+        // Title
+        FUIRenderer.DrawText(canvas, "VJOY TO SC MAPPING", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += FUIRenderer.ScaleLineHeight(35f);
+
+        // Description
+        FUIRenderer.DrawText(canvas, "Map vJoy devices to Star Citizen joystick instances (js1, js2, etc.)",
+            new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += lineHeight + 10f;
+
+        // vJoy mappings
+        _scVJoyMappingBounds.Clear();
+        float rowHeight = 32f;
+        float rowGap = 6f;
+
+        // Get available vJoy devices
+        var availableVJoy = _vjoyDevices.Where(v => v.Exists).ToList();
+
+        if (availableVJoy.Count == 0)
+        {
+            FUIRenderer.DrawText(canvas, "No vJoy devices available.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+            y += lineHeight;
+            FUIRenderer.DrawText(canvas, "Configure vJoy devices to map them to SC.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+            y += lineHeight * 2;
+        }
+        else
+        {
+            foreach (var vjoy in availableVJoy.Take(8)) // Limit to 8 devices
+            {
+                var rowBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
+                _scVJoyMappingBounds.Add(rowBounds);
+
+                bool isHovered = rowBounds.Contains(_mousePosition.X, _mousePosition.Y);
+                int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
+
+                DrawVJoyMappingRow(canvas, rowBounds, vjoy.Id, scInstance, isHovered);
+                y += rowHeight + rowGap;
+            }
+        }
+
+        // Export section
+        y += 20f;
+        FUIRenderer.DrawText(canvas, "EXPORT", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += FUIRenderer.ScaleLineHeight(30f);
+
+        // Export path preview
+        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scExportService != null)
+        {
+            var installation = _scInstallations[_selectedSCInstallation];
+            string exportPath = _scExportService.GetExportPath(_scExportProfile, installation);
+
+            FUIRenderer.DrawText(canvas, "EXPORT PATH", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += lineHeight;
+            FUIRenderer.DrawText(canvas, TruncatePath(exportPath, 55), new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += lineHeight + 15f;
+        }
+
+        // Export button
+        float buttonWidth = 200f;
+        float buttonHeight = 36f;
+        float buttonX = leftMargin + (rightMargin - leftMargin - buttonWidth) / 2;
+        _scExportButtonBounds = new SKRect(buttonX, y, buttonX + buttonWidth, y + buttonHeight);
+        _scExportButtonHovered = _scExportButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+        bool canExport = _scInstallations.Count > 0 && _scExportProfile.VJoyToSCInstance.Count > 0;
+        DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
+        y += buttonHeight + 15f;
+
+        // Status message
+        if (!string.IsNullOrEmpty(_scExportStatus))
+        {
+            var elapsed = DateTime.Now - _scExportStatusTime;
+            if (elapsed.TotalSeconds < 10)
+            {
+                var statusColor = _scExportStatus.Contains("Success") ? FUIColors.Success : FUIColors.Warning;
+                FUIRenderer.DrawTextCentered(canvas, _scExportStatus,
+                    new SKRect(leftMargin, y, rightMargin, y + 20f), statusColor, 11f);
+            }
+            else
+            {
+                _scExportStatus = null;
+            }
+        }
+    }
+
+    private void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
+    {
+        var bgColor = isEnabled
+            ? (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150))
+            : FUIColors.Background1.WithAlpha(100);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        canvas.DrawRect(bounds, bgPaint);
+
+        var borderColor = isEnabled ? FUIColors.Frame : FUIColors.Frame.WithAlpha(100);
+        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
+        canvas.DrawRect(bounds, borderPaint);
+
+        var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
+        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), textColor, 11f);
+
+        // Dropdown arrow
+        if (isEnabled)
+        {
+            float arrowX = bounds.Right - 18;
+            float arrowY = bounds.MidY;
+            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
+            using var path = new SKPath();
+            path.MoveTo(arrowX - 4, arrowY - 3);
+            path.LineTo(arrowX + 4, arrowY - 3);
+            path.LineTo(arrowX, arrowY + 3);
+            path.Close();
+            canvas.DrawPath(path, arrowPaint);
+        }
+    }
+
+    private void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
+    {
+        var bgColor = isHovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background1.WithAlpha(140);
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        canvas.DrawRect(bounds, bgPaint);
+
+        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
+        canvas.DrawRect(bounds, borderPaint);
+
+        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), FUIColors.TextPrimary, 11f);
+    }
+
+    private void DrawVJoyMappingRow(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
+    {
+        var bgColor = isHovered ? FUIColors.Background2.WithAlpha(150) : FUIColors.Background1.WithAlpha(80);
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        canvas.DrawRect(bounds, bgPaint);
+
+        if (isHovered)
+        {
+            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(150), StrokeWidth = 1f, IsAntialias = true };
+            canvas.DrawRect(bounds, borderPaint);
+        }
+
+        float textY = bounds.MidY + 4;
+
+        // vJoy label
+        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 10, textY), FUIColors.TextPrimary, 11f);
+
+        // Arrow
+        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 80, textY), FUIColors.TextDim, 11f);
+
+        // SC instance
+        var scColor = FUIColors.Active;
+        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 110, textY), scColor, 11f, true);
+
+        // Click hint
+        if (isHovered)
+        {
+            FUIRenderer.DrawText(canvas, "click to change", new SKPoint(bounds.Right - 90, textY), FUIColors.TextDim, 9f);
+        }
+    }
+
+    private void DrawExportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
+    {
+        var bgColor = isEnabled
+            ? (isHovered ? FUIColors.Active.WithAlpha(180) : FUIColors.Active.WithAlpha(120))
+            : FUIColors.Background2.WithAlpha(100);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var path = FUIRenderer.CreateFrame(bounds, 4f);
+        canvas.DrawPath(path, bgPaint);
+
+        var borderColor = isEnabled ? FUIColors.Active : FUIColors.Frame.WithAlpha(100);
+        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1.5f, IsAntialias = true };
+        canvas.DrawPath(path, borderPaint);
+
+        var textColor = isEnabled ? FUIColors.TextBright : FUIColors.TextDim;
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
+    }
+
+    private void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
+    {
+        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 10f);
+        y += lineHeight;
+    }
+
+    private void DrawSCInstallationDropdown(SKCanvas canvas)
+    {
+        float itemHeight = 28f;
+        float dropdownWidth = _scInstallationSelectorBounds.Width;
+        float dropdownHeight = Math.Min(_scInstallations.Count * itemHeight + 4, 200f);
+
+        _scInstallationDropdownBounds = new SKRect(
+            _scInstallationSelectorBounds.Left,
+            _scInstallationSelectorBounds.Bottom + 2,
+            _scInstallationSelectorBounds.Right,
+            _scInstallationSelectorBounds.Bottom + 2 + dropdownHeight);
+
+        // Shadow
+        FUIRenderer.DrawPanelShadow(canvas, _scInstallationDropdownBounds, 2f, 2f, 8f);
+
+        // Background
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(240), IsAntialias = true };
+        canvas.DrawRect(_scInstallationDropdownBounds, bgPaint);
+
+        // Border
+        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
+        canvas.DrawRect(_scInstallationDropdownBounds, borderPaint);
+
+        // Items
+        float y = _scInstallationDropdownBounds.Top + 2;
+        for (int i = 0; i < _scInstallations.Count; i++)
+        {
+            var itemBounds = new SKRect(_scInstallationDropdownBounds.Left + 2, y,
+                _scInstallationDropdownBounds.Right - 2, y + itemHeight);
+
+            bool isHovered = i == _hoveredSCInstallation;
+            bool isSelected = i == _selectedSCInstallation;
+
+            if (isHovered || isSelected)
+            {
+                var highlightColor = isSelected ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2.WithAlpha(150);
+                using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
+                canvas.DrawRect(itemBounds, highlightPaint);
+            }
+
+            var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+            FUIRenderer.DrawText(canvas, _scInstallations[i].DisplayName,
+                new SKPoint(itemBounds.Left + 10, itemBounds.MidY + 4), textColor, 11f);
+
+            y += itemHeight;
+        }
+    }
+
+    private static string TruncatePath(string path, int maxLength)
+    {
+        if (string.IsNullOrEmpty(path) || path.Length <= maxLength)
+            return path;
+
+        // Try to show start and end
+        int keepStart = 15;
+        int keepEnd = maxLength - keepStart - 3;
+        return path.Substring(0, keepStart) + "..." + path.Substring(path.Length - keepEnd);
+    }
+
+    private void HandleBindingsTabClick(SKPoint point)
+    {
+        // SC Installation dropdown handling (close when clicking outside)
+        if (_scInstallationDropdownOpen)
+        {
+            if (_scInstallationDropdownBounds.Contains(point))
+            {
+                // Click on dropdown item
+                if (_hoveredSCInstallation >= 0 && _hoveredSCInstallation < _scInstallations.Count)
+                {
+                    _selectedSCInstallation = _hoveredSCInstallation;
+                    LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+                }
+                _scInstallationDropdownOpen = false;
+                return;
+            }
+            else
+            {
+                // Click outside - close dropdown
+                _scInstallationDropdownOpen = false;
+                return;
+            }
+        }
+
+        // SC Installation selector click (toggle dropdown)
+        if (_scInstallationSelectorBounds.Contains(point) && _scInstallations.Count > 0)
+        {
+            _scInstallationDropdownOpen = !_scInstallationDropdownOpen;
+            return;
+        }
+
+        // Refresh button
+        if (_scRefreshButtonBounds.Contains(point))
+        {
+            RefreshSCInstallations();
+            _scExportStatus = "Installations refreshed";
+            _scExportStatusTime = DateTime.Now;
+            return;
+        }
+
+        // Export button
+        if (_scExportButtonBounds.Contains(point))
+        {
+            ExportToSC();
+            return;
+        }
+
+        // vJoy mapping row clicks (cycle through js1-js8)
+        for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
+        {
+            if (_scVJoyMappingBounds[i].Contains(point))
+            {
+                var availableVJoy = _vjoyDevices.Where(v => v.Exists).ToList();
+                if (i < availableVJoy.Count)
+                {
+                    var vjoyId = availableVJoy[i].Id;
+                    int currentInstance = _scExportProfile.GetSCInstance(vjoyId);
+                    int newInstance = (currentInstance % 8) + 1; // Cycle 1-8
+                    _scExportProfile.SetSCInstance(vjoyId, newInstance);
+                }
+                return;
+            }
+        }
+
+        // Profile name click (could open edit dialog in future)
+        if (_scProfileNameBounds.Contains(point))
+        {
+            EditSCProfileName();
+            return;
+        }
+    }
+
+    private void ExportToSC()
+    {
+        if (_scExportService == null || _scInstallations.Count == 0)
+        {
+            _scExportStatus = "No SC installation available";
+            _scExportStatusTime = DateTime.Now;
+            return;
+        }
+
+        if (_scExportProfile.VJoyToSCInstance.Count == 0)
+        {
+            _scExportStatus = "No vJoy mappings configured";
+            _scExportStatusTime = DateTime.Now;
+            return;
+        }
+
+        try
+        {
+            var installation = _scInstallations[_selectedSCInstallation];
+
+            // Validate profile
+            var validation = _scExportService.Validate(_scExportProfile);
+            if (!validation.IsValid)
+            {
+                _scExportStatus = $"Validation failed: {validation.Errors.FirstOrDefault()}";
+                _scExportStatusTime = DateTime.Now;
+                return;
+            }
+
+            // Export
+            string exportPath = _scExportService.ExportToInstallation(_scExportProfile, installation);
+            _scExportStatus = $"Success! Exported to {Path.GetFileName(exportPath)}";
+            _scExportStatusTime = DateTime.Now;
+
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Exported SC profile to: {exportPath}");
+        }
+        catch (Exception ex)
+        {
+            _scExportStatus = $"Export failed: {ex.Message}";
+            _scExportStatusTime = DateTime.Now;
+            System.Diagnostics.Debug.WriteLine($"[MainForm] SC export failed: {ex}");
+        }
+    }
+
+    private void EditSCProfileName()
+    {
+        using var dialog = new Form
+        {
+            Text = "Export Profile Name",
+            Width = 320,
+            Height = 140,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = Color.FromArgb(20, 22, 30)
+        };
+
+        var label = new Label
+        {
+            Text = "Profile Name:",
+            Left = 15,
+            Top = 15,
+            Width = 280,
+            ForeColor = Color.FromArgb(180, 190, 210)
+        };
+
+        var textBox = new TextBox
+        {
+            Text = _scExportProfile.ProfileName,
+            Left = 15,
+            Top = 40,
+            Width = 280,
+            BackColor = Color.FromArgb(30, 35, 45),
+            ForeColor = Color.White
+        };
+
+        var okButton = new Button
+        {
+            Text = "OK",
+            Left = 130,
+            Top = 70,
+            Width = 75,
+            DialogResult = DialogResult.OK,
+            BackColor = Color.FromArgb(40, 50, 70)
+        };
+
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            Left = 210,
+            Top = 70,
+            Width = 75,
+            DialogResult = DialogResult.Cancel,
+            BackColor = Color.FromArgb(40, 50, 70)
+        };
+
+        dialog.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+
+        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
+        {
+            _scExportProfile.ProfileName = textBox.Text.Trim();
+        }
     }
 
     private void DrawSettingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)

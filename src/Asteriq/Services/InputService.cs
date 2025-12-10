@@ -194,6 +194,7 @@ public class InputService : IDisposable
         }
     }
 
+    [System.Diagnostics.Conditional("DEBUG")]
     private static void LogAxisTypes(string message)
     {
         var logPath = Path.Combine(

@@ -1685,7 +1685,7 @@ public class MainForm : Form
         bool hasVJoy = _vjoyDevices.Count > 0 && _selectedVJoyDeviceIndex < _vjoyDevices.Count;
         VJoyDeviceInfo? vjoyDevice = hasVJoy ? _vjoyDevices[_selectedVJoyDeviceIndex] : null;
 
-        float rowHeight = 32f;  // Compact rows (bindings shown in right panel now)
+        float rowHeight = 32f;  // Compact rows
         float rowGap = 4f;
         float sectionHeaderHeight = 22f;
         float sectionGap = 8f;
@@ -1891,7 +1891,7 @@ public class MainForm : Form
         // Right side indicator: keyboard keycaps or binding dot
         if (hasKeyParts)
         {
-            // Draw each key part as a separate keycap, right-aligned
+            // Draw each key part as a separate keycap, right-aligned, vertically centered
             float keycapHeight = 18f;
             float keycapGap = 3f;
             float keycapPadding = 6f;
@@ -1914,7 +1914,7 @@ public class MainForm : Form
                 using var keycapBgPaint = new SKPaint
                 {
                     Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Warning.WithAlpha(40),
+                    Color = FUIColors.TextPrimary.WithAlpha(20),
                     IsAntialias = true
                 };
                 canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
@@ -1923,14 +1923,14 @@ public class MainForm : Form
                 using var keycapFramePaint = new SKPaint
                 {
                     Style = SKPaintStyle.Stroke,
-                    Color = FUIColors.Warning.WithAlpha(150),
+                    Color = FUIColors.TextPrimary.WithAlpha(120),
                     StrokeWidth = 1f,
                     IsAntialias = true
                 };
                 canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
 
                 // Keycap text
-                FUIRenderer.DrawTextCentered(canvas, keyText, keycapBounds, FUIColors.Warning, 9f);
+                FUIRenderer.DrawTextCentered(canvas, keyText.ToUpperInvariant(), keycapBounds, FUIColors.TextPrimary, 9f);
 
                 // Move left for next keycap
                 keycapRight = keycapLeft - keycapGap;
@@ -2067,13 +2067,13 @@ public class MainForm : Form
         var inputs = GetInputsForSelectedOutput();
         bool isListening = _isListeningForInput;
 
-        float rowHeight = 28f;
+        float rowHeight = 40f;  // Two-line layout
         float rowGap = 4f;
 
         if (inputs.Count == 0 && !isListening)
         {
             // No inputs - show "None" with dashed border
-            var emptyBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
+            var emptyBounds = new SKRect(leftMargin, y, rightMargin, y + 28);
             using var emptyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(100) };
             canvas.DrawRoundRect(emptyBounds, 3, 3, emptyBgPaint);
 
@@ -2086,12 +2086,12 @@ public class MainForm : Form
             };
             canvas.DrawRoundRect(emptyBounds, 3, 3, emptyFramePaint);
 
-            FUIRenderer.DrawText(canvas, "No input mapped", new SKPoint(leftMargin + 10, y + 18), FUIColors.TextDisabled, 11f);
-            y += rowHeight + rowGap;
+            FUIRenderer.DrawText(canvas, "No input mapped", new SKPoint(leftMargin + 10, emptyBounds.MidY + 4), FUIColors.TextDisabled, 11f);
+            y += 28 + rowGap;
         }
         else
         {
-            // Draw each input source row
+            // Draw each input source row (two-line layout)
             for (int i = 0; i < inputs.Count; i++)
             {
                 var input = inputs[i];
@@ -2109,13 +2109,17 @@ public class MainForm : Form
                 };
                 canvas.DrawRoundRect(rowBounds, 3, 3, rowFramePaint);
 
-                // Input text
-                string inputText = $"{input.DeviceName} - {input.Type} {input.Index}";
-                if (inputText.Length > 30) inputText = inputText.Substring(0, 27) + "...";
-                FUIRenderer.DrawText(canvas, inputText, new SKPoint(leftMargin + 8, y + 18), FUIColors.TextPrimary, 10f);
+                // Line 1: Input type and index (e.g., "Button 5")
+                string inputTypeText = input.Type == InputType.Button
+                    ? $"Button {input.Index + 1}"
+                    : $"{input.Type} {input.Index}";
+                FUIRenderer.DrawText(canvas, inputTypeText, new SKPoint(leftMargin + 8, y + 14), FUIColors.TextPrimary, 11f);
 
-                // Remove [×] button
-                var removeBounds = new SKRect(rightMargin - 26, y + 2, rightMargin, y + rowHeight - 2);
+                // Line 2: Device name (smaller, dimmer)
+                FUIRenderer.DrawText(canvas, input.DeviceName, new SKPoint(leftMargin + 8, y + 30), FUIColors.TextDim, 9f);
+
+                // Remove [×] button (full height of row)
+                var removeBounds = new SKRect(rightMargin - 26, y, rightMargin, y + rowHeight);
                 bool removeHovered = _hoveredInputSourceRemove == i;
 
                 using var removeBgPaint = new SKPaint
@@ -2408,14 +2412,17 @@ public class MainForm : Form
         FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += 20;
 
-        // Mode buttons
+        // Mode buttons - all on one row
         string[] modes = { "Normal", "Toggle", "Pulse", "Hold" };
-        float buttonHeight = 32f;
-        float buttonGap = 6f;
+        float buttonHeight = 26f;
+        float buttonGap = 4f;
+        float totalGap = buttonGap * (modes.Length - 1);
+        float buttonWidth = (width - totalGap) / modes.Length;
 
-        for (int i = 0; i < modes.Length && y + buttonHeight < bottom; i++)
+        for (int i = 0; i < modes.Length; i++)
         {
-            var modeBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
+            float buttonX = leftMargin + i * (buttonWidth + buttonGap);
+            var modeBounds = new SKRect(buttonX, y, buttonX + buttonWidth, y + buttonHeight);
             bool selected = i == (int)_selectedButtonMode;
             bool hovered = i == _hoveredButtonMode;
 
@@ -2433,14 +2440,12 @@ public class MainForm : Form
             };
             canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
 
-            FUIRenderer.DrawText(canvas, modes[i], new SKPoint(modeBounds.Left + 12, modeBounds.MidY + 4),
-                selected ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+            FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
+                selected ? FUIColors.Active : FUIColors.TextPrimary, 9f);
 
             _buttonModeBounds[i] = modeBounds;
-            y += buttonHeight + buttonGap;
         }
-
-        y += 10;
+        y += buttonHeight + 15;
 
         // Clear binding button
         if (y + 40 < bottom)
@@ -2530,7 +2535,7 @@ public class MainForm : Form
             using var keycapBgPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = FUIColors.Warning.WithAlpha(50),
+                Color = FUIColors.TextPrimary.WithAlpha(25),
                 IsAntialias = true
             };
             canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
@@ -2539,14 +2544,14 @@ public class MainForm : Form
             using var keycapFramePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Warning.WithAlpha(180),
+                Color = FUIColors.TextPrimary.WithAlpha(150),
                 StrokeWidth = 1f,
                 IsAntialias = true
             };
             canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
 
-            // Keycap text
-            FUIRenderer.DrawTextCentered(canvas, keyText, keycapBounds, FUIColors.Warning, 10f);
+            // Keycap text (uppercase)
+            FUIRenderer.DrawTextCentered(canvas, keyText.ToUpperInvariant(), keycapBounds, FUIColors.TextPrimary, 10f);
 
             startX += keycapWidth + keycapGap;
         }
@@ -3267,8 +3272,8 @@ public class MainForm : Form
     {
         if (profile == null) return "—";
 
+        // Find mapping for this button slot (either VJoyButton or Keyboard output type)
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
-            m.Output.Type == OutputType.VJoyButton &&
             m.Output.VJoyDevice == vjoyId &&
             m.Output.Index == buttonIndex);
 
@@ -3739,14 +3744,12 @@ public class MainForm : Form
     /// </summary>
     private bool ConfirmDuplicateMapping(string existingMappingName, string newMappingTarget)
     {
-        var result = MessageBox.Show(
-            $"This input is already mapped to:\n\n{existingMappingName}\n\nDo you want to remove the existing mapping and create a new one for {newMappingTarget}?",
+        using var dialog = new FUIConfirmDialog(
             "Duplicate Mapping",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Warning,
-            MessageBoxDefaultButton.Button2);
-
-        return result == DialogResult.Yes;
+            $"This input is already mapped to:\n\n{existingMappingName}\n\nRemove existing and create new mapping for {newMappingTarget}?",
+            "Replace",
+            "Cancel");
+        return dialog.ShowDialog(this) == DialogResult.Yes;
     }
 
     /// <summary>

@@ -27,6 +27,65 @@ public class DeviceInputState
 }
 
 /// <summary>
+/// Axis type as reported by DirectInput (HID usage)
+/// </summary>
+public enum AxisType
+{
+    Unknown = 0,
+    X = 1,
+    Y = 2,
+    Z = 3,
+    RX = 4,
+    RY = 5,
+    RZ = 6,
+    Slider = 7
+}
+
+/// <summary>
+/// Information about a single axis on a device
+/// </summary>
+public class AxisInfo
+{
+    public int Index { get; init; }
+    public AxisType Type { get; init; }
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Get the corresponding vJoy axis index for this axis type.
+    /// Returns -1 if the type cannot be mapped to vJoy.
+    /// </summary>
+    public int ToVJoyAxisIndex()
+    {
+        return Type switch
+        {
+            AxisType.X => 0,
+            AxisType.Y => 1,
+            AxisType.Z => 2,
+            AxisType.RX => 3,
+            AxisType.RY => 4,
+            AxisType.RZ => 5,
+            AxisType.Slider => 6, // First slider maps to Slider0
+            _ => -1
+        };
+    }
+
+    /// <summary>
+    /// Get a display name for the axis type
+    /// </summary>
+    public string TypeName => Type switch
+    {
+        AxisType.X => "X",
+        AxisType.Y => "Y",
+        AxisType.Z => "Z",
+        AxisType.RX => "RX",
+        AxisType.RY => "RY",
+        AxisType.RZ => "RZ",
+        AxisType.Slider => "Slider",
+        _ => "Unknown"
+    };
+}
+
+/// <summary>
 /// Information about a detected physical device
 /// </summary>
 public class PhysicalDeviceInfo
@@ -42,6 +101,28 @@ public class PhysicalDeviceInfo
     /// Whether this is a virtual device (vJoy, vXBox, etc.)
     /// </summary>
     public bool IsVirtual { get; init; }
+
+    /// <summary>
+    /// Unique HID device path (used for reliable device identification).
+    /// This is unique per physical device instance, unlike SDL2's GUID which
+    /// identifies device type only.
+    /// </summary>
+    public string HidDevicePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Detailed axis information including types (from HID report descriptor).
+    /// May be empty if HID info is not available.
+    /// </summary>
+    public List<AxisInfo> AxisInfos { get; set; } = new();
+
+    /// <summary>
+    /// Get the axis type for a given index. Returns Unknown if not available.
+    /// </summary>
+    public AxisType GetAxisType(int index)
+    {
+        var axisInfo = AxisInfos.FirstOrDefault(a => a.Index == index);
+        return axisInfo?.Type ?? AxisType.Unknown;
+    }
 
     public override string ToString() => $"{Name} (Axes:{AxisCount}, Buttons:{ButtonCount}, Hats:{HatCount})";
 }

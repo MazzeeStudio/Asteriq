@@ -362,11 +362,9 @@ public class MainForm : Form
             }
             else
             {
-                MessageBox.Show(this,
+                FUIMessageBox.ShowError(this,
                     "Failed to import profile. The file may be corrupted or in an invalid format.",
-                    "Import Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    "Import Failed");
             }
         }
     }
@@ -375,11 +373,9 @@ public class MainForm : Form
     {
         if (_profileService.ActiveProfile == null)
         {
-            MessageBox.Show(this,
+            FUIMessageBox.ShowInfo(this,
                 "No profile is currently active. Please select a profile first.",
-                "Export",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+                "Export");
             return;
         }
 
@@ -400,19 +396,15 @@ public class MainForm : Form
             bool success = _profileService.ExportProfile(profile.Id, saveDialog.FileName);
             if (success)
             {
-                MessageBox.Show(this,
+                FUIMessageBox.ShowInfo(this,
                     $"Profile '{profile.Name}' exported successfully.",
-                    "Export Complete",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                    "Export Complete");
             }
             else
             {
-                MessageBox.Show(this,
+                FUIMessageBox.ShowError(this,
                     "Failed to export profile.",
-                    "Export Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    "Export Failed");
             }
         }
     }
@@ -5621,10 +5613,9 @@ public class MainForm : Form
                    $"  POV Hats: {physical.HatCount} (Continuous recommended)\n\n" +
                    "Would you like to open the vJoy Configuration utility?";
 
-        var result = MessageBox.Show(this, message, "vJoy Configuration Required",
-            MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+        var result = FUIMessageBox.ShowQuestion(this, message, "vJoy Configuration Required");
 
-        if (result == DialogResult.Yes)
+        if (result)
         {
             LaunchVJoyConfigurator();
         }
@@ -5658,22 +5649,18 @@ public class MainForm : Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this,
+                FUIMessageBox.ShowError(this,
                     $"Failed to launch vJoy Configurator:\n{ex.Message}",
-                    "Launch Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    "Launch Failed");
             }
         }
         else
         {
-            MessageBox.Show(this,
+            FUIMessageBox.ShowWarning(this,
                 "vJoy Configuration utility (vJoyConf.exe) was not found.\n\n" +
                 "Please install vJoy from:\nhttps://github.com/jshafer817/vJoy/releases\n\n" +
                 "Or manually run vJoyConf.exe from your vJoy installation folder.",
-                "vJoy Not Found",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
+                "vJoy Not Found");
         }
     }
 
@@ -5683,35 +5670,7 @@ public class MainForm : Form
     /// </summary>
     private VJoyDeviceInfo? ShowVJoyDeviceSelectionDialog(PhysicalDeviceInfo physicalDevice)
     {
-        using var dialog = new Form
-        {
-            Text = "Select vJoy Device",
-            Size = new Size(400, 350),
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(30, 35, 40)
-        };
-
-        var infoLabel = new Label
-        {
-            Text = $"Select a vJoy device to map {physicalDevice.Name}:\n" +
-                   $"({physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats)",
-            Location = new Point(15, 15),
-            Size = new Size(360, 40),
-            ForeColor = Color.White
-        };
-        dialog.Controls.Add(infoLabel);
-
-        var listBox = new ListBox
-        {
-            Location = new Point(15, 60),
-            Size = new Size(355, 180),
-            BackColor = Color.FromArgb(40, 45, 50),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 10f)
-        };
+        var items = new List<FUISelectionDialog.SelectionItem>();
 
         // Add vJoy devices to list
         foreach (var vjoy in _vjoyDevices)
@@ -5720,95 +5679,73 @@ public class MainForm : Form
             int buttons = vjoy.ButtonCount;
             int povs = vjoy.ContPovCount + vjoy.DiscPovCount;
 
-            string status = "";
+            string status;
             if (axes >= physicalDevice.AxisCount &&
                 buttons >= physicalDevice.ButtonCount &&
                 povs >= physicalDevice.HatCount)
             {
-                status = " [OK]";
+                status = "[OK]";
             }
             else
             {
-                status = " [partial]";
+                status = "[partial]";
             }
 
-            listBox.Items.Add($"vJoy #{vjoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs{status}");
+            items.Add(new FUISelectionDialog.SelectionItem
+            {
+                Text = $"vJoy #{vjoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs",
+                Status = status,
+                Tag = vjoy
+            });
         }
 
         // Add option to configure new vJoy device
-        listBox.Items.Add("+ Configure new vJoy device...");
-
-        if (listBox.Items.Count > 0)
-            listBox.SelectedIndex = 0;
-
-        dialog.Controls.Add(listBox);
-
-        var okButton = new Button
+        items.Add(new FUISelectionDialog.SelectionItem
         {
-            Text = "Map 1:1",
-            Location = new Point(190, 260),
-            Size = new Size(80, 30),
-            DialogResult = DialogResult.OK,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(0, 120, 180),
-            ForeColor = Color.White
-        };
-        dialog.Controls.Add(okButton);
+            Text = "+ Configure new vJoy device...",
+            IsAction = true
+        });
 
-        var cancelButton = new Button
+        string description = $"Select a vJoy device to map {physicalDevice.Name}:\n" +
+                           $"({physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats)";
+
+        int selectedIndex = FUISelectionDialog.Show(this, "Select vJoy Device", description, items, "Map 1:1", "Cancel");
+
+        if (selectedIndex < 0)
+            return null;
+
+        // Check if user selected "Configure new vJoy device"
+        if (selectedIndex == _vjoyDevices.Count)
         {
-            Text = "Cancel",
-            Location = new Point(285, 260),
-            Size = new Size(80, 30),
-            DialogResult = DialogResult.Cancel,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(60, 65, 70),
-            ForeColor = Color.White
-        };
-        dialog.Controls.Add(cancelButton);
+            ShowVJoyConfigurationHelp(physicalDevice, noDevices: false);
+            return null;
+        }
 
-        dialog.AcceptButton = okButton;
-        dialog.CancelButton = cancelButton;
-
-        if (dialog.ShowDialog(this) == DialogResult.OK)
+        if (selectedIndex >= 0 && selectedIndex < _vjoyDevices.Count)
         {
-            int selectedIndex = listBox.SelectedIndex;
+            var selectedVJoy = _vjoyDevices[selectedIndex];
 
-            // Check if user selected "Configure new vJoy device"
-            if (selectedIndex == _vjoyDevices.Count)
+            // Warn about partial mappings if necessary
+            int axes = CountVJoyAxes(selectedVJoy);
+            int buttons = selectedVJoy.ButtonCount;
+            int povs = selectedVJoy.ContPovCount + selectedVJoy.DiscPovCount;
+
+            if (axes < physicalDevice.AxisCount ||
+                buttons < physicalDevice.ButtonCount ||
+                povs < physicalDevice.HatCount)
             {
-                ShowVJoyConfigurationHelp(physicalDevice, noDevices: false);
-                return null;
+                var result = FUIMessageBox.ShowQuestion(this,
+                    $"vJoy #{selectedVJoy.Id} doesn't have enough capacity.\n\n" +
+                    $"Physical device: {physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats\n" +
+                    $"vJoy #{selectedVJoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs\n\n" +
+                    "Some controls will not be mapped. Continue?",
+                    "Partial Mapping");
+
+                if (!result)
+                    return null;
             }
 
-            if (selectedIndex >= 0 && selectedIndex < _vjoyDevices.Count)
-            {
-                var selectedVJoy = _vjoyDevices[selectedIndex];
-
-                // Warn about partial mappings if necessary
-                int axes = CountVJoyAxes(selectedVJoy);
-                int buttons = selectedVJoy.ButtonCount;
-                int povs = selectedVJoy.ContPovCount + selectedVJoy.DiscPovCount;
-
-                if (axes < physicalDevice.AxisCount ||
-                    buttons < physicalDevice.ButtonCount ||
-                    povs < physicalDevice.HatCount)
-                {
-                    var result = MessageBox.Show(this,
-                        $"vJoy #{selectedVJoy.Id} doesn't have enough capacity.\n\n" +
-                        $"Physical device: {physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats\n" +
-                        $"vJoy #{selectedVJoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs\n\n" +
-                        "Some controls will not be mapped. Continue?",
-                        "Partial Mapping",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Warning);
-
-                    if (result != DialogResult.Yes)
-                        return null;
-                }
-
-                return selectedVJoy;
-            }
+            return selectedVJoy;
         }
 
         return null;
@@ -5834,13 +5771,11 @@ public class MainForm : Form
         var physicalDevice = _devices[_selectedDevice];
         if (physicalDevice.IsVirtual) return;
 
-        var result = MessageBox.Show(this,
+        var result = FUIMessageBox.ShowQuestion(this,
             $"Remove all mappings for {physicalDevice.Name}?\n\nThis will remove axis, button, and hat mappings from all vJoy devices.",
-            "Clear Mappings",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Question);
+            "Clear Mappings");
 
-        if (result != DialogResult.Yes) return;
+        if (!result) return;
 
         var profile = _profileService.ActiveProfile;
         if (profile == null) return;
@@ -5854,11 +5789,9 @@ public class MainForm : Form
 
         _profileService.SaveActiveProfile();
 
-        MessageBox.Show(this,
+        FUIMessageBox.ShowInfo(this,
             $"Removed {axisRemoved} axis, {buttonRemoved} button, and {hatRemoved} hat mappings.",
-            "Mappings Cleared",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+            "Mappings Cleared");
 
         _canvas.Invalidate();
     }

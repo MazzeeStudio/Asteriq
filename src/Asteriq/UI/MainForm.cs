@@ -1097,8 +1097,8 @@ public class MainForm : Form
                 }
             }
 
-            // Right panel: Button mode buttons
-            if (_selectedMappingRow >= 8)
+            // Right panel: Button mode buttons (for button category)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0)
             {
                 for (int i = 0; i < _buttonModeBounds.Length; i++)
                 {
@@ -1133,8 +1133,8 @@ public class MainForm : Form
                 }
             }
 
-            // Right panel: Curve editor handling (for axis rows)
-            if (_selectedMappingRow >= 0 && _selectedMappingRow < 8)
+            // Right panel: Curve editor handling (for axis category)
+            if (_mappingCategory == 1 && _selectedMappingRow >= 0)
             {
                 var pt = new SKPoint(e.X, e.Y);
 
@@ -1513,16 +1513,16 @@ public class MainForm : Form
                 return;
             }
 
-            // Right panel: Button mode selection
-            if (_selectedMappingRow >= 8 && _hoveredButtonMode >= 0)
+            // Right panel: Button mode selection (button category)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredButtonMode >= 0)
             {
                 _selectedButtonMode = (ButtonMode)_hoveredButtonMode;
                 UpdateButtonModeForSelected();
                 return;
             }
 
-            // Right panel: Output type selection
-            if (_selectedMappingRow >= 8 && _hoveredOutputType >= 0)
+            // Right panel: Output type selection (button category)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredOutputType >= 0)
             {
                 _outputTypeIsKeyboard = (_hoveredOutputType == 1);
                 if (!_outputTypeIsKeyboard)
@@ -1533,15 +1533,15 @@ public class MainForm : Form
                 return;
             }
 
-            // Right panel: Key capture field
-            if (_selectedMappingRow >= 8 && _outputTypeIsKeyboard && _keyCaptureBoundsHovered)
+            // Right panel: Key capture field (button category)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _outputTypeIsKeyboard && _keyCaptureBoundsHovered)
             {
                 _isCapturingKey = true;
                 return;
             }
 
-            // Right panel: Axis settings - curve type selection
-            if (_selectedMappingRow >= 0 && _selectedMappingRow < 8)
+            // Right panel: Axis settings - curve type selection (axis category)
+            if (_mappingCategory == 1 && _selectedMappingRow >= 0)
             {
                 // Check curve preset clicks
                 var pt = new SKPoint(e.X, e.Y);
@@ -2531,20 +2531,28 @@ public class MainForm : Form
         // Right side indicator: keyboard keycaps or binding dot
         if (hasKeyParts)
         {
-            // Draw each key part as a separate keycap, right-aligned, vertically centered
-            float keycapHeight = 18f;
-            float keycapGap = 3f;
-            float keycapPadding = 6f;
-            float keycapRight = bounds.Right - 10;
+            // Draw keycaps right-aligned within available space
+            float keycapHeight = 16f;
+            float keycapGap = 2f;
+            float keycapPadding = 6f;  // Padding inside each keycap (left + right)
+            float fontSize = 8f;  // Slightly smaller font for compact display
+            float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
+            float keycapRight = bounds.Right - 8;
             float keycapTop = bounds.MidY - keycapHeight / 2;
 
-            using var textPaint = new SKPaint { TextSize = 9f, IsAntialias = true };
+            // Use same font settings as DrawTextCentered for accurate measurement
+            using var measurePaint = new SKPaint
+            {
+                TextSize = scaledFontSize,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
+            };
 
-            // Draw keycaps from right to left (so key is rightmost, then modifiers)
+            // Draw keycaps from right to left (key rightmost, then modifiers)
             for (int i = keyParts!.Count - 1; i >= 0; i--)
             {
-                string keyText = keyParts[i];
-                float textWidth = textPaint.MeasureText(keyText);
+                string keyText = keyParts[i].ToUpperInvariant();
+                float textWidth = measurePaint.MeasureText(keyText);
                 float keycapWidth = textWidth + keycapPadding * 2;
                 float keycapLeft = keycapRight - keycapWidth;
 
@@ -2563,14 +2571,23 @@ public class MainForm : Form
                 using var keycapFramePaint = new SKPaint
                 {
                     Style = SKPaintStyle.Stroke,
-                    Color = FUIColors.TextPrimary.WithAlpha(120),
+                    Color = FUIColors.TextPrimary.WithAlpha(100),
                     StrokeWidth = 1f,
                     IsAntialias = true
                 };
                 canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
 
-                // Keycap text
-                FUIRenderer.DrawTextCentered(canvas, keyText.ToUpperInvariant(), keycapBounds, FUIColors.TextPrimary, 9f);
+                // Keycap text - draw manually centered to ensure padding is respected
+                float textX = keycapLeft + keycapPadding;
+                float textY = keycapBounds.MidY + scaledFontSize / 3;
+                using var textPaint = new SKPaint
+                {
+                    Color = FUIColors.TextPrimary,
+                    TextSize = scaledFontSize,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
+                };
+                canvas.DrawText(keyText, textX, textY, textPaint);
 
                 // Move left for next keycap
                 keycapRight = keycapLeft - keycapGap;
@@ -2674,8 +2691,9 @@ public class MainForm : Form
             return;
         }
 
-        // Determine if axis or button
-        bool isAxis = _selectedMappingRow < 8;
+        // Determine if axis or button based on current category
+        // Category 0 = Buttons, Category 1 = Axes
+        bool isAxis = _mappingCategory == 1;
         string outputName = GetSelectedOutputName();
 
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 15), FUIColors.Active, 13f, true);
@@ -2749,14 +2767,14 @@ public class MainForm : Form
                 };
                 canvas.DrawRoundRect(rowBounds, 3, 3, rowFramePaint);
 
-                // Line 1: Input type and index (e.g., "Button 5")
+                // Line 1: Input type and index (e.g., "Button 5") - vertically centered in top half
                 string inputTypeText = input.Type == InputType.Button
                     ? $"Button {input.Index + 1}"
                     : $"{input.Type} {input.Index}";
-                FUIRenderer.DrawText(canvas, inputTypeText, new SKPoint(leftMargin + 8, y + 14), FUIColors.TextPrimary, 11f);
+                FUIRenderer.DrawText(canvas, inputTypeText, new SKPoint(leftMargin + 8, y + 16), FUIColors.TextPrimary, 11f);
 
-                // Line 2: Device name (smaller, dimmer)
-                FUIRenderer.DrawText(canvas, input.DeviceName, new SKPoint(leftMargin + 8, y + 30), FUIColors.TextDim, 9f);
+                // Line 2: Device name (smaller, dimmer) - vertically centered in bottom half
+                FUIRenderer.DrawText(canvas, input.DeviceName, new SKPoint(leftMargin + 8, y + 32), FUIColors.TextDim, 9f);
 
                 // Remove [×] button (full height of row)
                 var removeBounds = new SKRect(rightMargin - 26, y, rightMargin, y + rowHeight);
@@ -2852,8 +2870,9 @@ public class MainForm : Form
         if (profile == null) return inputs;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        bool isAxis = _selectedMappingRow < 8;
-        int outputIndex = isAxis ? _selectedMappingRow : _selectedMappingRow - 8;
+        // Category 0 = Buttons, Category 1 = Axes
+        bool isAxis = _mappingCategory == 1;
+        int outputIndex = _selectedMappingRow;
 
         if (isAxis)
         {
@@ -2882,14 +2901,17 @@ public class MainForm : Form
     {
         if (_selectedMappingRow < 0) return "";
 
-        if (_selectedMappingRow < 8)
+        // Category 0 = Buttons, Category 1 = Axes
+        if (_mappingCategory == 1)
         {
+            // Axes
             string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
             return _selectedMappingRow < axisNames.Length ? axisNames[_selectedMappingRow] : $"Axis {_selectedMappingRow}";
         }
         else
         {
-            return $"Button {_selectedMappingRow - 8 + 1}";
+            // Buttons
+            return $"Button {_selectedMappingRow + 1}";
         }
     }
 
@@ -3431,16 +3453,27 @@ public class MainForm : Form
 
         float keycapHeight = 20f;
         float keycapGap = 4f;
-        float keycapPadding = 8f;
+        float keycapPadding = 8f;  // Padding on each side of text
+        float fontSize = 10f;
+        float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
 
-        using var textPaint = new SKPaint { TextSize = 10f, IsAntialias = true };
+        // Use consistent font for measurement
+        using var measurePaint = new SKPaint
+        {
+            TextSize = scaledFontSize,
+            IsAntialias = true,
+            Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
+        };
 
         // Calculate total width of all keycaps
         float totalWidth = 0;
         var keycapWidths = new List<float>();
+        var textWidths = new List<float>();
         foreach (var part in parts)
         {
-            float textWidth = textPaint.MeasureText(part);
+            string upperPart = part.ToUpperInvariant();
+            float textWidth = measurePaint.MeasureText(upperPart);
+            textWidths.Add(textWidth);
             float keycapWidth = textWidth + keycapPadding * 2;
             keycapWidths.Add(keycapWidth);
             totalWidth += keycapWidth;
@@ -3454,7 +3487,7 @@ public class MainForm : Form
         // Draw each keycap
         for (int i = 0; i < parts.Count; i++)
         {
-            string keyText = parts[i];
+            string keyText = parts[i].ToUpperInvariant();
             float keycapWidth = keycapWidths[i];
             var keycapBounds = new SKRect(startX, keycapTop, startX + keycapWidth, keycapTop + keycapHeight);
 
@@ -3477,8 +3510,17 @@ public class MainForm : Form
             };
             canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
 
-            // Keycap text (uppercase)
-            FUIRenderer.DrawTextCentered(canvas, keyText.ToUpperInvariant(), keycapBounds, FUIColors.TextPrimary, 10f);
+            // Keycap text - draw with explicit padding from left edge
+            float textX = startX + keycapPadding;
+            float textY = keycapBounds.MidY + scaledFontSize / 3;
+            using var textPaint = new SKPaint
+            {
+                Color = FUIColors.TextPrimary,
+                TextSize = scaledFontSize,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
+            };
+            canvas.DrawText(keyText, textX, textY, textPaint);
 
             startX += keycapWidth + keycapGap;
         }
@@ -5423,8 +5465,9 @@ public class MainForm : Form
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        bool isAxis = _selectedMappingRow < 8;
-        int outputIndex = isAxis ? _selectedMappingRow : _selectedMappingRow - 8;
+        // Category 0 = Buttons, Category 1 = Axes
+        bool isAxis = _mappingCategory == 1;
+        int outputIndex = _selectedMappingRow;
 
         if (isAxis)
         {
@@ -5474,14 +5517,16 @@ public class MainForm : Form
         _isCapturingKey = false;
         _selectedButtonMode = ButtonMode.Normal;
 
-        if (_selectedMappingRow < 8) return; // Only for buttons
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        int outputIndex = _selectedMappingRow - 8;
+        int outputIndex = _selectedMappingRow;
 
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
             m.Output.VJoyDevice == vjoyDevice.Id &&
@@ -5498,14 +5543,16 @@ public class MainForm : Form
 
     private void UpdateButtonModeForSelected()
     {
-        if (_selectedMappingRow < 8) return; // Only for buttons
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        int outputIndex = _selectedMappingRow - 8;
+        int outputIndex = _selectedMappingRow;
 
         // Find mapping for this button slot (either VJoyButton or Keyboard output)
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
@@ -5522,14 +5569,16 @@ public class MainForm : Form
 
     private void UpdateOutputTypeForSelected()
     {
-        if (_selectedMappingRow < 8) return; // Only for buttons
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        int outputIndex = _selectedMappingRow - 8;
+        int outputIndex = _selectedMappingRow;
 
         // Find mapping for this button slot
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
@@ -5556,14 +5605,16 @@ public class MainForm : Form
 
     private void UpdateKeyNameForSelected()
     {
-        if (_selectedMappingRow < 8) return;
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
         if (profile == null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        int outputIndex = _selectedMappingRow - 8;
+        int outputIndex = _selectedMappingRow;
 
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
             m.Output.VJoyDevice == vjoyDevice.Id &&

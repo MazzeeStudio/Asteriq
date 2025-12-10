@@ -5914,22 +5914,10 @@ public class MainForm : Form
         float titleBarHeight = 50;
         float pad = FUIRenderer.SpaceLG;
 
-        // Left L-corner accent
-        using (var accentPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary.WithAlpha(100),
-            StrokeWidth = 2f,
-            IsAntialias = true,
-            StrokeCap = SKStrokeCap.Square
-        })
-        {
-            canvas.DrawLine(pad, titleBarY + 8, pad, titleBarY + titleBarHeight - 5, accentPaint);
-            canvas.DrawLine(pad, titleBarY + 8, pad + 25, titleBarY + 8, accentPaint);
-        }
-
-        // Title text
-        FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(pad + 40, titleBarY + 38), FUIColors.Primary, 26f, true);
+        // Title text - aligned with left panel L-corner frame
+        // Panel starts at sideTabPad(8) + sideTabWidth(28) = 36
+        float titleX = 36f;
+        FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 26f, true);
 
         // Window controls - always at fixed position from right edge
         float btnTotalWidth = 28f * 3 + 8f * 2; // 3 buttons at 28px + 2 gaps at 8px = 100px
@@ -5944,8 +5932,8 @@ public class MainForm : Form
         float totalTabsWidth = tabSpacing * (_tabNames.Length - 1) + tabMeasurePaint.MeasureText(_tabNames[_tabNames.Length - 1]);
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
 
-        // Left side elements positioning
-        float subtitleX = pad + 185;
+        // Left side elements positioning (title starts at titleX, title is ~145px wide)
+        float subtitleX = titleX + 160;
         float profileSelectorWidth = 130f;
         float profileGap = 15f;
 
@@ -5960,7 +5948,7 @@ public class MainForm : Form
         }
         else
         {
-            profileSelectorX = pad + 185; // After title, where subtitle would be
+            profileSelectorX = titleX + 160; // After title, where subtitle would be
         }
 
         // Check if profile selector fits before tabs
@@ -6452,6 +6440,18 @@ public class MainForm : Form
     private void DrawDeviceDetailsPanel(SKCanvas canvas, SKRect bounds)
     {
         float pad = FUIRenderer.PanelPadding;
+        float frameInset = 5f;
+
+        // Panel background (matching mappings view)
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(100),
+            IsAntialias = true
+        };
+        canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
+            bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(150), 30f, 8f);
 
         if (_devices.Count == 0 || _selectedDevice < 0 || _selectedDevice >= _devices.Count)
         {
@@ -6462,29 +6462,38 @@ public class MainForm : Form
 
         var device = _devices[_selectedDevice];
 
-        // Component header
-        FUIRenderer.DrawText(canvas, "VK01", new SKPoint(bounds.Left + pad, bounds.Top + 20), FUIColors.Active, 12f);
-        FUIRenderer.DrawText(canvas, device.Name.Length > 30 ? device.Name.Substring(0, 27) + "..." : device.Name,
-            new SKPoint(bounds.Left + pad + 55, bounds.Top + 20), FUIColors.TextBright, 14f);
-
-        // Device silhouette - fill available space (height-constrained, like mappings view)
-        float silhouetteTop = bounds.Top + 45;
-        float silhouetteBottom = bounds.Bottom - 20;
-        float availHeight = silhouetteBottom - silhouetteTop;
-
-        // Use height as the primary constraint, keep it square-ish
-        float maxSize = 900f;
-        float size = Math.Min(availHeight, maxSize);
-
-        // Center horizontally in the available space
+        // Draw the device silhouette centered in panel (matching mappings view style)
         float centerX = bounds.MidX;
-        float centerY = (silhouetteTop + silhouetteBottom) / 2;
+        float centerY = bounds.MidY;
 
-        float silhouetteLeft = centerX - size / 2;
-        float silhouetteRight = centerX + size / 2;
+        if (_joystickSvg?.Picture != null)
+        {
+            // Limit size to 900px max and apply same rendering as mappings tab
+            float maxSize = 900f;
+            float maxWidth = Math.Min(bounds.Width - 40, maxSize);
+            float maxHeight = Math.Min(bounds.Height - 40, maxSize);
 
-        _silhouetteBounds = new SKRect(silhouetteLeft, silhouetteTop, silhouetteRight, silhouetteBottom);
-        DrawDeviceSilhouette(canvas, _silhouetteBounds);
+            // Create constrained bounds centered in the panel
+            float constrainedWidth = Math.Min(maxWidth, maxHeight); // Keep square-ish
+            float constrainedHeight = constrainedWidth;
+            _silhouetteBounds = new SKRect(
+                centerX - constrainedWidth / 2,
+                centerY - constrainedHeight / 2,
+                centerX + constrainedWidth / 2,
+                centerY + constrainedHeight / 2
+            );
+
+            // Draw the silhouette using shared method
+            DrawDeviceSilhouette(canvas, _silhouetteBounds);
+        }
+        else
+        {
+            // Placeholder when no SVG
+            _silhouetteBounds = SKRect.Empty;
+            FUIRenderer.DrawTextCentered(canvas, "Device Preview",
+                new SKRect(bounds.Left, centerY - 20, bounds.Right, centerY + 20),
+                FUIColors.TextDim, 14f);
+        }
 
         // Draw dynamic lead-lines for active inputs
         DrawActiveInputLeadLines(canvas, bounds);

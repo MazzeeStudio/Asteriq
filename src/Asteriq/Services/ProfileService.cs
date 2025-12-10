@@ -474,6 +474,30 @@ public class ProfileService
     }
 
     /// <summary>
+    /// Font size setting for accessibility (Small/Medium/Large)
+    /// </summary>
+    public FontSizeOption FontSize
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.FontSize;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.FontSize = value;
+            SaveSettings(settings);
+            FontSizeChanged?.Invoke(this, value);
+        }
+    }
+
+    /// <summary>
+    /// Event fired when font size setting changes
+    /// </summary>
+    public event EventHandler<FontSizeOption>? FontSizeChanged;
+
+    /// <summary>
     /// Load the last used profile if auto-load is enabled
     /// </summary>
     public MappingProfile? LoadLastProfileIfEnabled()
@@ -610,12 +634,23 @@ public class ProfileInfo
 }
 
 /// <summary>
+/// Font size options for accessibility
+/// </summary>
+public enum FontSizeOption
+{
+    Small,   // Original sizes
+    Medium,  // +2pt (default)
+    Large    // +4pt
+}
+
+/// <summary>
 /// Application settings
 /// </summary>
 public class AppSettings
 {
     public Guid? LastProfileId { get; set; }
     public bool AutoLoadLastProfile { get; set; } = true;
+    public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
 }
 
 /// <summary>

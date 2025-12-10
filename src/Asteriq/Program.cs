@@ -143,6 +143,22 @@ static class Program
             return;
         }
 
+        if (args.Contains("--scdetect"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunSCDetection();
+            return;
+        }
+
+        if (args.Contains("--scextract"))
+        {
+            if (!AttachConsole(-1))
+                AllocConsole();
+            RunSCExtraction(args);
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new UI.MainForm());
     }
@@ -214,6 +230,16 @@ Profile Management:
                       Example: Asteriq.exe --keytest 1 31 RCTRL
                       Key names: A-Z, 0-9, F1-F12, CTRL, RCTRL, SHIFT,
                                  ALT, SPACE, ENTER, ESC, TAB, etc.
+
+Star Citizen Integration:
+  --scdetect          Detect Star Citizen installations
+                      Scans for SC versions (LIVE, PTU, EPTU) and displays
+                      installation paths, BuildIds, and mappings directories.
+
+  --scextract [env]   Extract defaultProfile.xml from Data.p4k
+                      Extracts and caches the default profile from the specified
+                      SC environment (LIVE, PTU, etc.). Uses preferred if not specified.
+                      Example: Asteriq.exe --scextract LIVE
 
 Examples:
   Asteriq.exe                     Launch GUI
@@ -1518,6 +1544,190 @@ Examples:
         keyboardService.Dispose();
         inputService.Dispose();
         Console.WriteLine("Done.");
+        Console.WriteLine("\n(Press Enter to continue...)");
+        Console.ReadLine();
+    }
+
+    private static void RunSCDetection()
+    {
+        Console.WriteLine("=== Asteriq Star Citizen Detection ===\n");
+
+        var scService = new SCInstallationService();
+
+        Console.WriteLine("Scanning for Star Citizen installations...\n");
+
+        var installations = scService.Installations;
+
+        if (installations.Count == 0)
+        {
+            Console.WriteLine("No Star Citizen installations found.");
+            Console.WriteLine("\nSearched locations:");
+            Console.WriteLine("  - Program Files\\Roberts Space Industries\\StarCitizen\\");
+            Console.WriteLine("  - All fixed drives (root, Games, Program Files)");
+            Console.WriteLine("\nIf SC is installed elsewhere, use the Settings tab to configure a custom path.");
+        }
+        else
+        {
+            Console.WriteLine($"Found {installations.Count} installation(s):\n");
+
+            foreach (var inst in installations)
+            {
+                Console.WriteLine($"=== {inst.DisplayName} ===");
+                Console.WriteLine($"  Environment: {inst.Environment}");
+                Console.WriteLine($"  BuildId: {inst.BuildId ?? "(not found)"}");
+                Console.WriteLine($"  Install Path: {inst.InstallPath}");
+                Console.WriteLine($"  Data.p4k: {inst.DataP4kPath}");
+                Console.WriteLine($"    Size: {inst.DataP4kSize / (1024.0 * 1024 * 1024):F2} GB");
+                Console.WriteLine($"    Modified: {inst.DataP4kLastModified:yyyy-MM-dd HH:mm:ss} UTC");
+                Console.WriteLine($"  Mappings Path: {inst.MappingsPath}");
+                Console.WriteLine($"    Exists: {Directory.Exists(inst.MappingsPath)}");
+                Console.WriteLine($"  ActionMaps Path: {inst.ActionMapsPath}");
+                Console.WriteLine($"    Exists: {File.Exists(inst.ActionMapsPath)}");
+                Console.WriteLine($"  Cache Key: {inst.GetCacheKey()}");
+                Console.WriteLine($"  Valid: {inst.IsValid}");
+                Console.WriteLine();
+            }
+
+            // Show preferred installation
+            var preferred = scService.GetPreferredInstallation();
+            if (preferred != null)
+            {
+                Console.WriteLine($"Preferred installation: {preferred.DisplayName}");
+            }
+        }
+
+        // Check if SC is running
+        Console.WriteLine($"\nStar Citizen running: {SCInstallationService.IsStarCitizenRunning()}");
+
+        Console.WriteLine("\n(Press Enter to continue...)");
+        Console.ReadLine();
+    }
+
+    private static void RunSCExtraction(string[] args)
+    {
+        Console.WriteLine("=== Asteriq SC Profile Extraction ===\n");
+
+        // Parse optional environment argument
+        string? targetEnv = null;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--scextract" && i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+            {
+                targetEnv = args[i + 1].ToUpperInvariant();
+            }
+        }
+
+        var scService = new SCInstallationService();
+        var cacheService = new SCProfileCacheService();
+
+        Console.WriteLine("Scanning for Star Citizen installations...\n");
+
+        var installations = scService.Installations;
+
+        if (installations.Count == 0)
+        {
+            Console.WriteLine("No Star Citizen installations found.");
+            Console.WriteLine("\n(Press Enter to continue...)");
+            Console.ReadLine();
+            return;
+        }
+
+        Console.WriteLine($"Found {installations.Count} installation(s):");
+        foreach (var inst in installations)
+        {
+            Console.WriteLine($"  - {inst.DisplayName}");
+        }
+
+        // Select target installation
+        Models.SCInstallation? target;
+        if (!string.IsNullOrEmpty(targetEnv))
+        {
+            target = scService.GetInstallation(targetEnv);
+            if (target == null)
+            {
+                Console.WriteLine($"\nERROR: Installation '{targetEnv}' not found.");
+                Console.WriteLine("\n(Press Enter to continue...)");
+                Console.ReadLine();
+                return;
+            }
+        }
+        else
+        {
+            target = scService.GetPreferredInstallation();
+            if (target == null)
+            {
+                Console.WriteLine("\nERROR: No preferred installation found.");
+                Console.WriteLine("\n(Press Enter to continue...)");
+                Console.ReadLine();
+                return;
+            }
+        }
+
+        Console.WriteLine($"\nTarget: {target.DisplayName}");
+        Console.WriteLine($"  Path: {target.InstallPath}");
+        Console.WriteLine($"  Data.p4k: {target.DataP4kPath}");
+        Console.WriteLine($"  Cache key: {target.GetCacheKey()}");
+
+        // Check cache
+        var cacheInfo = cacheService.GetCacheInfo();
+        Console.WriteLine($"\nCache directory: {cacheInfo.CacheDirectory}");
+        Console.WriteLine($"Cached profiles: {cacheInfo.CachedProfileCount} ({cacheInfo.FormattedSize})");
+
+        if (cacheService.HasCachedProfile(target))
+        {
+            Console.WriteLine($"  -> {target.Environment} profile is already cached");
+        }
+
+        Console.WriteLine("\nExtracting defaultProfile.xml...");
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var profile = cacheService.GetOrExtractProfile(target, (msg) =>
+        {
+            Console.WriteLine($"  {msg}");
+        });
+
+        stopwatch.Stop();
+
+        if (profile == null)
+        {
+            Console.WriteLine("\nERROR: Failed to extract profile.");
+            Console.WriteLine("\n(Press Enter to continue...)");
+            Console.ReadLine();
+            return;
+        }
+
+        Console.WriteLine($"\nExtraction completed in {stopwatch.ElapsedMilliseconds:N0}ms");
+        Console.WriteLine($"Root element: {profile.DocumentElement?.Name}");
+
+        // Count some basic info from the profile
+        var actionmaps = profile.SelectNodes("//actionmap");
+        var actions = profile.SelectNodes("//action");
+        Console.WriteLine($"Action maps: {actionmaps?.Count ?? 0}");
+        Console.WriteLine($"Actions: {actions?.Count ?? 0}");
+
+        // Show a sample of action maps
+        if (actionmaps != null && actionmaps.Count > 0)
+        {
+            Console.WriteLine("\nSample action maps:");
+            int count = 0;
+            foreach (System.Xml.XmlNode map in actionmaps)
+            {
+                var mapName = map.Attributes?["name"]?.Value ?? "unnamed";
+                var actionCount = map.SelectNodes("action")?.Count ?? 0;
+                Console.WriteLine($"  - {mapName} ({actionCount} actions)");
+                if (++count >= 10) break;
+            }
+            if (actionmaps.Count > 10)
+            {
+                Console.WriteLine($"  ... and {actionmaps.Count - 10} more");
+            }
+        }
+
+        // Update cache info
+        cacheInfo = cacheService.GetCacheInfo();
+        Console.WriteLine($"\nUpdated cache: {cacheInfo.CachedProfileCount} profiles ({cacheInfo.FormattedSize})");
+
         Console.WriteLine("\n(Press Enter to continue...)");
         Console.ReadLine();
     }

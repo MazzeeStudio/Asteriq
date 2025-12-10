@@ -59,7 +59,7 @@ public class MainForm : Form
     private float _pulsePhase = 0f;
     private float _leadLineProgress = 0f;
     private int _hoveredDevice = -1;
-    private int _selectedDevice = 0;
+    private int _selectedDevice = -1;  // Start with no selection, will be set in RefreshDevices
     private List<PhysicalDeviceInfo> _devices = new();
     private DeviceInputState? _currentInputState;
 
@@ -928,11 +928,29 @@ public class MainForm : Form
     private void RefreshDevices()
     {
         _devices = _inputService.EnumerateDevices();
-        if (_devices.Count > 0 && _selectedDevice < 0)
+
+        // Auto-select first device in current category if nothing selected
+        if (_selectedDevice < 0 && _devices.Count > 0)
         {
-            _selectedDevice = 0;
-            // Load device map for the first device
-            LoadDeviceMapForDevice(_devices[0].Name);
+            SelectFirstDeviceInCategory();
+        }
+    }
+
+    private void SelectFirstDeviceInCategory()
+    {
+        // Find first device matching current category
+        var filteredDevices = _deviceCategory == 0
+            ? _devices.Where(d => !d.IsVirtual).ToList()
+            : _devices.Where(d => d.IsVirtual).ToList();
+
+        if (filteredDevices.Count > 0)
+        {
+            // Get the actual index in _devices
+            _selectedDevice = _devices.IndexOf(filteredDevices[0]);
+            if (_selectedDevice >= 0)
+            {
+                LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+            }
         }
     }
 
@@ -1434,8 +1452,9 @@ public class MainForm : Form
         if (_activeTab == 0 && _hoveredDeviceCategory >= 0)
         {
             _deviceCategory = _hoveredDeviceCategory;
-            _selectedDevice = -1; // Reset selection when switching categories
+            _selectedDevice = -1; // Reset before selecting first in new category
             _currentInputState = null;
+            SelectFirstDeviceInCategory();
             return;
         }
 

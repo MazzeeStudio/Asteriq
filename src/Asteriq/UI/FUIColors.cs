@@ -121,19 +121,96 @@ public static class FUIColors
         _ => new(0x40, 0xA0, 0xFF, 0x60)
     };
 
-    // State colors (mostly theme-independent for clarity)
-    public static SKColor Warning => new(0xFF, 0xA0, 0x40);
-    public static SKColor Danger => new(0xFF, 0x50, 0x50);
-    public static SKColor Success => new(0x40, 0xFF, 0x90);
+    // State colors (theme-aware for visual harmony)
+    public static SKColor Warning => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0xFF, 0xA0, 0x40),  // Orange
+        FUITheme.Matrix => new(0xFF, 0xE0, 0x40),    // Yellow (contrasts with green)
+        FUITheme.Amber => new(0xFF, 0xE0, 0x60),     // Bright yellow
+        FUITheme.Ice => new(0xFF, 0xA0, 0x60),       // Warm orange (contrasts with cyan)
+        _ => new(0xFF, 0xA0, 0x40)
+    };
 
-    // Text hierarchy
-    public static SKColor TextBright => new(0xF0, 0xF4, 0xF8);
-    public static SKColor TextPrimary => new(0xC0, 0xC8, 0xD0);
-    public static SKColor TextDim => new(0x70, 0x78, 0x80);
-    public static SKColor TextDisabled => new(0x40, 0x44, 0x48);
+    public static SKColor Danger => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0xFF, 0x50, 0x50),  // Red
+        FUITheme.Matrix => new(0xFF, 0x60, 0x40),    // Red-orange (avoids green clash)
+        FUITheme.Amber => new(0xFF, 0x50, 0x50),     // Red
+        FUITheme.Ice => new(0xFF, 0x50, 0x80),       // Magenta-red
+        _ => new(0xFF, 0x50, 0x50)
+    };
 
-    // Frame/border colors
-    public static SKColor Frame => new(0x50, 0x58, 0x64);
-    public static SKColor FrameBright => new(0x90, 0x9C, 0xA8);
-    public static SKColor FrameDim => new(0x30, 0x34, 0x3C);
+    public static SKColor Success => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0x40, 0xFF, 0x90),  // Green
+        FUITheme.Matrix => new(0x80, 0xFF, 0x80),    // Bright green (matches theme)
+        FUITheme.Amber => new(0x40, 0xE0, 0xC0),     // Teal (contrasts with amber)
+        FUITheme.Ice => new(0x40, 0xFF, 0xC0),       // Cyan-green
+        _ => new(0x40, 0xFF, 0x90)
+    };
+
+    // Text hierarchy (theme-aware for visual harmony)
+    public static SKColor TextBright => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0xF0, 0xF4, 0xF8),  // Cool white
+        FUITheme.Matrix => new(0xE0, 0xFF, 0xE0),    // Green-tinted white
+        FUITheme.Amber => new(0xFF, 0xF8, 0xF0),     // Warm white
+        FUITheme.Ice => new(0xF0, 0xF8, 0xFF),       // Ice white
+        _ => new(0xF0, 0xF4, 0xF8)
+    };
+
+    public static SKColor TextPrimary => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0xC0, 0xC8, 0xD0),  // Cool gray
+        FUITheme.Matrix => new(0xA0, 0xD0, 0xA0),    // Light green
+        FUITheme.Amber => new(0xE0, 0xD0, 0xB0),     // Cream
+        FUITheme.Ice => new(0xB0, 0xD0, 0xE0),       // Pale cyan
+        _ => new(0xC0, 0xC8, 0xD0)
+    };
+
+    public static SKColor TextDim => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0x70, 0x78, 0x80),  // Slate
+        FUITheme.Matrix => new(0x50, 0x80, 0x50),    // Dark green
+        FUITheme.Amber => new(0x90, 0x78, 0x50),     // Brown
+        FUITheme.Ice => new(0x60, 0x80, 0x90),       // Steel
+        _ => new(0x70, 0x78, 0x80)
+    };
+
+    public static SKColor TextDisabled => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0x40, 0x44, 0x48),
+        FUITheme.Matrix => new(0x30, 0x48, 0x30),
+        FUITheme.Amber => new(0x48, 0x40, 0x30),
+        FUITheme.Ice => new(0x38, 0x44, 0x48),
+        _ => new(0x40, 0x44, 0x48)
+    };
+
+    // Frame/border colors (theme-aware)
+    public static SKColor Frame => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0x50, 0x58, 0x64),  // Blue-gray
+        FUITheme.Matrix => new(0x40, 0x60, 0x40),    // Green-gray
+        FUITheme.Amber => new(0x64, 0x54, 0x40),     // Brown-gray
+        FUITheme.Ice => new(0x48, 0x58, 0x64),       // Cyan-gray
+        _ => new(0x50, 0x58, 0x64)
+    };
+
+    public static SKColor FrameBright => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0x90, 0x9C, 0xA8),
+        FUITheme.Matrix => new(0x70, 0xA0, 0x70),
+        FUITheme.Amber => new(0xA8, 0x94, 0x70),
+        FUITheme.Ice => new(0x80, 0x9C, 0xA8),
+        _ => new(0x90, 0x9C, 0xA8)
+    };
+
+    public static SKColor FrameDim => _currentTheme switch
+    {
+        FUITheme.Midnight => new(0x30, 0x34, 0x3C),
+        FUITheme.Matrix => new(0x28, 0x38, 0x28),
+        FUITheme.Amber => new(0x3C, 0x34, 0x28),
+        FUITheme.Ice => new(0x2C, 0x34, 0x3C),
+        _ => new(0x30, 0x34, 0x3C)
+    };
 }

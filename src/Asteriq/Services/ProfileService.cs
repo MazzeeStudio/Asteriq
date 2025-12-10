@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Asteriq.Models;
+using Asteriq.UI;
 
 namespace Asteriq.Services;
 
@@ -498,6 +499,30 @@ public class ProfileService
     public event EventHandler<FontSizeOption>? FontSizeChanged;
 
     /// <summary>
+    /// Theme setting
+    /// </summary>
+    public FUITheme Theme
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.Theme;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.Theme = value;
+            SaveSettings(settings);
+            ThemeChanged?.Invoke(this, value);
+        }
+    }
+
+    /// <summary>
+    /// Event fired when theme setting changes
+    /// </summary>
+    public event EventHandler<FUITheme>? ThemeChanged;
+
+    /// <summary>
     /// Load the last used profile if auto-load is enabled
     /// </summary>
     public MappingProfile? LoadLastProfileIfEnabled()
@@ -651,6 +676,7 @@ public class AppSettings
     public Guid? LastProfileId { get; set; }
     public bool AutoLoadLastProfile { get; set; } = true;
     public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
+    public FUITheme Theme { get; set; } = FUITheme.Midnight;
 }
 
 /// <summary>

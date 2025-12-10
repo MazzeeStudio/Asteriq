@@ -15,6 +15,9 @@ public class InputService : IDisposable
     private volatile bool _isPolling;
     private Task? _pollTask;
     private bool _isInitialized;
+    private HidDeviceService? _hidDeviceService;
+    private List<HidDeviceService.HidDeviceInfo>? _hidDevicesCache;
+    private readonly HashSet<string> _matchedHidDevicePaths = new();
 
     /// <summary>
     /// When true, only fires InputReceived when state changes. Default: false (fire every poll)
@@ -53,6 +56,17 @@ public class InputService : IDisposable
         // Enable joystick events
         SDL.SDL_JoystickEventState(SDL.SDL_ENABLE);
 
+        // Initialize HidSharp for axis type detection and unique device identification
+        try
+        {
+            _hidDeviceService = new HidDeviceService();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"HidSharp initialization failed (axis types will be unknown): {ex.Message}");
+            // Continue without HidSharp - we'll just not have axis type info
+        }
+
         _isInitialized = true;
         return true;
     }
@@ -83,29 +97,148 @@ public class InputService : IDisposable
     private PhysicalDeviceInfo? GetDeviceInfo(int deviceIndex)
     {
         string name = SDL.SDL_JoystickNameForIndex(deviceIndex) ?? $"Unknown Device {deviceIndex}";
-        Guid guid = SDL.SDL_JoystickGetDeviceGUID(deviceIndex);
+        Guid sdlGuid = SDL.SDL_JoystickGetDeviceGUID(deviceIndex);
 
         // Need to open the joystick to get axis/button counts
         IntPtr joystick = SDL.SDL_JoystickOpen(deviceIndex);
         if (joystick == IntPtr.Zero)
             return null;
 
+        // Get the instance ID for matching with DirectInput
+        var instanceId = SDL.SDL_JoystickInstanceID(joystick);
+
         var info = new PhysicalDeviceInfo
         {
             DeviceIndex = deviceIndex,
             Name = name,
-            InstanceGuid = guid,
+            InstanceGuid = sdlGuid,
             AxisCount = SDL.SDL_JoystickNumAxes(joystick),
             ButtonCount = SDL.SDL_JoystickNumButtons(joystick),
             HatCount = SDL.SDL_JoystickNumHats(joystick),
             IsVirtual = IsVirtualDevice(name)
         };
 
+        // Try to get axis type information from DirectInput
+        PopulateAxisTypes(info);
+
         // Keep joystick open for polling
         _openJoysticks[deviceIndex] = joystick;
         _deviceInfo[deviceIndex] = info;
 
         return info;
+    }
+
+    /// <summary>
+    /// Populate axis type information from HidSharp
+    /// </summary>
+    private void PopulateAxisTypes(PhysicalDeviceInfo info)
+    {
+        if (_hidDeviceService == null)
+        {
+            LogAxisTypes($"HidDeviceService is null for {info.Name}");
+            return;
+        }
+
+        try
+        {
+            // Cache HID devices on first call (to handle multiple identical devices)
+            if (_hidDevicesCache == null)
+            {
+                _hidDevicesCache = _hidDeviceService.EnumerateDevices();
+                LogAxisTypes($"Enumerated {_hidDevicesCache.Count} HID devices:");
+                foreach (var d in _hidDevicesCache)
+                {
+                    LogAxisTypes($"  - {d.ProductName}: {d.Axes.Count} axes, Path=...{d.DevicePath.Substring(Math.Max(0, d.DevicePath.Length - 40))}");
+                    foreach (var axis in d.Axes)
+                    {
+                        LogAxisTypes($"      Axis {axis.Index}: {axis.Type}");
+                    }
+                }
+            }
+
+            // Find matching device by name, but exclude already-matched devices
+            // This handles the case of multiple identical devices (e.g., two Alpha Primes)
+            // The DevicePath is unique per physical device instance
+            LogAxisTypes($"Looking for match for SDL device: '{info.Name}'");
+            LogAxisTypes($"  Already matched paths: {_matchedHidDevicePaths.Count}");
+
+            var matchingDevice = _hidDevicesCache.FirstOrDefault(d =>
+                !_matchedHidDevicePaths.Contains(d.DevicePath) &&
+                DeviceNamesMatch(d.ProductName, info.Name));
+
+            if (matchingDevice != null)
+            {
+                // Mark this HID device as matched so it won't be reused
+                _matchedHidDevicePaths.Add(matchingDevice.DevicePath);
+
+                // Copy axis info directly (HidDeviceService already uses our AxisInfo type)
+                info.AxisInfos = matchingDevice.Axes;
+
+                // Store the unique device path for future reference
+                info.HidDevicePath = matchingDevice.DevicePath;
+
+                LogAxisTypes($"Matched {info.Name} to HID device with {info.AxisInfos.Count} axes");
+                foreach (var axis in info.AxisInfos)
+                {
+                    LogAxisTypes($"  Axis {axis.Index}: {axis.Type} -> vJoy index {axis.ToVJoyAxisIndex()}");
+                }
+            }
+            else
+            {
+                LogAxisTypes($"No match found for '{info.Name}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogAxisTypes($"Failed to get axis types for {info.Name}: {ex.Message}");
+        }
+    }
+
+    private static void LogAxisTypes(string message)
+    {
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Asteriq", "axis_types.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+        File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+    }
+
+    /// <summary>
+    /// Check if two device names match, accounting for naming differences between HidSharp and SDL2.
+    /// SDL2 sometimes expands abbreviations (e.g., "L-" -> "LEFT ", "R-" -> "RIGHT ").
+    /// </summary>
+    private static bool DeviceNamesMatch(string hidName, string sdlName)
+    {
+        // Exact match
+        if (hidName.Equals(sdlName, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Normalize names for comparison
+        var normalizedHid = NormalizeDeviceName(hidName);
+        var normalizedSdl = NormalizeDeviceName(sdlName);
+
+        return normalizedHid.Equals(normalizedSdl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Normalize device name by expanding common abbreviations and removing extra spaces.
+    /// </summary>
+    private static string NormalizeDeviceName(string name)
+    {
+        var normalized = name.Trim();
+
+        // Expand common Virpil/VKB abbreviations that SDL2 expands
+        // "L-" at start -> "LEFT "
+        // "R-" at start -> "RIGHT "
+        if (normalized.StartsWith("L-", StringComparison.OrdinalIgnoreCase))
+            normalized = "LEFT " + normalized.Substring(2);
+        else if (normalized.StartsWith("R-", StringComparison.OrdinalIgnoreCase))
+            normalized = "RIGHT " + normalized.Substring(2);
+
+        // Remove extra whitespace
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\s+", " ");
+
+        return normalized;
     }
 
     /// <summary>
@@ -297,6 +430,10 @@ public class InputService : IDisposable
         _openJoysticks.Clear();
         _deviceInfo.Clear();
         _lastState.Clear();
+
+        _hidDeviceService = null;
+        _hidDevicesCache = null;
+        _matchedHidDevicePaths.Clear();
 
         if (_isInitialized)
         {

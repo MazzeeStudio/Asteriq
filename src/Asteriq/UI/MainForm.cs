@@ -69,9 +69,11 @@ public class MainForm : Form
     private SKRect _deviceCategoryD1Bounds;
     private SKRect _deviceCategoryD2Bounds;
 
-    // 1:1 Mapping button in device panel
+    // Device Actions panel buttons
     private SKRect _map1to1ButtonBounds;
     private bool _map1to1ButtonHovered;
+    private SKRect _clearMappingsButtonBounds;
+    private bool _clearMappingsButtonHovered;
 
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
     private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
@@ -1330,8 +1332,9 @@ public class MainForm : Form
             _hoveredDevice = -1;
         }
 
-        // Map 1:1 button hover detection
+        // Device action button hover detection
         _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
+        _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
@@ -1487,10 +1490,15 @@ public class MainForm : Form
             _activeInputTracker.Clear(); // Clear lead-lines when switching devices
         }
 
-        // Map 1:1 button click
+        // Device action button clicks
         if (_map1to1ButtonHovered && !_map1to1ButtonBounds.IsEmpty)
         {
             CreateOneToOneMappings();
+            return;
+        }
+        if (_clearMappingsButtonHovered && !_clearMappingsButtonBounds.IsEmpty)
+        {
+            ClearDeviceMappings();
             return;
         }
 
@@ -1810,8 +1818,17 @@ public class MainForm : Form
             var detailsBounds = new SKRect(centerStart, contentTop, centerEnd, contentBottom);
             DrawDeviceDetailsPanel(canvas, detailsBounds);
 
-            // Right panel: Status
-            var statusBounds = new SKRect(bounds.Right - pad - rightPanelWidth, contentTop, bounds.Right - pad, contentBottom);
+            // Right panel: Split into Device Actions (top) and Status (bottom)
+            float rightPanelX = bounds.Right - pad - rightPanelWidth;
+            float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
+            float panelGap = 8f;
+
+            // Top half: Device Actions panel
+            var deviceActionsBounds = new SKRect(rightPanelX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
+            DrawDeviceActionsPanel(canvas, deviceActionsBounds);
+
+            // Bottom half: Status panel
+            var statusBounds = new SKRect(rightPanelX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
             DrawStatusPanel(canvas, statusBounds);
         }
 
@@ -5296,7 +5313,7 @@ public class MainForm : Form
     }
 
     /// <summary>
-    /// Create 1:1 mappings from the selected physical device to the selected vJoy device.
+    /// Create 1:1 mappings from the selected physical device to a user-selected vJoy device.
     /// Maps all axes, buttons, and hats directly without any curves or modifications.
     /// </summary>
     private void CreateOneToOneMappings()
@@ -5307,6 +5324,12 @@ public class MainForm : Form
         var physicalDevice = _devices[_selectedDevice];
         if (physicalDevice.IsVirtual) return; // Only map physical devices
 
+        // Ensure vJoy devices are loaded
+        if (_vjoyDevices.Count == 0)
+        {
+            _vjoyDevices = _vjoyService.EnumerateDevices();
+        }
+
         // Check if we have any vJoy devices
         if (_vjoyDevices.Count == 0)
         {
@@ -5314,42 +5337,9 @@ public class MainForm : Form
             return;
         }
 
-        // Find the best vJoy device (one that can accommodate all controls)
-        var vjoyDevice = FindBestVJoyDevice(physicalDevice);
-        if (vjoyDevice == null)
-        {
-            // Use first available vJoy device but warn about capacity
-            vjoyDevice = _vjoyDevices[0];
-            int vjoyAxes = CountVJoyAxes(vjoyDevice);
-            int vjoyButtons = vjoyDevice.ButtonCount;
-            int vjoyPovs = vjoyDevice.ContPovCount + vjoyDevice.DiscPovCount;
-
-            if (vjoyAxes < physicalDevice.AxisCount ||
-                vjoyButtons < physicalDevice.ButtonCount ||
-                vjoyPovs < physicalDevice.HatCount)
-            {
-                var result = MessageBox.Show(this,
-                    $"No vJoy device has enough capacity for {physicalDevice.Name}.\n\n" +
-                    $"Physical device: {physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats\n" +
-                    $"Best vJoy (#{vjoyDevice.Id}): {vjoyAxes} axes, {vjoyButtons} buttons, {vjoyPovs} POVs\n\n" +
-                    "Do you want to create partial mappings with the available capacity?\n\n" +
-                    "Click 'No' to open vJoy configuration help.",
-                    "vJoy Capacity Warning",
-                    MessageBoxButtons.YesNoCancel,
-                    MessageBoxIcon.Warning);
-
-                if (result == DialogResult.No)
-                {
-                    ShowVJoyConfigurationHelp(physicalDevice, noDevices: false);
-                    return;
-                }
-                else if (result == DialogResult.Cancel)
-                {
-                    return;
-                }
-                // Yes = continue with partial mappings
-            }
-        }
+        // Show vJoy device selection dialog
+        var vjoyDevice = ShowVJoyDeviceSelectionDialog(physicalDevice);
+        if (vjoyDevice == null) return; // User cancelled
 
         // Update selected vJoy device index
         _selectedVJoyDeviceIndex = _vjoyDevices.IndexOf(vjoyDevice);
@@ -5375,15 +5365,61 @@ public class MainForm : Form
             m.Inputs.Any(i => i.DeviceId == deviceId) &&
             m.Output.VJoyDevice == vjoyDevice.Id);
 
-        // Create axis mappings (map up to the number of axes on the vJoy device)
-        int vJoyAxisCount = CountVJoyAxes(vjoyDevice);
-        int axesToMap = Math.Min(physicalDevice.AxisCount, vJoyAxisCount);
+        // Create axis mappings using actual axis types when available
+        // Maps each physical axis to the corresponding vJoy axis based on type (X->X, Slider->Slider, etc.)
+        var vjoyAxisIndices = GetVJoyAxisIndices(vjoyDevice);
+        var usedVJoyAxes = new HashSet<int>();
+        var sliderCount = 0; // Track how many sliders we've mapped
 
-        for (int i = 0; i < axesToMap; i++)
+        LogMapping($"=== 1:1 Mapping for {physicalDevice.Name} ===");
+        LogMapping($"Device: {physicalDevice.Name}, AxisCount: {physicalDevice.AxisCount}, AxisInfos.Count: {physicalDevice.AxisInfos.Count}");
+        LogMapping($"HidDevicePath: {physicalDevice.HidDevicePath}");
+        foreach (var ai in physicalDevice.AxisInfos)
         {
+            LogMapping($"  AxisInfo: Index={ai.Index}, Type={ai.Type}, vJoyIndex={ai.ToVJoyAxisIndex()}");
+        }
+
+        for (int i = 0; i < physicalDevice.AxisCount; i++)
+        {
+            // Determine the target vJoy axis index based on axis type
+            int vjoyAxisIndex;
+            var axisInfo = physicalDevice.AxisInfos.FirstOrDefault(a => a.Index == i);
+
+            LogMapping($"Processing axis {i}: axisInfo={axisInfo?.Type.ToString() ?? "NULL"}");
+
+            if (axisInfo != null && axisInfo.Type != AxisType.Unknown)
+            {
+                // Use actual axis type to determine vJoy target
+                vjoyAxisIndex = axisInfo.ToVJoyAxisIndex();
+
+                // Handle multiple sliders (Slider0 = 6, Slider1 = 7)
+                if (axisInfo.Type == AxisType.Slider)
+                {
+                    vjoyAxisIndex = 6 + sliderCount; // Map to Slider0 first, then Slider1
+                    sliderCount++;
+                }
+            }
+            else
+            {
+                // Fallback: use sequential mapping if axis type is unknown
+                vjoyAxisIndex = i < vjoyAxisIndices.Count ? vjoyAxisIndices[i] : -1;
+            }
+
+            // Skip if the vJoy axis isn't available or already used
+            if (vjoyAxisIndex < 0 || !vjoyAxisIndices.Contains(vjoyAxisIndex) || usedVJoyAxes.Contains(vjoyAxisIndex))
+            {
+                // Try to find an unused vJoy axis as fallback
+                vjoyAxisIndex = vjoyAxisIndices.FirstOrDefault(idx => !usedVJoyAxes.Contains(idx), -1);
+                if (vjoyAxisIndex < 0) continue; // No more vJoy axes available
+            }
+
+            usedVJoyAxes.Add(vjoyAxisIndex);
+            string vjoyAxisName = GetVJoyAxisName(vjoyAxisIndex);
+            string physicalAxisName = axisInfo?.TypeName ?? $"Axis {i}";
+
             var mapping = new AxisMapping
             {
-                Name = $"{physicalDevice.Name} Axis {i} -> vJoy {vjoyDevice.Id} Axis {i}",
+                Name = $"{physicalDevice.Name} {physicalAxisName} -> vJoy {vjoyDevice.Id} {vjoyAxisName}",
                 Inputs = new List<InputSource>
                 {
                     new InputSource
@@ -5398,7 +5434,7 @@ public class MainForm : Form
                 {
                     Type = OutputType.VJoyAxis,
                     VJoyDevice = vjoyDevice.Id,
-                    Index = i
+                    Index = vjoyAxisIndex
                 },
                 Curve = new AxisCurve { Type = CurveType.Linear }
             };
@@ -5489,6 +5525,43 @@ public class MainForm : Form
         if (vjoy.HasSlider0) count++;
         if (vjoy.HasSlider1) count++;
         return count;
+    }
+
+    /// <summary>
+    /// Get the list of available vJoy axis indices in standard order.
+    /// Returns indices 0-7 corresponding to X, Y, Z, RX, RY, RZ, Slider0, Slider1.
+    /// </summary>
+    private List<int> GetVJoyAxisIndices(VJoyDeviceInfo vjoy)
+    {
+        var indices = new List<int>();
+        if (vjoy.HasAxisX) indices.Add(0);   // X
+        if (vjoy.HasAxisY) indices.Add(1);   // Y
+        if (vjoy.HasAxisZ) indices.Add(2);   // Z
+        if (vjoy.HasAxisRX) indices.Add(3);  // RX
+        if (vjoy.HasAxisRY) indices.Add(4);  // RY
+        if (vjoy.HasAxisRZ) indices.Add(5);  // RZ
+        if (vjoy.HasSlider0) indices.Add(6); // Slider0
+        if (vjoy.HasSlider1) indices.Add(7); // Slider1
+        return indices;
+    }
+
+    /// <summary>
+    /// Get a human-readable name for a vJoy axis index.
+    /// </summary>
+    private string GetVJoyAxisName(int index)
+    {
+        return index switch
+        {
+            0 => "X",
+            1 => "Y",
+            2 => "Z",
+            3 => "RX",
+            4 => "RY",
+            5 => "RZ",
+            6 => "Slider1",
+            7 => "Slider2",
+            _ => $"Axis{index}"
+        };
     }
 
     /// <summary>
@@ -5602,6 +5675,191 @@ public class MainForm : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }
+    }
+
+    /// <summary>
+    /// Show a dialog to select a vJoy device for 1:1 mapping.
+    /// Returns the selected device or null if cancelled.
+    /// </summary>
+    private VJoyDeviceInfo? ShowVJoyDeviceSelectionDialog(PhysicalDeviceInfo physicalDevice)
+    {
+        using var dialog = new Form
+        {
+            Text = "Select vJoy Device",
+            Size = new Size(400, 350),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = Color.FromArgb(30, 35, 40)
+        };
+
+        var infoLabel = new Label
+        {
+            Text = $"Select a vJoy device to map {physicalDevice.Name}:\n" +
+                   $"({physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats)",
+            Location = new Point(15, 15),
+            Size = new Size(360, 40),
+            ForeColor = Color.White
+        };
+        dialog.Controls.Add(infoLabel);
+
+        var listBox = new ListBox
+        {
+            Location = new Point(15, 60),
+            Size = new Size(355, 180),
+            BackColor = Color.FromArgb(40, 45, 50),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10f)
+        };
+
+        // Add vJoy devices to list
+        foreach (var vjoy in _vjoyDevices)
+        {
+            int axes = CountVJoyAxes(vjoy);
+            int buttons = vjoy.ButtonCount;
+            int povs = vjoy.ContPovCount + vjoy.DiscPovCount;
+
+            string status = "";
+            if (axes >= physicalDevice.AxisCount &&
+                buttons >= physicalDevice.ButtonCount &&
+                povs >= physicalDevice.HatCount)
+            {
+                status = " [OK]";
+            }
+            else
+            {
+                status = " [partial]";
+            }
+
+            listBox.Items.Add($"vJoy #{vjoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs{status}");
+        }
+
+        // Add option to configure new vJoy device
+        listBox.Items.Add("+ Configure new vJoy device...");
+
+        if (listBox.Items.Count > 0)
+            listBox.SelectedIndex = 0;
+
+        dialog.Controls.Add(listBox);
+
+        var okButton = new Button
+        {
+            Text = "Map 1:1",
+            Location = new Point(190, 260),
+            Size = new Size(80, 30),
+            DialogResult = DialogResult.OK,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(0, 120, 180),
+            ForeColor = Color.White
+        };
+        dialog.Controls.Add(okButton);
+
+        var cancelButton = new Button
+        {
+            Text = "Cancel",
+            Location = new Point(285, 260),
+            Size = new Size(80, 30),
+            DialogResult = DialogResult.Cancel,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(60, 65, 70),
+            ForeColor = Color.White
+        };
+        dialog.Controls.Add(cancelButton);
+
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            int selectedIndex = listBox.SelectedIndex;
+
+            // Check if user selected "Configure new vJoy device"
+            if (selectedIndex == _vjoyDevices.Count)
+            {
+                ShowVJoyConfigurationHelp(physicalDevice, noDevices: false);
+                return null;
+            }
+
+            if (selectedIndex >= 0 && selectedIndex < _vjoyDevices.Count)
+            {
+                var selectedVJoy = _vjoyDevices[selectedIndex];
+
+                // Warn about partial mappings if necessary
+                int axes = CountVJoyAxes(selectedVJoy);
+                int buttons = selectedVJoy.ButtonCount;
+                int povs = selectedVJoy.ContPovCount + selectedVJoy.DiscPovCount;
+
+                if (axes < physicalDevice.AxisCount ||
+                    buttons < physicalDevice.ButtonCount ||
+                    povs < physicalDevice.HatCount)
+                {
+                    var result = MessageBox.Show(this,
+                        $"vJoy #{selectedVJoy.Id} doesn't have enough capacity.\n\n" +
+                        $"Physical device: {physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats\n" +
+                        $"vJoy #{selectedVJoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs\n\n" +
+                        "Some controls will not be mapped. Continue?",
+                        "Partial Mapping",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (result != DialogResult.Yes)
+                        return null;
+                }
+
+                return selectedVJoy;
+            }
+        }
+
+        return null;
+    }
+
+    private static void LogMapping(string message)
+    {
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Asteriq", "axis_types.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+        File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] [Mapping] {message}\n");
+    }
+
+    /// <summary>
+    /// Clear all mappings for the selected physical device.
+    /// </summary>
+    private void ClearDeviceMappings()
+    {
+        if (_selectedDevice < 0 || _selectedDevice >= _devices.Count) return;
+
+        var physicalDevice = _devices[_selectedDevice];
+        if (physicalDevice.IsVirtual) return;
+
+        var result = MessageBox.Show(this,
+            $"Remove all mappings for {physicalDevice.Name}?\n\nThis will remove axis, button, and hat mappings from all vJoy devices.",
+            "Clear Mappings",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (result != DialogResult.Yes) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile == null) return;
+
+        string deviceId = physicalDevice.InstanceGuid.ToString();
+
+        // Remove all mappings from this device
+        int axisRemoved = profile.AxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        int buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        int hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+
+        _profileService.SaveActiveProfile();
+
+        MessageBox.Show(this,
+            $"Removed {axisRemoved} axis, {buttonRemoved} button, and {hatRemoved} hat mappings.",
+            "Mappings Cleared",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+
+        _canvas.Invalidate();
     }
 
     private void CreateBindingForRow(int rowIndex, DetectedInput input)
@@ -6863,44 +7121,6 @@ public class MainForm : Form
             }
         }
 
-        // "Map 1:1 to vJoy" button (only for physical devices with a device selected)
-        if (_deviceCategory == 0 && _selectedDevice >= 0 && _selectedDevice < _devices.Count && !_devices[_selectedDevice].IsVirtual)
-        {
-            float buttonY = bounds.Bottom - pad - 65;
-            float buttonWidth = contentBounds.Width - pad * 2;
-            float buttonHeight = 32f;
-            _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, buttonY, contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
-
-            // Button background
-            var buttonBgColor = _map1to1ButtonHovered ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2.WithAlpha(80);
-            using var buttonBgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = buttonBgColor,
-                IsAntialias = true
-            };
-            canvas.DrawRect(_map1to1ButtonBounds, buttonBgPaint);
-
-            // Button border
-            var buttonBorderColor = _map1to1ButtonHovered ? FUIColors.Active : FUIColors.Frame;
-            using var buttonBorderPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = buttonBorderColor,
-                StrokeWidth = 1f,
-                IsAntialias = true
-            };
-            canvas.DrawRect(_map1to1ButtonBounds, buttonBorderPaint);
-
-            // Button text
-            var buttonTextColor = _map1to1ButtonHovered ? FUIColors.Active : FUIColors.TextPrimary;
-            FUIRenderer.DrawTextCentered(canvas, "MAP 1:1 TO VJOY", _map1to1ButtonBounds, buttonTextColor, 11f);
-        }
-        else
-        {
-            _map1to1ButtonBounds = SKRect.Empty;
-        }
-
         // "Scan for devices" prompt
         float promptY = bounds.Bottom - pad - 20;
         FUIRenderer.DrawText(canvas, "+ SCAN FOR DEVICES",
@@ -7504,6 +7724,115 @@ public class MainForm : Form
         // Button cluster on side
         canvas.DrawCircle(centerX - stickWidth / 2 - 8, bounds.Top + 55, 5, outlinePaint);
         canvas.DrawCircle(centerX - stickWidth / 2 - 8, bounds.Top + 70, 5, outlinePaint);
+    }
+
+    private void DrawDeviceActionsPanel(SKCanvas canvas, SKRect bounds)
+    {
+        float pad = FUIRenderer.PanelPadding;
+        float frameInset = 5f;
+
+        // Panel shadow
+        FUIRenderer.DrawPanelShadow(canvas, bounds, 3f, 3f, 10f);
+
+        // Panel background
+        var contentBounds = new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
+                                        bounds.Right - frameInset, bounds.Bottom - frameInset);
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(140),
+            IsAntialias = true
+        };
+        canvas.DrawRect(contentBounds, bgPaint);
+
+        // L-corner frame
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 35f, 10f);
+
+        // Header
+        float titleBarHeight = 32f;
+        var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
+        FUIRenderer.DrawPanelTitle(canvas, titleBounds, "D3", "DEVICE ACTIONS");
+
+        float y = contentBounds.Top + titleBarHeight + pad;
+        float buttonHeight = 32f;
+        float buttonGap = 8f;
+
+        // Check if we have a physical device selected
+        bool hasPhysicalDevice = _deviceCategory == 0 && _selectedDevice >= 0 &&
+                                  _selectedDevice < _devices.Count && !_devices[_selectedDevice].IsVirtual;
+
+        if (hasPhysicalDevice)
+        {
+            var device = _devices[_selectedDevice];
+
+            // Device info
+            FUIRenderer.DrawText(canvas, "SELECTED DEVICE", new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+            y += 16f;
+
+            string shortName = device.Name.Length > 22 ? device.Name.Substring(0, 20) + "..." : device.Name;
+            FUIRenderer.DrawText(canvas, shortName, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextPrimary, 11f);
+            y += 20f;
+
+            // Device stats
+            FUIRenderer.DrawText(canvas, $"{device.AxisCount} axes  {device.ButtonCount} btns  {device.HatCount} hats",
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+            y += 24f;
+
+            // Map 1:1 to vJoy button
+            float buttonWidth = contentBounds.Width - pad * 2;
+            _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+            DrawDeviceActionButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", _map1to1ButtonHovered);
+            y += buttonHeight + buttonGap;
+
+            // Clear mappings button
+            _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+            DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDestructive: true);
+        }
+        else
+        {
+            // No device selected
+            _map1to1ButtonBounds = SKRect.Empty;
+            _clearMappingsButtonBounds = SKRect.Empty;
+
+            FUIRenderer.DrawText(canvas, "Select a physical device",
+                new SKPoint(contentBounds.Left + pad, y + 20), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "to see available actions",
+                new SKPoint(contentBounds.Left + pad, y + 36), FUIColors.TextDim, 10f);
+        }
+    }
+
+    private void DrawDeviceActionButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isDestructive = false)
+    {
+        // Button background
+        var bgColor = isHovered
+            ? (isDestructive ? FUIColors.Warning.WithAlpha(40) : FUIColors.Active.WithAlpha(40))
+            : FUIColors.Background2.WithAlpha(80);
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = bgColor,
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Button border
+        var borderColor = isHovered
+            ? (isDestructive ? FUIColors.Warning : FUIColors.Active)
+            : FUIColors.Frame;
+        using var borderPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = borderColor,
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds, borderPaint);
+
+        // Button text
+        var textColor = isHovered
+            ? (isDestructive ? FUIColors.Warning : FUIColors.Active)
+            : FUIColors.TextPrimary;
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 10f);
     }
 
     private void DrawStatusPanel(SKCanvas canvas, SKRect bounds)

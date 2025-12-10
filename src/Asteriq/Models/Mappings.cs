@@ -132,6 +132,18 @@ public class OutputTarget
 }
 
 /// <summary>
+/// Deadzone mode (following JoystickGremlinEx patterns)
+/// </summary>
+public enum DeadzoneMode
+{
+    /// <summary>Centered axis (e.g., joystick) - has center deadzone</summary>
+    Centered,
+
+    /// <summary>End-only axis (e.g., throttle/slider) - deadzone at min end only</summary>
+    EndOnly
+}
+
+/// <summary>
 /// Configuration for axis response curve
 /// </summary>
 public class AxisCurve
@@ -142,41 +154,165 @@ public class AxisCurve
     /// <summary>Curvature amount (-1.0 to 1.0, 0 = linear)</summary>
     public float Curvature { get; set; } = 0f;
 
-    /// <summary>Deadzone at center (0.0 to 1.0)</summary>
-    public float Deadzone { get; set; } = 0f;
+    /// <summary>Deadzone mode - centered (joystick) vs end-only (throttle)</summary>
+    public DeadzoneMode DeadzoneMode { get; set; } = DeadzoneMode.Centered;
+
+    /// <summary>
+    /// Deadzone at low end (for EndOnly mode: 0.0 to 1.0)
+    /// For Centered mode: this is the left/negative full extent (-1.0)
+    /// Default -1.0 means full negative range is active
+    /// </summary>
+    public float DeadzoneLow { get; set; } = -1.0f;
+
+    /// <summary>
+    /// Deadzone center-left edge (Centered mode only, -1.0 to 0.0)
+    /// Values between DeadzoneLow and DeadzoneCenterLow ramp from -1 to 0
+    /// Default 0 means no center deadzone on negative side
+    /// </summary>
+    public float DeadzoneCenterLow { get; set; } = 0f;
+
+    /// <summary>
+    /// Deadzone center-right edge (Centered mode only, 0.0 to 1.0)
+    /// Values between DeadzoneCenterRight and DeadzoneHigh ramp from 0 to 1
+    /// Default 0 means no center deadzone on positive side
+    /// </summary>
+    public float DeadzoneCenterHigh { get; set; } = 0f;
+
+    /// <summary>
+    /// Deadzone at high end (for EndOnly mode: 0.0 to 1.0)
+    /// For Centered mode: this is the right/positive full extent (+1.0)
+    /// Default +1.0 means full positive range is active
+    /// </summary>
+    public float DeadzoneHigh { get; set; } = 1.0f;
+
+    /// <summary>Simple deadzone property for backward compatibility (uses center deadzone)</summary>
+    public float Deadzone
+    {
+        get => Math.Max(Math.Abs(DeadzoneCenterLow), Math.Abs(DeadzoneCenterHigh));
+        set
+        {
+            DeadzoneCenterLow = -Math.Abs(value);
+            DeadzoneCenterHigh = Math.Abs(value);
+        }
+    }
 
     /// <summary>Saturation point (0.0 to 1.0, where output reaches max)</summary>
     public float Saturation { get; set; } = 1f;
+
+    /// <summary>Invert the axis output</summary>
+    public bool Inverted { get; set; } = false;
 
     /// <summary>Custom curve control points (for CurveType.Custom)</summary>
     public List<(float input, float output)>? ControlPoints { get; set; }
 
     /// <summary>
-    /// Apply the curve to an input value
+    /// Apply the curve to an input value (-1 to 1 range)
+    /// Processing order (matching JoystickGremlinEx):
+    /// 1. Deadzone - filter small movements
+    /// 2. Saturation - scale output range
+    /// 3. Response curve - shape the response
+    /// 4. Inversion - flip if needed
     /// </summary>
     public float Apply(float input)
     {
-        // Apply deadzone
-        float absInput = Math.Abs(input);
-        if (absInput < Deadzone)
-            return 0f;
-
-        // Scale input from deadzone to saturation
-        float sign = Math.Sign(input);
-        float scaled = (absInput - Deadzone) / (Saturation - Deadzone);
-        scaled = Math.Clamp(scaled, 0f, 1f);
-
-        // Apply curve
-        float output = Type switch
+        // Step 1: Apply deadzone
+        float deadzoned;
+        if (DeadzoneMode == DeadzoneMode.Centered)
         {
-            CurveType.Linear => scaled,
-            CurveType.SCurve => ApplySCurve(scaled),
-            CurveType.Exponential => ApplyExponential(scaled),
-            CurveType.Custom => ApplyCustom(scaled),
-            _ => scaled
+            // Centered deadzone (4-parameter model like JoystickGremlinEx)
+            deadzoned = ApplyCenteredDeadzone(input);
+        }
+        else
+        {
+            // End-only deadzone (for throttle/slider)
+            float normalized = (input + 1f) / 2f; // -1..1 -> 0..1
+            deadzoned = ApplyEndDeadzone(normalized);
+            deadzoned = deadzoned * 2f - 1f; // 0..1 -> -1..1
+        }
+
+        // Step 2: Apply saturation (scales so Saturation input -> 1.0 output)
+        float saturated = ApplySaturation(deadzoned);
+
+        // Step 3: Apply response curve to magnitude
+        float sign = Math.Sign(saturated);
+        float magnitude = Math.Abs(saturated);
+
+        float curved = Type switch
+        {
+            CurveType.Linear => magnitude,
+            CurveType.SCurve => ApplySCurve(magnitude),
+            CurveType.Exponential => ApplyExponential(magnitude),
+            CurveType.Custom => ApplyCustom(magnitude),
+            _ => magnitude
         };
 
-        return sign * Math.Clamp(output, 0f, 1f);
+        curved = Math.Clamp(curved, 0f, 1f);
+
+        // Step 4: Apply inversion
+        if (Inverted)
+            curved = 1f - curved;
+
+        return sign * curved;
+    }
+
+    /// <summary>
+    /// Apply centered deadzone (4-parameter model matching JoystickGremlinEx)
+    /// Params: DeadzoneLow, DeadzoneCenterLow, DeadzoneCenterHigh, DeadzoneHigh
+    /// Constraint: -1 <= low < low_center <= 0 <= high_center < high <= 1
+    /// </summary>
+    private float ApplyCenteredDeadzone(float value)
+    {
+        // JoystickGremlinEx formula from vjoy.py:1014-1031
+        if (value >= 0)
+        {
+            // Positive region: scale from high_center to high → 0 to 1
+            float range = Math.Abs(DeadzoneHigh - DeadzoneCenterHigh);
+            if (range <= 0.0001f) return value > DeadzoneCenterHigh ? 1f : 0f;
+            return Math.Min(1f, Math.Max(0f, (value - DeadzoneCenterHigh) / range));
+        }
+        else
+        {
+            // Negative region: scale from low to low_center → -1 to 0
+            float range = Math.Abs(DeadzoneLow - DeadzoneCenterLow);
+            if (range <= 0.0001f) return value < DeadzoneCenterLow ? -1f : 0f;
+            return Math.Max(-1f, Math.Min(0f, (value - DeadzoneCenterLow) / range));
+        }
+    }
+
+    /// <summary>
+    /// Apply end-only deadzone (for throttle/slider)
+    /// Input is 0..1 range, maps to 0..1 output
+    /// </summary>
+    private float ApplyEndDeadzone(float value)
+    {
+        float dzLow = Math.Max(0f, (DeadzoneLow + 1f) / 2f); // Convert -1..1 to 0..1
+        float dzHigh = Math.Min(1f, (DeadzoneHigh + 1f) / 2f);
+
+        if (value <= dzLow)
+            return 0f;
+        if (value >= dzHigh)
+            return 1.0f;
+
+        float range = dzHigh - dzLow;
+        if (range <= 0.0001f) return value;
+
+        return (value - dzLow) / range;
+    }
+
+    /// <summary>
+    /// Apply saturation - scales output so that input=Saturation produces output=1.0
+    /// </summary>
+    private float ApplySaturation(float value)
+    {
+        if (Saturation >= 1.0f) return value;
+
+        float absValue = Math.Abs(value);
+        float sign = Math.Sign(value);
+
+        if (absValue >= Saturation)
+            return sign * 1.0f;
+
+        return sign * (absValue / Saturation);
     }
 
     private float ApplySCurve(float x)
@@ -213,7 +349,7 @@ public class AxisCurve
         if (ControlPoints == null || ControlPoints.Count < 2)
             return x;
 
-        // Linear interpolation between control points
+        // Catmull-Rom spline interpolation for smooth curves
         for (int i = 0; i < ControlPoints.Count - 1; i++)
         {
             var (x1, y1) = ControlPoints[i];
@@ -221,12 +357,36 @@ public class AxisCurve
 
             if (x >= x1 && x <= x2)
             {
+                if (Math.Abs(x2 - x1) < 0.001f) return y1;
                 float t = (x - x1) / (x2 - x1);
-                return y1 + t * (y2 - y1);
+
+                // Get surrounding points for Catmull-Rom spline
+                // p0 = point before p1, p3 = point after p2
+                float y0 = i > 0 ? ControlPoints[i - 1].output : y1 - (y2 - y1);
+                float y3 = i < ControlPoints.Count - 2 ? ControlPoints[i + 2].output : y2 + (y2 - y1);
+
+                return CatmullRomInterpolate(y0, y1, y2, y3, t);
             }
         }
 
         return x;
+    }
+
+    /// <summary>
+    /// Catmull-Rom spline interpolation for smooth curves through control points.
+    /// t ranges from 0 to 1, output is between p1 and p2.
+    /// </summary>
+    private static float CatmullRomInterpolate(float p0, float p1, float p2, float p3, float t)
+    {
+        float t2 = t * t;
+        float t3 = t2 * t;
+
+        return 0.5f * (
+            (2f * p1) +
+            (-p0 + p2) * t +
+            (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+            (-p0 + 3f * p1 - 3f * p2 + p3) * t3
+        );
     }
 }
 

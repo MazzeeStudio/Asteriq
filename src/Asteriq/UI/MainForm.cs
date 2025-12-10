@@ -7812,9 +7812,6 @@ public class MainForm : Form
 
     private void DrawDeviceSilhouette(SKCanvas canvas, SKRect bounds)
     {
-        // L-corner frame for "targeting" feel
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(100), 20f, 6f);
-
         // Draw the actual SVG if loaded, otherwise fallback to simple outline
         var activeSvg = GetActiveSvg();
         if (activeSvg?.Picture != null)

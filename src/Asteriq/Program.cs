@@ -359,7 +359,11 @@ Examples:
                         Console.Write($"[{state.DeviceIndex}] {axes} | Btn: {(buttons.Length > 0 ? buttons : "-"),-20}");
                     }
                 }
-                catch (ArgumentOutOfRangeException) { /* Console resized */ }
+                catch (ArgumentOutOfRangeException)
+                {
+                    // Console was resized - cursor position is now out of bounds
+                    // This is expected behavior and safe to ignore for diagnostic display
+                }
             };
 
             inputService.StartPolling(100); // 100Hz
@@ -370,7 +374,10 @@ Examples:
                 if (endLine >= 0 && endLine < Console.BufferHeight)
                     Console.SetCursorPosition(0, endLine);
             }
-            catch (ArgumentOutOfRangeException) { }
+            catch (ArgumentOutOfRangeException)
+            {
+                // Console was resized - cursor position is now out of bounds
+            }
             Log("Polling... Press any key to stop.");
             Console.ReadKey(true);
             Log("");
@@ -870,7 +877,10 @@ Examples:
                     Console.Write($"IN:  {axes} | Btn: {(btns.Length > 0 ? btns : "-"),-20}");
                 }
             }
-            catch { }
+            catch (ArgumentOutOfRangeException)
+            {
+                // Console was resized - cursor position is now out of bounds
+            }
         };
 
         inputService.StartPolling(500); // 500Hz for responsive mapping
@@ -1347,7 +1357,10 @@ Examples:
                     Console.Write($"[{state.DeviceName.Substring(0, Math.Min(15, state.DeviceName.Length)),-15}] {axes}   ");
                 }
             }
-            catch { }
+            catch (ArgumentOutOfRangeException)
+            {
+                // Console was resized - cursor position is now out of bounds
+            }
         };
 
         inputService.StartPolling(500);
@@ -1554,7 +1567,10 @@ Examples:
                     Console.Write($"Button {buttonIndex + 1}: {btnState,-10} -> {keyState,-15} | Press count: {pressCount}   ");
                 }
             }
-            catch { }
+            catch (ArgumentOutOfRangeException)
+            {
+                // Console was resized - cursor position is now out of bounds
+            }
         };
 
         inputService.StartPolling(500); // 500Hz

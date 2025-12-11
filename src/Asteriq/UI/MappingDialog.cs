@@ -158,7 +158,17 @@ public class MappingDialog : Form
         _timeoutTimer.Start();
     }
 
-    private async void StartInputDetection()
+    /// <summary>
+    /// Starts input detection asynchronously. Fire-and-forget from UI initialization.
+    /// All exceptions are handled internally.
+    /// </summary>
+    private void StartInputDetection()
+    {
+        // Fire-and-forget async operation with internal exception handling
+        _ = StartInputDetectionAsync();
+    }
+
+    private async Task StartInputDetectionAsync()
     {
         _state = MappingDialogState.WaitingForInput;
         _timeoutRemaining = 30;
@@ -170,7 +180,7 @@ public class MappingDialog : Form
                 axisThreshold: 0.5f,
                 timeoutMs: 30000);
 
-            if (_detectedInput != null)
+            if (_detectedInput is not null)
             {
                 _state = MappingDialogState.SelectingOutput;
                 _timeoutTimer.Stop();
@@ -188,8 +198,9 @@ public class MappingDialog : Form
                 Cancel();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[MappingDialog] Input detection failed: {ex.Message}");
             Cancel();
         }
     }

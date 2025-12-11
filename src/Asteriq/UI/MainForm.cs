@@ -302,7 +302,7 @@ public partial class MainForm : Form
 
     // SC Bindings grid column state
     private float _scGridActionColWidth = 300f;   // Action name column
-    private float _scGridDeviceColMinWidth = 120f;   // Minimum device column width
+    private float _scGridDeviceColMinWidth = 160f;   // Minimum device column width
     private Dictionary<string, float> _scGridDeviceColWidths = new();  // Calculated width per column based on content
     private float _scGridHorizontalScroll = 0f;   // Horizontal scroll offset for device columns
     private float _scGridTotalWidth = 0f;         // Total width of all columns

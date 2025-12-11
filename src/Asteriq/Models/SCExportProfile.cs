@@ -124,6 +124,23 @@ public class SCExportProfile
     }
 
     /// <summary>
+    /// Gets all bindings that would conflict with the given input (same device + input).
+    /// Excludes the specified action to avoid reporting self-conflicts.
+    /// </summary>
+    public List<SCActionBinding> GetConflictingBindings(
+        uint vjoyDevice,
+        string inputName,
+        string? excludeActionMap = null,
+        string? excludeActionName = null)
+    {
+        return Bindings.Where(b =>
+            b.VJoyDevice == vjoyDevice &&
+            b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
+            !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
+            .ToList();
+    }
+
+    /// <summary>
     /// Generates the filename for export
     /// </summary>
     public string GetExportFileName()

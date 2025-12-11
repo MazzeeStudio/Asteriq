@@ -308,9 +308,23 @@ public partial class MainForm : Form
     private (int actionIndex, int colIndex) _scHoveredCell = (-1, -1);   // Currently hovered cell
     private bool _scIsListeningForInput = false;  // True when waiting for user input
     private DateTime _scListeningStartTime;       // When listening started (for timeout)
+    private DateTime _scLastCellClickTime;        // When the last cell was clicked (for double-click detection)
     private const int SCListeningTimeoutMs = 5000; // 5 second timeout for input listening
     private SCGridColumn? _scListeningColumn;     // Which column we're listening for
     private HashSet<string> _scConflictingBindings = new();  // Set of binding keys that have conflicts
+    private int _scHighlightedColumn = -1;        // Column index to highlight (-1 = none)
+
+    // SC Bindings scrollbar interaction state
+    private bool _scIsDraggingVScroll = false;    // Dragging vertical scrollbar
+    private bool _scIsDraggingHScroll = false;    // Dragging horizontal scrollbar
+    private float _scScrollDragStartY = 0;        // Y position when drag started
+    private float _scScrollDragStartX = 0;        // X position when drag started
+    private float _scScrollDragStartOffset = 0;   // Scroll offset when drag started
+    private SKRect _scVScrollbarBounds;           // Vertical scrollbar track bounds
+    private SKRect _scHScrollbarBounds;           // Horizontal scrollbar track bounds
+    private SKRect _scVScrollThumbBounds;         // Vertical scrollbar thumb bounds
+    private SKRect _scHScrollThumbBounds;         // Horizontal scrollbar thumb bounds
+    private SKRect _scColumnHeadersBounds;        // Bounds of the column headers row
 
     // SC Bindings search and filter state
     private string _scSearchText = "";           // Search text for filtering actions
@@ -1475,6 +1489,35 @@ public partial class MainForm : Form
         // Store mouse position for debug display
         _mousePosition = e.Location;
 
+        // Handle SC Bindings scrollbar dragging
+        if (_scIsDraggingVScroll)
+        {
+            float deltaY = e.Y - _scScrollDragStartY;
+            float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
+            float trackHeight = _scVScrollbarBounds.Height - _scVScrollThumbBounds.Height;
+            if (trackHeight > 0 && maxScroll > 0)
+            {
+                float scrollDelta = (deltaY / trackHeight) * maxScroll;
+                _scBindingsScrollOffset = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxScroll);
+            }
+            _canvas.Invalidate();
+            return;
+        }
+
+        if (_scIsDraggingHScroll)
+        {
+            float deltaX = e.X - _scScrollDragStartX;
+            float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
+            float trackWidth = _scHScrollbarBounds.Width - _scHScrollThumbBounds.Width;
+            if (trackWidth > 0 && maxHScroll > 0)
+            {
+                float scrollDelta = (deltaX / trackWidth) * maxHScroll;
+                _scGridHorizontalScroll = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxHScroll);
+            }
+            _canvas.Invalidate();
+            return;
+        }
+
         // Handle background slider dragging (works across all tabs since it's global)
         if (_draggingBgSlider != null)
         {
@@ -1686,7 +1729,7 @@ public partial class MainForm : Form
             if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions != null)
             {
                 // Find which row is hovered, accounting for scroll offset and group headers
-                float rowHeight = 24f;
+                float rowHeight = 28f;  // Must match drawing code
                 float rowGap = 2f;
                 float categoryHeaderHeight = 28f;
                 float relativeY = e.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
@@ -1903,9 +1946,17 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
     {
-        // Handle right-click to remove curve control points
+        // Handle right-click
         if (e.Button == MouseButtons.Right)
         {
+            // Right-click on SC Bindings tab to clear cell binding
+            if (_activeTab == 2)
+            {
+                HandleBindingsTabRightClick(new SKPoint(e.X, e.Y));
+                return;
+            }
+
+            // Right-click on curve control points in Mappings tab
             if (_activeTab == 1 && _mappingCategory == 1 && _selectedCurveType == CurveType.Custom)
             {
                 var pt = new SKPoint(e.X, e.Y);
@@ -2299,6 +2350,14 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
     {
+        // Release SC Bindings scrollbar dragging
+        if (_scIsDraggingVScroll || _scIsDraggingHScroll)
+        {
+            _scIsDraggingVScroll = false;
+            _scIsDraggingHScroll = false;
+            _canvas.Invalidate();
+        }
+
         if (_draggingCurvePoint >= 0 || _draggingDeadzoneHandle >= 0)
         {
             _draggingCurvePoint = -1;
@@ -2340,9 +2399,22 @@ public partial class MainForm : Form
         if (_activeTab == 2 && _scBindingsListBounds.Contains(e.X, e.Y))
         {
             float scrollAmount = -e.Delta / 4f;
-            float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
 
-            _scBindingsScrollOffset = Math.Clamp(_scBindingsScrollOffset + scrollAmount, 0, maxScroll);
+            // Shift+Wheel = horizontal scroll
+            if (Control.ModifierKeys.HasFlag(Keys.Shift))
+            {
+                float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
+                if (maxHScroll > 0)
+                {
+                    _scGridHorizontalScroll = Math.Clamp(_scGridHorizontalScroll + scrollAmount, 0, maxHScroll);
+                }
+            }
+            else
+            {
+                // Normal vertical scroll
+                float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
+                _scBindingsScrollOffset = Math.Clamp(_scBindingsScrollOffset + scrollAmount, 0, maxScroll);
+            }
             _canvas.Invalidate();
         }
     }

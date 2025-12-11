@@ -329,4 +329,55 @@ public class SCInstallationService
             return false;
         }
     }
+
+    /// <summary>
+    /// Gets a list of existing XML profile files in the mappings folder
+    /// </summary>
+    public static List<SCMappingFile> GetExistingProfiles(SCInstallation installation)
+    {
+        var profiles = new List<SCMappingFile>();
+
+        try
+        {
+            if (!Directory.Exists(installation.MappingsPath))
+                return profiles;
+
+            foreach (var file in Directory.GetFiles(installation.MappingsPath, "*.xml"))
+            {
+                var fileInfo = new FileInfo(file);
+                profiles.Add(new SCMappingFile
+                {
+                    FileName = fileInfo.Name,
+                    FilePath = file,
+                    FileSize = fileInfo.Length,
+                    LastModified = fileInfo.LastWriteTime
+                });
+            }
+
+            // Sort by last modified (newest first)
+            profiles.Sort((a, b) => b.LastModified.CompareTo(a.LastModified));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SCInstallationService] Error listing profiles: {ex.Message}");
+        }
+
+        return profiles;
+    }
+}
+
+/// <summary>
+/// Represents an existing SC mapping file that can be imported
+/// </summary>
+public class SCMappingFile
+{
+    public string FileName { get; set; } = string.Empty;
+    public string FilePath { get; set; } = string.Empty;
+    public long FileSize { get; set; }
+    public DateTime LastModified { get; set; }
+
+    /// <summary>
+    /// Display name (filename without extension)
+    /// </summary>
+    public string DisplayName => Path.GetFileNameWithoutExtension(FileName);
 }

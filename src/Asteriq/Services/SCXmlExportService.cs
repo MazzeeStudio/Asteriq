@@ -285,6 +285,193 @@ public class SCXmlExportService
         var fileName = profile.GetExportFileName();
         return Path.Combine(installation.MappingsPath, fileName);
     }
+
+    /// <summary>
+    /// Imports bindings from an existing SC XML profile file
+    /// </summary>
+    public SCImportResult ImportFromFile(string filePath)
+    {
+        var result = new SCImportResult();
+
+        try
+        {
+            var doc = XDocument.Load(filePath);
+            var root = doc.Root;
+
+            if (root is null || root.Name.LocalName != "ActionMaps")
+            {
+                result.Error = "Invalid SC profile format - missing ActionMaps root element";
+                return result;
+            }
+
+            // Get profile name from header or attribute
+            var header = root.Element("CustomisationUIHeader");
+            result.ProfileName = header?.Attribute("label")?.Value
+                ?? root.Attribute("profileName")?.Value
+                ?? Path.GetFileNameWithoutExtension(filePath);
+
+            // Parse all actionmap/action/rebind elements
+            foreach (var actionMap in root.Elements("actionmap"))
+            {
+                var mapName = actionMap.Attribute("name")?.Value;
+                if (string.IsNullOrEmpty(mapName))
+                    continue;
+
+                foreach (var action in actionMap.Elements("action"))
+                {
+                    var actionName = action.Attribute("name")?.Value;
+                    if (string.IsNullOrEmpty(actionName))
+                        continue;
+
+                    foreach (var rebind in action.Elements("rebind"))
+                    {
+                        var inputStr = rebind.Attribute("input")?.Value;
+                        if (string.IsNullOrEmpty(inputStr))
+                            continue;
+
+                        var binding = ParseRebindInput(mapName, actionName, inputStr);
+                        if (binding is not null)
+                        {
+                            // Check for invert attribute
+                            if (rebind.Attribute("invert")?.Value == "1")
+                                binding.Inverted = true;
+
+                            // Check for activationMode
+                            var activationMode = rebind.Attribute("activationMode")?.Value;
+                            if (!string.IsNullOrEmpty(activationMode))
+                                binding.ActivationMode = ParseActivationMode(activationMode);
+
+                            result.Bindings.Add(binding);
+                        }
+                    }
+                }
+            }
+
+            result.Success = true;
+            System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Imported {result.Bindings.Count} bindings from {filePath}");
+        }
+        catch (Exception ex)
+        {
+            result.Error = $"Failed to parse profile: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Import error: {ex.Message}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Parses a rebind input string like "js1_button5" or "kb1_lalt+n"
+    /// </summary>
+    private static SCActionBinding? ParseRebindInput(string actionMap, string actionName, string inputStr)
+    {
+        // Format: devicePrefix_[modifiers+]inputName
+        // Examples: js1_button5, kb1_lalt+n, mo1_mouse1, js2_rotz
+
+        var underscoreIdx = inputStr.IndexOf('_');
+        if (underscoreIdx <= 0)
+            return null;
+
+        var devicePrefix = inputStr.Substring(0, underscoreIdx);
+        var remainder = inputStr.Substring(underscoreIdx + 1);
+
+        // Determine device type
+        SCDeviceType deviceType;
+        uint vjoyDevice = 0;
+
+        if (devicePrefix.StartsWith("kb"))
+        {
+            deviceType = SCDeviceType.Keyboard;
+        }
+        else if (devicePrefix.StartsWith("mo"))
+        {
+            deviceType = SCDeviceType.Mouse;
+        }
+        else if (devicePrefix.StartsWith("js"))
+        {
+            deviceType = SCDeviceType.Joystick;
+            // Parse instance number
+            if (uint.TryParse(devicePrefix.Substring(2), out var instance))
+                vjoyDevice = instance;
+            else
+                vjoyDevice = 1;
+        }
+        else
+        {
+            return null; // Unknown device type
+        }
+
+        // Parse modifiers and input name
+        var modifiers = new List<string>();
+        var inputName = remainder;
+
+        // Check for modifiers (format: mod1+mod2+inputName)
+        var parts = remainder.Split('+');
+        if (parts.Length > 1)
+        {
+            inputName = parts[^1]; // Last part is the input
+            modifiers = parts[..^1].ToList(); // All but last are modifiers
+        }
+
+        // Infer input type from name
+        var inputType = InferInputType(inputName);
+
+        return new SCActionBinding
+        {
+            ActionMap = actionMap,
+            ActionName = actionName,
+            DeviceType = deviceType,
+            InputName = inputName,
+            Modifiers = modifiers,
+            VJoyDevice = vjoyDevice,
+            InputType = inputType
+        };
+    }
+
+    /// <summary>
+    /// Infers the input type from the input name
+    /// </summary>
+    private static SCInputType InferInputType(string inputName)
+    {
+        var lower = inputName.ToLowerInvariant();
+
+        // Axis patterns
+        if (lower.StartsWith("rot") || lower.EndsWith("x") || lower.EndsWith("y") || lower.EndsWith("z") ||
+            lower.Contains("slider") || lower.Contains("throttle"))
+            return SCInputType.Axis;
+
+        // Hat patterns
+        if (lower.StartsWith("hat") || lower.Contains("pov"))
+            return SCInputType.Hat;
+
+        // Everything else is a button
+        return SCInputType.Button;
+    }
+
+    /// <summary>
+    /// Parses activation mode string
+    /// </summary>
+    private static SCActivationMode ParseActivationMode(string mode)
+    {
+        return mode.ToLowerInvariant() switch
+        {
+            "hold" => SCActivationMode.Hold,
+            "double_tap" or "doubletap" => SCActivationMode.DoubleTap,
+            "triple_tap" or "tripletap" => SCActivationMode.TripleTap,
+            "delayed_press" or "delayedpress" => SCActivationMode.DelayedPress,
+            _ => SCActivationMode.Press
+        };
+    }
+}
+
+/// <summary>
+/// Result of importing an SC profile
+/// </summary>
+public class SCImportResult
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public string ProfileName { get; set; } = string.Empty;
+    public List<SCActionBinding> Bindings { get; set; } = new();
 }
 
 /// <summary>

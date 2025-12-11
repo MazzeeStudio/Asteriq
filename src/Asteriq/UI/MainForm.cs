@@ -301,8 +301,8 @@ public partial class MainForm : Form
     private List<string> _scActionMaps = new();  // List of unique action maps
 
     // SC Bindings grid column state
-    private float _scGridActionColWidth = 280f;   // Action name column (wider for long action names)
-    private float _scGridDeviceColWidth = 90f;    // Each device column (KB, Mouse, JS1...)
+    private float _scGridActionColWidth = 150f;   // Action name column (compact)
+    private float _scGridDeviceColWidth = 160f;   // Each device column - wide enough for "shift + l-ctl + l-alt + g"
     private float _scGridHorizontalScroll = 0f;   // Horizontal scroll offset for device columns
     private float _scGridTotalWidth = 0f;         // Total width of all columns
     private List<SCGridColumn>? _scGridColumns;   // Cached column definitions

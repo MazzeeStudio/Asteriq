@@ -114,7 +114,7 @@ public class SCProfileCacheService
     {
         // Try cache first
         var cached = GetCachedProfile(installation);
-        if (cached != null)
+        if (cached is not null)
         {
             progressCallback?.Invoke($"Loaded cached profile for {installation.Environment}");
             return cached;
@@ -139,7 +139,7 @@ public class SCProfileCacheService
         progressCallback?.Invoke($"Searching for defaultProfile.xml ({extractor.EntryCount:N0} entries)...");
 
         var profile = extractor.ExtractDefaultProfile();
-        if (profile == null)
+        if (profile is null)
         {
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to extract profile from p4k for {installation.Environment}");
             return null;

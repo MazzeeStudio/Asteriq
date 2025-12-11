@@ -134,7 +134,7 @@ public class ConsoleDiagnostics : IDisposable
 
             var pressedButtons = state.Buttons
                 .Select((pressed, i) => pressed ? (i + 1).ToString() : null)
-                .Where(b => b != null)
+                .Where(b => b is not null)
                 .ToList();
 
             var btnStr = pressedButtons.Count > 0

@@ -59,7 +59,7 @@ public partial class MainForm
 
         // Current profile info
         var profile = _profileService.ActiveProfile;
-        if (profile != null)
+        if (profile is not null)
         {
             // Active profile header
             FUIRenderer.DrawText(canvas, "ACTIVE PROFILE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -117,17 +117,17 @@ public partial class MainForm
         DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "New Profile", false);
         // Duplicate button
         DrawSettingsButton(canvas, new SKRect(rightMargin - (width - buttonGap) / 2, y, rightMargin, y + buttonHeight),
-            profile != null ? "Duplicate" : "---", profile == null);
+            profile is not null ? "Duplicate" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
         // Import/Export buttons
         DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "Import", false);
         DrawSettingsButton(canvas, new SKRect(rightMargin - (width - buttonGap) / 2, y, rightMargin, y + buttonHeight),
-            profile != null ? "Export" : "---", profile == null);
+            profile is not null ? "Export" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
         // Delete button (danger)
-        if (profile != null)
+        if (profile is not null)
         {
             var deleteBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
             using var delBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(30) };
@@ -175,11 +175,11 @@ public partial class MainForm
             FUIRenderer.DrawText(canvas, layer.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextPrimary, 11f);
 
             // Activator button info
-            string activatorText = layer.ActivatorButton != null
+            string activatorText = layer.ActivatorButton is not null
                 ? $"Button {layer.ActivatorButton.Index + 1} on {layer.ActivatorButton.DeviceName}"
                 : "Not assigned";
             FUIRenderer.DrawText(canvas, activatorText, new SKPoint(leftMargin + 100, y + 11),
-                layer.ActivatorButton != null ? FUIColors.TextDim : FUIColors.Warning.WithAlpha(150), 9f);
+                layer.ActivatorButton is not null ? FUIColors.TextDim : FUIColors.Warning.WithAlpha(150), 9f);
 
             // Delete button
             float delSize = 20f;

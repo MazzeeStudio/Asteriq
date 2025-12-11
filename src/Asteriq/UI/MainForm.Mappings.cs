@@ -238,7 +238,7 @@ public partial class MainForm
         if (string.IsNullOrEmpty(output.KeyName)) return null;
 
         var parts = new List<string>();
-        if (output.Modifiers != null && output.Modifiers.Count > 0)
+        if (output.Modifiers is not null && output.Modifiers.Count > 0)
         {
             parts.AddRange(output.Modifiers);
         }
@@ -252,7 +252,7 @@ public partial class MainForm
     /// </summary>
     private List<string>? GetButtonKeyParts(MappingProfile? profile, uint vjoyId, int buttonIndex)
     {
-        if (profile == null) return null;
+        if (profile is null) return null;
 
         // Find mapping for this button slot that has keyboard output
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
@@ -260,7 +260,7 @@ public partial class MainForm
             m.Output.Index == buttonIndex &&
             !string.IsNullOrEmpty(m.Output.KeyName));
 
-        if (mapping == null) return null;
+        if (mapping is null) return null;
 
         return GetKeyboardMappingParts(mapping);
     }
@@ -298,7 +298,7 @@ public partial class MainForm
         bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
-        bool hasKeyParts = keyParts != null && keyParts.Count > 0;
+        bool hasKeyParts = keyParts is not null && keyParts.Count > 0;
 
         // Background
         SKColor bgColor;
@@ -425,7 +425,7 @@ public partial class MainForm
         float centerY = bounds.MidY;
 
         // Draw the joystick SVG if available - use same brightness as device tab
-        if (_joystickSvg?.Picture != null)
+        if (_joystickSvg?.Picture is not null)
         {
             // Limit size to 900px max and apply same rendering as device tab
             float maxSize = 900f;
@@ -654,7 +654,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return inputs;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return inputs;
+        if (profile is null) return inputs;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         // Category 0 = Buttons, Category 1 = Axes
@@ -667,7 +667,7 @@ public partial class MainForm
                 m.Output.Type == OutputType.VJoyAxis &&
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
-            if (mapping != null)
+            if (mapping is not null)
                 inputs.AddRange(mapping.Inputs);
         }
         else
@@ -677,7 +677,7 @@ public partial class MainForm
             var mapping = profile.ButtonMappings.FirstOrDefault(m =>
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
-            if (mapping != null)
+            if (mapping is not null)
                 inputs.AddRange(mapping.Inputs);
         }
 
@@ -1289,7 +1289,7 @@ public partial class MainForm
         if (string.IsNullOrEmpty(keyName)) return "";
 
         var parts = new List<string>();
-        if (modifiers != null && modifiers.Count > 0)
+        if (modifiers is not null && modifiers.Count > 0)
         {
             parts.AddRange(modifiers);
         }
@@ -1304,7 +1304,7 @@ public partial class MainForm
     {
         // Build list of key parts
         var parts = new List<string>();
-        if (modifiers != null && modifiers.Count > 0)
+        if (modifiers is not null && modifiers.Count > 0)
         {
             parts.AddRange(modifiers);
         }
@@ -2430,7 +2430,7 @@ public partial class MainForm
             FUIRenderer.DrawText(canvas, "Press a button or move an axis...",
                 new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 12f);
         }
-        else if (_pendingInput != null)
+        else if (_pendingInput is not null)
         {
             FUIRenderer.DrawText(canvas, _pendingInput.ToString(),
                 new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 12f);
@@ -2442,7 +2442,7 @@ public partial class MainForm
         }
 
         // Clear button if there's input
-        if (_pendingInput != null && !_isListeningForInput)
+        if (_pendingInput is not null && !_isListeningForInput)
         {
             var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
             DrawSmallIconButton(canvas, clearBounds, "×", false, true);
@@ -2909,14 +2909,14 @@ public partial class MainForm
 
     private string GetAxisBindingText(MappingProfile? profile, uint vjoyId, int axisIndex)
     {
-        if (profile == null) return "—";
+        if (profile is null) return "—";
 
         var mapping = profile.AxisMappings.FirstOrDefault(m =>
             m.Output.Type == OutputType.VJoyAxis &&
             m.Output.VJoyDevice == vjoyId &&
             m.Output.Index == axisIndex);
 
-        if (mapping == null || mapping.Inputs.Count == 0) return "—";
+        if (mapping is null || mapping.Inputs.Count == 0) return "—";
 
         var input = mapping.Inputs[0];
         return $"{input.DeviceName} - Axis {input.Index}";
@@ -2924,14 +2924,14 @@ public partial class MainForm
 
     private string GetButtonBindingText(MappingProfile? profile, uint vjoyId, int buttonIndex)
     {
-        if (profile == null) return "—";
+        if (profile is null) return "—";
 
         // Find mapping for this button slot (either VJoyButton or Keyboard output type)
         var mapping = profile.ButtonMappings.FirstOrDefault(m =>
             m.Output.VJoyDevice == vjoyId &&
             m.Output.Index == buttonIndex);
 
-        if (mapping == null || mapping.Inputs.Count == 0) return "—";
+        if (mapping is null || mapping.Inputs.Count == 0) return "—";
 
         var input = mapping.Inputs[0];
         if (input.Type == InputType.Button)
@@ -3054,7 +3054,7 @@ public partial class MainForm
     private void LoadExistingBinding(int rowIndex)
     {
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         bool isAxis = rowIndex < 8;
@@ -3067,7 +3067,7 @@ public partial class MainForm
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
-            if (mapping != null && mapping.Inputs.Count > 0)
+            if (mapping is not null && mapping.Inputs.Count > 0)
             {
                 var input = mapping.Inputs[0];
                 _pendingInput = new DetectedInput
@@ -3098,7 +3098,7 @@ public partial class MainForm
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
-            if (mapping != null && mapping.Inputs.Count > 0)
+            if (mapping is not null && mapping.Inputs.Count > 0)
             {
                 var input = mapping.Inputs[0];
                 _pendingInput = new DetectedInput
@@ -3199,10 +3199,10 @@ public partial class MainForm
 
     private void SaveMapping()
     {
-        if (!_mappingEditorOpen || _pendingInput == null) return;
+        if (!_mappingEditorOpen || _pendingInput is null) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _isEditingAxis ? _editingRowIndex : _editingRowIndex - 8;
@@ -3289,14 +3289,14 @@ public partial class MainForm
 
         // Show vJoy device selection dialog
         var vjoyDevice = ShowVJoyDeviceSelectionDialog(physicalDevice);
-        if (vjoyDevice == null) return; // User cancelled
+        if (vjoyDevice is null) return; // User cancelled
 
         // Update selected vJoy device index
         _selectedVJoyDeviceIndex = _vjoyDevices.IndexOf(vjoyDevice);
 
         // Ensure we have an active profile
         var profile = _profileService.ActiveProfile;
-        if (profile == null)
+        if (profile is null)
         {
             profile = _profileService.CreateAndActivateProfile($"1:1 - {physicalDevice.Name}");
         }
@@ -3560,7 +3560,7 @@ public partial class MainForm
 
         string? vjoyConfPath = possiblePaths.FirstOrDefault(File.Exists);
 
-        if (vjoyConfPath != null)
+        if (vjoyConfPath is not null)
         {
             try
             {
@@ -3701,7 +3701,7 @@ public partial class MainForm
         if (!result) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         string deviceId = physicalDevice.InstanceGuid.ToString();
 
@@ -3745,7 +3745,7 @@ public partial class MainForm
 
         // Remove all mappings from this device
         int axisRemoved = 0, buttonRemoved = 0, hatRemoved = 0;
-        if (profile != null)
+        if (profile is not null)
         {
             axisRemoved = profile.AxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
             buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
@@ -3774,7 +3774,7 @@ public partial class MainForm
     private void CreateBindingForRow(int rowIndex, DetectedInput input)
     {
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         // Use current mapping category to determine axis vs button
@@ -3825,7 +3825,7 @@ public partial class MainForm
     private void RemoveBindingAtRow(int rowIndex, bool save = true)
     {
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         // Use current mapping category to determine axis vs button
@@ -3840,7 +3840,7 @@ public partial class MainForm
                 m.Output.Type == OutputType.VJoyAxis &&
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
-            if (existing != null)
+            if (existing is not null)
             {
                 profile.AxisMappings.Remove(existing);
             }
@@ -3851,7 +3851,7 @@ public partial class MainForm
                 m.Output.Type == OutputType.VJoyButton &&
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
-            if (existing != null)
+            if (existing is not null)
             {
                 profile.ButtonMappings.Remove(existing);
             }
@@ -4063,7 +4063,7 @@ public partial class MainForm
     private void SaveMappingForRow(int rowIndex, DetectedInput input, bool isAxis)
     {
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4079,7 +4079,7 @@ public partial class MainForm
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
-            if (existingMapping != null)
+            if (existingMapping is not null)
             {
                 // Add input to existing mapping (support multiple inputs)
                 existingMapping.Inputs.Add(newInputSource);
@@ -4110,7 +4110,7 @@ public partial class MainForm
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
-            if (existingMapping != null)
+            if (existingMapping is not null)
             {
                 // Add input to existing mapping (support multiple inputs)
                 existingMapping.Inputs.Add(newInputSource);
@@ -4173,7 +4173,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         // Category 0 = Buttons, Category 1 = Axes
@@ -4187,7 +4187,7 @@ public partial class MainForm
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
-            if (mapping != null && inputIndex >= 0 && inputIndex < mapping.Inputs.Count)
+            if (mapping is not null && inputIndex >= 0 && inputIndex < mapping.Inputs.Count)
             {
                 mapping.Inputs.RemoveAt(inputIndex);
                 if (mapping.Inputs.Count == 0)
@@ -4204,7 +4204,7 @@ public partial class MainForm
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
 
-            if (mapping != null && inputIndex >= 0 && inputIndex < mapping.Inputs.Count)
+            if (mapping is not null && inputIndex >= 0 && inputIndex < mapping.Inputs.Count)
             {
                 mapping.Inputs.RemoveAt(inputIndex);
                 if (mapping.Inputs.Count == 0)
@@ -4236,7 +4236,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _selectedMappingRow;
@@ -4245,7 +4245,7 @@ public partial class MainForm
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
-        if (mapping != null)
+        if (mapping is not null)
         {
             _outputTypeIsKeyboard = mapping.Output.Type == OutputType.Keyboard;
             _selectedKeyName = mapping.Output.KeyName ?? "";
@@ -4264,7 +4264,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _selectedMappingRow;
@@ -4274,7 +4274,7 @@ public partial class MainForm
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
-        if (mapping != null)
+        if (mapping is not null)
         {
             mapping.Mode = _selectedButtonMode;
             profile.ModifiedAt = DateTime.UtcNow;
@@ -4290,7 +4290,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _selectedMappingRow;
@@ -4300,7 +4300,7 @@ public partial class MainForm
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
-        if (mapping != null)
+        if (mapping is not null)
         {
             // Update output type and clear/set key name
             mapping.Output.Type = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
@@ -4326,7 +4326,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _selectedMappingRow;
@@ -4335,7 +4335,7 @@ public partial class MainForm
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
-        if (mapping != null)
+        if (mapping is not null)
         {
             mapping.Output.KeyName = _selectedKeyName;
             mapping.Output.Modifiers = _selectedModifiers?.ToList();
@@ -4374,7 +4374,7 @@ public partial class MainForm
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null) return;
+        if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
         int outputIndex = _selectedMappingRow;
@@ -4383,7 +4383,7 @@ public partial class MainForm
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
-        if (mapping != null)
+        if (mapping is not null)
         {
             mapping.PulseDurationMs = _pulseDurationMs;
             mapping.HoldDurationMs = _holdDurationMs;
@@ -4434,7 +4434,7 @@ public partial class MainForm
         float y = bounds.Top;
 
         var profile = _profileService.ActiveProfile;
-        if (profile == null)
+        if (profile is null)
         {
             FUIRenderer.DrawText(canvas, "No profile selected",
                 new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 12f);
@@ -4581,7 +4581,7 @@ public partial class MainForm
     private void OpenMappingDialogForControl(string controlId)
     {
         // Need device map, selected device, and control info
-        if (_deviceMap == null || _selectedDevice < 0 || _selectedDevice >= _devices.Count)
+        if (_deviceMap is null || _selectedDevice < 0 || _selectedDevice >= _devices.Count)
             return;
 
         // Find the control definition in the device map
@@ -4589,7 +4589,7 @@ public partial class MainForm
             return;
 
         // Get the binding from the control (e.g., "button0", "x", "hat0")
-        if (control.Bindings == null || control.Bindings.Count == 0)
+        if (control.Bindings is null || control.Bindings.Count == 0)
             return;
 
         var device = _devices[_selectedDevice];
@@ -4597,7 +4597,7 @@ public partial class MainForm
 
         // Parse the binding to determine input type and index
         var (inputType, inputIndex) = ParseBinding(binding, control.Type);
-        if (inputType == null)
+        if (inputType is null)
             return;
 
         // Ensure we have an active profile

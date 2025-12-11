@@ -97,7 +97,7 @@ public class MappingDialog : Form
         InitializeCanvas();
         InitializeTimers();
 
-        if (preSelectedInput != null)
+        if (preSelectedInput is not null)
         {
             // Skip input detection, go straight to output selection
             _detectedInput = preSelectedInput;
@@ -220,7 +220,7 @@ public class MappingDialog : Form
         Console.WriteLine($"[MappingDialog] _keyboardMode: {_keyboardMode}");
         Console.WriteLine($"[MappingDialog] _selectedKey: '{_selectedKey}'");
 
-        if (_detectedInput == null)
+        if (_detectedInput is null)
         {
             Console.WriteLine($"[MappingDialog] _detectedInput is null, cancelling");
             Cancel();
@@ -629,7 +629,7 @@ public class MappingDialog : Form
 
     private void DrawSelectingOutput(SKCanvas canvas, SKRect bounds)
     {
-        if (_detectedInput == null)
+        if (_detectedInput is null)
         {
             FUIRenderer.DrawTextCentered(canvas, "No input detected",
                 new SKRect(0, bounds.Height / 2, bounds.Width, bounds.Height / 2 + 20),

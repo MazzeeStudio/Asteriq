@@ -171,7 +171,7 @@ public class InputDetectionService : IDisposable
     /// <summary>
     /// Whether currently waiting for input
     /// </summary>
-    public bool IsWaiting => _currentDetection != null;
+    public bool IsWaiting => _currentDetection is not null;
 
     /// <summary>
     /// Start waiting for an input. Returns when user presses a button or moves an axis.
@@ -187,7 +187,7 @@ public class InputDetectionService : IDisposable
     {
         lock (_lock)
         {
-            if (_currentDetection != null)
+            if (_currentDetection is not null)
                 throw new InvalidOperationException("Already waiting for input");
 
             _filter = filter;
@@ -257,7 +257,7 @@ public class InputDetectionService : IDisposable
     {
         lock (_lock)
         {
-            if (_currentDetection == null)
+            if (_currentDetection is null)
                 return;
 
             var deviceGuid = state.InstanceGuid;
@@ -299,7 +299,7 @@ public class InputDetectionService : IDisposable
 
             // Phase 4: Active detection
             var detected = DetectInputChange(state);
-            if (detected != null)
+            if (detected is not null)
             {
                 InputDetected?.Invoke(this, detected);
                 _currentDetection.TrySetResult(detected);

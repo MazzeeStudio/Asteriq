@@ -20,11 +20,11 @@ public class SCSchemaService
     {
         var actions = new List<SCAction>();
 
-        if (doc.DocumentElement == null)
+        if (doc.DocumentElement is null)
             return actions;
 
         var actionMaps = doc.DocumentElement.SelectNodes("//actionmap");
-        if (actionMaps == null)
+        if (actionMaps is null)
             return actions;
 
         foreach (XmlElement actionMap in actionMaps)
@@ -35,7 +35,7 @@ public class SCSchemaService
 
             var category = SCCategoryMapper.GetCategoryName(mapName);
             var actionNodes = actionMap.SelectNodes("action");
-            if (actionNodes == null)
+            if (actionNodes is null)
                 continue;
 
             foreach (XmlElement actionNode in actionNodes)
@@ -96,7 +96,7 @@ public class SCSchemaService
         foreach (var deviceAttr in DeviceAttributes)
         {
             var deviceElements = actionNode.SelectNodes(deviceAttr);
-            if (deviceElements == null)
+            if (deviceElements is null)
                 continue;
 
             foreach (XmlElement deviceElem in deviceElements)
@@ -121,7 +121,7 @@ public class SCSchemaService
 
         // Parse <rebind> elements (used in user profiles)
         var rebinds = actionNode.SelectNodes("rebind");
-        if (rebinds != null)
+        if (rebinds is not null)
         {
             foreach (XmlElement rebind in rebinds)
             {

@@ -175,7 +175,7 @@ public partial class Form1 : Form
         // Update button display - show which are pressed
         var pressedButtons = state.Buttons
             .Select((pressed, i) => pressed ? $"B{i + 1}" : null)
-            .Where(b => b != null)
+            .Where(b => b is not null)
             .ToList();
 
         _buttonDisplay.Text = pressedButtons.Count > 0

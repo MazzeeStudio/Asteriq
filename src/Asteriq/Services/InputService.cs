@@ -88,7 +88,7 @@ public class InputService : IDisposable
         for (int i = 0; i < numJoysticks; i++)
         {
             var (info, _) = GetDeviceInfo(i);
-            if (info != null)
+            if (info is not null)
                 devices.Add(info);
         }
 
@@ -166,7 +166,7 @@ public class InputService : IDisposable
     /// </summary>
     private void PopulateAxisTypes(PhysicalDeviceInfo info)
     {
-        if (_hidDeviceService == null)
+        if (_hidDeviceService is null)
         {
             LogAxisTypes($"HidDeviceService is null for {info.Name}");
             return;
@@ -175,7 +175,7 @@ public class InputService : IDisposable
         try
         {
             // Cache HID devices on first call (to handle multiple identical devices)
-            if (_hidDevicesCache == null)
+            if (_hidDevicesCache is null)
             {
                 _hidDevicesCache = _hidDeviceService.EnumerateDevices();
                 LogAxisTypes($"Enumerated {_hidDevicesCache.Count} HID devices:");
@@ -199,7 +199,7 @@ public class InputService : IDisposable
                 !_matchedHidDevicePaths.Contains(d.DevicePath) &&
                 DeviceNamesMatch(d.ProductName, info.Name));
 
-            if (matchingDevice != null)
+            if (matchingDevice is not null)
             {
                 // Mark this HID device as matched so it won't be reused
                 _matchedHidDevicePaths.Add(matchingDevice.DevicePath);
@@ -549,7 +549,7 @@ public class InputService : IDisposable
 
             // New device found - open and track it properly
             var (info, newInstanceId) = GetDeviceInfo(i);
-            if (info != null)
+            if (info is not null)
             {
                 LogAxisTypes($"CheckForNewDevices: Opened device '{info.Name}' at index {i}, instanceId={newInstanceId}, firing DeviceConnected");
                 DeviceConnected?.Invoke(this, info);

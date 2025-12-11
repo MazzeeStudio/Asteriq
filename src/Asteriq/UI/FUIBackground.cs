@@ -57,7 +57,7 @@ public class FUIBackground : IDisposable
         }
 
         // Layer 1: Grid (intensity-based)
-        if (GridStrength > 0 && _gridBitmap != null)
+        if (GridStrength > 0 && _gridBitmap is not null)
         {
             using var gridPaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(255 * GridOpacity)) };
             canvas.DrawBitmap(_gridBitmap, bounds.Left, bounds.Top, gridPaint);
@@ -70,7 +70,7 @@ public class FUIBackground : IDisposable
         }
 
         // Layer 3: Noise/grain (intensity-based)
-        if (NoiseIntensity > 0 && _noiseBitmap != null)
+        if (NoiseIntensity > 0 && _noiseBitmap is not null)
         {
             // Scale noise opacity - max around 15% for subtle effect
             byte alpha = (byte)(255 * NoiseOpacity * 0.15f);
@@ -89,7 +89,7 @@ public class FUIBackground : IDisposable
         }
 
         // Layer 5: Vignette (intensity-based)
-        if (VignetteStrength > 0 && _vignetteBitmap != null)
+        if (VignetteStrength > 0 && _vignetteBitmap is not null)
         {
             using var vignettePaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(255 * VignetteOpacity)) };
             canvas.DrawBitmap(_vignetteBitmap, bounds.Left, bounds.Top, vignettePaint);

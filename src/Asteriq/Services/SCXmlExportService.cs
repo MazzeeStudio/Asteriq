@@ -163,7 +163,7 @@ public class SCXmlExportService
             foreach (var actionGroup in actionGroups)
             {
                 var actionElement = CreateActionElement(actionGroup.ToList(), profile);
-                if (actionElement != null)
+                if (actionElement is not null)
                 {
                     actionMapElement.Add(actionElement);
                 }
@@ -203,7 +203,7 @@ public class SCXmlExportService
 
             // Add activationMode attribute if not default press
             var activationModeStr = binding.ActivationMode.ToXmlString();
-            if (activationModeStr != null)
+            if (activationModeStr is not null)
             {
                 rebindElement.Add(new XAttribute("activationMode", activationModeStr));
             }

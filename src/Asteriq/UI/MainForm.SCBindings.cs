@@ -1357,22 +1357,17 @@ public partial class MainForm
         if (string.IsNullOrEmpty(modifier))
             return "";
 
-        // Remove left/right prefix and uppercase
-        var cleaned = modifier
-            .Replace("lshift", "SHFT")
-            .Replace("rshift", "SHFT")
-            .Replace("lctrl", "CTRL")
-            .Replace("rctrl", "CTRL")
-            .Replace("lalt", "ALT")
-            .Replace("ralt", "ALT");
+        var lower = modifier.ToLowerInvariant();
 
-        // If no known replacement matched, try generic cleanup
-        if (cleaned == modifier)
-        {
-            cleaned = modifier.TrimStart('l', 'r').ToUpper();
-            if (cleaned.Length > 4)
-                cleaned = cleaned.Substring(0, 4);
-        }
+        // Map common modifiers to short display names
+        if (lower.Contains("shift")) return "SHFT";
+        if (lower.Contains("ctrl") || lower.Contains("control")) return "CTRL";
+        if (lower.Contains("alt")) return "ALT";
+
+        // Generic cleanup for unknown modifiers
+        var cleaned = lower.TrimStart('l', 'r').ToUpperInvariant();
+        if (cleaned.Length > 4)
+            cleaned = cleaned.Substring(0, 4);
 
         return cleaned;
     }

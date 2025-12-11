@@ -266,10 +266,36 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 - ✅ Type indicators (axis/button/hat icons)
 - ✅ Conflict highlighting
 
-### In Progress / Broken
-- ❌ **Joystick input detection** - Click JS cell, press button, binding not detected
-  - `DetectJoystickInput()` logic needs debugging
-  - Issue: Physical input → vJoy mapping lookup not working
+### BLOCKING ISSUES - FIXED (2025-12-11)
+
+#### 1. Joystick Input Detection - CRITICAL ✅ FIXED
+- **Problem**: Click JS cell, press physical button, binding not detected
+- **Solution**: Rewrote `DetectJoystickInput()` to poll `InputService.GetDeviceState()` directly
+- **Added**: State tracking to detect button press transitions
+- **Added**: 1:1 fallback mapping for devices assigned to vJoy without explicit mappings
+- **Files**: MainForm.SCBindings.cs, Services/InputService.cs (added GetDeviceState method)
+
+#### 2. ASSIGN Button Handler - HIGH ✅ VERIFIED WORKING
+- **Status**: Already implemented - opens manual assignment dialog
+- **Method**: `AssignSCBinding()` at line 2667
+- **Note**: `_scAssigningInput` state variable was unused (cosmetic issue only)
+
+#### 3. Action Name Display - MEDIUM ✅ FIXED
+- **Problem**: Raw action names shown (e.g., `v_strafe_forward`)
+- **Solution**: Now uses `SCCategoryMapper.FormatActionName()` for display
+- **Files**: MainForm.SCBindings.cs:938
+
+#### 4. Category Name Mismatch - MEDIUM ✅ FIXED
+- **Problem**: SCSchemaService.DeriveCategory() conflicted with SCCategoryMapper
+- **Solution**: Removed DeriveCategory(), now uses SCCategoryMapper.GetCategoryName() directly
+- **Files**: SCSchemaService.cs:36
+
+#### 5. Binding Count Bug - LOW ❌
+- **Problem**: Shows filtered count, not total
+- **Example**: "150 actions" when filtered, user thinks that's total
+- **Should show**: "150 of 3000 actions" or similar
+- **Files**: MainForm.SCBindings.cs:730-731
+- **Status**: Still pending (low priority)
 
 ### Future Work
 - ❌ Double-tap binding support
@@ -305,4 +331,4 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 - Real-time input listening works for KB/Mouse but not joysticks
 - Category mapper provides same logical grouping as SCVirtStick
 
-Last Updated: 2024-12-11
+Last Updated: 2025-12-11

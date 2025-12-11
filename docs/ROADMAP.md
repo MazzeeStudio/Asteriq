@@ -112,11 +112,25 @@ See `docs/SC_BINDINGS_IMPLEMENTATION.md` for detailed implementation plan.
 - [x] Installation selector panel
 - [x] Export configuration panel (profile name, vJoy-to-SC mapping)
 - [x] Export button with status display
+- [x] Multi-column grid (KB, Mouse, JS1-JSn)
+- [x] Default bindings from p4k displayed
+- [x] Category expand/collapse
+- [x] Search functionality
+- [x] KB/Mouse input listening (framework)
 
-### Session 5: Integration & Polish
+### Session 5: Input Detection & Binding ✅ COMPLETE
+- [x] Fix joystick input detection - rewrote DetectJoystickInput() to poll InputService directly
+- [x] Implement physical input → vJoy output lookup - uses MappingProfile.GetVJoyOutputForPhysicalInput() with 1:1 fallback
+- [x] ASSIGN button click handler - verified working (opens manual assignment dialog)
+- [x] Fix action name display - now uses SCCategoryMapper.FormatActionName()
+- [x] Fix category naming - SCSchemaService now uses SCCategoryMapper.GetCategoryName()
+- [x] Added InputService.GetDeviceState() method for on-demand state polling
+
+### Session 6: Polish & Integration
+- [ ] Fix binding count to show total vs filtered (low priority)
 - [ ] Wire up settings persistence
 - [ ] Add export success/error notifications
-- [ ] Test full workflow
+- [ ] Test full workflow end-to-end
 - [ ] Handle edge cases (no SC installed, corrupt p4k, etc.)
 
 Reference implementation: `C:\Users\mhams\source\repos\SCVirtStick\SCVirtStick\Core\`

@@ -194,12 +194,10 @@ public partial class MainForm
                 _scExportProfile.TargetEnvironment = installation.Environment;
                 _scExportProfile.TargetBuildId = installation.BuildId;
 
-                // Build action maps list and filter to joystick-relevant actions
-                _scActionMaps = _scActions
-                    .Select(a => a.ActionMap)
-                    .Distinct()
-                    .OrderBy(m => m)
-                    .ToList();
+                // Build category list (user-friendly names, sorted by SCCategoryMapper order)
+                _scActionMaps = SCCategoryMapper.GetSortedCategories(
+                    _scActions.Select(a => a.ActionMap).Distinct()
+                ).ToList();
 
                 // Default: show joystick-relevant actions only
                 RefreshFilteredActions();
@@ -227,34 +225,94 @@ public partial class MainForm
         // Start with joystick-relevant actions
         var actions = _scSchemaService.FilterJoystickActions(_scActions);
 
-        // Apply action map filter if set
+        // Apply action map filter if set (use category name for filtering)
         if (!string.IsNullOrEmpty(_scActionMapFilter))
         {
-            actions = actions.Where(a => a.ActionMap == _scActionMapFilter).ToList();
+            actions = actions.Where(a =>
+                SCCategoryMapper.GetCategoryName(a.ActionMap) == _scActionMapFilter).ToList();
         }
 
-        // Apply search filter if set
+        // Apply search filter if set - search multiple fields like SCVirtStick
         if (!string.IsNullOrEmpty(_scSearchText))
         {
             var searchLower = _scSearchText.ToLowerInvariant();
-            actions = actions.Where(a =>
-                a.ActionName.ToLowerInvariant().Contains(searchLower) ||
-                a.ActionMap.ToLowerInvariant().Contains(searchLower) ||
-                FormatActionMapName(a.ActionMap).ToLowerInvariant().Contains(searchLower)
-            ).ToList();
+            actions = actions.Where(a => ActionMatchesSearch(a, searchLower)).ToList();
         }
 
         // Apply "show bound only" filter if enabled
         if (_scShowBoundOnly)
         {
             actions = actions.Where(a =>
-                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null
+                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null ||
+                a.DefaultBindings.Any()
             ).ToList();
         }
 
-        _scFilteredActions = actions.OrderBy(a => a.ActionMap).ThenBy(a => a.ActionName).ToList();
+        // Sort by category order (like SCVirtStick), then by action name
+        _scFilteredActions = actions
+            .OrderBy(a => SCCategoryMapper.GetSortOrder(a.ActionMap))
+            .ThenBy(a => SCCategoryMapper.GetCategoryName(a.ActionMap))
+            .ThenBy(a => a.ActionName)
+            .ToList();
+
         _scBindingsScrollOffset = 0;  // Reset scroll when filter changes
         _scSelectedActionIndex = -1;  // Clear selection
+    }
+
+    /// <summary>
+    /// Checks if an action matches the search filter (like SCVirtStick's ActionMatchesSearch)
+    /// Searches: action name, display name, category, binding input names, modifiers
+    /// </summary>
+    private bool ActionMatchesSearch(SCAction action, string searchLower)
+    {
+        // Check action name (raw)
+        if (action.ActionName.ToLowerInvariant().Contains(searchLower))
+            return true;
+
+        // Check formatted action name (display name)
+        if (SCCategoryMapper.FormatActionName(action.ActionName).ToLowerInvariant().Contains(searchLower))
+            return true;
+
+        // Check category name
+        if (SCCategoryMapper.GetCategoryName(action.ActionMap).ToLowerInvariant().Contains(searchLower))
+            return true;
+
+        // Check actionmap name (raw)
+        if (action.ActionMap.ToLowerInvariant().Contains(searchLower))
+            return true;
+
+        // Check user binding input names
+        var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
+        if (userBinding != null)
+        {
+            if (userBinding.InputName.ToLowerInvariant().Contains(searchLower))
+                return true;
+
+            // Check modifiers
+            foreach (var modifier in userBinding.Modifiers)
+            {
+                if (modifier.ToLowerInvariant().Contains(searchLower))
+                    return true;
+            }
+        }
+
+        // Check default binding input names
+        foreach (var binding in action.DefaultBindings)
+        {
+            if (binding.Input.ToLowerInvariant().Contains(searchLower))
+                return true;
+
+            if (binding.FullInput.ToLowerInvariant().Contains(searchLower))
+                return true;
+
+            foreach (var modifier in binding.Modifiers)
+            {
+                if (modifier.ToLowerInvariant().Contains(searchLower))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     #endregion
@@ -1673,12 +1731,8 @@ public partial class MainForm
 
     private static string FormatActionMapName(string actionMap)
     {
-        // Convert "spaceship_movement" to "Spaceship Movement"
-        if (string.IsNullOrEmpty(actionMap)) return actionMap;
-
-        return string.Join(" ", actionMap
-            .Split('_')
-            .Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower()));
+        // Use SCCategoryMapper for consistent user-friendly names
+        return SCCategoryMapper.GetCategoryName(actionMap);
     }
 
     #endregion
@@ -2172,7 +2226,8 @@ public partial class MainForm
     }
 
     /// <summary>
-    /// Detects joystick input by checking recent active inputs mapped to the target vJoy device
+    /// Detects joystick input by checking recent active inputs mapped to the target vJoy device.
+    /// Finds the physical input that was pressed and looks up its vJoy mapping.
     /// </summary>
     private string? DetectJoystickInput(SCGridColumn col)
     {
@@ -2190,26 +2245,37 @@ public partial class MainForm
         if (profile == null)
             return null;
 
-        // Look for any active button input that maps to this vJoy device
+        // Get the selected device ID for matching (DeviceId is InstanceGuid.ToString())
+        var selectedDevice = _selectedDevice >= 0 && _selectedDevice < _devices.Count
+            ? _devices[_selectedDevice]
+            : null;
+
+        if (selectedDevice == null)
+            return null;
+
+        string deviceId = selectedDevice.InstanceGuid.ToString();
+
+        // Look for active button inputs and find their vJoy mappings
         foreach (var active in activeInputs.Where(i => !i.IsAxis && i.Value > 0.5f))
         {
-            if (active.Control != null)
+            // Parse button index from binding name (e.g., "button5" -> 4, zero-based)
+            if (active.Binding.StartsWith("button") &&
+                int.TryParse(active.Binding.Substring(6), out int buttonNum))
             {
-                // Try to find a button mapping that outputs to this vJoy device
-                var buttonMappings = profile.ButtonMappings
-                    .Where(m => m.Output.VJoyDevice == col.VJoyDeviceId &&
-                                m.Output.Type == Models.OutputType.VJoyButton)
-                    .ToList();
+                int buttonIndex = buttonNum - 1; // Convert to 0-based
 
-                if (buttonMappings.Count > 0)
+                // Find the mapping for this specific physical input
+                var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+                    m.Inputs.Any(i =>
+                        i.DeviceId == deviceId &&
+                        i.Type == Models.InputType.Button &&
+                        i.Index == buttonIndex) &&
+                    m.Output.VJoyDevice == col.VJoyDeviceId &&
+                    m.Output.Type == Models.OutputType.VJoyButton);
+
+                if (mapping != null)
                 {
-                    // Return first button that has activity
-                    var firstButton = buttonMappings
-                        .OrderBy(m => m.Output.Index)
-                        .FirstOrDefault();
-
-                    if (firstButton != null)
-                        return $"button{firstButton.Output.Index + 1}";
+                    return $"button{mapping.Output.Index + 1}";
                 }
             }
         }
@@ -2217,26 +2283,46 @@ public partial class MainForm
         // Check axis inputs
         foreach (var active in activeInputs.Where(i => i.IsAxis && Math.Abs(i.Value) > 0.3f))
         {
-            if (active.Control != null)
+            // Get axis index from binding name
+            int axisIndex = GetAxisIndexFromBinding(active.Binding);
+            if (axisIndex < 0) continue;
+
+            // Find the mapping for this specific physical input
+            var mapping = profile.AxisMappings.FirstOrDefault(m =>
+                m.Inputs.Any(i =>
+                    i.DeviceId == deviceId &&
+                    i.Type == Models.InputType.Axis &&
+                    i.Index == axisIndex) &&
+                m.Output.VJoyDevice == col.VJoyDeviceId &&
+                m.Output.Type == Models.OutputType.VJoyAxis);
+
+            if (mapping != null)
             {
-                var axisMappings = profile.AxisMappings
-                    .Where(m => m.Output.VJoyDevice == col.VJoyDeviceId &&
-                                m.Output.Type == Models.OutputType.VJoyAxis)
-                    .ToList();
-
-                if (axisMappings.Count > 0)
-                {
-                    var firstAxis = axisMappings
-                        .OrderBy(m => m.Output.Index)
-                        .FirstOrDefault();
-
-                    if (firstAxis != null)
-                        return GetSCAxisName(firstAxis.Output.Index);
-                }
+                return GetSCAxisName(mapping.Output.Index);
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Converts axis binding name back to axis index
+    /// </summary>
+    private static int GetAxisIndexFromBinding(string binding)
+    {
+        return binding.ToLowerInvariant() switch
+        {
+            "x" => 0,
+            "y" => 1,
+            "z" => 2,
+            "rx" => 3,
+            "ry" => 4,
+            "rz" => 5,
+            "slider1" => 6,
+            "slider2" => 7,
+            _ when binding.StartsWith("axis") && int.TryParse(binding.Substring(4), out int idx) => idx,
+            _ => -1
+        };
     }
 
     private static string GetSCAxisName(int axisIndex)

@@ -272,6 +272,15 @@ public partial class MainForm : Form
     private int _hoveredSCInstallation = -1;
     private SKRect _scExportButtonBounds;
     private bool _scExportButtonHovered;
+    private SKRect _scExportFilenameBoxBounds;
+    private bool _scExportFilenameBoxFocused;
+    private string _scExportFilename = "";  // Custom export filename, empty = auto-generate
+    private SKRect _scImportButtonBounds;
+    private bool _scImportButtonHovered;
+    private List<SCMappingFile> _scAvailableProfiles = new();
+    private bool _scImportDropdownOpen;
+    private SKRect _scImportDropdownBounds;
+    private int _scHoveredImportProfile = -1;
     private SKRect _scRefreshButtonBounds;
     private bool _scRefreshButtonHovered;
     private SKRect _scClearAllButtonBounds;
@@ -914,6 +923,12 @@ public partial class MainForm : Form
             return HandleSearchBoxKey(keyData);
         }
 
+        // Handle export filename box input
+        if (_scExportFilenameBoxFocused && _activeTab == 2)
+        {
+            return HandleExportFilenameBoxKey(keyData);
+        }
+
         // Cancel key capture with Escape
         if (keyData == Keys.Escape)
         {
@@ -930,6 +945,11 @@ public partial class MainForm : Form
             if (_scSearchBoxFocused)
             {
                 _scSearchBoxFocused = false;
+                return true;
+            }
+            if (_scExportFilenameBoxFocused)
+            {
+                _scExportFilenameBoxFocused = false;
                 return true;
             }
         }
@@ -975,6 +995,68 @@ public partial class MainForm : Form
         }
 
         return false; // Let other keys pass through
+    }
+
+    private bool HandleExportFilenameBoxKey(Keys keyData)
+    {
+        // Remove modifiers for comparison
+        var key = keyData & Keys.KeyCode;
+
+        if (key == Keys.Escape || key == Keys.Enter)
+        {
+            _scExportFilenameBoxFocused = false;
+            return true;
+        }
+
+        if (key == Keys.Back)
+        {
+            if (_scExportFilename.Length > 0)
+            {
+                _scExportFilename = _scExportFilename.Substring(0, _scExportFilename.Length - 1);
+            }
+            return true;
+        }
+
+        if (key == Keys.Delete)
+        {
+            _scExportFilename = "";
+            return true;
+        }
+
+        // Allow alphanumeric and filename-safe characters (no spaces, special chars)
+        char c = KeyToFilenameChar(key, (keyData & Keys.Shift) == Keys.Shift);
+        if (c != '\0' && _scExportFilename.Length < 50)
+        {
+            _scExportFilename += c;
+            return true;
+        }
+
+        return false; // Let other keys pass through
+    }
+
+    private static char KeyToFilenameChar(Keys key, bool shift)
+    {
+        // Letters
+        if (key >= Keys.A && key <= Keys.Z)
+        {
+            char c = (char)('a' + (key - Keys.A));
+            return shift ? char.ToUpper(c) : c;
+        }
+
+        // Numbers
+        if (key >= Keys.D0 && key <= Keys.D9)
+        {
+            return (char)('0' + (key - Keys.D0));
+        }
+
+        // Only filename-safe characters
+        return key switch
+        {
+            Keys.OemMinus => shift ? '_' : '-',
+            Keys.Oemplus => '=',
+            Keys.OemPeriod => '.',
+            _ => '\0'
+        };
     }
 
     private static char KeyToChar(Keys key, bool shift)
@@ -2616,6 +2698,7 @@ public partial class MainForm : Form
 
     private void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
     {
+        // FUI style matching profile selector dropdown
         var bgColor = isEnabled
             ? (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150))
             : FUIColors.Background1.WithAlpha(100);
@@ -2623,26 +2706,23 @@ public partial class MainForm : Form
         using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
         canvas.DrawRect(bounds, bgPaint);
 
-        var borderColor = isEnabled ? FUIColors.Frame : FUIColors.Frame.WithAlpha(100);
+        // Border - highlight when hovered (FUI style)
+        var borderColor = isEnabled
+            ? (isHovered ? FUIColors.FrameBright : FUIColors.Frame)
+            : FUIColors.Frame.WithAlpha(100);
         using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
         canvas.DrawRect(bounds, borderPaint);
 
-        var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), textColor, 11f);
+        // Truncate text to leave room for arrow prefix and padding
+        float textPadding = 5f;
+        float arrowPrefixWidth = 16f;  // Space for "▾ "
+        float maxTextWidth = bounds.Width - textPadding - arrowPrefixWidth - 8f;
+        string truncatedText = TruncateTextToWidth(text, maxTextWidth, 11f);
 
-        // Dropdown arrow
-        if (isEnabled)
-        {
-            float arrowX = bounds.Right - 18;
-            float arrowY = bounds.MidY;
-            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
-            using var path = new SKPath();
-            path.MoveTo(arrowX - 4, arrowY - 3);
-            path.LineTo(arrowX + 4, arrowY - 3);
-            path.LineTo(arrowX, arrowY + 3);
-            path.Close();
-            canvas.DrawPath(path, arrowPaint);
-        }
+        // Display text with dropdown arrow prefix (FUI style like profile selector)
+        string displayText = isEnabled ? $"▾ {truncatedText}" : truncatedText;
+        var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + textPadding, bounds.MidY + 4), textColor, 11f);
     }
 
     private void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)

@@ -71,6 +71,15 @@ public partial class MainForm : Form
     private SKRect _deviceCategoryD1Bounds;
     private SKRect _deviceCategoryD2Bounds;
 
+    
+    // Device list drag-to-reorder state
+    private bool _isDraggingDevice = false;
+    private int _dragDeviceIndex = -1;
+    private int _dragDropTargetIndex = -1;
+    private SKPoint _dragStartPoint;
+    private SKPoint _dragCurrentPoint;
+    private List<SKRect> _deviceItemBounds = new();  // Bounds of each device item for hit testing
+
     // Device Actions panel buttons
     private SKRect _map1to1ButtonBounds;
     private bool _map1to1ButtonHovered;
@@ -1302,6 +1311,9 @@ public partial class MainForm : Form
         // Combine connected and disconnected devices
         _devices = connectedDevices.Concat(disconnectedToShow).ToList();
 
+        // Apply user-defined device order from profile
+        ApplyDeviceOrder();
+
         // Auto-select first device in current category if nothing selected
         if (_selectedDevice < 0 && _devices.Count > 0)
         {
@@ -1657,6 +1669,42 @@ public partial class MainForm : Form
         {
             UpdateBgSliderFromPoint(e.X);
             return;
+        }
+
+        // Handle device list drag-to-reorder (physical devices only)
+        if (_activeTab == 0 && _deviceCategory == 0 && _dragDeviceIndex >= 0)
+        {
+            var currentPoint = new SKPoint(e.X, e.Y);
+            float dragDistance = SKPoint.Distance(currentPoint, _dragStartPoint);
+
+            // Start actual drag if moved beyond threshold (5 pixels)
+            if (!_isDraggingDevice && dragDistance > 5)
+            {
+                _isDraggingDevice = true;
+                Cursor = Cursors.SizeAll;
+            }
+
+            if (_isDraggingDevice)
+            {
+                _dragCurrentPoint = currentPoint;
+
+                // Calculate drop target index based on Y position
+                float dragItemHeight = 60f;
+                float dragItemGap = FUIRenderer.ItemSpacing;
+                float dragContentTop = 90 + 32 + FUIRenderer.PanelPadding;
+
+                // Get filtered devices (physical only)
+                var physicalDevices = _devices.Where(d => !d.IsVirtual).ToList();
+
+                // Calculate which slot the cursor is over
+                float relativeY = e.Y - dragContentTop;
+                int targetIndex = (int)(relativeY / (dragItemHeight + dragItemGap));
+                targetIndex = Math.Clamp(targetIndex, 0, physicalDevices.Count);
+
+                _dragDropTargetIndex = targetIndex;
+                _canvas.Invalidate();
+                return;
+            }
         }
 
         // Mappings tab hover handling
@@ -2218,14 +2266,27 @@ public partial class MainForm : Form
             return;
         }
 
-        // Device list clicks
-        if (_hoveredDevice >= 0 && _hoveredDevice < _devices.Count)
+        // Device list clicks - initiate potential drag on physical devices
+        if (_activeTab == 0 && _deviceCategory == 0 && _hoveredDevice >= 0 && _hoveredDevice < _devices.Count)
         {
             _selectedDevice = _hoveredDevice;
             _currentInputState = null;
             // Load device map for the selected device
             LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
             _activeInputTracker.Clear(); // Clear lead-lines when switching devices
+
+            // Start potential drag - will only become a drag if mouse moves enough
+            _dragDeviceIndex = _hoveredDevice;
+            _dragStartPoint = new SKPoint(e.X, e.Y);
+            _dragCurrentPoint = _dragStartPoint;
+        }
+        else if (_hoveredDevice >= 0 && _hoveredDevice < _devices.Count)
+        {
+            // Non-draggable device selection (virtual devices tab)
+            _selectedDevice = _hoveredDevice;
+            _currentInputState = null;
+            LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+            _activeInputTracker.Clear();
         }
 
         // Device action button clicks (only on Devices tab)
@@ -2502,6 +2563,77 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
     {
+        // Complete device drag-to-reorder
+        if (_isDraggingDevice && _dragDeviceIndex >= 0 && _dragDeviceIndex < _devices.Count)
+        {
+            var filteredDevices = _devices.Where(d => !d.IsVirtual).ToList();
+
+            // _dragDeviceIndex is actual index in _devices, find filtered index
+            var draggedDevice = _devices[_dragDeviceIndex];
+            int sourceFilteredIndex = filteredDevices.IndexOf(draggedDevice);
+
+            // Only reorder if valid source and different target
+            if (sourceFilteredIndex >= 0 && _dragDropTargetIndex >= 0 && _dragDropTargetIndex != sourceFilteredIndex)
+            {
+                // Calculate target filtered index (adjusted for removal)
+                int targetFilteredIndex = _dragDropTargetIndex;
+                if (targetFilteredIndex > sourceFilteredIndex)
+                    targetFilteredIndex--;
+
+                // Get the device at target position (or use end of list)
+                int targetActualIndex;
+                if (targetFilteredIndex >= 0 && targetFilteredIndex < filteredDevices.Count)
+                {
+                    var targetDevice = filteredDevices[targetFilteredIndex];
+                    targetActualIndex = _devices.IndexOf(targetDevice);
+                    // If dropping after source in the filtered list, insert after target
+                    if (_dragDropTargetIndex > sourceFilteredIndex)
+                        targetActualIndex++;
+                }
+                else
+                {
+                    // Dropping at end - find last physical device and insert after it
+                    targetActualIndex = _devices.Count;
+                    for (int i = _devices.Count - 1; i >= 0; i--)
+                    {
+                        if (!_devices[i].IsVirtual)
+                        {
+                            targetActualIndex = i + 1;
+                            break;
+                        }
+                    }
+                }
+
+                // Perform the move
+                int sourceActualIndex = _devices.IndexOf(draggedDevice);
+                _devices.RemoveAt(sourceActualIndex);
+                if (targetActualIndex > sourceActualIndex)
+                    targetActualIndex--;
+                _devices.Insert(targetActualIndex, draggedDevice);
+
+                // Update selection to follow the moved device
+                _selectedDevice = _devices.IndexOf(draggedDevice);
+
+                // Save the new order
+                SaveDeviceOrder();
+            }
+
+            // Reset drag state
+            _isDraggingDevice = false;
+            _dragDeviceIndex = -1;
+            _dragDropTargetIndex = -1;
+            Cursor = Cursors.Default;
+            _canvas.Invalidate();
+            return;
+        }
+
+        // Reset potential drag state even if we didn't actually drag
+        if (_dragDeviceIndex >= 0)
+        {
+            _dragDeviceIndex = -1;
+            _dragDropTargetIndex = -1;
+        }
+
         // Release SC Bindings scrollbar dragging
         if (_scIsDraggingVScroll || _scIsDraggingHScroll)
         {
@@ -3180,6 +3312,139 @@ public partial class MainForm : Form
 
         // CRT scan line overlay
         FUIRenderer.DrawScanLineOverlay(canvas, bounds, 2f, 4);
+    }
+
+    #endregion
+
+    #region Device Order
+
+    /// <summary>
+    /// Save the current device order to the active profile and reassign vJoy slots
+    /// Device order = vJoy order (first device -> vJoy 1, second -> vJoy 2, etc.)
+    /// </summary>
+    private void SaveDeviceOrder()
+    {
+        if (_profileService.ActiveProfile is null)
+            return;
+
+        var profile = _profileService.ActiveProfile;
+
+        // Get physical devices only (that's what we reorder)
+        var physicalDevices = _devices.Where(d => !d.IsVirtual).ToList();
+
+        // Save the order as list of instance GUIDs
+        profile.DeviceOrder = physicalDevices
+            .Select(d => d.InstanceGuid.ToString())
+            .ToList();
+
+        // Build mapping from device GUID to old assignment info
+        var oldAssignmentsByGuid = new Dictionary<string, DeviceAssignment>();
+        foreach (var assignment in profile.DeviceAssignments)
+        {
+            oldAssignmentsByGuid[assignment.PhysicalDevice.Guid] = assignment;
+        }
+
+        // Build mapping from old vJoy ID to new vJoy ID based on new order
+        var oldToNewVJoy = new Dictionary<uint, uint>();
+
+        // Clear and rebuild device assignments based on new order
+        profile.DeviceAssignments.Clear();
+        for (int i = 0; i < physicalDevices.Count; i++)
+        {
+            var device = physicalDevices[i];
+            uint newVJoyId = (uint)(i + 1); // vJoy is 1-indexed
+            string deviceGuid = device.InstanceGuid.ToString();
+
+            // Track old -> new mapping for updating mappings
+            if (oldAssignmentsByGuid.TryGetValue(deviceGuid, out var oldAssignment))
+            {
+                oldToNewVJoy[oldAssignment.VJoyDevice] = newVJoyId;
+            }
+
+            // Get existing VidPid if available from old assignments
+            string vidPid = oldAssignment?.PhysicalDevice.VidPid ?? "";
+
+            // Create new assignment
+            profile.DeviceAssignments.Add(new DeviceAssignment
+            {
+                PhysicalDevice = new PhysicalDeviceRef
+                {
+                    Name = device.Name,
+                    Guid = deviceGuid,
+                    VidPid = vidPid
+                },
+                VJoyDevice = newVJoyId
+            });
+        }
+
+        // Update all mappings to use new vJoy IDs
+        foreach (var mapping in profile.AxisMappings)
+        {
+            if (oldToNewVJoy.TryGetValue(mapping.Output.VJoyDevice, out uint newId))
+            {
+                mapping.Output.VJoyDevice = newId;
+            }
+        }
+        foreach (var mapping in profile.ButtonMappings)
+        {
+            if (oldToNewVJoy.TryGetValue(mapping.Output.VJoyDevice, out uint newId))
+            {
+                mapping.Output.VJoyDevice = newId;
+            }
+        }
+        foreach (var mapping in profile.HatMappings)
+        {
+            if (oldToNewVJoy.TryGetValue(mapping.Output.VJoyDevice, out uint newId))
+            {
+                mapping.Output.VJoyDevice = newId;
+            }
+        }
+
+        _profileService.SaveActiveProfile();
+
+        Console.WriteLine($"Device order saved. vJoy assignments updated:");
+        for (int i = 0; i < physicalDevices.Count; i++)
+        {
+            Console.WriteLine($"  {i + 1}: {physicalDevices[i].Name} -> vJoy {i + 1}");
+        }
+    }
+
+    /// <summary>
+    /// Apply saved device order from the active profile
+    /// </summary>
+    private void ApplyDeviceOrder()
+    {
+        if (_profileService.ActiveProfile is null)
+            return;
+
+        var savedOrder = _profileService.ActiveProfile.DeviceOrder;
+        if (savedOrder is null || savedOrder.Count == 0)
+            return;
+
+        // Separate physical and virtual devices
+        var physicalDevices = _devices.Where(d => !d.IsVirtual).ToList();
+        var virtualDevices = _devices.Where(d => d.IsVirtual).ToList();
+
+        // Sort physical devices by saved order
+        var orderedPhysical = new List<PhysicalDeviceInfo>();
+        var unorderedPhysical = new List<PhysicalDeviceInfo>(physicalDevices);
+
+        foreach (var guid in savedOrder)
+        {
+            var device = unorderedPhysical.FirstOrDefault(d =>
+                d.InstanceGuid.ToString().Equals(guid, StringComparison.OrdinalIgnoreCase));
+            if (device is not null)
+            {
+                orderedPhysical.Add(device);
+                unorderedPhysical.Remove(device);
+            }
+        }
+
+        // Add any new devices (not in saved order) at the end
+        orderedPhysical.AddRange(unorderedPhysical);
+
+        // Rebuild devices list with physical first, then virtual
+        _devices = orderedPhysical.Concat(virtualDevices).ToList();
     }
 
     #endregion

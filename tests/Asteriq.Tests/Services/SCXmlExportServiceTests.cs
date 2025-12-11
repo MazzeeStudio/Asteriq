@@ -427,6 +427,92 @@ public class SCXmlExportServiceTests
         Assert.Equal("layout_My Profile _test__exported.xml", filename);
     }
 
+    [Fact]
+    public void Export_CreatesKeyboardBindings_WithKbPrefix()
+    {
+        var profile = CreateTestProfile();
+        profile.Bindings.Add(new SCActionBinding
+        {
+            ActionMap = "spaceship_movement",
+            ActionName = "v_strafe_forward",
+            DeviceType = SCDeviceType.Keyboard,
+            InputName = "w",
+            InputType = SCInputType.Button
+        });
+
+        var doc = _service.Export(profile);
+
+        var rebind = doc.Descendants("rebind").First();
+        Assert.Equal("kb1_w", rebind.Attribute("input")?.Value);
+    }
+
+    [Fact]
+    public void Export_CreatesMouseBindings_WithMoPrefix()
+    {
+        var profile = CreateTestProfile();
+        profile.Bindings.Add(new SCActionBinding
+        {
+            ActionMap = "spaceship_weapons",
+            ActionName = "v_attack1",
+            DeviceType = SCDeviceType.Mouse,
+            InputName = "mouse1",
+            InputType = SCInputType.Button
+        });
+
+        var doc = _service.Export(profile);
+
+        var rebind = doc.Descendants("rebind").First();
+        Assert.Equal("mo1_mouse1", rebind.Attribute("input")?.Value);
+    }
+
+    [Fact]
+    public void Export_CreatesMultipleBindingsPerAction()
+    {
+        var profile = CreateTestProfile();
+        profile.Bindings.Add(new SCActionBinding
+        {
+            ActionMap = "spaceship_movement",
+            ActionName = "v_strafe_forward",
+            DeviceType = SCDeviceType.Keyboard,
+            InputName = "w"
+        });
+        profile.Bindings.Add(new SCActionBinding
+        {
+            ActionMap = "spaceship_movement",
+            ActionName = "v_strafe_forward",
+            DeviceType = SCDeviceType.Joystick,
+            VJoyDevice = 1,
+            InputName = "y"
+        });
+
+        var doc = _service.Export(profile);
+
+        var action = doc.Descendants("action").First(a => a.Attribute("name")?.Value == "v_strafe_forward");
+        var rebinds = action.Elements("rebind").ToList();
+        Assert.Equal(2, rebinds.Count);
+        Assert.Contains(rebinds, r => r.Attribute("input")?.Value == "kb1_w");
+        Assert.Contains(rebinds, r => r.Attribute("input")?.Value == "js1_y");
+    }
+
+    [Fact]
+    public void Export_HandlesModifiersCorrectly_ForKeyboard()
+    {
+        var profile = CreateTestProfile();
+        profile.Bindings.Add(new SCActionBinding
+        {
+            ActionMap = "spaceship_targeting",
+            ActionName = "v_target_hostile",
+            DeviceType = SCDeviceType.Keyboard,
+            InputName = "t",
+            Modifiers = new List<string> { "lalt" }
+        });
+
+        var doc = _service.Export(profile);
+
+        var rebind = doc.Descendants("rebind").First();
+        Assert.Equal("kb1_lalt+t", rebind.Attribute("input")?.Value);
+    }
+
     #endregion
 
     #region SCActionBinding Tests
@@ -446,15 +532,19 @@ public class SCXmlExportServiceTests
     }
 
     [Fact]
-    public void SCActionBinding_Key_CombinesMapAndName()
+    public void SCActionBinding_Key_IncludesDeviceType()
     {
         var binding = new SCActionBinding
         {
             ActionMap = "spaceship_movement",
-            ActionName = "v_strafe_forward"
+            ActionName = "v_strafe_forward",
+            DeviceType = SCDeviceType.Joystick
         };
 
-        Assert.Equal("spaceship_movement.v_strafe_forward", binding.Key);
+        // Key now includes device type to allow multiple bindings per action
+        Assert.Equal("spaceship_movement.v_strafe_forward.Joystick", binding.Key);
+        // ActionKey is the old format without device type
+        Assert.Equal("spaceship_movement.v_strafe_forward", binding.ActionKey);
     }
 
     #endregion

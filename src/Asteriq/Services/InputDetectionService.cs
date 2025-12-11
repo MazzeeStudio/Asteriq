@@ -136,21 +136,23 @@ public class InputDetectionService : IDisposable
 
     // Track axis movement confirmation - need sustained movement to confirm intentional input
     private Dictionary<Guid, int[]> _axisMovementConfirmCount = new();
-    private const int RequiredConfirmationFrames = 8; // Must maintain movement for 8 frames to filter out noise spikes
+    private const int RequiredConfirmationFrames = 3; // Reduced from 8 - quality sticks don't need much confirmation
 
-    // Jitter threshold - movements smaller than this are considered noise (8% of axis range)
-    private const float JitterThreshold = 0.08f;
+    // Jitter threshold - movements smaller than this are considered noise (5% of axis range)
+    // Reduced from 8% to allow more sensitive detection
+    private const float JitterThreshold = 0.05f;
 
     // High-variance threshold - axes with stdDev above this are completely ignored (noisy/phantom axes)
-    // Lowered to 0.03 to catch more noisy axes (3% standard deviation during warmup = noisy)
-    private const float HighVarianceThreshold = 0.03f;
+    // Increased from 0.03 to 0.15 - VirPil and other quality sticks can have natural jitter
+    // Only truly broken axes should be filtered (15% standard deviation = definitely broken)
+    private const float HighVarianceThreshold = 0.15f;
 
     // Track which axes are too noisy to use
     private Dictionary<Guid, bool[]> _noisyAxes = new();
 
-    // Warmup configuration
-    private const int RequiredWarmupSamples = 30; // Collect 30 samples for stable baseline
-    private const int RequiredWarmupPolls = 10;   // Initial settle time before collecting samples
+    // Warmup configuration - reduced for faster response
+    private const int RequiredWarmupSamples = 10; // Reduced from 30 - fewer samples needed for baseline
+    private const int RequiredWarmupPolls = 5;    // Reduced from 10 - less settle time needed
 
     // Per-device warmup tracking (each device needs its own warmup)
     private Dictionary<Guid, int> _deviceWarmupPolls = new();
@@ -370,10 +372,10 @@ public class InputDetectionService : IDisposable
                 float variance = count > 0 ? varianceSum / count : 0f;
                 float stdDev = MathF.Sqrt(variance);
 
-                // Mark axis as noisy if:
-                // 1. Standard deviation is too high (consistently varying)
-                // 2. Range during warmup exceeds threshold (axis moved or is oscillating)
-                bool isNoisy = stdDev > HighVarianceThreshold || range > JitterThreshold * 2;
+                // Mark axis as noisy if standard deviation is very high (phantom/broken axis)
+                // Removed the range check - if user moves axis during warmup it shouldn't be marked noisy
+                // Only truly broken axes with 15%+ standard deviation are filtered
+                bool isNoisy = stdDev > HighVarianceThreshold;
 
                 if (isNoisy)
                 {

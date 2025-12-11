@@ -3163,22 +3163,28 @@ public partial class MainForm
             // Wait for actual input change - use a delay to skip initial state
             await Task.Delay(200); // Small delay to let user release any currently pressed buttons
 
-            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.5f, 15000);
+            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.15f, 15000);
 
             if (detected is not null && _mappingEditorOpen)
             {
                 _pendingInput = detected;
 
                 // Update manual entry dropdowns to match detected input
+                PhysicalDeviceInfo? sourceDevice = null;
                 for (int i = 0; i < _devices.Count; i++)
                 {
                     if (_devices[i].InstanceGuid == detected.DeviceGuid)
                     {
                         _selectedSourceDevice = i;
+                        sourceDevice = _devices[i];
                         break;
                     }
                 }
                 _selectedSourceControl = detected.Index;
+
+                // Note: We intentionally do NOT auto-select vJoy row here.
+                // When user explicitly clicks a row to edit, their choice is respected.
+                // Type-aware mapping is only used in 1:1 auto-mapping feature.
             }
         }
         catch (Exception ex)
@@ -3309,57 +3315,22 @@ public partial class MainForm
             m.Inputs.Any(i => i.DeviceId == deviceId) &&
             m.Output.VJoyDevice == vjoyDevice.Id);
 
-        // Create axis mappings using actual axis types when available
-        // Maps each physical axis to the corresponding vJoy axis based on type (X->X, Slider->Slider, etc.)
+        // Create axis mappings using simple sequential mapping
+        // Maps physical axis 0 -> vJoy axis 0, axis 1 -> vJoy axis 1, etc.
+        // This is predictable and consistent with manual mapping behavior.
         var vjoyAxisIndices = GetVJoyAxisIndices(vjoyDevice);
-        var usedVJoyAxes = new HashSet<int>();
-        var sliderCount = 0; // Track how many sliders we've mapped
 
         LogMapping($"=== 1:1 Mapping for {physicalDevice.Name} ===");
-        LogMapping($"Device: {physicalDevice.Name}, AxisCount: {physicalDevice.AxisCount}, AxisInfos.Count: {physicalDevice.AxisInfos.Count}");
-        LogMapping($"HidDevicePath: {physicalDevice.HidDevicePath}");
-        foreach (var ai in physicalDevice.AxisInfos)
+        LogMapping($"Device: {physicalDevice.Name}, AxisCount: {physicalDevice.AxisCount}");
+
+        int axesToMap = Math.Min(physicalDevice.AxisCount, vjoyAxisIndices.Count);
+        for (int i = 0; i < axesToMap; i++)
         {
-            LogMapping($"  AxisInfo: Index={ai.Index}, Type={ai.Type}, vJoyIndex={ai.ToVJoyAxisIndex()}");
-        }
-
-        for (int i = 0; i < physicalDevice.AxisCount; i++)
-        {
-            // Determine the target vJoy axis index based on axis type
-            int vjoyAxisIndex;
-            var axisInfo = physicalDevice.AxisInfos.FirstOrDefault(a => a.Index == i);
-
-            LogMapping($"Processing axis {i}: axisInfo={axisInfo?.Type.ToString() ?? "NULL"}");
-
-            if (axisInfo != null && axisInfo.Type != AxisType.Unknown)
-            {
-                // Use actual axis type to determine vJoy target
-                vjoyAxisIndex = axisInfo.ToVJoyAxisIndex();
-
-                // Handle multiple sliders (Slider0 = 6, Slider1 = 7)
-                if (axisInfo.Type == AxisType.Slider)
-                {
-                    vjoyAxisIndex = 6 + sliderCount; // Map to Slider0 first, then Slider1
-                    sliderCount++;
-                }
-            }
-            else
-            {
-                // Fallback: use sequential mapping if axis type is unknown
-                vjoyAxisIndex = i < vjoyAxisIndices.Count ? vjoyAxisIndices[i] : -1;
-            }
-
-            // Skip if the vJoy axis isn't available or already used
-            if (vjoyAxisIndex < 0 || !vjoyAxisIndices.Contains(vjoyAxisIndex) || usedVJoyAxes.Contains(vjoyAxisIndex))
-            {
-                // Try to find an unused vJoy axis as fallback
-                vjoyAxisIndex = vjoyAxisIndices.FirstOrDefault(idx => !usedVJoyAxes.Contains(idx), -1);
-                if (vjoyAxisIndex < 0) continue; // No more vJoy axes available
-            }
-
-            usedVJoyAxes.Add(vjoyAxisIndex);
+            int vjoyAxisIndex = vjoyAxisIndices[i];
             string vjoyAxisName = GetVJoyAxisName(vjoyAxisIndex);
-            string physicalAxisName = axisInfo?.TypeName ?? $"Axis {i}";
+            string physicalAxisName = $"Axis {i}";
+
+            LogMapping($"Mapping axis {i} -> vJoy axis {vjoyAxisIndex} ({vjoyAxisName})");
 
             var mapping = new AxisMapping
             {
@@ -4045,12 +4016,17 @@ public partial class MainForm
             // Small delay to let user release any currently pressed buttons
             await Task.Delay(200);
 
-            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.5f, 15000);
+            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.15f, 15000);
 
             if (detected is not null && _selectedMappingRow == rowIndex)
             {
                 _pendingInput = detected;
                 var inputSource = detected.ToInputSource();
+
+                // Note: We intentionally do NOT auto-select vJoy row here.
+                // When user explicitly clicks a row to map, their choice is respected.
+                // Type-aware mapping is only used in 1:1 auto-mapping feature.
+                int targetRowIndex = rowIndex;
 
                 // Check for duplicate mapping
                 var profile = _profileService.ActiveProfile;
@@ -4059,7 +4035,7 @@ public partial class MainForm
                     var existingMapping = FindExistingMappingForInput(profile, inputSource);
                     if (existingMapping is not null)
                     {
-                        string newTarget = isAxis ? $"vJoy Axis {rowIndex}" : $"vJoy Button {rowIndex + 1}";
+                        string newTarget = isAxis ? $"vJoy Axis {targetRowIndex}" : $"vJoy Button {targetRowIndex + 1}";
                         if (!ConfirmDuplicateMapping(existingMapping, newTarget))
                         {
                             // User cancelled, don't create the mapping
@@ -4071,7 +4047,7 @@ public partial class MainForm
                 }
 
                 // Save the mapping using current panel settings (output type, key combo, button mode)
-                SaveMappingForRow(rowIndex, detected, isAxis);
+                SaveMappingForRow(targetRowIndex, detected, isAxis);
             }
         }
         catch (Exception ex)

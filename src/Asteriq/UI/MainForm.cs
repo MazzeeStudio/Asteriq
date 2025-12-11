@@ -274,6 +274,10 @@ public partial class MainForm : Form
     private bool _scExportButtonHovered;
     private SKRect _scRefreshButtonBounds;
     private bool _scRefreshButtonHovered;
+    private SKRect _scClearAllButtonBounds;
+    private bool _scClearAllButtonHovered;
+    private SKRect _scResetDefaultsButtonBounds;
+    private bool _scResetDefaultsButtonHovered;
     private SKRect _scProfileNameBounds;
     private bool _scProfileNameHovered;
     private List<SKRect> _scVJoyMappingBounds = new();

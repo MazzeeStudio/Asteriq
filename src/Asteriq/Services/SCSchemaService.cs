@@ -325,14 +325,17 @@ public class SCSchemaService
     }
 
     /// <summary>
-    /// Filters actions to only joystick-relevant ones
+    /// Filters actions to only joystick-relevant ones.
+    /// Includes all actions since any button/axis action can be bound to a joystick.
+    /// Previously filtered to only show actions with existing JS bindings, but this
+    /// excluded actions like VTOL that users want to bind to their joystick.
     /// </summary>
     public List<SCAction> FilterJoystickActions(List<SCAction> actions)
     {
-        return actions.Where(a =>
-            a.DefaultBindings.Any(b => b.DevicePrefix.StartsWith("js")) ||
-            a.InputType == SCInputType.Axis)
-            .ToList();
+        // Include all actions - users should be able to bind any action to their joystick
+        // The old filter excluded actions like v_vtol_toggle that have keyboard defaults
+        // but no default joystick binding
+        return actions.ToList();
     }
 }
 

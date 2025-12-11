@@ -273,6 +273,8 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 - **Solution**: Rewrote `DetectJoystickInput()` to poll `InputService.GetDeviceState()` directly
 - **Added**: State tracking to detect button press transitions
 - **Added**: 1:1 fallback mapping for devices assigned to vJoy without explicit mappings
+- **Added**: Axis baseline tracking - captures axis positions at start of listening
+- **Added**: Maximum deflection tracking - registers axis when >70% deflection OR when user releases
 - **Files**: MainForm.SCBindings.cs, Services/InputService.cs (added GetDeviceState method)
 
 #### 2. ASSIGN Button Handler - HIGH ✅ VERIFIED WORKING
@@ -296,6 +298,31 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 - **Should show**: "150 of 3000 actions" or similar
 - **Files**: MainForm.SCBindings.cs:730-731
 - **Status**: Still pending (low priority)
+
+#### 6. Axis Export Bug - CRITICAL ✅ FIXED (2025-12-11)
+- **Problem**: Axis bindings were being exported as buttons
+- **Root cause**: Input type inference in `AssignJoystickBinding()` wasn't comprehensive
+- **Solution**: Added `InferInputTypeFromName()` method that handles all input formats:
+  - Standard axes: x, y, z, rx, ry, rz
+  - Sliders: slider1, slider2, slider*
+  - Fallback axes: axis0, axis1, etc.
+  - Hats: hat1_up, hat2_right, etc.
+- **Files**: MainForm.SCBindings.cs:2742-2764
+
+#### 7. Clear All / Reset Defaults - HIGH ✅ IMPLEMENTED (2025-12-11)
+- **Feature**: Added Clear All Bindings and Reset to Defaults buttons
+- **Location**: Right panel, above Export button
+- **Clear All**: Removes all user joystick bindings from profile
+- **Reset Defaults**: Clears bindings and reloads schema from p4k cache
+- **Files**: MainForm.SCBindings.cs, MainForm.cs
+
+#### 8. VTOL Actions Missing from Filter - CRITICAL ✅ FIXED (2025-12-11)
+- **Problem**: User couldn't find VTOL bindings when searching
+- **Root cause**: `FilterJoystickActions()` was excluding actions without default joystick bindings
+- **Example**: `v_vtol_toggle` has `keyboard="k"` but `joystick=" "` (empty) - was filtered out
+- **Solution**: Changed `FilterJoystickActions()` to return ALL actions since users should be able to bind any action to their joystick
+- **Files**: SCSchemaService.cs:333-339, SCSchemaServiceTests.cs
+- **Available actions now visible**: v_toggle_landing_system, v_deploy_landing_system, v_retract_landing_system, v_vtol_toggle, v_vtol_on, v_vtol_off
 
 ### Future Work
 - ❌ Double-tap binding support

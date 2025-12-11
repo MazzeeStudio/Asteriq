@@ -595,6 +595,28 @@ public class ProfileService
     }
 
     /// <summary>
+    /// Load window state (size and position)
+    /// </summary>
+    public (int width, int height, int x, int y) LoadWindowState()
+    {
+        var settings = LoadSettings();
+        return (settings.WindowWidth, settings.WindowHeight, settings.WindowX, settings.WindowY);
+    }
+
+    /// <summary>
+    /// Save window state (size and position)
+    /// </summary>
+    public void SaveWindowState(int width, int height, int x, int y)
+    {
+        var settings = LoadSettings();
+        settings.WindowWidth = width;
+        settings.WindowHeight = height;
+        settings.WindowX = x;
+        settings.WindowY = y;
+        SaveSettings(settings);
+    }
+
+    /// <summary>
     /// Activate a profile by ID, making it the current active profile
     /// </summary>
     public bool ActivateProfile(Guid profileId)

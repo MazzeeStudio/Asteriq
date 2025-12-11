@@ -199,12 +199,9 @@ public partial class MainForm
                     _scActions.Select(a => a.ActionMap).Distinct()
                 ).ToList();
 
-                // If this is a fresh profile (no bindings), populate with SC defaults
-                // This follows SCVirtStick's model: profile contains ALL bindings, no separate "defaults"
-                if (_scExportProfile.Bindings.Count == 0)
-                {
-                    ApplyDefaultBindingsToProfile();
-                }
+                // NOTE: We intentionally do NOT auto-apply defaults here.
+                // Defaults are only applied when user explicitly clicks "Reset Defaults".
+                // This allows users to create completely blank profiles if desired.
 
                 // Default: show joystick-relevant actions only
                 RefreshFilteredActions();
@@ -330,8 +327,10 @@ public partial class MainForm
         }
 
         // Sort by category order (like SCVirtStick), then by action name
+        // IMPORTANT: Use GetCategorySortOrder on the CATEGORY NAME to ensure all actions
+        // with the same display category are grouped together, regardless of raw actionmap
         _scFilteredActions = actions
-            .OrderBy(a => SCCategoryMapper.GetSortOrder(a.ActionMap))
+            .OrderBy(a => SCCategoryMapper.GetCategorySortOrder(SCCategoryMapper.GetCategoryName(a.ActionMap)))
             .ThenBy(a => SCCategoryMapper.GetCategoryName(a.ActionMap))
             .ThenBy(a => a.ActionName)
             .ToList();
@@ -405,27 +404,33 @@ public partial class MainForm
         float frameInset = 5f;
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
-        // Three-panel layout: Left (installation) | Center (bindings table) | Right (export)
-        float leftPanelWidth = 280f;
-        float rightPanelWidth = 260f;
+        // Two-panel layout: Left (bindings table) | Right (Installation + Export stacked)
+        // Table on left for more space, controls on right
+        float rightPanelWidth = 280f;
         float gap = 10f;
-        float centerPanelWidth = contentBounds.Width - leftPanelWidth - rightPanelWidth - gap * 2;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
-            contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
-        var centerBounds = new SKRect(leftBounds.Right + gap, contentBounds.Top,
-            leftBounds.Right + gap + centerPanelWidth, contentBounds.Bottom);
-        var rightBounds = new SKRect(centerBounds.Right + gap, contentBounds.Top,
+            contentBounds.Right - rightPanelWidth - gap, contentBounds.Bottom);
+        var rightBounds = new SKRect(leftBounds.Right + gap, contentBounds.Top,
             contentBounds.Right, contentBounds.Bottom);
 
-        // LEFT PANEL - SC Installation (condensed)
-        DrawSCInstallationPanelCompact(canvas, leftBounds, frameInset);
+        // Split right panel vertically: SC Installation (top) | Export (bottom)
+        float installationHeight = 150f; // Compact installation panel
+        float verticalGap = 8f;
 
-        // CENTER PANEL - SC Action Bindings Table
-        DrawSCBindingsTablePanel(canvas, centerBounds, frameInset);
+        var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
+            rightBounds.Right, rightBounds.Top + installationHeight);
+        var exportBounds = new SKRect(rightBounds.Left, installationBounds.Bottom + verticalGap,
+            rightBounds.Right, rightBounds.Bottom);
 
-        // RIGHT PANEL - vJoy Mapping & Export
-        DrawSCExportPanelCompact(canvas, rightBounds, frameInset);
+        // LEFT PANEL - SC Action Bindings Table (wider)
+        DrawSCBindingsTablePanel(canvas, leftBounds, frameInset);
+
+        // RIGHT TOP - SC Installation (condensed)
+        DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
+
+        // RIGHT BOTTOM - Export panel
+        DrawSCExportPanelCompact(canvas, exportBounds, frameInset);
 
         // Draw dropdowns last (on top)
         if (_scInstallationDropdownOpen && _scInstallations.Count > 0)
@@ -938,15 +943,18 @@ public partial class MainForm
             {
                 var action = _scFilteredActions[i];
 
-                // Category header when action map changes
-                if (action.ActionMap != lastActionMap)
+                // Use formatted category name for grouping (multiple action maps can share the same display name)
+                string categoryName = SCCategoryMapper.GetCategoryName(action.ActionMap);
+
+                // Category header when category changes
+                if (categoryName != lastActionMap)
                 {
-                    lastActionMap = action.ActionMap;
-                    bool isCollapsed = _scCollapsedCategories.Contains(action.ActionMap);
+                    lastActionMap = categoryName;
+                    bool isCollapsed = _scCollapsedCategories.Contains(categoryName);
 
                     // Store header bounds for click detection
                     var headerBounds = new SKRect(leftMargin - 5, scrollY, rightMargin + 5, scrollY + categoryHeaderHeight - 2);
-                    _scCategoryHeaderBounds[action.ActionMap] = headerBounds;
+                    _scCategoryHeaderBounds[categoryName] = headerBounds;
 
                     // Draw category header (always visible)
                     if (scrollY >= listTop - categoryHeaderHeight && scrollY < listBottom)
@@ -963,11 +971,11 @@ public partial class MainForm
                         float indicatorY = scrollY + categoryHeaderHeight / 2;
                         DrawCollapseIndicator(canvas, indicatorX, indicatorY, isCollapsed, headerHovered);
 
-                        // Category name
-                        string categoryName = FormatActionMapName(action.ActionMap);
-                        int categoryActionCount = _scFilteredActions.Count(a => a.ActionMap == action.ActionMap);
+                        // Count actions in this category (same display name)
+                        int categoryActionCount = _scFilteredActions.Count(a =>
+                            SCCategoryMapper.GetCategoryName(a.ActionMap) == categoryName);
                         int categoryBoundCount = _scFilteredActions.Count(a =>
-                            a.ActionMap == action.ActionMap &&
+                            SCCategoryMapper.GetCategoryName(a.ActionMap) == categoryName &&
                             _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null);
 
                         FUIRenderer.DrawText(canvas, categoryName,
@@ -987,9 +995,9 @@ public partial class MainForm
                     // If collapsed, skip all actions in this category
                     if (isCollapsed)
                     {
-                        // Skip to next category
+                        // Skip to next category (by display name)
                         while (i < _scFilteredActions.Count - 1 &&
-                               _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                               SCCategoryMapper.GetCategoryName(_scFilteredActions[i + 1].ActionMap) == categoryName)
                         {
                             i++;
                         }
@@ -1874,7 +1882,17 @@ public partial class MainForm
         float itemHeight = 24f;
         float dropdownWidth = _scActionMapFilterBounds.Width + 60f;
         int itemCount = _scActionMaps.Count + 1; // +1 for "All Categories"
-        float dropdownHeight = Math.Min(itemCount * itemHeight + 4, 300f);
+        float totalContentHeight = itemCount * itemHeight + 4;
+        float maxDropdownHeight = 300f;
+        float dropdownHeight = Math.Min(totalContentHeight, maxDropdownHeight);
+        bool needsScroll = totalContentHeight > maxDropdownHeight;
+        float scrollbarWidth = needsScroll ? 8f : 0f;
+
+        // Calculate max scroll
+        _scActionMapFilterMaxScroll = Math.Max(0, totalContentHeight - dropdownHeight);
+
+        // Clamp scroll offset
+        _scActionMapFilterScrollOffset = Math.Max(0, Math.Min(_scActionMapFilterScrollOffset, _scActionMapFilterMaxScroll));
 
         _scActionMapFilterDropdownBounds = new SKRect(
             _scActionMapFilterBounds.Right - dropdownWidth,
@@ -1897,52 +1915,79 @@ public partial class MainForm
         canvas.Save();
         canvas.ClipRect(_scActionMapFilterDropdownBounds);
 
-        // Items
-        float y = _scActionMapFilterDropdownBounds.Top + 2;
+        // Items - apply scroll offset
+        float y = _scActionMapFilterDropdownBounds.Top + 2 - _scActionMapFilterScrollOffset;
 
         // "All Categories" option
         var allItemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y,
-            _scActionMapFilterDropdownBounds.Right - 2, y + itemHeight);
+            _scActionMapFilterDropdownBounds.Right - 2 - scrollbarWidth, y + itemHeight);
 
         bool allHovered = _scHoveredActionMapFilter == -1 && allItemBounds.Contains(_mousePosition.X, _mousePosition.Y);
         bool allSelected = string.IsNullOrEmpty(_scActionMapFilter);
 
-        if (allHovered || allSelected)
+        // Only draw if visible
+        if (allItemBounds.Bottom > _scActionMapFilterDropdownBounds.Top && allItemBounds.Top < _scActionMapFilterDropdownBounds.Bottom)
         {
-            var highlightColor = allSelected ? FUIColors.Active.WithAlpha(50) : FUIColors.Background2.WithAlpha(120);
-            using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
-            canvas.DrawRect(allItemBounds, highlightPaint);
-        }
+            if (allHovered || allSelected)
+            {
+                var highlightColor = allSelected ? FUIColors.Active.WithAlpha(50) : FUIColors.Background2.WithAlpha(120);
+                using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
+                canvas.DrawRect(allItemBounds, highlightPaint);
+            }
 
-        var allTextColor = allSelected ? FUIColors.Active : (allHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        FUIRenderer.DrawText(canvas, "All Categories",
-            new SKPoint(allItemBounds.Left + 8, allItemBounds.MidY + 4), allTextColor, 10f);
+            var allTextColor = allSelected ? FUIColors.Active : (allHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+            FUIRenderer.DrawText(canvas, "All Categories",
+                new SKPoint(allItemBounds.Left + 8, allItemBounds.MidY + 4), allTextColor, 10f);
+        }
         y += itemHeight;
 
         // Category items
         for (int i = 0; i < _scActionMaps.Count; i++)
         {
             var itemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y,
-                _scActionMapFilterDropdownBounds.Right - 2, y + itemHeight);
+                _scActionMapFilterDropdownBounds.Right - 2 - scrollbarWidth, y + itemHeight);
 
-            bool isHovered = i == _scHoveredActionMapFilter;
-            bool isSelected = _scActionMapFilter == _scActionMaps[i];
-
-            if (isHovered || isSelected)
+            // Only draw if visible
+            if (itemBounds.Bottom > _scActionMapFilterDropdownBounds.Top && itemBounds.Top < _scActionMapFilterDropdownBounds.Bottom)
             {
-                var highlightColor = isSelected ? FUIColors.Active.WithAlpha(50) : FUIColors.Background2.WithAlpha(120);
-                using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
-                canvas.DrawRect(itemBounds, highlightPaint);
-            }
+                bool isHovered = i == _scHoveredActionMapFilter;
+                bool isSelected = _scActionMapFilter == _scActionMaps[i];
 
-            var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-            FUIRenderer.DrawText(canvas, FormatActionMapName(_scActionMaps[i]),
-                new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4), textColor, 10f);
+                if (isHovered || isSelected)
+                {
+                    var highlightColor = isSelected ? FUIColors.Active.WithAlpha(50) : FUIColors.Background2.WithAlpha(120);
+                    using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = highlightColor, IsAntialias = true };
+                    canvas.DrawRect(itemBounds, highlightPaint);
+                }
+
+                var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+                FUIRenderer.DrawText(canvas, FormatActionMapName(_scActionMaps[i]),
+                    new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4), textColor, 10f);
+            }
 
             y += itemHeight;
         }
 
         canvas.Restore();
+
+        // Draw scrollbar if needed
+        if (needsScroll)
+        {
+            float scrollTrackX = _scActionMapFilterDropdownBounds.Right - scrollbarWidth - 2;
+            float scrollTrackY = _scActionMapFilterDropdownBounds.Top + 2;
+            float scrollTrackHeight = dropdownHeight - 4;
+
+            // Scrollbar track
+            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, scrollTrackY, scrollTrackX + scrollbarWidth, scrollTrackY + scrollTrackHeight), 2f), trackPaint);
+
+            // Scrollbar thumb
+            float thumbHeight = Math.Max(20f, scrollTrackHeight * (dropdownHeight / totalContentHeight));
+            float thumbY = scrollTrackY + (_scActionMapFilterScrollOffset / _scActionMapFilterMaxScroll) * (scrollTrackHeight - thumbHeight);
+
+            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim.WithAlpha(150), IsAntialias = true };
+            canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, thumbY, scrollTrackX + scrollbarWidth, thumbY + thumbHeight), 2f), thumbPaint);
+        }
     }
 
     private static string FormatActionMapName(string actionMap)
@@ -2013,9 +2058,9 @@ public partial class MainForm
         {
             if (_scActionMapFilterDropdownBounds.Contains(point))
             {
-                // Calculate which item was clicked
+                // Calculate which item was clicked, accounting for scroll offset
                 float itemHeight = 24f;
-                float relativeY = point.Y - _scActionMapFilterDropdownBounds.Top - 2;
+                float relativeY = point.Y - _scActionMapFilterDropdownBounds.Top - 2 + _scActionMapFilterScrollOffset;
                 int clickedIndex = (int)(relativeY / itemHeight) - 1; // -1 because first item is "All Categories"
 
                 if (clickedIndex < 0)
@@ -2029,11 +2074,13 @@ public partial class MainForm
                 }
                 RefreshFilteredActions();
                 _scActionMapFilterDropdownOpen = false;
+                _scActionMapFilterScrollOffset = 0; // Reset scroll when closing
                 return;
             }
             else
             {
                 _scActionMapFilterDropdownOpen = false;
+                _scActionMapFilterScrollOffset = 0; // Reset scroll when closing
                 return;
             }
         }
@@ -2237,24 +2284,25 @@ public partial class MainForm
             float categoryHeaderHeight = 28f;
             float relativeY = point.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
 
-            string? lastActionMap = null;
+            string? lastCategoryName = null;
             float currentY = 0;
 
             for (int i = 0; i < _scFilteredActions.Count; i++)
             {
                 var action = _scFilteredActions[i];
+                string categoryName = SCCategoryMapper.GetCategoryName(action.ActionMap);
 
                 // Account for category header
-                if (action.ActionMap != lastActionMap)
+                if (categoryName != lastCategoryName)
                 {
-                    lastActionMap = action.ActionMap;
+                    lastCategoryName = categoryName;
                     currentY += categoryHeaderHeight;
 
                     // If category is collapsed, skip all its actions
-                    if (_scCollapsedCategories.Contains(action.ActionMap))
+                    if (_scCollapsedCategories.Contains(categoryName))
                     {
                         while (i < _scFilteredActions.Count - 1 &&
-                               _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                               SCCategoryMapper.GetCategoryName(_scFilteredActions[i + 1].ActionMap) == categoryName)
                         {
                             i++;
                         }
@@ -2419,24 +2467,25 @@ public partial class MainForm
         float categoryHeaderHeight = 28f;
         float relativeY = point.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
 
-        string? lastActionMap = null;
+        string? lastCategoryName = null;
         float currentY = 0;
 
         for (int i = 0; i < _scFilteredActions.Count; i++)
         {
             var action = _scFilteredActions[i];
+            string categoryName = SCCategoryMapper.GetCategoryName(action.ActionMap);
 
             // Account for category header
-            if (action.ActionMap != lastActionMap)
+            if (categoryName != lastCategoryName)
             {
-                lastActionMap = action.ActionMap;
+                lastCategoryName = categoryName;
                 currentY += categoryHeaderHeight;
 
                 // If category is collapsed, skip all its actions
-                if (_scCollapsedCategories.Contains(action.ActionMap))
+                if (_scCollapsedCategories.Contains(categoryName))
                 {
                     while (i < _scFilteredActions.Count - 1 &&
-                           _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                           SCCategoryMapper.GetCategoryName(_scFilteredActions[i + 1].ActionMap) == categoryName)
                     {
                         i++;
                     }
@@ -3163,13 +3212,12 @@ public partial class MainForm
 
     private void ClearAllBindings()
     {
-        var result = MessageBox.Show(
-            $"Clear all {_scExportProfile.Bindings.Count} binding(s) from profile '{_scExportProfile.ProfileName}'?\n\nThis will remove ALL bindings. Use 'Reset to Defaults' to restore SC default bindings.",
+        using var dialog = new FUIConfirmDialog(
             "Clear All Bindings",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Warning);
+            $"Clear all {_scExportProfile.Bindings.Count} binding(s) from profile '{_scExportProfile.ProfileName}'?\n\nThis will remove ALL bindings.\nUse 'Reset to Defaults' to restore SC default bindings.",
+            "Clear", "Cancel");
 
-        if (result == DialogResult.Yes)
+        if (dialog.ShowDialog(this) == DialogResult.Yes)
         {
             int count = _scExportProfile.Bindings.Count;
             _scExportProfile.ClearBindings();
@@ -3185,13 +3233,12 @@ public partial class MainForm
 
     private void ResetToDefaults()
     {
-        var result = MessageBox.Show(
-            "Reset all bindings to default values from Star Citizen's defaultProfile.xml?\n\nThis will clear your custom bindings and reload the defaults.",
+        using var dialog = new FUIConfirmDialog(
             "Reset to Defaults",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Question);
+            "Reset all bindings to default values from\nStar Citizen's defaultProfile.xml?\n\nThis will clear your custom bindings and reload the defaults.",
+            "Reset", "Cancel");
 
-        if (result == DialogResult.Yes)
+        if (dialog.ShowDialog(this) == DialogResult.Yes)
         {
             // Clear existing bindings
             _scExportProfile.ClearBindings();
@@ -3285,7 +3332,11 @@ public partial class MainForm
 
         if (availableVJoy.Count == 0)
         {
-            MessageBox.Show("No vJoy devices available. Please configure vJoy.", "No vJoy", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            using var warningDialog = new FUIConfirmDialog(
+                "No vJoy",
+                "No vJoy devices available.\nPlease configure vJoy.",
+                "OK", "Cancel");
+            warningDialog.ShowDialog(this);
             return;
         }
 
@@ -3625,22 +3676,17 @@ public partial class MainForm
             }
         }
 
-        // Cursor when focused
+        // Cursor when focused - position at end of text
         if (focused)
         {
-            float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : MeasureTextWidth(text, 10f));
+            // Use FUIRenderer.MeasureText for consistent measurement with DrawText
+            float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 10f));
             if ((DateTime.Now.Millisecond / 500) % 2 == 0)
             {
                 using var cursorPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
                 canvas.DrawLine(cursorX, bounds.Top + 5, cursorX, bounds.Bottom - 5, cursorPaint);
             }
         }
-    }
-
-    private static float MeasureTextWidth(string text, float fontSize)
-    {
-        using var paint = new SKPaint { TextSize = fontSize, IsAntialias = true };
-        return paint.MeasureText(text);
     }
 
     private void DrawCollapseIndicator(SKCanvas canvas, float x, float y, bool isCollapsed, bool isHovered)
@@ -3769,7 +3815,7 @@ public partial class MainForm
             if (profile.BindingCount > 0)
             {
                 string countStr = profile.BindingCount.ToString();
-                float badgeX = rowBounds.Right - 8 - MeasureTextWidth(countStr, 8f);
+                float badgeX = rowBounds.Right - 8 - FUIRenderer.MeasureText(countStr, 8f);
                 FUIRenderer.DrawText(canvas, countStr, new SKPoint(badgeX, rowBounds.MidY + 3f), FUIColors.TextDim, 8f);
             }
 
@@ -3917,8 +3963,11 @@ public partial class MainForm
             // Check for duplicate name
             if (_scExportProfileService != null && _scExportProfileService.ProfileExists(newName))
             {
-                MessageBox.Show($"A profile named '{newName}' already exists.", "Profile Exists",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                using var existsDialog = new FUIConfirmDialog(
+                    "Profile Exists",
+                    $"A profile named '{newName}' already exists.",
+                    "OK", "Cancel");
+                existsDialog.ShowDialog(this);
                 return;
             }
 
@@ -3946,13 +3995,12 @@ public partial class MainForm
     {
         if (_scExportProfileService == null || _scExportProfiles.Count == 0) return;
 
-        var result = MessageBox.Show(
-            $"Delete SC export profile '{_scExportProfile.ProfileName}'?\n\nThis cannot be undone.",
+        using var confirmDialog = new FUIConfirmDialog(
             "Delete Profile",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Warning);
+            $"Delete SC export profile '{_scExportProfile.ProfileName}'?\n\nThis cannot be undone.",
+            "Delete", "Cancel");
 
-        if (result == DialogResult.Yes)
+        if (confirmDialog.ShowDialog(this) == DialogResult.Yes)
         {
             var deletedName = _scExportProfile.ProfileName;
             _scExportProfileService.DeleteProfile(deletedName);

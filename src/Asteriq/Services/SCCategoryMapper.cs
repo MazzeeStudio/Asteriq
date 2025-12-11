@@ -134,13 +134,55 @@ public static class SCCategoryMapper
     }
 
     /// <summary>
+    /// Category display name to sort order mapping
+    /// </summary>
+    private static readonly Dictionary<string, int> CategorySortOrders = new()
+    {
+        { "Flight Control", 1 },
+        { "Weapons", 2 },
+        { "Targeting", 3 },
+        { "Missiles", 4 },
+        { "Defensive", 5 },
+        { "Power Management", 6 },
+        { "View & Camera", 7 },
+        { "Ship Systems", 8 },
+        { "Ground Vehicles", 9 },
+        { "On Foot", 10 },
+        { "EVA", 11 },
+        { "Turrets", 12 },
+        { "Mining", 13 },
+        { "Salvage", 14 },
+        { "Tractor Beam", 15 },
+        { "Interface", 16 },
+        { "Communication", 17 },
+        { "Server Admin", 18 },
+        { "Other", 99 }
+    };
+
+    /// <summary>
+    /// Gets the sort order for a category NAME (not actionmap).
+    /// Use this when sorting actions to ensure all actions with the same
+    /// display category are grouped together regardless of raw actionmap.
+    /// </summary>
+    public static int GetCategorySortOrder(string categoryName)
+    {
+        if (string.IsNullOrEmpty(categoryName))
+            return 99;
+
+        return CategorySortOrders.TryGetValue(categoryName, out var order) ? order : 99;
+    }
+
+    /// <summary>
     /// Gets all unique categories in sorted order
     /// </summary>
     public static IEnumerable<string> GetSortedCategories(IEnumerable<string> actionMaps)
     {
+        // Get unique category names first, then determine order
+        // Use the minimum order value among all action maps that map to each category
         return actionMaps
-            .Select(m => (Category: GetCategoryName(m), Order: GetSortOrder(m)))
-            .Distinct()
+            .Select(m => new { Category = GetCategoryName(m), Order = GetSortOrder(m) })
+            .GroupBy(x => x.Category)
+            .Select(g => new { Category = g.Key, Order = g.Min(x => x.Order) })
             .OrderBy(x => x.Order)
             .ThenBy(x => x.Category)
             .Select(x => x.Category);

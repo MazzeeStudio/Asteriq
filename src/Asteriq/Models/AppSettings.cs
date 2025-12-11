@@ -32,4 +32,10 @@ public class AppSettings
     // SC Export profile settings
     public string? LastSCExportProfile { get; set; }
     public bool AutoLoadLastSCExportProfile { get; set; } = true;
+
+    // Window state
+    public int WindowWidth { get; set; } = 0;  // 0 = use default
+    public int WindowHeight { get; set; } = 0; // 0 = use default
+    public int WindowX { get; set; } = int.MinValue; // MinValue = center on screen
+    public int WindowY { get; set; } = int.MinValue; // MinValue = center on screen
 }

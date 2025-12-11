@@ -296,6 +296,8 @@ public partial class MainForm : Form
     private bool _scActionMapFilterDropdownOpen;
     private SKRect _scActionMapFilterDropdownBounds;
     private int _scHoveredActionMapFilter = -1;
+    private float _scActionMapFilterScrollOffset = 0;
+    private float _scActionMapFilterMaxScroll = 0;
     private List<string> _scActionMaps = new();  // List of unique action maps
 
     // SC Bindings grid column state
@@ -847,13 +849,45 @@ public partial class MainForm : Form
     private void InitializeForm()
     {
         Text = "Asteriq";
-        Size = new Size(1280, 800);
         MinimumSize = new Size(1024, 768);
-        StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Color.Black;
         DoubleBuffered = true;
         KeyPreview = true;
+
+        // Load saved window state or use defaults
+        var (width, height, x, y) = _profileService.LoadWindowState();
+        if (width > 0 && height > 0)
+        {
+            Size = new Size(width, height);
+        }
+        else
+        {
+            Size = new Size(1280, 800);
+        }
+
+        // Restore position or center on screen
+        if (x != int.MinValue && y != int.MinValue)
+        {
+            // Validate position is on a visible screen
+            var screenBounds = Screen.AllScreens.Select(s => s.Bounds).ToArray();
+            bool isVisible = screenBounds.Any(b => b.Contains(x, y) ||
+                b.Contains(x + width / 2, y + height / 2));
+
+            if (isVisible)
+            {
+                StartPosition = FormStartPosition.Manual;
+                Location = new Point(x, y);
+            }
+            else
+            {
+                StartPosition = FormStartPosition.CenterScreen;
+            }
+        }
+        else
+        {
+            StartPosition = FormStartPosition.CenterScreen;
+        }
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -1724,7 +1758,9 @@ public partial class MainForm : Form
             if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
             {
                 float itemHeight = 24f;
-                int itemIndex = (int)((e.Y - _scActionMapFilterDropdownBounds.Top - 2) / itemHeight) - 1;
+                // Account for scroll offset when calculating hovered item
+                float relativeY = e.Y - _scActionMapFilterDropdownBounds.Top - 2 + _scActionMapFilterScrollOffset;
+                int itemIndex = (int)(relativeY / itemHeight) - 1;
                 _scHoveredActionMapFilter = itemIndex >= -1 && itemIndex < _scActionMaps.Count ? itemIndex : -1;
                 Cursor = Cursors.Hand;
             }
@@ -2389,6 +2425,15 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
     {
+        // Handle scroll on action map filter dropdown when open
+        if (_activeTab == 2 && _scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+        {
+            float scrollAmount = -e.Delta / 4f;
+            _scActionMapFilterScrollOffset = Math.Clamp(_scActionMapFilterScrollOffset + scrollAmount, 0, _scActionMapFilterMaxScroll);
+            _canvas.Invalidate();
+            return;
+        }
+
         // Handle scroll on MAPPINGS tab when mouse is over the bindings list
         if (_activeTab == 1 && _bindingsListBounds.Contains(e.X, e.Y))
         {
@@ -3027,6 +3072,12 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        // Save window state before closing
+        if (WindowState == FormWindowState.Normal)
+        {
+            _profileService?.SaveWindowState(Width, Height, Left, Top);
+        }
+
         _renderTimer?.Stop();
         _renderTimer?.Dispose();
         _inputService?.StopPolling();

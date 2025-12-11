@@ -843,16 +843,9 @@ public partial class MainForm
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
 
-        // Title row with Refresh button
+        // Title
         FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
-
-        float buttonWidth = 55f;
-        float buttonHeight = 18f;
-        _scRefreshButtonBounds = new SKRect(rightMargin - buttonWidth, y - 3, rightMargin, y - 3 + buttonHeight);
-        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawTextButton(canvas, _scRefreshButtonBounds, "Refresh", _scRefreshButtonHovered);
-
-        y += 20f;
+        y += 18f;
 
         // Installation selector
         float selectorHeight = 24f;
@@ -1840,44 +1833,36 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = FUIRenderer.ScaleLineHeight(14f);
+        float lineHeight = FUIRenderer.ScaleLineHeight(15f);
+        float buttonGap = 6f;
 
-        // Title row with + New and Save buttons
+        // Title
         FUIRenderer.DrawText(canvas, "PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
+        y += 18f;
 
-        float textBtnWidth = 45f;
-        float textBtnHeight = 18f;
-        float buttonGap = 4f;
+        // Profile dropdown (full width)
+        float dropdownHeight = 24f;
+        _scProfileDropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
+        bool dropdownHovered = _scProfileDropdownBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, _scExportProfile.ProfileName, dropdownHovered, _scProfileDropdownOpen);
+        y += dropdownHeight + 6f;
+
+        // Buttons row: + New, Save (aligned right)
+        float textBtnWidth = 50f;
+        float textBtnHeight = 20f;
 
         // Save button (rightmost)
-        _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y - 3, rightMargin, y - 3 + textBtnHeight);
+        _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y, rightMargin, y + textBtnHeight);
         _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
 
         // New button (left of Save)
         float newBtnX = rightMargin - textBtnWidth * 2 - buttonGap;
-        _scNewProfileButtonBounds = new SKRect(newBtnX, y - 3, newBtnX + textBtnWidth, y - 3 + textBtnHeight);
+        _scNewProfileButtonBounds = new SKRect(newBtnX, y, newBtnX + textBtnWidth, y + textBtnHeight);
         _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawTextButton(canvas, _scNewProfileButtonBounds, "+ New", _scNewProfileButtonHovered);
 
-        y += 20f;
-
-        float dropdownHeight = 24f;
-        float refreshBtnWidth = 22f;
-
-        // Profile dropdown (full width minus refresh button)
-        float dropdownRight = rightMargin - refreshBtnWidth - buttonGap;
-        _scProfileDropdownBounds = new SKRect(leftMargin, y, dropdownRight, y + dropdownHeight);
-        bool dropdownHovered = _scProfileDropdownBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, _scExportProfile.ProfileName, dropdownHovered, _scProfileDropdownOpen);
-
-        // Small refresh button next to dropdown
-        float refreshX = dropdownRight + buttonGap;
-        var refreshBounds = new SKRect(refreshX, y, refreshX + refreshBtnWidth, y + dropdownHeight);
-        bool refreshHovered = refreshBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawProfileRefreshButton(canvas, refreshBounds, refreshHovered);
-
-        y += dropdownHeight + 8f;
+        y += textBtnHeight + 10f;
 
         // Draw profile dropdown list if open (shows both Asteriq profiles and SC mapping files)
         if (_scProfileDropdownOpen)

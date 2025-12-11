@@ -126,7 +126,7 @@ public class OutputTarget
 
     private string FormatKeyboardOutput()
     {
-        var modStr = Modifiers != null && Modifiers.Count > 0 ? string.Join("+", Modifiers) + "+" : "";
+        var modStr = Modifiers is not null && Modifiers.Count > 0 ? string.Join("+", Modifiers) + "+" : "";
         return $"Key {modStr}{KeyName ?? Index.ToString()}";
     }
 }
@@ -346,7 +346,7 @@ public class AxisCurve
 
     private float ApplyCustom(float x)
     {
-        if (ControlPoints == null || ControlPoints.Count < 2)
+        if (ControlPoints is null || ControlPoints.Count < 2)
             return x;
 
         // Catmull-Rom spline interpolation for smooth curves
@@ -596,7 +596,7 @@ public class MappingProfile
             a.PhysicalDevice.Guid.Equals(deviceGuid, StringComparison.OrdinalIgnoreCase));
 
         // Fallback to VID:PID match
-        if (assignment == null && !string.IsNullOrEmpty(vidPid))
+        if (assignment is null && !string.IsNullOrEmpty(vidPid))
         {
             assignment = DeviceAssignments.FirstOrDefault(a =>
                 !string.IsNullOrEmpty(a.PhysicalDevice.VidPid) &&

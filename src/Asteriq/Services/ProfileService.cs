@@ -40,7 +40,7 @@ public class ProfileService
     /// <summary>
     /// Whether a profile is currently active
     /// </summary>
-    public bool HasActiveProfile => _activeProfile != null;
+    public bool HasActiveProfile => _activeProfile is not null;
 
     public ProfileService()
     {
@@ -116,7 +116,7 @@ public class ProfileService
         {
             var json = File.ReadAllText(filePath);
             var profile = JsonSerializer.Deserialize<MappingProfile>(json, _jsonOptions);
-            if (profile != null)
+            if (profile is not null)
             {
                 Console.WriteLine($"[ProfileService] Loaded profile '{profile.Name}' with {profile.ButtonMappings.Count} button mappings");
                 foreach (var mapping in profile.ButtonMappings)
@@ -159,7 +159,7 @@ public class ProfileService
             {
                 var json = File.ReadAllText(file);
                 var profile = JsonSerializer.Deserialize<MappingProfile>(json, _jsonOptions);
-                if (profile != null)
+                if (profile is not null)
                 {
                     profiles.Add(new ProfileInfo
                     {
@@ -191,7 +191,7 @@ public class ProfileService
     public MappingProfile? DuplicateProfile(Guid sourceId, string newName)
     {
         var source = LoadProfile(sourceId);
-        if (source == null)
+        if (source is null)
             return null;
 
         var duplicate = new MappingProfile
@@ -232,7 +232,7 @@ public class ProfileService
             {
                 Id = newId,
                 Name = layer.Name,
-                ActivatorButton = layer.ActivatorButton == null ? null : new InputSource
+                ActivatorButton = layer.ActivatorButton is null ? null : new InputSource
                 {
                     DeviceId = layer.ActivatorButton.DeviceId,
                     DeviceName = layer.ActivatorButton.DeviceName,
@@ -410,7 +410,7 @@ public class ProfileService
     public bool ExportProfile(Guid profileId, string exportPath)
     {
         var profile = LoadProfile(profileId);
-        if (profile == null)
+        if (profile is null)
             return false;
 
         var json = JsonSerializer.Serialize(profile, _jsonOptions);
@@ -424,7 +424,7 @@ public class ProfileService
     public MappingProfile? ImportProfile(string importPath, bool generateNewId = true)
     {
         var profile = LoadProfileFromPath(importPath);
-        if (profile == null)
+        if (profile is null)
             return null;
 
         if (generateNewId)
@@ -552,7 +552,7 @@ public class ProfileService
     public MappingProfile? LoadLastProfileIfEnabled()
     {
         var settings = LoadSettings();
-        if (!settings.AutoLoadLastProfile || settings.LastProfileId == null)
+        if (!settings.AutoLoadLastProfile || settings.LastProfileId is null)
             return null;
 
         return LoadProfile(settings.LastProfileId.Value);
@@ -600,7 +600,7 @@ public class ProfileService
     public bool ActivateProfile(Guid profileId)
     {
         var profile = LoadProfile(profileId);
-        if (profile == null)
+        if (profile is null)
             return false;
 
         ActiveProfile = profile;
@@ -649,7 +649,7 @@ public class ProfileService
     /// </summary>
     public void SaveActiveProfile()
     {
-        if (ActiveProfile != null)
+        if (ActiveProfile is not null)
         {
             SaveProfile(ActiveProfile);
         }
@@ -661,7 +661,7 @@ public class ProfileService
     public void Initialize()
     {
         var profile = LoadLastProfileIfEnabled();
-        if (profile != null)
+        if (profile is not null)
         {
             ActiveProfile = profile;
         }

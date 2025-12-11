@@ -54,14 +54,16 @@ public class VJoyService : IDisposable
 
             return true;
         }
-        catch (DllNotFoundException)
+        catch (DllNotFoundException dnf)
         {
-            Console.WriteLine("vJoyInterface.dll not found");
+            Console.WriteLine($"vJoy initialization failed: vJoyInterface.dll not found. " +
+                              $"Ensure vJoy is installed and the DLL is accessible. Details: {dnf.Message}");
             return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"vJoy init error: {ex.Message}");
+            Console.WriteLine($"vJoy initialization failed during version check/driver validation. " +
+                              $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return false;
         }
     }

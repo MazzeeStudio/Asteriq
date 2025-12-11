@@ -65,7 +65,7 @@ public class MappingEngine : IDisposable
     /// </summary>
     public bool Start()
     {
-        if (_activeProfile == null)
+        if (_activeProfile is null)
             return false;
 
         // Acquire required vJoy devices
@@ -103,7 +103,7 @@ public class MappingEngine : IDisposable
     /// </summary>
     public void ProcessInput(DeviceInputState state)
     {
-        if (!_isRunning || _activeProfile == null)
+        if (!_isRunning || _activeProfile is null)
             return;
 
         var deviceId = GetDeviceId(state);
@@ -155,12 +155,12 @@ public class MappingEngine : IDisposable
     /// </summary>
     private void UpdateShiftLayers(string deviceId, DeviceInputState state)
     {
-        if (_activeProfile == null)
+        if (_activeProfile is null)
             return;
 
         foreach (var layer in _activeProfile.ShiftLayers)
         {
-            if (layer.ActivatorButton == null)
+            if (layer.ActivatorButton is null)
                 continue;
 
             // Check if activator button is on this device
@@ -184,11 +184,11 @@ public class MappingEngine : IDisposable
     /// </summary>
     private bool IsMappingActive(Mapping mapping)
     {
-        if (_activeProfile == null)
+        if (_activeProfile is null)
             return false;
 
         // No layer = base layer, always active when no shift is pressed
-        if (mapping.LayerId == null)
+        if (mapping.LayerId is null)
         {
             // Base layer is active when NO shift layers are active
             return !_activeProfile.ShiftLayers.Any(l => l.IsActive);
@@ -515,7 +515,7 @@ public class MappingEngine : IDisposable
                 return inputPressed;
 
             case ButtonMode.Toggle:
-                if (inputPressed && mapping.HoldStartTime == null)
+                if (inputPressed && mapping.HoldStartTime is null)
                 {
                     // Rising edge - toggle
                     mapping.ToggleState = !mapping.ToggleState;
@@ -528,13 +528,13 @@ public class MappingEngine : IDisposable
                 return mapping.ToggleState;
 
             case ButtonMode.Pulse:
-                if (inputPressed && mapping.HoldStartTime == null)
+                if (inputPressed && mapping.HoldStartTime is null)
                 {
                     // Rising edge - start pulse
                     mapping.HoldStartTime = DateTime.UtcNow;
                 }
 
-                if (mapping.HoldStartTime != null)
+                if (mapping.HoldStartTime is not null)
                 {
                     var elapsed = (DateTime.UtcNow - mapping.HoldStartTime.Value).TotalMilliseconds;
                     if (elapsed < mapping.PulseDurationMs)
@@ -548,7 +548,7 @@ public class MappingEngine : IDisposable
             case ButtonMode.HoldToActivate:
                 if (inputPressed)
                 {
-                    if (mapping.HoldStartTime == null)
+                    if (mapping.HoldStartTime is null)
                         mapping.HoldStartTime = DateTime.UtcNow;
 
                     var elapsed = (DateTime.UtcNow - mapping.HoldStartTime.Value).TotalMilliseconds;
@@ -590,7 +590,7 @@ public class MappingEngine : IDisposable
     {
         var devices = new HashSet<uint>();
 
-        if (_activeProfile == null)
+        if (_activeProfile is null)
             return devices;
 
         foreach (var mapping in _activeProfile.AxisMappings)

@@ -60,7 +60,8 @@ public class DeviceMap
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error loading device map: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Failed to load device map from '{jsonPath}'. " +
+                                               $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return null;
         }
     }

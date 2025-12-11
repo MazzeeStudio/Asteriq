@@ -353,7 +353,7 @@ public class HidHideService
             };
 
             using var process = Process.Start(psi);
-            if (process == null)
+            if (process is null)
                 return "";
 
             var output = process.StandardOutput.ReadToEnd();
@@ -364,7 +364,8 @@ public class HidHideService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"HidHide CLI error: {ex.Message}");
+            Console.WriteLine($"HidHide CLI command failed. Command: '{arguments}', " +
+                              $"CLI path: '{_cliPath}', Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return "";
         }
     }

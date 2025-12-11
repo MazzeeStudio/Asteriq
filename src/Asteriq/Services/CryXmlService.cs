@@ -18,7 +18,7 @@ public static class CryXmlService
     /// </summary>
     public static bool IsCryXmlB(byte[] data)
     {
-        if (data == null || data.Length < 7)
+        if (data is null || data.Length < 7)
             return false;
 
         // Check for known headers
@@ -33,7 +33,7 @@ public static class CryXmlService
     /// </summary>
     public static bool IsRegularXml(byte[] data)
     {
-        if (data == null || data.Length < 1)
+        if (data is null || data.Length < 1)
             return false;
 
         // Regular XML starts with '<'
@@ -45,7 +45,7 @@ public static class CryXmlService
     /// </summary>
     public static XmlDocument? Deserialize(byte[] data)
     {
-        if (data == null || data.Length == 0)
+        if (data is null || data.Length == 0)
             return null;
 
         // Check if it's already regular XML
@@ -91,7 +91,7 @@ public static class CryXmlService
     public static string? DeserializeToString(byte[] data)
     {
         var doc = Deserialize(data);
-        if (doc == null)
+        if (doc is null)
             return null;
 
         using var stringWriter = new StringWriter();
@@ -216,7 +216,7 @@ public static class CryXmlService
 
         // Create root element
         var rootXmlNode = BuildXmlNode(doc, nodes[0], nodes, attributes, childIndices, strings);
-        if (rootXmlNode != null)
+        if (rootXmlNode is not null)
         {
             doc.AppendChild(rootXmlNode);
         }
@@ -285,7 +285,7 @@ public static class CryXmlService
                 if (childNodeIndex >= 0 && childNodeIndex < allNodes.Count)
                 {
                     var childElement = BuildXmlNode(doc, allNodes[childNodeIndex], allNodes, allAttributes, childIndices, strings);
-                    if (childElement != null)
+                    if (childElement is not null)
                     {
                         element.AppendChild(childElement);
                     }

@@ -96,6 +96,34 @@ public class InputService : IDisposable
     }
 
     /// <summary>
+    /// Get the current input state for a device by its device index.
+    /// Returns null if the device is not found or not opened.
+    /// </summary>
+    public DeviceInputState? GetDeviceState(int deviceIndex)
+    {
+        if (!_isInitialized) return null;
+
+        // Find the joystick by device index
+        foreach (var kvp in _openJoysticks)
+        {
+            int instanceId = kvp.Key;
+            IntPtr joystick = kvp.Value;
+
+            if (!_deviceInfo.TryGetValue(instanceId, out var info))
+                continue;
+
+            if (info.DeviceIndex == deviceIndex && SDL.SDL_JoystickGetAttached(joystick) == SDL.SDL_bool.SDL_TRUE)
+            {
+                // Update SDL state first
+                SDL.SDL_JoystickUpdate();
+                return ReadDeviceState(joystick, info);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Get info about a specific device by index. Returns the SDL instance ID.
     /// </summary>
     private (PhysicalDeviceInfo? info, int instanceId) GetDeviceInfo(int deviceIndex)

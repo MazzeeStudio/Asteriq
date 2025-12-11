@@ -33,7 +33,7 @@ public class SCSchemaService
             if (string.IsNullOrEmpty(mapName))
                 continue;
 
-            var category = DeriveCategory(mapName);
+            var category = SCCategoryMapper.GetCategoryName(mapName);
             var actionNodes = actionMap.SelectNodes("action");
             if (actionNodes == null)
                 continue;
@@ -224,22 +224,6 @@ public class SCSchemaService
         var lower = keyName.ToLower();
         return lower is "lshift" or "rshift" or "lctrl" or "rctrl" or "lalt" or "ralt"
             or "shift" or "ctrl" or "alt";
-    }
-
-    /// <summary>
-    /// Derives a user-friendly category from action map name
-    /// </summary>
-    private static string DeriveCategory(string actionMap)
-    {
-        // Convert actionmap names like "spaceship_movement" to "Spaceship - Movement"
-        var parts = actionMap.Split('_');
-        if (parts.Length == 0)
-            return actionMap;
-
-        var formatted = parts.Select(p =>
-            char.ToUpper(p[0]) + p[1..].ToLower());
-
-        return string.Join(" - ", formatted);
     }
 
     /// <summary>

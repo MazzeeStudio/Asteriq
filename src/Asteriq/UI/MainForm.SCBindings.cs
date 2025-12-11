@@ -935,7 +935,7 @@ public partial class MainForm
 
                     // Draw action name with ellipsis if too long
                     float actionIndent = 18f;
-                    string displayName = action.ActionName;
+                    string displayName = SCCategoryMapper.FormatActionName(action.ActionName);
                     float maxNameWidth = actionColWidth - actionIndent - 10f;
                     displayName = TruncateTextToWidth(displayName, maxNameWidth, 10f);
                     var nameColor = isSelected ? FUIColors.Active : FUIColors.TextPrimary;
@@ -2142,6 +2142,7 @@ public partial class MainForm
     {
         _scIsListeningForInput = false;
         _scListeningColumn = null;
+        _scPreviousInputStates = null; // Reset input state tracking
         System.Diagnostics.Debug.WriteLine("[SCBindings] Input listening cancelled");
     }
 
@@ -2225,84 +2226,162 @@ public partial class MainForm
         return null;
     }
 
+    // State tracking for joystick input detection during SC binding listening mode
+    private Dictionary<string, DeviceInputState>? _scPreviousInputStates;
+
     /// <summary>
-    /// Detects joystick input by checking recent active inputs mapped to the target vJoy device.
-    /// Finds the physical input that was pressed and looks up its vJoy mapping.
+    /// Detects joystick input by polling all physical devices and finding inputs
+    /// that map to the target vJoy device.
     /// </summary>
     private string? DetectJoystickInput(SCGridColumn col)
     {
-        // Get recently active inputs from the tracker
-        var activeInputs = _activeInputTracker.GetVisibleInputs()
-            .Where(input => input.LastActivity > _scListeningStartTime)
-            .OrderByDescending(input => input.LastActivity)
-            .ToList();
-
-        if (activeInputs.Count == 0)
-            return null;
-
-        // Get the active profile
+        // Get the active profile for mapping lookup
         var profile = _profileService.ActiveProfile;
-        if (profile == null)
-            return null;
-
-        // Get the selected device ID for matching (DeviceId is InstanceGuid.ToString())
-        var selectedDevice = _selectedDevice >= 0 && _selectedDevice < _devices.Count
-            ? _devices[_selectedDevice]
-            : null;
-
-        if (selectedDevice == null)
-            return null;
-
-        string deviceId = selectedDevice.InstanceGuid.ToString();
-
-        // Look for active button inputs and find their vJoy mappings
-        foreach (var active in activeInputs.Where(i => !i.IsAxis && i.Value > 0.5f))
+        if (profile is null)
         {
-            // Parse button index from binding name (e.g., "button5" -> 4, zero-based)
-            if (active.Binding.StartsWith("button") &&
-                int.TryParse(active.Binding.Substring(6), out int buttonNum))
-            {
-                int buttonIndex = buttonNum - 1; // Convert to 0-based
-
-                // Find the mapping for this specific physical input
-                var mapping = profile.ButtonMappings.FirstOrDefault(m =>
-                    m.Inputs.Any(i =>
-                        i.DeviceId == deviceId &&
-                        i.Type == Models.InputType.Button &&
-                        i.Index == buttonIndex) &&
-                    m.Output.VJoyDevice == col.VJoyDeviceId &&
-                    m.Output.Type == Models.OutputType.VJoyButton);
-
-                if (mapping != null)
-                {
-                    return $"button{mapping.Output.Index + 1}";
-                }
-            }
+            System.Diagnostics.Debug.WriteLine("[SCBindings] DetectJoystickInput: No active profile");
+            return null;
         }
 
-        // Check axis inputs
-        foreach (var active in activeInputs.Where(i => i.IsAxis && Math.Abs(i.Value) > 0.3f))
+        // Initialize previous states on first call
+        if (_scPreviousInputStates is null)
         {
-            // Get axis index from binding name
-            int axisIndex = GetAxisIndexFromBinding(active.Binding);
-            if (axisIndex < 0) continue;
-
-            // Find the mapping for this specific physical input
-            var mapping = profile.AxisMappings.FirstOrDefault(m =>
-                m.Inputs.Any(i =>
-                    i.DeviceId == deviceId &&
-                    i.Type == Models.InputType.Axis &&
-                    i.Index == axisIndex) &&
-                m.Output.VJoyDevice == col.VJoyDeviceId &&
-                m.Output.Type == Models.OutputType.VJoyAxis);
-
-            if (mapping != null)
+            _scPreviousInputStates = new Dictionary<string, DeviceInputState>();
+            // Capture initial state of all devices
+            foreach (var device in _devices.Where(d => !d.IsVirtual && d.IsConnected))
             {
-                return GetSCAxisName(mapping.Output.Index);
+                var state = _inputService.GetDeviceState(device.DeviceIndex);
+                if (state is not null)
+                {
+                    _scPreviousInputStates[device.InstanceGuid.ToString()] = state;
+                }
             }
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized input states for {_scPreviousInputStates.Count} devices");
+            return null; // First frame - just capture baseline
+        }
+
+        // Poll all connected physical devices for input changes
+        foreach (var device in _devices.Where(d => !d.IsVirtual && d.IsConnected))
+        {
+            var currentState = _inputService.GetDeviceState(device.DeviceIndex);
+            if (currentState is null) continue;
+
+            string deviceId = device.InstanceGuid.ToString();
+            _scPreviousInputStates.TryGetValue(deviceId, out var previousState);
+
+            // Check for button presses (transition from not pressed to pressed)
+            for (int i = 0; i < currentState.Buttons.Length; i++)
+            {
+                bool wasPressed = previousState is not null && i < previousState.Buttons.Length && previousState.Buttons[i];
+                bool isPressed = currentState.Buttons[i];
+
+                if (isPressed && !wasPressed)
+                {
+                    // Button was just pressed - look up vJoy mapping
+                    var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Button, i);
+                    if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected button {i} on {device.Name} -> vJoy{output.VJoyDevice} button{output.Index + 1}");
+                        _scPreviousInputStates[deviceId] = currentState;
+                        _scPreviousInputStates = null; // Reset for next listening session
+                        return $"button{output.Index + 1}";
+                    }
+
+                    // If no mapping found, check if this device is assigned to the target vJoy device
+                    // and use 1:1 mapping (physical button N -> vJoy button N)
+                    var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
+                    if (vJoyDevice == col.VJoyDeviceId)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} button {i} -> vJoy{vJoyDevice} button{i + 1}");
+                        _scPreviousInputStates[deviceId] = currentState;
+                        _scPreviousInputStates = null;
+                        return $"button{i + 1}";
+                    }
+                }
+            }
+
+            // Check for significant axis movement (more than 50% deflection from center)
+            for (int i = 0; i < currentState.Axes.Length; i++)
+            {
+                float prevValue = previousState is not null && i < previousState.Axes.Length ? previousState.Axes[i] : 0f;
+                float currValue = currentState.Axes[i];
+
+                // Detect significant movement (crossed threshold)
+                if (Math.Abs(currValue) > 0.5f && Math.Abs(prevValue) < 0.3f)
+                {
+                    // Axis moved significantly - look up vJoy mapping
+                    var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Axis, i);
+                    if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected axis {i} on {device.Name} -> vJoy{output.VJoyDevice} axis{output.Index}");
+                        _scPreviousInputStates[deviceId] = currentState;
+                        _scPreviousInputStates = null;
+                        return GetSCAxisName(output.Index);
+                    }
+
+                    // 1:1 fallback for assigned devices
+                    var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
+                    if (vJoyDevice == col.VJoyDeviceId)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} axis {i} -> vJoy{vJoyDevice} axis{i}");
+                        _scPreviousInputStates[deviceId] = currentState;
+                        _scPreviousInputStates = null;
+                        return GetSCAxisName(i);
+                    }
+                }
+            }
+
+            // Check for hat inputs
+            for (int i = 0; i < currentState.Hats.Length; i++)
+            {
+                int prevHat = previousState is not null && i < previousState.Hats.Length ? previousState.Hats[i] : -1;
+                int currHat = currentState.Hats[i];
+
+                // Detect hat movement (from center to a direction)
+                if (currHat >= 0 && prevHat < 0)
+                {
+                    var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Hat, i);
+                    if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
+                    {
+                        string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected hat {i} {hatDir} on {device.Name}");
+                        _scPreviousInputStates[deviceId] = currentState;
+                        _scPreviousInputStates = null;
+                        return $"hat{i + 1}_{hatDir}";
+                    }
+
+                    // 1:1 fallback
+                    var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
+                    if (vJoyDevice == col.VJoyDeviceId)
+                    {
+                        string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
+                        _scPreviousInputStates[deviceId] = currentState;
+                        _scPreviousInputStates = null;
+                        return $"hat{i + 1}_{hatDir}";
+                    }
+                }
+            }
+
+            // Update previous state for next iteration
+            _scPreviousInputStates[deviceId] = currentState;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Convert hat angle (0-359 degrees) to discrete direction (0=up, 1=right, 2=down, 3=left)
+    /// </summary>
+    private static int HatAngleToDiscrete(int angle)
+    {
+        if (angle < 0) return -1; // Centered
+        // Normalize to 0-359
+        angle = ((angle % 360) + 360) % 360;
+        // 315-44 = up, 45-134 = right, 135-224 = down, 225-314 = left
+        if (angle >= 315 || angle < 45) return 0;   // Up
+        if (angle >= 45 && angle < 135) return 1;   // Right
+        if (angle >= 135 && angle < 225) return 2;  // Down
+        return 3; // Left
     }
 
     /// <summary>

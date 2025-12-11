@@ -80,7 +80,7 @@ public class SCSchemaServiceTests
         var actions = _service.ParseActions(doc);
 
         Assert.Single(actions);
-        Assert.Equal("Spaceship - Movement", actions[0].Category);
+        Assert.Equal("Flight Control", actions[0].Category); // Uses SCCategoryMapper for user-friendly names
     }
 
     [Fact]

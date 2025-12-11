@@ -310,6 +310,7 @@ public partial class MainForm : Form
     private DateTime _scListeningStartTime;       // When listening started (for timeout)
     private const int SCListeningTimeoutMs = 5000; // 5 second timeout for input listening
     private SCGridColumn? _scListeningColumn;     // Which column we're listening for
+    private HashSet<string> _scConflictingBindings = new();  // Set of binding keys that have conflicts
 
     // SC Bindings search and filter state
     private string _scSearchText = "";           // Search text for filtering actions
@@ -1125,6 +1126,12 @@ public partial class MainForm : Form
 
         // Update active input animations (~16ms per tick = 0.016s)
         _activeInputTracker.UpdateAnimations(0.016f);
+
+        // Check for SC binding input when in listening mode
+        if (_activeTab == 2 && _scIsListeningForInput)
+        {
+            CheckSCBindingInput();
+        }
 
         // Update background animations
         _background.Update(0.016f);

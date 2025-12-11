@@ -21,6 +21,12 @@ public partial class MainForm
             _scExportService = new SCXmlExportService();
             _scExportProfileService = new SCExportProfileService();
 
+            // Ensure vJoy devices are enumerated for SC Bindings columns
+            if (_vjoyDevices.Count == 0 && _vjoyService != null)
+            {
+                _vjoyDevices = _vjoyService.EnumerateDevices();
+            }
+
             RefreshSCInstallations();
             RefreshSCExportProfiles();
 
@@ -53,6 +59,9 @@ public partial class MainForm
                 }
             }
 
+            // Initial conflict detection
+            UpdateConflictingBindings();
+
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstallations.Count} installations found");
         }
         catch (Exception ex)
@@ -65,6 +74,47 @@ public partial class MainForm
     {
         if (_scExportProfileService == null) return;
         _scExportProfiles = _scExportProfileService.ListProfiles();
+    }
+
+    /// <summary>
+    /// Detects conflicting bindings where the same input is assigned to multiple actions.
+    /// Stores conflict keys in _scConflictingBindings for rendering.
+    /// </summary>
+    private void UpdateConflictingBindings()
+    {
+        _scConflictingBindings.Clear();
+
+        // Track which inputs are used and by which actions
+        // Key: "js1_button5" or "kb1_w" etc., Value: list of action keys that use it
+        var inputUsage = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        // Check user bindings from export profile
+        foreach (var binding in _scExportProfile.Bindings)
+        {
+            int scInstance = _scExportProfile.GetSCInstance(binding.VJoyDevice);
+            string inputKey = $"js{scInstance}_{binding.InputName}";
+            string actionKey = binding.Key;
+
+            if (!inputUsage.TryGetValue(inputKey, out var actions))
+            {
+                actions = new List<string>();
+                inputUsage[inputKey] = actions;
+            }
+            actions.Add(actionKey);
+        }
+
+        // Find inputs that are used by multiple actions
+        foreach (var kvp in inputUsage)
+        {
+            if (kvp.Value.Count > 1)
+            {
+                // Mark all actions using this input as conflicting
+                foreach (var actionKey in kvp.Value)
+                {
+                    _scConflictingBindings.Add(actionKey);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -803,8 +853,9 @@ public partial class MainForm
                 {
                     bool isHovered = i == _scHoveredActionIndex;
                     bool isSelected = i == _scSelectedActionIndex;
+                    bool isEvenRow = i % 2 == 0;
 
-                    // Row background
+                    // Row background - alternating colors with selection/hover states
                     if (isSelected)
                     {
                         using var selPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
@@ -814,6 +865,12 @@ public partial class MainForm
                     {
                         using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(120), IsAntialias = true };
                         canvas.DrawRect(rowBounds, hoverPaint);
+                    }
+                    else if (isEvenRow)
+                    {
+                        // Subtle alternating row background
+                        using var altPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40), IsAntialias = true };
+                        canvas.DrawRect(rowBounds, altPaint);
                     }
 
                     float textY = scrollY + rowHeight / 2 + 4;
@@ -865,6 +922,8 @@ public partial class MainForm
                             string? bindingText = null;
                             SKColor textColor = FUIColors.TextDim;
                             bool isDefault = false;
+                            SCInputType? inputType = null;
+                            bool isConflicting = false;
 
                             // Check for user binding (from export profile) for joystick columns
                             if (col.IsJoystick)
@@ -873,7 +932,10 @@ public partial class MainForm
                                 if (userBinding != null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
                                 {
                                     bindingText = FormatBindingForCell(userBinding.InputName, userBinding.Modifiers);
-                                    textColor = FUIColors.Success;
+                                    // Check if this binding conflicts with another
+                                    isConflicting = _scConflictingBindings.Contains(userBinding.Key);
+                                    textColor = isConflicting ? FUIColors.Danger : FUIColors.Success;
+                                    inputType = userBinding.InputType;
                                 }
                             }
 
@@ -892,6 +954,9 @@ public partial class MainForm
                                                col.IsMouse ? FUIColors.Warning.WithAlpha(180) :
                                                FUIColors.TextDim;
                                     isDefault = true;
+                                    // Determine input type from input name for joystick bindings only
+                                    if (col.IsJoystick)
+                                        inputType = DetectInputTypeFromName(defaultBinding.Input);
                                 }
                             }
 
@@ -903,8 +968,14 @@ public partial class MainForm
                             }
                             else if (!string.IsNullOrEmpty(bindingText))
                             {
-                                // Draw keycap-style badge for binding
-                                DrawBindingBadge(canvas, colX + 3, textY - 10, deviceColWidth - 6, bindingText, textColor, isDefault);
+                                // Draw keycap-style badge for binding (show type indicator for joystick bindings only)
+                                DrawBindingBadge(canvas, colX + 3, textY - 10, deviceColWidth - 6, bindingText, textColor, isDefault, col.IsJoystick ? inputType : null);
+
+                                // Draw conflict warning indicator
+                                if (isConflicting)
+                                {
+                                    DrawConflictIndicator(canvas, colX + deviceColWidth - 12, textY - 8);
+                                }
                             }
                             else
                             {
@@ -915,6 +986,13 @@ public partial class MainForm
                             // Draw column separator
                             using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1 };
                             canvas.DrawLine(colX, scrollY, colX, scrollY + rowHeight, sepPaint);
+
+                            // Draw conflict cell background tint
+                            if (isConflicting && !isCellListening)
+                            {
+                                using var conflictBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(25), IsAntialias = true };
+                                canvas.DrawRect(cellBounds, conflictBgPaint);
+                            }
 
                             // Draw selection border for selected cell
                             if (isCellSelected && !isCellListening)
@@ -1089,12 +1167,15 @@ public partial class MainForm
     /// <summary>
     /// Draws a keycap-style badge for a binding
     /// </summary>
-    private void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth, string text, SKColor color, bool isDefault)
+    private void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
     {
         // Measure text to determine badge width
         float fontSize = 9f;
         float textWidth = FUIRenderer.MeasureText(text, fontSize);
-        float badgeWidth = Math.Min(maxWidth - 2, textWidth + 10);
+
+        // Add space for type indicator if provided
+        float indicatorWidth = inputType.HasValue ? 14f : 0f;
+        float badgeWidth = Math.Min(maxWidth - 2, textWidth + indicatorWidth + 10);
         float badgeHeight = 16f;
 
         var badgeBounds = new SKRect(x, y, x + badgeWidth, y + badgeHeight);
@@ -1118,13 +1199,124 @@ public partial class MainForm
         };
         canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
 
+        float textX = x + 5;
+
+        // Draw type indicator if provided
+        if (inputType.HasValue)
+        {
+            DrawInputTypeIndicator(canvas, x + 4, y + badgeHeight / 2, inputType.Value, color);
+            textX = x + indicatorWidth + 2;
+        }
+
         // Badge text (truncate if needed)
         string displayText = text;
-        if (textWidth > badgeWidth - 8)
+        float availableTextWidth = badgeWidth - (textX - x) - 5;
+        if (textWidth > availableTextWidth)
         {
-            displayText = TruncateTextToWidth(text, badgeWidth - 12, fontSize);
+            displayText = TruncateTextToWidth(text, availableTextWidth - 4, fontSize);
         }
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, y + badgeHeight / 2 + 3), color, fontSize);
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(textX, y + badgeHeight / 2 + 3), color, fontSize);
+    }
+
+    /// <summary>
+    /// Draws a small type indicator icon for axis, button, or hat
+    /// </summary>
+    private void DrawInputTypeIndicator(SKCanvas canvas, float x, float centerY, SCInputType inputType, SKColor color)
+    {
+        using var paint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = color.WithAlpha(150),
+            StrokeWidth = 1.2f,
+            IsAntialias = true
+        };
+
+        switch (inputType)
+        {
+            case SCInputType.Axis:
+                // Double-headed arrow for axis
+                float arrowLen = 4f;
+                canvas.DrawLine(x, centerY, x + arrowLen * 2, centerY, paint);
+                // Left arrow head
+                canvas.DrawLine(x, centerY, x + 2, centerY - 2, paint);
+                canvas.DrawLine(x, centerY, x + 2, centerY + 2, paint);
+                // Right arrow head
+                canvas.DrawLine(x + arrowLen * 2, centerY, x + arrowLen * 2 - 2, centerY - 2, paint);
+                canvas.DrawLine(x + arrowLen * 2, centerY, x + arrowLen * 2 - 2, centerY + 2, paint);
+                break;
+
+            case SCInputType.Button:
+                // Small filled circle for button
+                paint.Style = SKPaintStyle.Fill;
+                canvas.DrawCircle(x + 4, centerY, 3f, paint);
+                break;
+
+            case SCInputType.Hat:
+                // Diamond/cross for hat
+                float hatSize = 3f;
+                float cx = x + 4;
+                canvas.DrawLine(cx, centerY - hatSize, cx, centerY + hatSize, paint);
+                canvas.DrawLine(cx - hatSize, centerY, cx + hatSize, centerY, paint);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Draws a small conflict warning indicator (exclamation mark in triangle)
+    /// </summary>
+    private void DrawConflictIndicator(SKCanvas canvas, float x, float y)
+    {
+        float size = 8f;
+
+        // Draw triangle background
+        using var fillPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Danger,
+            IsAntialias = true
+        };
+
+        var path = new SKPath();
+        path.MoveTo(x + size / 2, y);
+        path.LineTo(x + size, y + size);
+        path.LineTo(x, y + size);
+        path.Close();
+        canvas.DrawPath(path, fillPaint);
+
+        // Draw exclamation mark
+        using var textPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.White,
+            IsAntialias = true,
+            TextSize = 7f
+        };
+        canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
+    }
+
+    /// <summary>
+    /// Detects the input type from an input name (for joystick bindings)
+    /// </summary>
+    private static SCInputType DetectInputTypeFromName(string inputName)
+    {
+        if (string.IsNullOrEmpty(inputName))
+            return SCInputType.Button;
+
+        var lower = inputName.ToLowerInvariant();
+
+        // Hat/POV inputs
+        if (lower.Contains("hat") || lower.Contains("pov"))
+            return SCInputType.Hat;
+
+        // Axis inputs (x, y, z, rx, ry, rz, slider, throttle, etc.)
+        if (lower is "x" or "y" or "z" or "rx" or "ry" or "rz" or "rotx" or "roty" or "rotz")
+            return SCInputType.Axis;
+
+        if (lower.StartsWith("slider") || lower.StartsWith("throttle"))
+            return SCInputType.Axis;
+
+        // Default to button
+        return SCInputType.Button;
     }
 
     /// <summary>
@@ -1830,6 +2022,370 @@ public partial class MainForm
         _scListeningColumn = col;
 
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
+    }
+
+    /// <summary>
+    /// Called from the render timer to check for input during listening mode
+    /// </summary>
+    private void CheckSCBindingInput()
+    {
+        if (!_scIsListeningForInput || _scListeningColumn == null || _scFilteredActions == null)
+            return;
+
+        // Check for timeout
+        if ((DateTime.Now - _scListeningStartTime).TotalMilliseconds > SCListeningTimeoutMs)
+        {
+            CancelSCInputListening();
+            return;
+        }
+
+        // Check for Escape to cancel
+        if (IsKeyHeld(0x1B)) // VK_ESCAPE
+        {
+            CancelSCInputListening();
+            return;
+        }
+
+        var (actionIndex, colIndex) = _scSelectedCell;
+        if (actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
+            return;
+
+        var action = _scFilteredActions[actionIndex];
+        var col = _scListeningColumn;
+
+        // Detect input based on column type
+        if (col.IsKeyboard)
+        {
+            var detectedKey = DetectKeyboardInput();
+            if (detectedKey != null)
+            {
+                AssignKeyboardBinding(action, detectedKey.Value.key, detectedKey.Value.modifiers);
+                CancelSCInputListening();
+            }
+        }
+        else if (col.IsMouse)
+        {
+            var detectedMouse = DetectMouseInput();
+            if (detectedMouse != null)
+            {
+                AssignMouseBinding(action, detectedMouse);
+                CancelSCInputListening();
+            }
+        }
+        else if (col.IsJoystick)
+        {
+            // Joystick input detection will use physical→vJoy mapping lookup
+            var detectedJoystick = DetectJoystickInput(col);
+            if (detectedJoystick != null)
+            {
+                AssignJoystickBinding(action, col, detectedJoystick);
+                CancelSCInputListening();
+            }
+        }
+    }
+
+    private void CancelSCInputListening()
+    {
+        _scIsListeningForInput = false;
+        _scListeningColumn = null;
+        System.Diagnostics.Debug.WriteLine("[SCBindings] Input listening cancelled");
+    }
+
+    /// <summary>
+    /// Detects keyboard input, returning the key and modifiers if a non-modifier key is pressed
+    /// </summary>
+    private (Keys key, List<string> modifiers)? DetectKeyboardInput()
+    {
+        // Collect held modifiers
+        var modifiers = new List<string>();
+        if (IsKeyHeld(0xA0) || IsKeyHeld(0xA1)) // VK_LSHIFT, VK_RSHIFT
+        {
+            modifiers.Add(IsKeyHeld(0xA1) ? "rshift" : "lshift");
+        }
+        if (IsKeyHeld(0xA2) || IsKeyHeld(0xA3)) // VK_LCONTROL, VK_RCONTROL
+        {
+            modifiers.Add(IsKeyHeld(0xA3) ? "rctrl" : "lctrl");
+        }
+        if (IsKeyHeld(0xA4) || IsKeyHeld(0xA5)) // VK_LMENU, VK_RMENU (Alt)
+        {
+            modifiers.Add(IsKeyHeld(0xA5) ? "ralt" : "lalt");
+        }
+
+        // Check for regular keys (A-Z)
+        for (int vk = 0x41; vk <= 0x5A; vk++) // A-Z
+        {
+            if (IsKeyPressed(vk))
+            {
+                return ((Keys)vk, modifiers);
+            }
+        }
+
+        // Check number keys (0-9)
+        for (int vk = 0x30; vk <= 0x39; vk++)
+        {
+            if (IsKeyPressed(vk))
+            {
+                return ((Keys)vk, modifiers);
+            }
+        }
+
+        // Check function keys (F1-F12)
+        for (int vk = 0x70; vk <= 0x7B; vk++) // VK_F1 - VK_F12
+        {
+            if (IsKeyPressed(vk))
+            {
+                return ((Keys)vk, modifiers);
+            }
+        }
+
+        // Check common keys
+        int[] commonKeys = { 0x20, 0x0D, 0x08, 0x09, 0x2E, 0x2D, 0x24, 0x23, 0x21, 0x22, // Space, Enter, Backspace, Tab, Delete, Insert, Home, End, PgUp, PgDn
+                            0x25, 0x26, 0x27, 0x28, // Arrow keys
+                            0xC0, 0xBD, 0xBB, 0xDB, 0xDD, 0xDC, 0xBA, 0xDE, 0xBC, 0xBE, 0xBF }; // Symbol keys
+
+        foreach (var vk in commonKeys)
+        {
+            if (IsKeyPressed(vk))
+            {
+                return ((Keys)vk, modifiers);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Detects mouse button input
+    /// </summary>
+    private string? DetectMouseInput()
+    {
+        // Check mouse buttons (excluding primary which is used for clicking)
+        if (IsKeyPressed(0x02)) return "mouse2"; // VK_RBUTTON
+        if (IsKeyPressed(0x04)) return "mouse3"; // VK_MBUTTON
+        if (IsKeyPressed(0x05)) return "mouse4"; // VK_XBUTTON1
+        if (IsKeyPressed(0x06)) return "mouse5"; // VK_XBUTTON2
+
+        // Mouse wheel detection would need WM_MOUSEWHEEL messages which we don't have here
+        // For now, mouse wheel bindings need to be entered differently
+
+        return null;
+    }
+
+    /// <summary>
+    /// Detects joystick input by checking recent active inputs mapped to the target vJoy device
+    /// </summary>
+    private string? DetectJoystickInput(SCGridColumn col)
+    {
+        // Get recently active inputs from the tracker
+        var activeInputs = _activeInputTracker.GetVisibleInputs()
+            .Where(input => input.LastActivity > _scListeningStartTime)
+            .OrderByDescending(input => input.LastActivity)
+            .ToList();
+
+        if (activeInputs.Count == 0)
+            return null;
+
+        // Get the active profile
+        var profile = _profileService.ActiveProfile;
+        if (profile == null)
+            return null;
+
+        // Look for any active button input that maps to this vJoy device
+        foreach (var active in activeInputs.Where(i => !i.IsAxis && i.Value > 0.5f))
+        {
+            if (active.Control != null)
+            {
+                // Try to find a button mapping that outputs to this vJoy device
+                var buttonMappings = profile.ButtonMappings
+                    .Where(m => m.Output.VJoyDevice == col.VJoyDeviceId &&
+                                m.Output.Type == Models.OutputType.VJoyButton)
+                    .ToList();
+
+                if (buttonMappings.Count > 0)
+                {
+                    // Return first button that has activity
+                    var firstButton = buttonMappings
+                        .OrderBy(m => m.Output.Index)
+                        .FirstOrDefault();
+
+                    if (firstButton != null)
+                        return $"button{firstButton.Output.Index + 1}";
+                }
+            }
+        }
+
+        // Check axis inputs
+        foreach (var active in activeInputs.Where(i => i.IsAxis && Math.Abs(i.Value) > 0.3f))
+        {
+            if (active.Control != null)
+            {
+                var axisMappings = profile.AxisMappings
+                    .Where(m => m.Output.VJoyDevice == col.VJoyDeviceId &&
+                                m.Output.Type == Models.OutputType.VJoyAxis)
+                    .ToList();
+
+                if (axisMappings.Count > 0)
+                {
+                    var firstAxis = axisMappings
+                        .OrderBy(m => m.Output.Index)
+                        .FirstOrDefault();
+
+                    if (firstAxis != null)
+                        return GetSCAxisName(firstAxis.Output.Index);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetSCAxisName(int axisIndex)
+    {
+        return axisIndex switch
+        {
+            0 => "x",
+            1 => "y",
+            2 => "z",
+            3 => "rx",
+            4 => "ry",
+            5 => "rz",
+            6 => "slider1",
+            7 => "slider2",
+            _ => $"axis{axisIndex}"
+        };
+    }
+
+    private static string GetHatDirection(int dir)
+    {
+        return dir switch
+        {
+            0 => "up",
+            1 => "right",
+            2 => "down",
+            3 => "left",
+            _ => "up"
+        };
+    }
+
+    private void AssignKeyboardBinding(SCAction action, Keys key, List<string> modifiers)
+    {
+        // Store as SC-format keyboard binding
+        string inputName = KeyToSCInput(key);
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning KB binding: {action.ActionName} = {string.Join("+", modifiers)}+{inputName}");
+
+        // Update the default binding in the action (for display purposes)
+        // Note: KB/Mouse bindings are stored differently from joystick bindings
+        var existingBinding = action.DefaultBindings.FirstOrDefault(b => b.DevicePrefix.StartsWith("kb"));
+        if (existingBinding != null)
+        {
+            existingBinding.Input = inputName;
+            existingBinding.Modifiers = modifiers;
+        }
+        else
+        {
+            action.DefaultBindings.Add(new SCDefaultBinding
+            {
+                DevicePrefix = "kb1",
+                Input = inputName,
+                Modifiers = modifiers
+            });
+        }
+    }
+
+    private void AssignMouseBinding(SCAction action, string inputName)
+    {
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning Mouse binding: {action.ActionName} = {inputName}");
+
+        var existingBinding = action.DefaultBindings.FirstOrDefault(b => b.DevicePrefix.StartsWith("mo"));
+        if (existingBinding != null)
+        {
+            existingBinding.Input = inputName;
+        }
+        else
+        {
+            action.DefaultBindings.Add(new SCDefaultBinding
+            {
+                DevicePrefix = "mo1",
+                Input = inputName
+            });
+        }
+    }
+
+    private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName)
+    {
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{inputName}");
+
+        // Determine input type from input name
+        var inputType = SCInputType.Button;
+        if (inputName == "x" || inputName == "y" || inputName == "z" ||
+            inputName == "rx" || inputName == "ry" || inputName == "rz" ||
+            inputName.StartsWith("slider"))
+        {
+            inputType = SCInputType.Axis;
+        }
+
+        // Set the binding (removes any existing binding for this action first)
+        _scExportProfile.SetBinding(action.ActionMap, action.ActionName, new SCActionBinding
+        {
+            ActionMap = action.ActionMap,
+            ActionName = action.ActionName,
+            VJoyDevice = col.VJoyDeviceId,
+            InputName = inputName,
+            InputType = inputType
+        });
+
+        // Save the profile and update conflict detection
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+        UpdateConflictingBindings();
+    }
+
+    private static string KeyToSCInput(Keys key)
+    {
+        return key switch
+        {
+            >= Keys.A and <= Keys.Z => key.ToString().ToLower(),
+            >= Keys.D0 and <= Keys.D9 => ((int)key - (int)Keys.D0).ToString(),
+            >= Keys.NumPad0 and <= Keys.NumPad9 => $"np_{(int)key - (int)Keys.NumPad0}",
+            >= Keys.F1 and <= Keys.F12 => key.ToString().ToLower(),
+            Keys.Space => "space",
+            Keys.Enter => "enter",
+            Keys.Escape => "escape",
+            Keys.Back => "backspace",
+            Keys.Tab => "tab",
+            Keys.Delete => "delete",
+            Keys.Insert => "insert",
+            Keys.Home => "home",
+            Keys.End => "end",
+            Keys.PageUp => "pgup",
+            Keys.PageDown => "pgdn",
+            Keys.Left => "left",
+            Keys.Right => "right",
+            Keys.Up => "up",
+            Keys.Down => "down",
+            Keys.OemMinus => "minus",
+            Keys.Oemplus => "equals",
+            Keys.OemOpenBrackets => "lbracket",
+            Keys.OemCloseBrackets => "rbracket",
+            Keys.OemBackslash or Keys.Oem5 => "backslash",
+            Keys.OemSemicolon or Keys.Oem1 => "semicolon",
+            Keys.OemQuotes or Keys.Oem7 => "apostrophe",
+            Keys.Oemcomma => "comma",
+            Keys.OemPeriod => "period",
+            Keys.OemQuestion or Keys.Oem2 => "slash",
+            Keys.Oemtilde or Keys.Oem3 => "grave",
+            _ => key.ToString().ToLower()
+        };
+    }
+
+    /// <summary>
+    /// Checks if a key was just pressed (transition from up to down)
+    /// </summary>
+    private static bool IsKeyPressed(int vk)
+    {
+        // GetAsyncKeyState returns high bit set if key is down
+        // and low bit set if key was pressed since last call
+        short state = GetAsyncKeyState(vk);
+        return (state & 0x0001) != 0; // Check "was pressed" bit
     }
 
     #endregion

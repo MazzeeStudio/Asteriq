@@ -301,8 +301,9 @@ public partial class MainForm : Form
     private List<string> _scActionMaps = new();  // List of unique action maps
 
     // SC Bindings grid column state
-    private float _scGridActionColWidth = 150f;   // Action name column (compact)
-    private float _scGridDeviceColWidth = 160f;   // Each device column - wide enough for "shift + l-ctl + l-alt + g"
+    private float _scGridActionColWidth = 300f;   // Action name column
+    private float _scGridDeviceColMinWidth = 120f;   // Minimum device column width
+    private Dictionary<string, float> _scGridDeviceColWidths = new();  // Calculated width per column based on content
     private float _scGridHorizontalScroll = 0f;   // Horizontal scroll offset for device columns
     private float _scGridTotalWidth = 0f;         // Total width of all columns
     private List<SCGridColumn>? _scGridColumns;   // Cached column definitions
@@ -2493,14 +2494,20 @@ public partial class MainForm : Form
     /// </summary>
     private int GetHoveredColumnIndex(float x)
     {
-        if (_scGridColumns == null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
+        if (_scGridColumns is null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
             return -1;
 
         float relativeX = x - _scDeviceColsStart + _scGridHorizontalScroll;
-        int colIndex = (int)(relativeX / _scGridDeviceColWidth);
 
-        if (colIndex >= 0 && colIndex < _scGridColumns.Count)
-            return colIndex;
+        // Walk through columns to find which one contains this X
+        float cumX = 0f;
+        for (int c = 0; c < _scGridColumns.Count; c++)
+        {
+            float colW = _scGridDeviceColWidths.TryGetValue(_scGridColumns[c].Id, out var w) ? w : _scGridDeviceColMinWidth;
+            if (relativeX >= cumX && relativeX < cumX + colW)
+                return c;
+            cumX += colW;
+        }
 
         return -1;
     }

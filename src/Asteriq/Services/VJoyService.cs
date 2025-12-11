@@ -13,6 +13,11 @@ public class VJoyService : IDisposable
     private bool _isInitialized;
     private System.Threading.Timer? _keepAliveTimer;
     private readonly object _lock = new();
+    
+    /// <summary>
+    /// Whether vJoy has been successfully initialized
+    /// </summary>
+    public bool IsInitialized => _isInitialized;
 
     // vJoy axis range (0 to 32767, center at 16384)
     public const int AxisMin = 0;
@@ -155,36 +160,48 @@ public class VJoyService : IDisposable
     }
 
     /// <summary>
-    /// Acquire exclusive access to a vJoy device
+    /// Acquire exclusive access to a vJoy device.
+    /// Uses Gremlin's approach: check owner PID and retry acquisition.
     /// </summary>
     public bool AcquireDevice(uint deviceId)
     {
         if (_acquiredDevices.ContainsKey(deviceId))
             return true;
 
-        var status = VJoyInterop.GetVJDStatusEnum(deviceId);
+        int currentPid = Environment.ProcessId;
+        int ownerPid = VJoyInterop.GetOwnerPid(deviceId);
 
-        if (status == VjdStat.Own)
+        // Check if we already own this device (same process)
+        if (ownerPid == currentPid)
         {
             _acquiredDevices[deviceId] = true;
             return true;
         }
 
-        if (status != VjdStat.Free)
+        // Try to acquire with retries (Gremlin uses 5 retries with 10ms delay)
+        const int maxRetries = 5;
+        for (int retry = 0; retry < maxRetries; retry++)
         {
-            Console.WriteLine($"vJoy device {deviceId} not available: {status}");
-            return false;
+            if (VJoyInterop.AcquireVJD(deviceId))
+            {
+                _acquiredDevices[deviceId] = true;
+                VJoyInterop.ResetVJD(deviceId);
+                Console.WriteLine($"vJoy device {deviceId} acquired successfully");
+                return true;
+            }
+
+            // Small delay before retry
+            if (retry < maxRetries - 1)
+            {
+                Thread.Sleep(10);
+            }
         }
 
-        if (!VJoyInterop.AcquireVJD(deviceId))
-        {
-            Console.WriteLine($"Failed to acquire vJoy device {deviceId}");
-            return false;
-        }
-
-        _acquiredDevices[deviceId] = true;
-        VJoyInterop.ResetVJD(deviceId);
-        return true;
+        // If all retries failed, log detailed status
+        var status = VJoyInterop.GetVJDStatusEnum(deviceId);
+        ownerPid = VJoyInterop.GetOwnerPid(deviceId);
+        Console.WriteLine($"Failed to acquire vJoy device {deviceId} after {maxRetries} retries. Status: {status}, Owner PID: {ownerPid}, Our PID: {currentPid}");
+        return false;
     }
 
     /// <summary>

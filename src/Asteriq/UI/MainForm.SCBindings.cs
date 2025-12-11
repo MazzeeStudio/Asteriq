@@ -632,48 +632,11 @@ public partial class MainForm
         float lineHeight = FUIRenderer.ScaleLineHeight(20f);
 
         // Title
-        FUIRenderer.DrawText(canvas, "VJOY TO SC MAPPING", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(35f);
-
-        // Description
-        FUIRenderer.DrawText(canvas, "Map vJoy devices to Star Citizen joystick instances (js1, js2, etc.)",
-            new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += lineHeight + 10f;
-
-        // vJoy mappings
-        _scVJoyMappingBounds.Clear();
-        float rowHeight = 32f;
-        float rowGap = 6f;
-
-        // Get available vJoy devices
-        var availableVJoy = _vjoyDevices.Where(v => v.Exists).ToList();
-
-        if (availableVJoy.Count == 0)
-        {
-            FUIRenderer.DrawText(canvas, "No vJoy devices available.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
-            y += lineHeight;
-            FUIRenderer.DrawText(canvas, "Configure vJoy devices to map them to SC.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
-            y += lineHeight * 2;
-        }
-        else
-        {
-            foreach (var vjoy in availableVJoy.Take(8)) // Limit to 8 devices
-            {
-                var rowBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
-                _scVJoyMappingBounds.Add(rowBounds);
-
-                bool isHovered = rowBounds.Contains(_mousePosition.X, _mousePosition.Y);
-                int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
-
-                DrawVJoyMappingRow(canvas, rowBounds, vjoy.Id, scInstance, isHovered);
-                y += rowHeight + rowGap;
-            }
-        }
-
-        // Export section
-        y += 20f;
         FUIRenderer.DrawText(canvas, "EXPORT", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
+
+        // Clear mapping bounds since we removed the UI
+        _scVJoyMappingBounds.Clear();
 
         // Export path preview
         if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scExportService != null)
@@ -1850,34 +1813,6 @@ public partial class MainForm
             DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         }
 
-        // vJoy mappings (compact)
-        FUIRenderer.DrawText(canvas, "VJOY → SC MAPPING", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-        y += lineHeight;
-
-        _scVJoyMappingBounds.Clear();
-        float rowHeight = 28f;
-        var availableVJoy = _vjoyDevices.Where(v => v.Exists).Take(4).ToList();
-
-        if (availableVJoy.Count == 0)
-        {
-            FUIRenderer.DrawText(canvas, "No vJoy devices", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += lineHeight;
-        }
-        else
-        {
-            foreach (var vjoy in availableVJoy)
-            {
-                var rowBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
-                _scVJoyMappingBounds.Add(rowBounds);
-
-                bool isHovered = rowBounds.Contains(_mousePosition.X, _mousePosition.Y);
-                int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
-
-                DrawVJoyMappingRowCompact(canvas, rowBounds, vjoy.Id, scInstance, isHovered);
-                y += rowHeight + 2f;
-            }
-        }
-
         // Binding count
         y += 10f;
         int bindingCount = _scExportProfile.Bindings.Count;
@@ -2417,23 +2352,6 @@ public partial class MainForm
             UpdateConflictingBindings();
             _scAssigningInput = false;
             return;
-        }
-
-        // vJoy mapping row clicks (cycle through js1-js8)
-        for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
-        {
-            if (_scVJoyMappingBounds[i].Contains(point))
-            {
-                var availableVJoy = _vjoyDevices.Where(v => v.Exists).Take(4).ToList();
-                if (i < availableVJoy.Count)
-                {
-                    var vjoyId = availableVJoy[i].Id;
-                    int currentInstance = _scExportProfile.GetSCInstance(vjoyId);
-                    int newInstance = (currentInstance % 8) + 1; // Cycle 1-8
-                    _scExportProfile.SetSCInstance(vjoyId, newInstance);
-                }
-                return;
-            }
         }
 
         // Profile name click (could open edit dialog in future)

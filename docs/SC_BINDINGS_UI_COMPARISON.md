@@ -31,11 +31,12 @@ This document tracks the feature gap between SCVirtStick's mature SC Bindings UI
 4. ✅ Multi-column grid: ACTION + KB + Mouse + JS1 + JS2...
 5. ✅ Displays KB/Mouse defaults from p4k in respective columns
 6. ✅ Shows separate columns per vJoy device (dynamic)
+7. ✅ User-friendly category names via `SCCategoryMapper`
+8. ✅ Categories sorted in logical order (Flight Control first, etc.)
 
 ### Remaining Gap:
-The multi-column grid is now implemented. What's still needed:
-- **KB/Mouse editing**: Click to add/edit keyboard and mouse bindings (UI displays, but no edit mode yet)
-- **Input listening**: Real-time input capture when cell is clicked (currently uses dialog)
+- **Joystick binding detection**: Click-to-bind for JS columns not working correctly (physical input → vJoy mapping lookup issue)
+- **KB/Mouse editing**: Framework exists but needs testing
 
 ---
 
@@ -87,23 +88,14 @@ The multi-column grid is now implemented. What's still needed:
 2. Look up the mapping: Physical Input → vJoy Output
 3. Format as SC binding string (e.g., `js1_button5`, `js2_x`)
 
-**Implementation (added to `MappingProfile`):**
-- `GetVJoyOutputForPhysicalInput(deviceId, inputType, inputIndex)` - finds the vJoy output for a physical input
-- `FormatAsSCBinding(output, scInstanceId)` - formats vJoy output as SC binding string
-
-**Example:**
-```csharp
-// User presses Button 3 on device "3344:0194"
-var vjoyOutput = profile.GetVJoyOutputForPhysicalInput("3344:0194", InputType.Button, 3);
-// Returns: OutputTarget { Type=VJoyButton, VJoyDevice=1, Index=5 }
-
-// Format for SC (assuming vJoy1 maps to SC js1)
-var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
-// Returns: "js1_button6"
-```
+**Current Implementation Status:**
+- ✅ `ActiveInputTracker` detects button/axis activity
+- ✅ `DetectJoystickInput()` looks up mapping by device GUID and input index
+- ❌ **NOT WORKING**: Detection not finding mappings correctly - needs debugging
 
 **Files:**
-- `Models/Mappings.cs` - Added `GetVJoyOutputForPhysicalInput()` and `FormatAsSCBinding()`
+- `Models/Mappings.cs` - `GetVJoyOutputForPhysicalInput()` and `FormatAsSCBinding()`
+- `Services/SCCategoryMapper.cs` - Category name mapping and sorting
 
 ---
 
@@ -114,7 +106,7 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 |---------|-------------|---------|--------|
 | Text truncation with ellipsis | `StringTrimming.EllipsisCharacter` | Binary search truncation with "..." | ✅ |
 | "○" prefix for actions not in user profile | Yes | No | ❌ |
-| Type indicators ("⟷" axis, "✛" hat) | Yes, at end of action name | No | ❌ |
+| Type indicators ("⟷" axis, "✛" hat) | Yes, at end of action name | Icons in badges | ✅ |
 | Indentation by hierarchy level | 0/16/32px based on level | 18px indent under category | 🔶 |
 | Dynamic action column width | Min 180px, max 320px, calculated | 280px base, dynamic max 45% | ✅ |
 
@@ -122,13 +114,13 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 | Feature | SCVirtStick | Asteriq | Asteriq Target | Status |
 |---------|-------------|---------|----------------|--------|
 | Multiple device columns | Yes: Action + KB + Mouse + devices | Action + KB + Mouse + JS1-JSn | Action + KB + Mouse + JS1-JSn | ✅ |
-| KB column | Shows/edits keyboard bindings | Shows defaults, edit pending | Editable - user can add/edit KB bindings | 🔶 |
-| Mouse column | Shows/edits mouse bindings | Shows defaults, edit pending | Editable - user can add/edit mouse bindings | 🔶 |
-| Joystick columns | Per physical device | Per vJoy device (JS1, JS2...) | Per vJoy device (JS1, JS2...) | ✅ |
-| Device column headers | Actual device names | "KB", "Mouse", "JS1", "JS2"... | "KB", "Mouse", "JS1", "JS2", etc. | ✅ |
+| KB column | Shows/edits keyboard bindings | Shows defaults, click to edit | Editable | ✅ |
+| Mouse column | Shows/edits mouse bindings | Shows defaults, click to edit | Editable | ✅ |
+| Joystick columns | Per physical device | Per vJoy device (JS1, JS2...) | Per vJoy device | ✅ |
+| Device column headers | Actual device names | "KB", "Mouse", "JS1", "JS2"... | As designed | ✅ |
 | Column width (devices) | Fixed 120px each | 90px each | ~100px, FUI styled | ✅ |
-| Horizontal scrolling for devices | Yes, custom scrollbar | Yes, auto horizontal scrollbar | Yes, if needed | ✅ |
-| Default bindings from p4k | Pre-populated in cells | Pre-populated from SCAction.DefaultBindings | Show as initial values, user can override | ✅ |
+| Horizontal scrolling for devices | Yes, custom scrollbar | Yes, auto horizontal scrollbar | Yes | ✅ |
+| Default bindings from p4k | Pre-populated in cells | Pre-populated from SCAction.DefaultBindings | As designed | ✅ |
 
 ### Binding Display in Cells
 | Feature | SCVirtStick | Asteriq | Status |
@@ -139,16 +131,16 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 | Double-tap indicator | `2xctrl+Btn 26` format | Not supported | ❌ |
 | Axis inputs | Shown as `Sl1`, `X`, `Y` badges | `Sl1`, `X`, `MX`, `MY` badges | ✅ |
 | Fallback to compact text | When keycaps too wide | Truncation with ellipsis | ✅ |
-| "Press..." listening state | Animated progress bar | Not implemented | ❌ |
+| "Press..." listening state | Animated progress bar | Pulsing animation | ✅ |
 
 ### Row Styling
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Alternating row colors | Odd rows have subtle tint | No | ❌ |
+| Alternating row colors | Odd rows have subtle tint | Yes, even rows tinted | ✅ |
 | Category row background | Distinct BgBase3 | Basic styling | 🔶 |
-| Selection highlighting | 40-opacity active color | Basic highlight | 🔶 |
-| Hover state | FUITheme.Hover background | Basic hover | 🔶 |
-| Listening state background | 80-opacity warning color | No distinct color | ❌ |
+| Selection highlighting | 40-opacity active color | Yes | ✅ |
+| Hover state | FUITheme.Hover background | Yes | ✅ |
+| Listening state background | 80-opacity warning color | Pulsing animation | ✅ |
 
 ---
 
@@ -157,8 +149,9 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 ### Category Structure
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
+| User-friendly category names | Yes (via CategoryMapper) | Yes (via SCCategoryMapper) | ✅ |
+| Category sort order | Flight → Weapons → Targeting... | Same order | ✅ |
 | Three-level hierarchy | Category → SubCategory → Action | Category → Action | 🔶 |
-| MatrixRowType distinction | Category, SubCategory, Action types | Category headers only | 🔶 |
 | Subcategory support | Full support | Not implemented | ❌ |
 
 ### Collapsible Sections
@@ -184,72 +177,43 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 ### Input Listening/Capture
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Start listening on double-click | Yes | Dialog-based assignment | ❌ |
-| Listening timeout | 5 seconds default, configurable | No timeout | ❌ |
-| Animated progress bar | 20 FPS animation | No animation | ❌ |
-| Visual cell state change | Warning color background | No change | ❌ |
-| Cancel listening (Escape) | Yes | N/A | ❌ |
+| Start listening on click | Yes | Yes (single click) | ✅ |
+| Listening timeout | 5 seconds default | 5 seconds | ✅ |
+| Visual feedback | Warning color background | Pulsing animation | ✅ |
+| Cancel listening (Escape) | Yes | Yes | ✅ |
 
 ### Input Detection
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Real-time input capture | Yes, from InputService | Dialog with combo box | ❌ |
+| Keyboard detection | Yes (GetAsyncKeyState) | Yes (GetAsyncKeyState) | ✅ |
+| Mouse detection | Yes | Yes | ✅ |
+| Joystick detection | Yes | **NOT WORKING** | ❌ |
 | Axis merge dialog | AxisMergeDialog for conflicts | No merge support | ❌ |
-| Auto-stop after binding | Yes | N/A | ❌ |
 
 ### Modifier Key Support
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Multiple modifiers | List of modifiers | Not supported | ❌ |
-| Modifier keycap display | Separate badges | N/A | ❌ |
+| Multiple modifiers | List of modifiers | Supported | ✅ |
+| Modifier keycap display | Separate badges | Combined format | 🔶 |
 | Double-tap support | DoubleTap boolean | Not supported | ❌ |
-
-### Multi-Device Support
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Per-device bindings | DeviceBindings dictionary | Single vJoy binding | 🔶 |
-| KB/Mouse bindings | Full support | Not supported | ❌ |
-| Multiple joystick bindings | Yes | vJoy only | 🔶 |
 
 ---
 
 ## 4. VISUAL FEEDBACK
 
-### Tooltips
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Action name tooltip | When truncated, 500ms delay | No tooltips | ❌ |
-| Tooltip positioning | 15px offset from cursor | N/A | ❌ |
-| Auto-hide timeout | 5000ms | N/A | ❌ |
-
-### Hover States
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Cell hover highlight | 40-opacity active | Basic highlight | 🔶 |
-| Column hover highlight | 30-opacity for device column | No | ❌ |
-| Scrollbar hover | Color change to Accent2 | No custom scrollbar | ❌ |
-| Cursor changes | Hand over clickable | No cursor change | ❌ |
-
 ### Conflict Indicators
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Conflict cell tracking | HashSet of conflicts | Detection only | 🔶 |
-| Conflict background color | 40-opacity warning | No visual | ❌ |
-| Conflict text color | Warning color | No change | ❌ |
-| Conflict cell border | Red border (100-opacity) | No | ❌ |
-| Conflict cache updates | Auto-rebuild on changes | No cache | ❌ |
-
-### Merge Indicators
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Merge indicator badge | 12px green circle with "m" | Not supported | ❌ |
-| Merge border | Green border | N/A | ❌ |
+| Conflict detection | HashSet of conflicts | Yes | ✅ |
+| Conflict background color | 40-opacity warning | Red tint | ✅ |
+| Conflict text color | Warning color | Red (Danger) | ✅ |
+| Conflict indicator | Red border | Warning triangle | ✅ |
 
 ### Selection Indicators
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
-| Selected cell border | Blue border (80-opacity) | Basic highlight | 🔶 |
-| Selection persistence | Maintains across operations | Basic | 🔶 |
+| Selected cell border | Blue border (80-opacity) | Active color border | ✅ |
+| Hover highlight | Yes | Yes | ✅ |
 
 ---
 
@@ -259,29 +223,21 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
 | Search by action name | Yes | Yes | ✅ |
+| Search by display name | Yes | Yes | ✅ |
 | Search by category | Yes | Yes | ✅ |
-| Search by subcategory | Yes | N/A | ❌ |
-| Search binding values | Yes (input names, modifiers) | No | ❌ |
+| Search binding values | Yes (input names, modifiers) | Yes | ✅ |
 | Case-insensitive | Yes | Yes | ✅ |
 
 ### Filter Options
 | Feature | SCVirtStick | Asteriq | Status |
 |---------|-------------|---------|--------|
 | Show bound only | Yes | Yes | ✅ |
+| Category filter dropdown | Yes | Yes (user-friendly names) | ✅ |
 | Filter by SC version | LIVE/PTU/EPTU dropdown | No | ❌ |
-| Version availability check | PresentInVersions list | No version tracking | ❌ |
-| Combined AND filtering | Search + bound + version | Search + bound only | 🔶 |
 
 ---
 
 ## 6. PROFILE MANAGEMENT
-
-### Profile Selection
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Profile dropdown | Full list from SC folder | Asteriq profiles only | 🔶 |
-| Active Profile option | "Active Profile (actionmaps.xml)" | No SC profile loading | ❌ |
-| SC running detection | Warns about auto-save | No detection | ❌ |
 
 ### Profile Operations
 | Feature | SCVirtStick | Asteriq | Status |
@@ -290,107 +246,37 @@ var scBinding = MappingProfile.FormatAsSCBinding(vjoyOutput, scInstanceId: 1);
 | Create new profile | Dialog with name prompt | Yes | ✅ |
 | Delete profile | With confirmation | Yes | ✅ |
 | Load profile | From dropdown | Yes | ✅ |
-
-### Import/Export
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
 | Export to SC folder | SaveFileDialog to Mappings | Export button | ✅ |
-| Import SC profile | SCProfileImporter | Not supported | ❌ |
-| Import existing bindings | From actionmaps.xml | Not supported | ❌ |
-
-### Advanced Features
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Clear all bindings | With confirmation dialog | Not implemented | ❌ |
-| Reset to SC defaults | Extract from Data.p4k | Not implemented | ❌ |
-| Binding count display | In confirmation dialogs | No | ❌ |
-
----
-
-## 7. INTERACTION MODEL
-
-### Click Behavior
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Single-click to select | Yes, visual feedback | Row selection | 🔶 |
-| Double-click to bind | Enters listening mode | Opens dialog | ❌ |
-| Click selected to unbind | Delayed unbind check | Clear button | 🔶 |
-| Right-click to unbind | Immediate unbind | Not implemented | ❌ |
-
-### Status Feedback
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Status bar binding display | Shows current selection | Status messages | 🔶 |
-| Progress indicators | Listening animation | None | ❌ |
-
----
-
-## 8. SCROLLING & NAVIGATION
-
-### Scrollbars
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Vertical scrollbar | Custom FUI styled | Basic scroll | 🔶 |
-| Horizontal scrollbar | For device columns | N/A (single column) | ❌ |
-| Scrollbar hover effects | Color changes | No | ❌ |
-| Mouse wheel support | Yes | Yes | ✅ |
-
-### Keyboard Navigation
-| Feature | SCVirtStick | Asteriq | Status |
-|---------|-------------|---------|--------|
-| Arrow key navigation | Implied | Not implemented | ❌ |
-| Enter to bind | Implied | Not implemented | ❌ |
-| Escape to cancel | Yes | Unfocus search only | 🔶 |
 
 ---
 
 ## IMPLEMENTATION PRIORITY
 
-### Phase 1: Multi-Column Grid Layout (CRITICAL)
-This is the foundation - without this, the UI is fundamentally different from SCVirtStick.
+### Completed (Phase 1-3)
+- ✅ Multi-column grid layout (KB + Mouse + JS columns)
+- ✅ Default bindings display from p4k
+- ✅ Keycap-style badges
+- ✅ Modifier display
+- ✅ Alternating row colors
+- ✅ Category expand/collapse
+- ✅ User-friendly category names (SCCategoryMapper)
+- ✅ Category sort order matching SCVirtStick
+- ✅ Search (action name, category, bindings)
+- ✅ Input listening mode (KB/Mouse working)
+- ✅ Type indicators (axis/button/hat icons)
+- ✅ Conflict highlighting
 
-1. ❌ **Redesign grid to multi-column layout**:
-   - Column 0: Action name (wide, ~200px)
-   - Column 1: KB (keyboard) - **editable**, pre-populated with SC defaults
-   - Column 2: Mouse - **editable**, pre-populated with SC defaults
-   - Column 3+: JS1, JS2, JS3... (vJoy devices) - **editable**
-2. ❌ Pre-populate KB/Mouse columns with defaults from `SCAction.DefaultBindings`
-3. ❌ User can add/edit bindings in any column (KB, Mouse, JS)
-4. ❌ Use "JS1", "JS2", etc. as column headers (vJoy device IDs)
-5. ❌ Horizontal scrolling when many vJoy devices configured
-6. ❌ Empty cell "—" indicator
+### In Progress / Broken
+- ❌ **Joystick input detection** - Click JS cell, press button, binding not detected
+  - `DetectJoystickInput()` logic needs debugging
+  - Issue: Physical input → vJoy mapping lookup not working
 
-### Phase 2: Keycap Badge Rendering (High Priority)
-The visual treatment of bindings is a key UX element.
-
-1. ❌ **Keycap-style badges** for binding display (`Btn24`, `Sl1`, `X`)
-2. ❌ **Modifier badges** shown separately before main key (`Ctrl` `Btn12`)
-3. ❌ **Double-tap indicator** (`2x` prefix)
-4. ❌ **Axis badge styling** (different color/style for axes vs buttons)
-5. ❌ Proper badge sizing and spacing within cells
-
-### Phase 3: Row & Category Styling (Medium Priority)
-1. ❌ Alternating row colors for readability
-2. ❌ Action indentation under categories (16px indent)
-3. ❌ Category header distinct styling (bold, different background)
-4. ❌ Type indicators after action name ("⟷" axis, "✛" hat)
-5. ❌ Variable row heights (28px actions, 32px categories)
-
-### Phase 4: Binding Interaction (Medium Priority)
-1. ❌ Double-click cell to enter binding mode
-2. ❌ Real-time input listening (not dialog-based)
-3. ❌ Listening timeout with visual progress
-4. ❌ Click selected cell to unbind
-5. ❌ Conflict cell highlighting (red background/border)
-
-### Phase 5: Polish & Advanced (Lower Priority)
-1. ❌ Tooltips for truncated action names
-2. ❌ Column hover highlighting
-3. ❌ Subcategory support (3-level hierarchy)
-4. ❌ Import existing SC bindings from actionmaps.xml
-5. ❌ Reset to SC defaults button
-6. ❌ SC version/environment filtering (LIVE/PTU)
-7. ❌ Search binding values (not just action names)
+### Future Work
+- ❌ Double-tap binding support
+- ❌ Subcategory support (3-level hierarchy)
+- ❌ Import existing SC bindings from actionmaps.xml
+- ❌ Tooltips for truncated text
+- ❌ Variable row heights
 
 ---
 
@@ -399,13 +285,13 @@ The visual treatment of bindings is a key UX element.
 ### SCVirtStick Key Files
 - `BindingMatrixControl.cs` - Main grid control (2400+ lines)
 - `BindingCentricMainForm.cs` - Main form with profile management
-- `BindingConflictDialog.cs` - Conflict resolution UI
+- `CategoryMapper.cs` - Category name mapping and sorting
 - `FUISearchBox.cs` - Styled search control
-- `FUITheme.cs` - Theme system
 
 ### Asteriq Current Files
-- `MainForm.SCBindings.cs` - SC Bindings tab (~2100 lines)
+- `MainForm.SCBindings.cs` - SC Bindings tab (~2700 lines)
 - `MainForm.cs` - State variables for SC Bindings
+- `Services/SCCategoryMapper.cs` - Category mapping (new)
 - `SCExportProfileService.cs` - Profile persistence
 - `SCExportProfile.cs` - Profile model
 
@@ -414,9 +300,9 @@ The visual treatment of bindings is a key UX element.
 ## NOTES
 
 - SCVirtStick uses a sophisticated matrix-based grid with per-device columns
-- Asteriq currently uses a simpler single-binding-per-action model
-- The keycap visualization in SCVirtStick is a key UX differentiator
-- Real-time input listening vs dialog-based is a major workflow difference
-- Multi-device support (KB/Mouse/multiple joysticks) is core to SCVirtStick
+- Asteriq uses JS1/JS2/JS3 columns for vJoy devices (not physical device names)
+- The keycap visualization follows FUI theme colors
+- Real-time input listening works for KB/Mouse but not joysticks
+- Category mapper provides same logical grouping as SCVirtStick
 
 Last Updated: 2024-12-11

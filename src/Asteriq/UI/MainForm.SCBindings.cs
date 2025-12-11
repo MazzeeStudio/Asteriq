@@ -194,9 +194,10 @@ public partial class MainForm
                 _scExportProfile.TargetEnvironment = installation.Environment;
                 _scExportProfile.TargetBuildId = installation.BuildId;
 
-                // Build category list (user-friendly names, sorted by SCCategoryMapper order)
-                _scActionMaps = SCCategoryMapper.GetSortedCategories(
-                    _scActions.Select(a => a.ActionMap).Distinct()
+                // Build category list from joystick-relevant actions (includes action-level overrides like Emergency)
+                var joystickActions = _scSchemaService.FilterJoystickActions(_scActions);
+                _scActionMaps = SCCategoryMapper.GetSortedCategoriesFromActions(
+                    joystickActions.Select(a => (a.ActionMap, a.ActionName))
                 ).ToList();
 
                 // NOTE: We intentionally do NOT auto-apply defaults here.
@@ -304,10 +305,11 @@ public partial class MainForm
         var actions = _scSchemaService.FilterJoystickActions(_scActions);
 
         // Apply action map filter if set (use category name for filtering)
+        // Use GetCategoryNameForAction to respect action-level overrides (e.g., Emergency)
         if (!string.IsNullOrEmpty(_scActionMapFilter))
         {
             actions = actions.Where(a =>
-                SCCategoryMapper.GetCategoryName(a.ActionMap) == _scActionMapFilter).ToList();
+                SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == _scActionMapFilter).ToList();
         }
 
         // Apply search filter if set - search multiple fields like SCVirtStick
@@ -327,11 +329,10 @@ public partial class MainForm
         }
 
         // Sort by category order (like SCVirtStick), then by action name
-        // IMPORTANT: Use GetCategorySortOrder on the CATEGORY NAME to ensure all actions
-        // with the same display category are grouped together, regardless of raw actionmap
+        // IMPORTANT: Use GetSortOrderForAction to respect action-level overrides (e.g., Emergency)
         _scFilteredActions = actions
-            .OrderBy(a => SCCategoryMapper.GetCategorySortOrder(SCCategoryMapper.GetCategoryName(a.ActionMap)))
-            .ThenBy(a => SCCategoryMapper.GetCategoryName(a.ActionMap))
+            .OrderBy(a => SCCategoryMapper.GetSortOrderForAction(a.ActionMap, a.ActionName))
+            .ThenBy(a => SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName))
             .ThenBy(a => a.ActionName)
             .ToList();
 
@@ -943,8 +944,8 @@ public partial class MainForm
             {
                 var action = _scFilteredActions[i];
 
-                // Use formatted category name for grouping (multiple action maps can share the same display name)
-                string categoryName = SCCategoryMapper.GetCategoryName(action.ActionMap);
+                // Use GetCategoryNameForAction to respect action-level overrides (e.g., Emergency)
+                string categoryName = SCCategoryMapper.GetCategoryNameForAction(action.ActionMap, action.ActionName);
 
                 // Category header when category changes
                 if (categoryName != lastActionMap)
@@ -973,9 +974,9 @@ public partial class MainForm
 
                         // Count actions in this category (same display name)
                         int categoryActionCount = _scFilteredActions.Count(a =>
-                            SCCategoryMapper.GetCategoryName(a.ActionMap) == categoryName);
+                            SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == categoryName);
                         int categoryBoundCount = _scFilteredActions.Count(a =>
-                            SCCategoryMapper.GetCategoryName(a.ActionMap) == categoryName &&
+                            SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == categoryName &&
                             _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null);
 
                         FUIRenderer.DrawText(canvas, categoryName,
@@ -995,9 +996,9 @@ public partial class MainForm
                     // If collapsed, skip all actions in this category
                     if (isCollapsed)
                     {
-                        // Skip to next category (by display name)
+                        // Skip to next category (by display name, using action-aware lookup)
                         while (i < _scFilteredActions.Count - 1 &&
-                               SCCategoryMapper.GetCategoryName(_scFilteredActions[i + 1].ActionMap) == categoryName)
+                               SCCategoryMapper.GetCategoryNameForAction(_scFilteredActions[i + 1].ActionMap, _scFilteredActions[i + 1].ActionName) == categoryName)
                         {
                             i++;
                         }
@@ -1990,10 +1991,10 @@ public partial class MainForm
         }
     }
 
-    private static string FormatActionMapName(string actionMap)
+    private static string FormatActionMapName(string categoryName)
     {
-        // Use SCCategoryMapper for consistent user-friendly names
-        return SCCategoryMapper.GetCategoryName(actionMap);
+        // _scActionMaps already contains formatted category names, just return as-is
+        return categoryName;
     }
 
     #endregion
@@ -2290,7 +2291,7 @@ public partial class MainForm
             for (int i = 0; i < _scFilteredActions.Count; i++)
             {
                 var action = _scFilteredActions[i];
-                string categoryName = SCCategoryMapper.GetCategoryName(action.ActionMap);
+                string categoryName = SCCategoryMapper.GetCategoryNameForAction(action.ActionMap, action.ActionName);
 
                 // Account for category header
                 if (categoryName != lastCategoryName)
@@ -2302,7 +2303,7 @@ public partial class MainForm
                     if (_scCollapsedCategories.Contains(categoryName))
                     {
                         while (i < _scFilteredActions.Count - 1 &&
-                               SCCategoryMapper.GetCategoryName(_scFilteredActions[i + 1].ActionMap) == categoryName)
+                               SCCategoryMapper.GetCategoryNameForAction(_scFilteredActions[i + 1].ActionMap, _scFilteredActions[i + 1].ActionName) == categoryName)
                         {
                             i++;
                         }
@@ -2473,7 +2474,7 @@ public partial class MainForm
         for (int i = 0; i < _scFilteredActions.Count; i++)
         {
             var action = _scFilteredActions[i];
-            string categoryName = SCCategoryMapper.GetCategoryName(action.ActionMap);
+            string categoryName = SCCategoryMapper.GetCategoryNameForAction(action.ActionMap, action.ActionName);
 
             // Account for category header
             if (categoryName != lastCategoryName)
@@ -2485,7 +2486,7 @@ public partial class MainForm
                 if (_scCollapsedCategories.Contains(categoryName))
                 {
                     while (i < _scFilteredActions.Count - 1 &&
-                           SCCategoryMapper.GetCategoryName(_scFilteredActions[i + 1].ActionMap) == categoryName)
+                           SCCategoryMapper.GetCategoryNameForAction(_scFilteredActions[i + 1].ActionMap, _scFilteredActions[i + 1].ActionName) == categoryName)
                     {
                         i++;
                     }

@@ -777,6 +777,9 @@ public partial class MainForm
         using var headerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(120), IsAntialias = true };
         canvas.DrawRect(new SKRect(leftMargin - 5, y, rightMargin + 5, y + headerRowHeight), headerPaint);
 
+        // Store column headers bounds for click detection
+        _scColumnHeadersBounds = new SKRect(deviceColsStart, y, deviceColsStart + visibleDeviceWidth, y + headerRowHeight);
+
         // Draw ACTION column header
         FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(leftMargin + 18f, headerTextY), FUIColors.TextDim, 9f, true);
 
@@ -796,9 +799,17 @@ public partial class MainForm
             if (colX + deviceColWidth > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
             {
                 var col = columns[c];
-                var headerColor = col.IsKeyboard ? FUIColors.Primary :
-                                  col.IsMouse ? FUIColors.Warning :
-                                  FUIColors.Success;
+
+                // Highlight background if this column is selected
+                if (c == _scHighlightedColumn)
+                {
+                    using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                    canvas.DrawRect(new SKRect(colX, y, colX + deviceColWidth, y + headerRowHeight), highlightPaint);
+                }
+
+                // Use consistent theme colors for all column headers
+                var headerColor = c == _scHighlightedColumn ? FUIColors.Active :
+                                  col.IsJoystick ? FUIColors.Active : FUIColors.TextPrimary;
 
                 // Center the header text in the column
                 float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
@@ -824,7 +835,7 @@ public partial class MainForm
         canvas.ClipRect(_scBindingsListBounds);
 
         _scActionRowBounds.Clear();
-        float rowHeight = 24f;
+        float rowHeight = 28f;
         float rowGap = 2f;
         float scrollY = listTop - _scBindingsScrollOffset;
 
@@ -957,14 +968,36 @@ public partial class MainForm
                             bool isCellHovered = _scHoveredCell == (i, c);
                             bool isCellSelected = _scSelectedCell == (i, c);
                             bool isCellListening = _scIsListeningForInput && _scSelectedCell == (i, c);
+                            bool isColumnHighlighted = c == _scHighlightedColumn;
+
+                            // Draw column highlight background
+                            if (isColumnHighlighted && !isCellSelected && !isCellListening)
+                            {
+                                using var colHighlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(20), IsAntialias = true };
+                                canvas.DrawRect(cellBounds, colHighlightPaint);
+                            }
 
                             // Draw cell background for hover/selection/listening states
                             if (isCellListening)
                             {
-                                // Listening state - pulsing warning color
-                                float pulse = (float)(0.5 + 0.3 * Math.Sin((DateTime.Now - _scListeningStartTime).TotalMilliseconds / 200.0));
-                                using var listeningPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha((byte)(80 * pulse)), IsAntialias = true };
-                                canvas.DrawRect(cellBounds, listeningPaint);
+                                // Listening state - use Active color to match theme
+                                using var listeningBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                                canvas.DrawRect(cellBounds, listeningBgPaint);
+
+                                // Draw countdown progress bar at bottom of cell
+                                float elapsed = (float)(DateTime.Now - _scListeningStartTime).TotalMilliseconds;
+                                float progress = Math.Max(0, 1.0f - elapsed / SCListeningTimeoutMs);
+                                float barHeight = 3f;
+                                float barWidth = (cellBounds.Width - 4) * progress;
+                                var progressBounds = new SKRect(cellBounds.Left + 2, cellBounds.Bottom - barHeight - 2,
+                                                                cellBounds.Left + 2 + barWidth, cellBounds.Bottom - 2);
+                                using var progressPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                                canvas.DrawRoundRect(progressBounds, 1.5f, 1.5f, progressPaint);
+
+                                // Pulsing border
+                                float pulse = (float)(0.6 + 0.4 * Math.Sin((DateTime.Now - _scListeningStartTime).TotalMilliseconds / 150.0));
+                                using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha((byte)(200 * pulse)), StrokeWidth = 2f, IsAntialias = true };
+                                canvas.DrawRect(cellBounds.Inset(1, 1), borderPaint);
                             }
                             else if (isCellSelected)
                             {
@@ -990,9 +1023,9 @@ public partial class MainForm
                                 if (userBinding != null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
                                 {
                                     bindingText = FormatBindingForCell(userBinding.InputName, userBinding.Modifiers);
-                                    // Check if this binding conflicts with another
+                                    // Check if this binding conflicts with another (for warning indicator only)
                                     isConflicting = _scConflictingBindings.Contains(userBinding.Key);
-                                    textColor = isConflicting ? FUIColors.Danger : FUIColors.Success;
+                                    textColor = FUIColors.Active;  // Always use Active color - conflicts are valid
                                     inputType = userBinding.InputType;
                                 }
                             }
@@ -1008,8 +1041,9 @@ public partial class MainForm
                                 if (defaultBinding != null)
                                 {
                                     bindingText = FormatBindingForCell(defaultBinding.Input, defaultBinding.Modifiers);
-                                    textColor = col.IsKeyboard ? FUIColors.Primary.WithAlpha(180) :
-                                               col.IsMouse ? FUIColors.Warning.WithAlpha(180) :
+                                    // Use muted theme colors for default (SC) bindings to distinguish from user bindings
+                                    textColor = col.IsKeyboard ? FUIColors.TextPrimary :
+                                               col.IsMouse ? FUIColors.TextPrimary :
                                                FUIColors.TextDim;
                                     isDefault = true;
                                     // Determine input type from input name for joystick bindings only
@@ -1021,36 +1055,35 @@ public partial class MainForm
                             // Draw cell content
                             if (isCellListening)
                             {
-                                // Show "Press..." text when listening
-                                FUIRenderer.DrawText(canvas, "Press...", new SKPoint(colX + 5, textY), FUIColors.Warning, 9f);
+                                // Show "PRESS INPUT" text when listening, centered, using theme Active color
+                                string listeningText = "PRESS INPUT";
+                                float listeningFontSize = 9f;
+                                float listeningTextWidth = FUIRenderer.MeasureText(listeningText, listeningFontSize);
+                                float listeningTextX = colX + (deviceColWidth - listeningTextWidth) / 2;
+                                FUIRenderer.DrawText(canvas, listeningText, new SKPoint(listeningTextX, textY - 2), FUIColors.Active, listeningFontSize, true);
                             }
                             else if (!string.IsNullOrEmpty(bindingText))
                             {
-                                // Draw keycap-style badge for binding (show type indicator for joystick bindings only)
-                                DrawBindingBadge(canvas, colX + 3, textY - 10, deviceColWidth - 6, bindingText, textColor, isDefault, col.IsJoystick ? inputType : null);
+                                // Draw keycap-style badge for binding, centered in cell
+                                DrawBindingBadgeCentered(canvas, cellBounds, bindingText, textColor, isDefault, col.IsJoystick ? inputType : null);
 
                                 // Draw conflict warning indicator
                                 if (isConflicting)
                                 {
-                                    DrawConflictIndicator(canvas, colX + deviceColWidth - 12, textY - 8);
+                                    DrawConflictIndicator(canvas, colX + deviceColWidth - 12, cellBounds.MidY - 4);
                                 }
                             }
                             else
                             {
-                                // Draw empty indicator
-                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + deviceColWidth / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 10f);
+                                // Draw empty indicator, centered
+                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + deviceColWidth / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 11f);
                             }
 
                             // Draw column separator
                             using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1 };
                             canvas.DrawLine(colX, scrollY, colX, scrollY + rowHeight, sepPaint);
 
-                            // Draw conflict cell background tint
-                            if (isConflicting && !isCellListening)
-                            {
-                                using var conflictBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(25), IsAntialias = true };
-                                canvas.DrawRect(cellBounds, conflictBgPaint);
-                            }
+                            // Conflict indicator is drawn via DrawConflictIndicator - no background tint needed
 
                             // Draw selection border for selected cell
                             if (isCellSelected && !isCellListening)
@@ -1072,55 +1105,72 @@ public partial class MainForm
         canvas.Restore();
 
         // Vertical scrollbar if needed
+        _scVScrollbarBounds = SKRect.Empty;
+        _scVScrollThumbBounds = SKRect.Empty;
         if (_scBindingsContentHeight > _scBindingsListBounds.Height)
         {
-            float scrollbarWidth = 6f;
+            float scrollbarWidth = 8f;  // Slightly wider for easier clicking
             float scrollbarX = rightMargin - scrollbarWidth + 10;
             float scrollbarHeight = _scBindingsListBounds.Height;
             float thumbHeight = Math.Max(30f, scrollbarHeight * (_scBindingsListBounds.Height / _scBindingsContentHeight));
-            float thumbY = listTop + (_scBindingsScrollOffset / (_scBindingsContentHeight - _scBindingsListBounds.Height)) * (scrollbarHeight - thumbHeight);
+            float maxVScroll = _scBindingsContentHeight - _scBindingsListBounds.Height;
+            float thumbY = listTop + (maxVScroll > 0 ? (_scBindingsScrollOffset / maxVScroll) * (scrollbarHeight - thumbHeight) : 0);
 
-            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
-            canvas.DrawRoundRect(new SKRect(scrollbarX, listTop, scrollbarX + scrollbarWidth, listTop + scrollbarHeight), 3f, 3f, trackPaint);
+            _scVScrollbarBounds = new SKRect(scrollbarX, listTop, scrollbarX + scrollbarWidth, listTop + scrollbarHeight);
+            _scVScrollThumbBounds = new SKRect(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight);
 
-            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(180), IsAntialias = true };
-            canvas.DrawRoundRect(new SKRect(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight), 3f, 3f, thumbPaint);
+            bool vScrollHovered = _scVScrollbarBounds.Contains(_mousePosition.X, _mousePosition.Y) || _scIsDraggingVScroll;
+
+            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(vScrollHovered ? (byte)120 : (byte)80), IsAntialias = true };
+            canvas.DrawRoundRect(_scVScrollbarBounds, 4f, 4f, trackPaint);
+
+            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = vScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180), IsAntialias = true };
+            canvas.DrawRoundRect(_scVScrollThumbBounds, 4f, 4f, thumbPaint);
         }
 
         // Horizontal scrollbar if needed
+        _scHScrollbarBounds = SKRect.Empty;
+        _scHScrollThumbBounds = SKRect.Empty;
         if (needsHorizontalScroll)
         {
-            float scrollbarHeight = 6f;
+            float scrollbarHeight = 8f;  // Slightly taller for easier clicking
             float scrollbarY = listBottom + 5f;
             float scrollbarWidth = visibleDeviceWidth;
             float thumbWidth = Math.Max(30f, scrollbarWidth * (visibleDeviceWidth / totalDeviceColsWidth));
             float maxHScroll = totalDeviceColsWidth - visibleDeviceWidth;
-            float thumbX = deviceColsStart + (_scGridHorizontalScroll / maxHScroll) * (scrollbarWidth - thumbWidth);
+            float thumbX = deviceColsStart + (maxHScroll > 0 ? (_scGridHorizontalScroll / maxHScroll) * (scrollbarWidth - thumbWidth) : 0);
 
-            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
-            canvas.DrawRoundRect(new SKRect(deviceColsStart, scrollbarY, deviceColsStart + scrollbarWidth, scrollbarY + scrollbarHeight), 3f, 3f, trackPaint);
+            _scHScrollbarBounds = new SKRect(deviceColsStart, scrollbarY, deviceColsStart + scrollbarWidth, scrollbarY + scrollbarHeight);
+            _scHScrollThumbBounds = new SKRect(thumbX, scrollbarY, thumbX + thumbWidth, scrollbarY + scrollbarHeight);
 
-            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(180), IsAntialias = true };
-            canvas.DrawRoundRect(new SKRect(thumbX, scrollbarY, thumbX + thumbWidth, scrollbarY + scrollbarHeight), 3f, 3f, thumbPaint);
+            bool hScrollHovered = _scHScrollbarBounds.Contains(_mousePosition.X, _mousePosition.Y) || _scIsDraggingHScroll;
+
+            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(hScrollHovered ? (byte)120 : (byte)80), IsAntialias = true };
+            canvas.DrawRoundRect(_scHScrollbarBounds, 4f, 4f, trackPaint);
+
+            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = hScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180), IsAntialias = true };
+            canvas.DrawRoundRect(_scHScrollThumbBounds, 4f, 4f, thumbPaint);
         }
     }
 
     /// <summary>
     /// Formats a binding input for display in a grid cell (with modifiers)
+    /// Uses a more readable separator between modifiers and the main key
     /// </summary>
     private string FormatBindingForCell(string input, List<string>? modifiers)
     {
-        if (modifiers == null || modifiers.Count == 0)
+        if (modifiers is null || modifiers.Count == 0)
             return FormatInputName(input);
 
-        var modStr = string.Join("+", modifiers
+        var modStr = string.Join(" + ", modifiers
             .Select(m => FormatModifierName(m))
             .Where(m => !string.IsNullOrEmpty(m)));
 
         if (string.IsNullOrEmpty(modStr))
             return FormatInputName(input);
 
-        return $"{modStr}+{FormatInputName(input)}";
+        // Use bullet separator for visual clarity: "CTRL • A"
+        return $"{modStr} • {FormatInputName(input)}";
     }
 
     /// <summary>
@@ -1277,6 +1327,69 @@ public partial class MainForm
     }
 
     /// <summary>
+    /// Draws a keycap-style badge for a binding, centered within the given cell bounds
+    /// Uses larger font and centered positioning for better readability
+    /// </summary>
+    private void DrawBindingBadgeCentered(SKCanvas canvas, SKRect cellBounds, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
+    {
+        // Use larger font for better readability
+        float fontSize = 11f;
+        float textWidth = FUIRenderer.MeasureText(text, fontSize);
+
+        // Add space for type indicator if provided
+        float indicatorWidth = inputType.HasValue ? 14f : 0f;
+        float padding = 8f;
+        float badgeWidth = Math.Min(cellBounds.Width - 6, textWidth + indicatorWidth + padding * 2);
+        float badgeHeight = 20f;
+
+        // Center the badge in the cell
+        float badgeX = cellBounds.Left + (cellBounds.Width - badgeWidth) / 2;
+        float badgeY = cellBounds.Top + (cellBounds.Height - badgeHeight) / 2;
+
+        var badgeBounds = new SKRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight);
+
+        // Badge background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
+            IsAntialias = true
+        };
+        canvas.DrawRoundRect(badgeBounds, 4f, 4f, bgPaint);
+
+        // Badge border
+        using var borderPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
+            StrokeWidth = 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRoundRect(badgeBounds, 4f, 4f, borderPaint);
+
+        float textX = badgeX + padding;
+
+        // Draw type indicator if provided
+        if (inputType.HasValue)
+        {
+            DrawInputTypeIndicator(canvas, badgeX + 4, badgeY + badgeHeight / 2, inputType.Value, color);
+            textX = badgeX + indicatorWidth + 4;
+        }
+
+        // Badge text (truncate if needed), vertically centered
+        string displayText = text;
+        float availableTextWidth = badgeWidth - (textX - badgeX) - padding;
+        if (textWidth > availableTextWidth)
+        {
+            displayText = TruncateTextToWidth(text, availableTextWidth - 4, fontSize);
+        }
+
+        // Center text vertically in badge
+        float textY = badgeY + badgeHeight / 2 + 4;
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(textX, textY), color, fontSize);
+    }
+
+    /// <summary>
     /// Draws a small type indicator icon for axis, button, or hat
     /// </summary>
     private void DrawInputTypeIndicator(SKCanvas canvas, float x, float centerY, SCInputType inputType, SKColor color)
@@ -1326,11 +1439,11 @@ public partial class MainForm
     {
         float size = 8f;
 
-        // Draw triangle background
+        // Draw triangle background - use Warning color since conflicts are valid
         using var fillPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = FUIColors.Danger,
+            Color = FUIColors.Warning,
             IsAntialias = true
         };
 
@@ -1472,7 +1585,7 @@ public partial class MainForm
         y += lineHeight;
 
         _scVJoyMappingBounds.Clear();
-        float rowHeight = 24f;
+        float rowHeight = 28f;
         var availableVJoy = _vjoyDevices.Where(v => v.Exists).Take(4).ToList();
 
         if (availableVJoy.Count == 0)
@@ -1531,10 +1644,10 @@ public partial class MainForm
 
             if (_scAssigningInput)
             {
-                // Show "waiting for input" state
-                using var waitBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(80), IsAntialias = true };
+                // Show "waiting for input" state - use Active color to match theme
+                using var waitBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80), IsAntialias = true };
                 canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
-                FUIRenderer.DrawTextCentered(canvas, "PRESS INPUT...", _scAssignInputButtonBounds, FUIColors.Warning, 9f);
+                FUIRenderer.DrawTextCentered(canvas, "PRESS INPUT...", _scAssignInputButtonBounds, FUIColors.Active, 9f);
             }
             else
             {
@@ -1741,6 +1854,35 @@ public partial class MainForm
 
     private void HandleBindingsTabClick(SKPoint point)
     {
+        // Scrollbar click handling - start dragging
+        if (_scVScrollbarBounds.Contains(point.X, point.Y))
+        {
+            _scIsDraggingVScroll = true;
+            _scScrollDragStartY = point.Y;
+            _scScrollDragStartOffset = _scBindingsScrollOffset;
+            return;
+        }
+
+        if (_scHScrollbarBounds.Contains(point.X, point.Y))
+        {
+            _scIsDraggingHScroll = true;
+            _scScrollDragStartX = point.X;
+            _scScrollDragStartOffset = _scGridHorizontalScroll;
+            return;
+        }
+
+        // Column header click - toggle column highlight
+        if (_scColumnHeadersBounds.Contains(point.X, point.Y))
+        {
+            int clickedCol = GetClickedColumnIndex(point.X);
+            if (clickedCol >= 0)
+            {
+                // Toggle highlight: if same column clicked, unhighlight; otherwise highlight new column
+                _scHighlightedColumn = (_scHighlightedColumn == clickedCol) ? -1 : clickedCol;
+                return;
+            }
+        }
+
         // SC Installation dropdown handling (close when clicking outside)
         if (_scInstallationDropdownOpen)
         {
@@ -1971,7 +2113,7 @@ public partial class MainForm
         if (_scBindingsListBounds.Contains(point) && _scFilteredActions != null)
         {
             // Find which row was clicked accounting for scroll offset and collapsed categories
-            float rowHeight = 24f;
+            float rowHeight = 28f;
             float rowGap = 2f;
             float categoryHeaderHeight = 28f;
             float relativeY = point.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
@@ -2051,31 +2193,132 @@ public partial class MainForm
     }
 
     /// <summary>
-    /// Handles a click on a binding cell - enters listening mode for input
+    /// Handles a click on a binding cell - selects on single click, activates listening on double-click
     /// </summary>
     private void HandleCellClick(int actionIndex, int colIndex)
     {
-        if (_scGridColumns == null || colIndex < 0 || colIndex >= _scGridColumns.Count)
+        if (_scGridColumns is null || colIndex < 0 || colIndex >= _scGridColumns.Count)
             return;
 
         var col = _scGridColumns[colIndex];
 
-        // If already listening for this cell, cancel
-        if (_scIsListeningForInput && _scSelectedCell == (actionIndex, colIndex))
+        // If already listening, cancel
+        if (_scIsListeningForInput)
         {
             _scIsListeningForInput = false;
-            _scSelectedCell = (-1, -1);
             _scListeningColumn = null;
-            return;
         }
 
-        // Start listening for input
-        _scSelectedCell = (actionIndex, colIndex);
-        _scIsListeningForInput = true;
-        _scListeningStartTime = DateTime.Now;
-        _scListeningColumn = col;
+        // Check for double-click on the same cell (within 400ms)
+        bool isDoubleClick = _scSelectedCell == (actionIndex, colIndex) &&
+                            (DateTime.Now - _scLastCellClickTime).TotalMilliseconds < 400;
 
-        System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
+        if (isDoubleClick)
+        {
+            // Double-click: enter listening mode
+            _scIsListeningForInput = true;
+            _scListeningStartTime = DateTime.Now;
+            _scListeningColumn = col;
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
+        }
+        else
+        {
+            // Single click: just select the cell
+            _scSelectedCell = (actionIndex, colIndex);
+            _scLastCellClickTime = DateTime.Now;
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected cell ({actionIndex}, {colIndex}) - {col.Header}");
+        }
+    }
+
+    /// <summary>
+    /// Handles right-click on a binding cell - clears the binding
+    /// </summary>
+    private void HandleCellRightClick(int actionIndex, int colIndex)
+    {
+        if (_scGridColumns is null || colIndex < 0 || colIndex >= _scGridColumns.Count)
+            return;
+        if (_scFilteredActions is null || actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
+            return;
+
+        var col = _scGridColumns[colIndex];
+        var action = _scFilteredActions[actionIndex];
+
+        // Cancel listening if active
+        if (_scIsListeningForInput)
+        {
+            CancelSCInputListening();
+        }
+
+        // Clear binding for this action on this column's device
+        if (col.IsJoystick)
+        {
+            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
+            if (userBinding is not null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
+            {
+                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName);
+                UpdateConflictingBindings();
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared binding for {action.ActionName} on {col.Header}");
+            }
+        }
+        // For keyboard/mouse, we don't clear default bindings (they're read-only from SC)
+    }
+
+    /// <summary>
+    /// Handles right-click on the bindings tab - finds the cell and clears its binding
+    /// </summary>
+    private void HandleBindingsTabRightClick(SKPoint point)
+    {
+        // Check if click is in the bindings list area
+        if (!_scBindingsListBounds.Contains(point) || _scFilteredActions is null)
+            return;
+
+        // Find which row was clicked accounting for scroll offset and collapsed categories
+        float rowHeight = 28f;  // Updated row height
+        float rowGap = 2f;
+        float categoryHeaderHeight = 28f;
+        float relativeY = point.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
+
+        string? lastActionMap = null;
+        float currentY = 0;
+
+        for (int i = 0; i < _scFilteredActions.Count; i++)
+        {
+            var action = _scFilteredActions[i];
+
+            // Account for category header
+            if (action.ActionMap != lastActionMap)
+            {
+                lastActionMap = action.ActionMap;
+                currentY += categoryHeaderHeight;
+
+                // If category is collapsed, skip all its actions
+                if (_scCollapsedCategories.Contains(action.ActionMap))
+                {
+                    while (i < _scFilteredActions.Count - 1 &&
+                           _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                    {
+                        i++;
+                    }
+                    continue;
+                }
+            }
+
+            float rowTop = currentY;
+            float rowBottom = currentY + rowHeight;
+
+            if (relativeY >= rowTop && relativeY < rowBottom)
+            {
+                // Check if right-click was in a device column cell
+                int clickedCol = GetClickedColumnIndex(point.X);
+                if (clickedCol >= 0 && _scGridColumns is not null && clickedCol < _scGridColumns.Count)
+                {
+                    HandleCellRightClick(i, clickedCol);
+                }
+                return;
+            }
+
+            currentY += rowHeight + rowGap;
+        }
     }
 
     /// <summary>
@@ -2142,7 +2385,7 @@ public partial class MainForm
     {
         _scIsListeningForInput = false;
         _scListeningColumn = null;
-        _scPreviousInputStates = null; // Reset input state tracking
+        ResetJoystickDetectionState(); // Reset all joystick detection state
         System.Diagnostics.Debug.WriteLine("[SCBindings] Input listening cancelled");
     }
 
@@ -2228,6 +2471,8 @@ public partial class MainForm
 
     // State tracking for joystick input detection during SC binding listening mode
     private Dictionary<string, DeviceInputState>? _scPreviousInputStates;
+    private Dictionary<string, float[]>? _scAxisBaseline; // Baseline axis values at start of listening
+    private (string deviceId, int axisIndex, float maxDeflection)? _scBestAxisCandidate; // Track largest axis movement
 
     /// <summary>
     /// Detects joystick input by polling all physical devices and finding inputs
@@ -2243,20 +2488,25 @@ public partial class MainForm
             return null;
         }
 
-        // Initialize previous states on first call
+        // Initialize states on first call - capture baseline for all devices
         if (_scPreviousInputStates is null)
         {
             _scPreviousInputStates = new Dictionary<string, DeviceInputState>();
-            // Capture initial state of all devices
+            _scAxisBaseline = new Dictionary<string, float[]>();
+            _scBestAxisCandidate = null;
+
             foreach (var device in _devices.Where(d => !d.IsVirtual && d.IsConnected))
             {
                 var state = _inputService.GetDeviceState(device.DeviceIndex);
                 if (state is not null)
                 {
-                    _scPreviousInputStates[device.InstanceGuid.ToString()] = state;
+                    string deviceId = device.InstanceGuid.ToString();
+                    _scPreviousInputStates[deviceId] = state;
+                    // Store baseline axis values (copy to avoid reference issues)
+                    _scAxisBaseline[deviceId] = state.Axes.ToArray();
                 }
             }
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized input states for {_scPreviousInputStates.Count} devices");
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized input states for {_scPreviousInputStates.Count} devices with axis baselines");
             return null; // First frame - just capture baseline
         }
 
@@ -2268,6 +2518,7 @@ public partial class MainForm
 
             string deviceId = device.InstanceGuid.ToString();
             _scPreviousInputStates.TryGetValue(deviceId, out var previousState);
+            _scAxisBaseline!.TryGetValue(deviceId, out var baseline);
 
             // Check for button presses (transition from not pressed to pressed)
             for (int i = 0; i < currentState.Buttons.Length; i++)
@@ -2282,8 +2533,7 @@ public partial class MainForm
                     if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
                     {
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected button {i} on {device.Name} -> vJoy{output.VJoyDevice} button{output.Index + 1}");
-                        _scPreviousInputStates[deviceId] = currentState;
-                        _scPreviousInputStates = null; // Reset for next listening session
+                        ResetJoystickDetectionState();
                         return $"button{output.Index + 1}";
                     }
 
@@ -2293,40 +2543,83 @@ public partial class MainForm
                     if (vJoyDevice == col.VJoyDeviceId)
                     {
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} button {i} -> vJoy{vJoyDevice} button{i + 1}");
-                        _scPreviousInputStates[deviceId] = currentState;
-                        _scPreviousInputStates = null;
+                        ResetJoystickDetectionState();
                         return $"button{i + 1}";
                     }
                 }
             }
 
-            // Check for significant axis movement (more than 50% deflection from center)
+            // Check for axis movement - track the axis with the largest deflection from baseline
             for (int i = 0; i < currentState.Axes.Length; i++)
             {
-                float prevValue = previousState is not null && i < previousState.Axes.Length ? previousState.Axes[i] : 0f;
+                float baselineValue = baseline is not null && i < baseline.Length ? baseline[i] : 0f;
                 float currValue = currentState.Axes[i];
+                float deflectionFromBaseline = Math.Abs(currValue - baselineValue);
 
-                // Detect significant movement (crossed threshold)
-                if (Math.Abs(currValue) > 0.5f && Math.Abs(prevValue) < 0.3f)
+                // Track the axis with the largest deflection (threshold: 40% movement from baseline)
+                if (deflectionFromBaseline > 0.4f)
                 {
-                    // Axis moved significantly - look up vJoy mapping
+                    // Check if this axis maps to target vJoy device
                     var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Axis, i);
-                    if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
+                    int? targetVJoy = (int?)output?.VJoyDevice;
+                    if (targetVJoy is null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected axis {i} on {device.Name} -> vJoy{output.VJoyDevice} axis{output.Index}");
-                        _scPreviousInputStates[deviceId] = currentState;
-                        _scPreviousInputStates = null;
-                        return GetSCAxisName(output.Index);
+                        // 1:1 fallback
+                        targetVJoy = (int?)profile.GetVJoyDeviceForPhysical(deviceId);
                     }
 
-                    // 1:1 fallback for assigned devices
-                    var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
-                    if (vJoyDevice == col.VJoyDeviceId)
+                    if (targetVJoy == col.VJoyDeviceId)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} axis {i} -> vJoy{vJoyDevice} axis{i}");
-                        _scPreviousInputStates[deviceId] = currentState;
-                        _scPreviousInputStates = null;
-                        return GetSCAxisName(i);
+                        // Update best candidate if this is larger deflection
+                        if (_scBestAxisCandidate is null || deflectionFromBaseline > _scBestAxisCandidate.Value.maxDeflection)
+                        {
+                            _scBestAxisCandidate = (deviceId, i, deflectionFromBaseline);
+                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Tracking axis {i} on {device.Name}, deflection: {deflectionFromBaseline:F2}");
+                        }
+                    }
+                }
+            }
+
+            // If we have a best axis candidate and it's now returning toward baseline (user released),
+            // or the deflection is very large (>70%), register it immediately
+            if (_scBestAxisCandidate is not null && _scBestAxisCandidate.Value.deviceId == deviceId)
+            {
+                int candidateAxisIndex = _scBestAxisCandidate.Value.axisIndex;
+                if (candidateAxisIndex < currentState.Axes.Length)
+                {
+                    float baselineVal = baseline is not null && candidateAxisIndex < baseline.Length ? baseline[candidateAxisIndex] : 0f;
+                    float currVal = currentState.Axes[candidateAxisIndex];
+                    float currentDeflection = Math.Abs(currVal - baselineVal);
+                    float prevDeflection = _scBestAxisCandidate.Value.maxDeflection;
+
+                    // Register axis if: large deflection (>70%) OR user started returning toward baseline
+                    bool largeDeflection = prevDeflection > 0.7f;
+                    bool returningToBaseline = currentDeflection < prevDeflection - 0.1f && prevDeflection > 0.5f;
+
+                    if (largeDeflection || returningToBaseline)
+                    {
+                        var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Axis, candidateAxisIndex);
+                        if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Registered axis {candidateAxisIndex} on {device.Name} -> vJoy{output.VJoyDevice} axis{output.Index} (deflection: {prevDeflection:F2})");
+                            ResetJoystickDetectionState();
+                            return GetSCAxisName(output.Index);
+                        }
+
+                        // 1:1 fallback
+                        var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
+                        if (vJoyDevice == col.VJoyDeviceId)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} axis {candidateAxisIndex} -> vJoy{vJoyDevice} axis{candidateAxisIndex} (deflection: {prevDeflection:F2})");
+                            ResetJoystickDetectionState();
+                            return GetSCAxisName(candidateAxisIndex);
+                        }
+                    }
+
+                    // Update max deflection if still increasing
+                    if (currentDeflection > prevDeflection)
+                    {
+                        _scBestAxisCandidate = (deviceId, candidateAxisIndex, currentDeflection);
                     }
                 }
             }
@@ -2345,8 +2638,7 @@ public partial class MainForm
                     {
                         string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected hat {i} {hatDir} on {device.Name}");
-                        _scPreviousInputStates[deviceId] = currentState;
-                        _scPreviousInputStates = null;
+                        ResetJoystickDetectionState();
                         return $"hat{i + 1}_{hatDir}";
                     }
 
@@ -2355,8 +2647,7 @@ public partial class MainForm
                     if (vJoyDevice == col.VJoyDeviceId)
                     {
                         string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
-                        _scPreviousInputStates[deviceId] = currentState;
-                        _scPreviousInputStates = null;
+                        ResetJoystickDetectionState();
                         return $"hat{i + 1}_{hatDir}";
                     }
                 }
@@ -2367,6 +2658,16 @@ public partial class MainForm
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Resets joystick detection state tracking variables
+    /// </summary>
+    private void ResetJoystickDetectionState()
+    {
+        _scPreviousInputStates = null;
+        _scAxisBaseline = null;
+        _scBestAxisCandidate = null;
     }
 
     /// <summary>
@@ -2479,6 +2780,46 @@ public partial class MainForm
     private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName)
     {
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{inputName}");
+
+        // Check for conflicting bindings (same input already used by another action)
+        var conflicts = _scExportProfile.GetConflictingBindings(
+            col.VJoyDeviceId,
+            inputName,
+            action.ActionMap,
+            action.ActionName);
+
+        if (conflicts.Count > 0)
+        {
+            // Show conflict dialog
+            string actionDisplayName = SCCategoryMapper.FormatActionName(action.ActionName);
+            string inputDisplayName = FormatInputName(inputName);
+            string deviceName = $"JS{col.SCInstance}";
+
+            var dialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
+            dialog.ShowDialog(this);
+
+            switch (dialog.Result)
+            {
+                case BindingConflictResult.Cancel:
+                    // User cancelled - don't apply the binding
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Binding cancelled for {action.ActionName}");
+                    return;
+
+                case BindingConflictResult.ReplaceAll:
+                    // Remove all conflicting bindings first
+                    foreach (var conflict in conflicts)
+                    {
+                        _scExportProfile.RemoveBinding(conflict.ActionMap, conflict.ActionName);
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Removed conflicting binding: {conflict.ActionName}");
+                    }
+                    break;
+
+                case BindingConflictResult.ApplyAnyway:
+                    // Just apply, keep the conflicts (user accepts duplicates)
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Applying binding with {conflicts.Count} conflict(s)");
+                    break;
+            }
+        }
 
         // Determine input type from input name
         var inputType = SCInputType.Button;
@@ -3107,7 +3448,7 @@ public partial class MainForm
         canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
 
         // Items
-        float rowHeight = 24f;
+        float rowHeight = 28f;
         float y = bounds.Top;
         _scHoveredProfileIndex = -1;
 

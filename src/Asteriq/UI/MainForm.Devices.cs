@@ -73,15 +73,63 @@ public partial class MainForm
         }
         else
         {
+            // Clear and rebuild device item bounds for hit testing
+            _deviceItemBounds.Clear();
+
             for (int i = 0; i < filteredDevices.Count && itemY + itemHeight < contentBounds.Bottom - 40; i++)
             {
                 // Find the actual device index in _devices
                 int actualIndex = _devices.IndexOf(filteredDevices[i]);
+
+                // Track bounds for drag-drop hit testing
+                var itemBounds = new SKRect(contentBounds.Left + pad - 10, itemY,
+                    contentBounds.Left + pad - 10 + contentBounds.Width - pad, itemY + itemHeight);
+                _deviceItemBounds.Add(itemBounds);
+
+                // Skip drawing the item being dragged (we'll draw it at cursor position)
+                if (_isDraggingDevice && actualIndex == _dragDeviceIndex)
+                {
+                    // Draw drop indicator line where this item would go
+                    itemY += itemHeight + itemGap;
+                    continue;
+                }
+
+                // Draw drop indicator if we're dragging and this is the drop target
+                if (_isDraggingDevice && i == _dragDropTargetIndex)
+                {
+                    using var dropPaint = new SKPaint
+                    {
+                        Style = SKPaintStyle.Stroke,
+                        Color = FUIColors.Active,
+                        StrokeWidth = 2f,
+                        IsAntialias = true
+                    };
+                    canvas.DrawLine(itemBounds.Left, itemY - 2, itemBounds.Right, itemY - 2, dropPaint);
+                }
+
                 string status = filteredDevices[i].IsConnected ? "ONLINE" : "DISCONNECTED";
                 string vjoyAssignment = GetVJoyAssignmentForDevice(filteredDevices[i]);
                 DrawDeviceListItem(canvas, contentBounds.Left + pad - 10, itemY, contentBounds.Width - pad,
                     filteredDevices[i].Name, status, actualIndex == _selectedDevice, actualIndex == _hoveredDevice, vjoyAssignment);
                 itemY += itemHeight + itemGap;
+            }
+
+            // Draw the dragged item at cursor position (ghost effect)
+            if (_isDraggingDevice && _dragDeviceIndex >= 0 && _dragDeviceIndex < _devices.Count)
+            {
+                var draggedDevice = _devices[_dragDeviceIndex];
+                string status = draggedDevice.IsConnected ? "ONLINE" : "DISCONNECTED";
+                string vjoyAssignment = GetVJoyAssignmentForDevice(draggedDevice);
+
+                // Draw with transparency at cursor position
+                canvas.Save();
+                canvas.Translate(_dragCurrentPoint.X - _dragStartPoint.X, _dragCurrentPoint.Y - _dragStartPoint.Y);
+                // Use a semi-transparent overlay effect
+                using var ghostPaint = new SKPaint { Color = SKColors.White.WithAlpha(180) };
+                DrawDeviceListItem(canvas, contentBounds.Left + pad - 10,
+                    _deviceItemBounds.Count > 0 ? _deviceItemBounds[0].Top + (_dragDeviceIndex * (itemHeight + itemGap)) : contentBounds.Top + 50,
+                    contentBounds.Width - pad, draggedDevice.Name, status, true, false, vjoyAssignment);
+                canvas.Restore();
             }
         }
 

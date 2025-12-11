@@ -581,6 +581,9 @@ public class MappingProfile
     /// <summary>Button-to-axis mappings</summary>
     public List<ButtonToAxisMapping> ButtonToAxisMappings { get; set; } = new();
 
+    /// <summary>User-defined device display order (list of device GUIDs)</summary>
+    public List<string> DeviceOrder { get; set; } = new();
+
     /// <summary>When created</summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

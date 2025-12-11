@@ -296,7 +296,7 @@ public class MappingEngine : IDisposable
         // Output
         if (mapping.Output.Type == OutputType.VJoyButton)
         {
-            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed);
+            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index + 1, outputPressed); // vJoy buttons are 1-indexed
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
@@ -435,7 +435,7 @@ public class MappingEngine : IDisposable
         // Output
         if (mapping.Output.Type == OutputType.VJoyButton)
         {
-            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed);
+            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index + 1, outputPressed); // vJoy buttons are 1-indexed
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {

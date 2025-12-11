@@ -510,7 +510,7 @@ public partial class MainForm : Form
         if (openDialog.ShowDialog(this) == DialogResult.OK)
         {
             var imported = _profileService.ImportProfile(openDialog.FileName, generateNewId: true);
-            if (imported != null)
+            if (imported is not null)
             {
                 _profileService.ActivateProfile(imported.Id);
                 RefreshProfileList();
@@ -526,7 +526,7 @@ public partial class MainForm : Form
 
     private void ExportActiveProfile()
     {
-        if (_profileService.ActiveProfile == null)
+        if (_profileService.ActiveProfile is null)
         {
             FUIMessageBox.ShowInfo(this,
                 "No profile is currently active. Please select a profile first.",
@@ -608,7 +608,7 @@ public partial class MainForm : Form
                     continue;
 
                 var map = DeviceMap.Load(mapFile);
-                if (map != null)
+                if (map is not null)
                     allMaps.Add((mapFile, map));
             }
 
@@ -652,7 +652,7 @@ public partial class MainForm : Form
             var defaultMapPath = Path.Combine(mapsDir, "joystick.json");
             _deviceMap = DeviceMap.Load(defaultMapPath);
 
-            if (_deviceMap != null && isLeftHand)
+            if (_deviceMap is not null && isLeftHand)
             {
                 // Override mirror setting for left-hand devices using generic map
                 _deviceMap.Mirror = true;
@@ -705,7 +705,7 @@ public partial class MainForm : Form
     /// </summary>
     private SKSvg? GetActiveSvg()
     {
-        if (_deviceMap == null)
+        if (_deviceMap is null)
             return _joystickSvg;
 
         // Check the device map's svgFile field
@@ -758,7 +758,7 @@ public partial class MainForm : Form
         // Check for transform attribute on the group
         var transform = group.Attribute("transform")?.Value;
         float tx = 0, ty = 0;
-        if (transform != null && transform.StartsWith("translate("))
+        if (transform is not null && transform.StartsWith("translate("))
         {
             var match = System.Text.RegularExpressions.Regex.Match(transform, @"translate\(([\d.-]+),?\s*([\d.-]*)\)");
             if (match.Success)
@@ -1334,7 +1334,7 @@ public partial class MainForm : Form
 
     private void TrackInputActivity(DeviceInputState state)
     {
-        if (_deviceMap == null) return;
+        if (_deviceMap is null) return;
 
         // Track axis changes
         for (int i = 0; i < state.Axes.Length; i++)
@@ -1387,7 +1387,7 @@ public partial class MainForm : Form
                 d.InstanceGuid == newDevice.InstanceGuid ||
                 (d.Name == newDevice.Name && d.AxisCount == newDevice.AxisCount && d.ButtonCount == newDevice.ButtonCount));
 
-            if (disconnected != null)
+            if (disconnected is not null)
             {
                 // Device reconnected - remove from disconnected list
                 _disconnectedDevices.Remove(disconnected);
@@ -1419,7 +1419,7 @@ public partial class MainForm : Form
             // Find the device that was disconnected before we refresh
             var disconnectedDevice = _devices.FirstOrDefault(d => d.DeviceIndex == deviceIndex);
 
-            if (disconnectedDevice != null && !disconnectedDevice.IsVirtual)
+            if (disconnectedDevice is not null && !disconnectedDevice.IsVirtual)
             {
                 // Always track physical devices when they disconnect
                 // Mark as disconnected and add to tracked list
@@ -1445,7 +1445,7 @@ public partial class MainForm : Form
 
     private void RestoreDeviceSelection(Guid? selectedGuid, string? selectedName)
     {
-        if (selectedGuid == null && selectedName == null)
+        if (selectedGuid is null && selectedName is null)
             return;
 
         // Try to find the device by GUID first, then by name
@@ -1453,7 +1453,7 @@ public partial class MainForm : Form
         for (int i = 0; i < _devices.Count; i++)
         {
             if (_devices[i].InstanceGuid == selectedGuid ||
-                (selectedName != null && _devices[i].Name == selectedName))
+                (selectedName is not null && _devices[i].Name == selectedName))
             {
                 newIndex = i;
                 break;
@@ -1489,7 +1489,7 @@ public partial class MainForm : Form
             {
                 var json = File.ReadAllText(path);
                 var devices = System.Text.Json.JsonSerializer.Deserialize<List<DisconnectedDeviceInfo>>(json);
-                if (devices != null)
+                if (devices is not null)
                 {
                     _disconnectedDevices = devices.Select(d => new PhysicalDeviceInfo
                     {
@@ -1640,7 +1640,7 @@ public partial class MainForm : Form
         }
 
         // Handle background slider dragging (works across all tabs since it's global)
-        if (_draggingBgSlider != null)
+        if (_draggingBgSlider is not null)
         {
             UpdateBgSliderFromPoint(e.X);
             return;
@@ -1849,7 +1849,7 @@ public partial class MainForm : Form
             }
 
             // Action row and cell hover detection
-            if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions != null)
+            if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions is not null)
             {
                 // Find which row is hovered, accounting for scroll offset and group headers
                 float rowHeight = 28f;  // Must match drawing code
@@ -2052,16 +2052,16 @@ public partial class MainForm : Form
         }
 
         // SVG silhouette hover detection
-        if (_silhouetteBounds.Contains(e.X, e.Y) && _joystickSvg != null)
+        if (_silhouetteBounds.Contains(e.X, e.Y) && _joystickSvg is not null)
         {
             var hitControlId = HitTestSvg(new SKPoint(e.X, e.Y));
             if (hitControlId != _hoveredControlId)
             {
                 _hoveredControlId = hitControlId;
-                Cursor = hitControlId != null ? Cursors.Hand : Cursors.Default;
+                Cursor = hitControlId is not null ? Cursors.Hand : Cursors.Default;
             }
         }
-        else if (_hoveredControlId != null)
+        else if (_hoveredControlId is not null)
         {
             _hoveredControlId = null;
         }
@@ -2433,7 +2433,7 @@ public partial class MainForm : Form
         }
 
         // SVG control clicks
-        if (_hoveredControlId != null)
+        if (_hoveredControlId is not null)
         {
             // Check for double-click (same control clicked within 500ms)
             bool isDoubleClick = _lastClickedControlId == _hoveredControlId &&
@@ -2498,7 +2498,7 @@ public partial class MainForm : Form
         }
 
         // Release background slider dragging
-        if (_draggingBgSlider != null)
+        if (_draggingBgSlider is not null)
         {
             _draggingBgSlider = null;
             SaveBackgroundSettings();
@@ -2553,7 +2553,7 @@ public partial class MainForm : Form
 
     private string? HitTestSvg(SKPoint screenPoint)
     {
-        if (_joystickSvg?.Picture == null || _controlBounds.Count == 0) return null;
+        if (_joystickSvg?.Picture is null || _controlBounds.Count == 0) return null;
 
         // Transform screen coordinates to SVG coordinates
         float svgX = (screenPoint.X - _svgOffset.X) / _svgScale;
@@ -3033,7 +3033,7 @@ public partial class MainForm : Form
         itemY += itemHeight;
 
         // "Export" option
-        bool canExport = _profileService.ActiveProfile != null;
+        bool canExport = _profileService.ActiveProfile is not null;
         DrawDropdownItem(canvas, x, itemY, width, itemHeight, "↑ Export...",
             _hoveredProfileIndex == _profiles.Count + 2, false, canExport);
     }

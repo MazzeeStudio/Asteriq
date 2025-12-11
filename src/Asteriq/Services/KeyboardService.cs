@@ -86,7 +86,7 @@ public class KeyboardService : IDisposable
             if (pressed)
             {
                 // Press modifiers first
-                if (modifiers != null)
+                if (modifiers is not null)
                 {
                     foreach (var mod in modifiers)
                         SendKey(mod, true);
@@ -99,7 +99,7 @@ public class KeyboardService : IDisposable
                 SendKey(virtualKeyCode, false);
 
                 // Release modifiers
-                if (modifiers != null)
+                if (modifiers is not null)
                 {
                     foreach (var mod in modifiers.Reverse())
                         SendKey(mod, false);
@@ -121,7 +121,7 @@ public class KeyboardService : IDisposable
             return;
 
         int[]? modifierCodes = null;
-        if (modifierNames != null && modifierNames.Count > 0)
+        if (modifierNames is not null && modifierNames.Count > 0)
         {
             modifierCodes = modifierNames
                 .Select(GetKeyCode)

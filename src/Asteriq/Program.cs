@@ -347,7 +347,7 @@ Examples:
                     return;
 
                 var axes = string.Join(" ", state.Axes.Take(6).Select((v, i) => $"A{i}:{v:+0.00;-0.00}"));
-                var pressedBtns = state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b != null);
+                var pressedBtns = state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b is not null);
                 var buttons = string.Join(",", pressedBtns);
 
                 // Move to device's line and overwrite (with bounds check)
@@ -439,7 +439,7 @@ Examples:
         }
 
         var sourceDevice = devices.FirstOrDefault(d => d.DeviceIndex == physicalIndex);
-        if (sourceDevice == null)
+        if (sourceDevice is null)
         {
             Console.WriteLine($"\nDevice index {physicalIndex} not found!");
             Console.ReadKey();
@@ -503,7 +503,7 @@ Examples:
             // Display status (sticky line)
             Console.SetCursorPosition(0, lineStart);
             var axes = string.Join(" ", state.Axes.Take(4).Select((v, i) => $"{axisMap[i]}:{v:+0.00;-0.00}"));
-            var btns = string.Join(",", state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b != null));
+            var btns = string.Join(",", state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b is not null));
             Console.Write($"IN:  {axes} | Btn: {(btns.Length > 0 ? btns : "-"),-20}");
             Console.SetCursorPosition(0, lineStart + 1);
             Console.Write($"OUT: vJoy {vjoyId} receiving input...                    ");
@@ -660,7 +660,7 @@ Examples:
             foreach (var dev in matchedDevices)
             {
                 var primaryPath = dev.PrimaryDevicePath;
-                if (primaryPath != null)
+                if (primaryPath is not null)
                 {
                     Console.WriteLine($"  {primaryPath}");
                 }
@@ -764,7 +764,7 @@ Examples:
         }
 
         var sourceDevice = devices.FirstOrDefault(d => d.DeviceIndex == physicalIndex);
-        if (sourceDevice == null)
+        if (sourceDevice is null)
         {
             Console.WriteLine($"\nDevice index {physicalIndex} not found!");
             inputService.Dispose();
@@ -873,7 +873,7 @@ Examples:
                 {
                     Console.SetCursorPosition(0, lineStart);
                     var axes = string.Join(" ", state.Axes.Take(4).Select((v, i) => $"A{i}:{v:+0.00;-0.00}"));
-                    var btns = string.Join(",", state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b != null));
+                    var btns = string.Join(",", state.Buttons.Select((p, i) => p ? (i + 1).ToString() : null).Where(b => b is not null));
                     Console.Write($"IN:  {axes} | Btn: {(btns.Length > 0 ? btns : "-"),-20}");
                 }
             }
@@ -930,7 +930,7 @@ Examples:
         if (profileService.LastProfileId.HasValue)
         {
             var lastProfile = profiles.FirstOrDefault(p => p.Id == profileService.LastProfileId.Value);
-            if (lastProfile != null)
+            if (lastProfile is not null)
                 Console.WriteLine($"Last used: {lastProfile.Name}");
         }
 
@@ -976,7 +976,7 @@ Examples:
         var devices = inputService.EnumerateDevices();
         var sourceDevice = devices.FirstOrDefault(d => d.DeviceIndex == physicalIndex);
 
-        if (sourceDevice == null)
+        if (sourceDevice is null)
         {
             Console.WriteLine($"ERROR: Device index {physicalIndex} not found.");
             Console.WriteLine("Available devices:");
@@ -1084,7 +1084,7 @@ Examples:
         var profileService = new ProfileService();
         var profile = profileService.LoadProfile(profileId.Value);
 
-        if (profile == null)
+        if (profile is null)
         {
             Console.WriteLine($"ERROR: Profile {profileId} not found.");
             return;
@@ -1141,7 +1141,7 @@ Examples:
         var profileService = new ProfileService();
         var profile = profileService.LoadProfile(profileId.Value);
 
-        if (profile == null)
+        if (profile is null)
         {
             Console.WriteLine($"ERROR: Profile {profileId} not found.");
             return;
@@ -1236,7 +1236,7 @@ Examples:
         var profileService = new ProfileService();
         var profile = profileService.ImportProfile(importPath);
 
-        if (profile != null)
+        if (profile is not null)
         {
             Console.WriteLine($"Profile imported successfully!");
             Console.WriteLine($"  ID: {profile.Id}");
@@ -1276,7 +1276,7 @@ Examples:
         var profileService = new ProfileService();
         var profile = profileService.LoadProfile(profileId.Value);
 
-        if (profile == null)
+        if (profile is null)
         {
             Console.WriteLine($"ERROR: Profile {profileId} not found.");
             return;
@@ -1317,7 +1317,7 @@ Examples:
         foreach (var deviceId in deviceIds)
         {
             var device = devices.FirstOrDefault(d => d.InstanceGuid.ToString() == deviceId);
-            if (device != null)
+            if (device is not null)
                 Console.WriteLine($"  [OK] {device.Name}");
             else
                 Console.WriteLine($"  [MISSING] Device {deviceId}");
@@ -1501,7 +1501,7 @@ Examples:
 
         // Normal mode: map specific button to key
         var sourceDevice = devices.FirstOrDefault(d => d.DeviceIndex == physicalIndex);
-        if (sourceDevice == null)
+        if (sourceDevice is null)
         {
             Console.WriteLine($"\nERROR: Device index {physicalIndex} not found!");
             inputService.Dispose();
@@ -1629,7 +1629,7 @@ Examples:
 
             // Show preferred installation
             var preferred = scService.GetPreferredInstallation();
-            if (preferred != null)
+            if (preferred is not null)
             {
                 Console.WriteLine($"Preferred installation: {preferred.DisplayName}");
             }
@@ -1682,7 +1682,7 @@ Examples:
         if (!string.IsNullOrEmpty(targetEnv))
         {
             target = scService.GetInstallation(targetEnv);
-            if (target == null)
+            if (target is null)
             {
                 Console.WriteLine($"\nERROR: Installation '{targetEnv}' not found.");
                 Console.WriteLine("\n(Press Enter to continue...)");
@@ -1693,7 +1693,7 @@ Examples:
         else
         {
             target = scService.GetPreferredInstallation();
-            if (target == null)
+            if (target is null)
             {
                 Console.WriteLine("\nERROR: No preferred installation found.");
                 Console.WriteLine("\n(Press Enter to continue...)");
@@ -1728,7 +1728,7 @@ Examples:
 
         stopwatch.Stop();
 
-        if (profile == null)
+        if (profile is null)
         {
             Console.WriteLine("\nERROR: Failed to extract profile.");
             Console.WriteLine("\n(Press Enter to continue...)");
@@ -1746,7 +1746,7 @@ Examples:
         Console.WriteLine($"Actions: {actions?.Count ?? 0}");
 
         // Show a sample of action maps
-        if (actionmaps != null && actionmaps.Count > 0)
+        if (actionmaps is not null && actionmaps.Count > 0)
         {
             Console.WriteLine("\nSample action maps:");
             int count = 0;
@@ -1811,7 +1811,7 @@ Examples:
         if (!string.IsNullOrEmpty(targetEnv))
         {
             target = scService.GetInstallation(targetEnv);
-            if (target == null)
+            if (target is null)
             {
                 Console.WriteLine($"ERROR: Installation '{targetEnv}' not found.");
                 Console.WriteLine("\n(Press Enter to continue...)");
@@ -1822,7 +1822,7 @@ Examples:
         else
         {
             target = scService.GetPreferredInstallation();
-            if (target == null)
+            if (target is null)
             {
                 Console.WriteLine("ERROR: No preferred installation found.");
                 Console.WriteLine("\n(Press Enter to continue...)");
@@ -1838,7 +1838,7 @@ Examples:
         Console.WriteLine("\nLoading defaultProfile.xml...");
         var profile = cacheService.GetOrExtractProfile(target);
 
-        if (profile == null)
+        if (profile is null)
         {
             Console.WriteLine("ERROR: Failed to load profile.");
             Console.WriteLine("\n(Press Enter to continue...)");
@@ -1941,7 +1941,7 @@ Examples:
         if (!string.IsNullOrEmpty(targetEnv))
         {
             target = scService.GetInstallation(targetEnv);
-            if (target == null)
+            if (target is null)
             {
                 Console.WriteLine($"ERROR: Installation '{targetEnv}' not found.");
                 Console.WriteLine("\n(Press Enter to continue...)");
@@ -1952,7 +1952,7 @@ Examples:
         else
         {
             target = scService.GetPreferredInstallation();
-            if (target == null)
+            if (target is null)
             {
                 Console.WriteLine("ERROR: No preferred installation found.");
                 Console.WriteLine("\n(Press Enter to continue...)");

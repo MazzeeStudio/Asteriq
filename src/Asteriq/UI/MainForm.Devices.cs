@@ -210,7 +210,7 @@ public partial class MainForm
         float centerX = bounds.MidX;
         float centerY = bounds.MidY;
 
-        if (_joystickSvg?.Picture != null)
+        if (_joystickSvg?.Picture is not null)
         {
             // Limit size to 900px max and apply same rendering as mappings tab
             float maxSize = 900f;
@@ -245,7 +245,7 @@ public partial class MainForm
 
     private void DrawActiveInputLeadLines(SKCanvas canvas, SKRect panelBounds)
     {
-        if (_deviceMap == null || _joystickSvg?.Picture == null) return;
+        if (_deviceMap is null || _joystickSvg?.Picture is null) return;
 
         var visibleInputs = _activeInputTracker.GetVisibleInputs();
         int inputIndex = 0;
@@ -253,7 +253,7 @@ public partial class MainForm
         foreach (var input in visibleInputs)
         {
             var control = input.Control;
-            if (control?.Anchor == null) continue; // Must have JSON anchor
+            if (control?.Anchor is null) continue; // Must have JSON anchor
 
             float opacity = input.GetOpacity(_activeInputTracker.FadeDelay, _activeInputTracker.FadeDuration);
             if (opacity < 0.01f) continue;
@@ -266,7 +266,7 @@ public partial class MainForm
             float labelX, labelY;
             bool goesRight = true;
 
-            if (control.LabelOffset != null)
+            if (control.LabelOffset is not null)
             {
                 // labelOffset is relative to anchor, in viewBox units
                 float labelVbX = control.Anchor.X + control.LabelOffset.X;
@@ -301,7 +301,7 @@ public partial class MainForm
     /// </summary>
     private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
     {
-        if (_joystickSvg?.Picture == null)
+        if (_joystickSvg?.Picture is null)
             return new SKPoint(viewBoxX, viewBoxY);
 
         float screenX, screenY;
@@ -412,7 +412,7 @@ public partial class MainForm
     {
         var points = new List<SKPoint> { anchor };
 
-        if (leadLine == null)
+        if (leadLine is null)
         {
             // Default: simple path from anchor to label
             // Add a midpoint to create a nice angled line
@@ -433,7 +433,7 @@ public partial class MainForm
         points.Add(shelfEndPoint);
 
         // Process intermediate segments (if any)
-        if (leadLine.Segments != null && leadLine.Segments.Count > 0)
+        if (leadLine.Segments is not null && leadLine.Segments.Count > 0)
         {
             var currentPoint = shelfEndPoint;
             int shelfDirection = shelfGoesRight ? 1 : -1;
@@ -539,7 +539,7 @@ public partial class MainForm
     {
         // Draw the actual SVG if loaded, otherwise fallback to simple outline
         var activeSvg = GetActiveSvg();
-        if (activeSvg?.Picture != null)
+        if (activeSvg?.Picture is not null)
         {
             bool mirror = _deviceMap?.Mirror ?? false;
             DrawSvgInBounds(canvas, activeSvg, bounds, mirror);
@@ -552,7 +552,7 @@ public partial class MainForm
 
     private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
     {
-        if (svg.Picture == null) return;
+        if (svg.Picture is null) return;
 
         var svgBounds = svg.Picture.CullRect;
         if (svgBounds.Width <= 0 || svgBounds.Height <= 0) return;

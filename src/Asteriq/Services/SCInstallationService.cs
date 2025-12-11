@@ -80,7 +80,7 @@ public class SCInstallationService
         {
             var match = installations.FirstOrDefault(i =>
                 i.Environment.Equals(env, StringComparison.OrdinalIgnoreCase));
-            if (match != null)
+            if (match is not null)
                 return match;
         }
 
@@ -140,7 +140,7 @@ public class SCInstallationService
                 envName = "CUSTOM";
 
             var installation = ValidateInstallation(customPath, envName);
-            if (installation != null)
+            if (installation is not null)
             {
                 _installations.Add(installation);
             }
@@ -172,7 +172,7 @@ public class SCInstallationService
                 continue;
 
             var installation = ValidateInstallation(versionPath, env);
-            if (installation != null)
+            if (installation is not null)
             {
                 _installations.Add(installation);
             }
@@ -271,13 +271,13 @@ public class SCInstallationService
 
         // Check if parent exists (Mappings folder might not exist yet)
         var controlsPath = Path.GetDirectoryName(modernPath);
-        if (controlsPath != null && Directory.Exists(controlsPath))
+        if (controlsPath is not null && Directory.Exists(controlsPath))
             return modernPath;
 
         // Try older path structure
         var olderPath = Path.Combine(installPath, "USER", "Controls", "Mappings");
         controlsPath = Path.GetDirectoryName(olderPath);
-        if (controlsPath != null && Directory.Exists(controlsPath))
+        if (controlsPath is not null && Directory.Exists(controlsPath))
             return olderPath;
 
         // Default to modern path (will be created on export)

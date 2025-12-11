@@ -114,7 +114,7 @@ public class SCExportProfileService
             {
                 var json = File.ReadAllText(file);
                 var profile = JsonSerializer.Deserialize<SCExportProfile>(json, _jsonOptions);
-                if (profile != null)
+                if (profile is not null)
                 {
                     profiles.Add(new SCExportProfileInfo
                     {
@@ -143,7 +143,7 @@ public class SCExportProfileService
     public SCExportProfile? DuplicateProfile(string sourceName, string newName)
     {
         var source = LoadProfile(sourceName);
-        if (source == null)
+        if (source is null)
             return null;
 
         var duplicate = new SCExportProfile
@@ -204,7 +204,7 @@ public class SCExportProfileService
             return false;
 
         var profile = LoadProfile(oldName);
-        if (profile == null)
+        if (profile is null)
             return false;
 
         profile.ProfileName = newName;

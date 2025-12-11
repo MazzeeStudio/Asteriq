@@ -22,7 +22,7 @@ public partial class MainForm
             _scExportProfileService = new SCExportProfileService();
 
             // Ensure vJoy devices are enumerated for SC Bindings columns
-            if (_vjoyDevices.Count == 0 && _vjoyService != null)
+            if (_vjoyDevices.Count == 0 && _vjoyService is not null)
             {
                 _vjoyDevices = _vjoyService.EnumerateDevices();
             }
@@ -39,7 +39,7 @@ public partial class MainForm
                 loadedProfile = _scExportProfileService.LoadProfile(lastProfileName);
             }
 
-            if (loadedProfile != null)
+            if (loadedProfile is not null)
             {
                 _scExportProfile = loadedProfile;
                 System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded last SC export profile: {loadedProfile.ProfileName}");
@@ -72,7 +72,7 @@ public partial class MainForm
 
     private void RefreshSCExportProfiles()
     {
-        if (_scExportProfileService == null) return;
+        if (_scExportProfileService is null) return;
         _scExportProfiles = _scExportProfileService.ListProfiles();
     }
 
@@ -164,7 +164,7 @@ public partial class MainForm
 
     private void RefreshSCInstallations()
     {
-        if (_scInstallationService == null) return;
+        if (_scInstallationService is null) return;
 
         _scInstallations = _scInstallationService.Installations.ToList();
 
@@ -183,12 +183,12 @@ public partial class MainForm
 
     private void LoadSCSchema(SCInstallation installation)
     {
-        if (_scProfileCacheService == null || _scSchemaService == null) return;
+        if (_scProfileCacheService is null || _scSchemaService is null) return;
 
         try
         {
             var profile = _scProfileCacheService.GetOrExtractProfile(installation);
-            if (profile != null)
+            if (profile is not null)
             {
                 _scActions = _scSchemaService.ParseActions(profile);
                 _scExportProfile.TargetEnvironment = installation.Environment;
@@ -296,7 +296,7 @@ public partial class MainForm
     /// </summary>
     private void ApplyDefaultBindingsToProfile()
     {
-        if (_scActions == null) return;
+        if (_scActions is null) return;
 
         int kbCount = 0, moCount = 0, jsCount = 0;
 
@@ -366,7 +366,7 @@ public partial class MainForm
 
     private void RefreshFilteredActions()
     {
-        if (_scActions == null || _scSchemaService == null)
+        if (_scActions is null || _scSchemaService is null)
         {
             _scFilteredActions = null;
             return;
@@ -394,7 +394,7 @@ public partial class MainForm
         if (_scShowBoundOnly)
         {
             actions = actions.Where(a =>
-                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null ||
+                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null ||
                 a.DefaultBindings.Any()
             ).ToList();
         }
@@ -435,7 +435,7 @@ public partial class MainForm
 
         // Check user binding input names
         var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
-        if (userBinding != null)
+        if (userBinding is not null)
         {
             if (userBinding.InputName.ToLowerInvariant().Contains(searchLower))
                 return true;
@@ -567,7 +567,7 @@ public partial class MainForm
             y += 10f;
 
             // Schema info
-            if (_scActions != null)
+            if (_scActions is not null)
             {
                 DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "Actions", _scActions.Count.ToString());
                 var joystickActions = _scSchemaService?.FilterJoystickActions(_scActions);
@@ -712,7 +712,7 @@ public partial class MainForm
         y += filenameBoxHeight + 8f;
 
         // Export path preview (folder)
-        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scExportService != null)
+        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scExportService is not null)
         {
             var installation = _scInstallations[_selectedSCInstallation];
             FUIRenderer.DrawText(canvas, "TO FOLDER", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
@@ -882,7 +882,7 @@ public partial class MainForm
 
         // Action count on right of title
         int actionCount = _scFilteredActions?.Count ?? 0;
-        int boundCount = _scFilteredActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null) ?? 0;
+        int boundCount = _scFilteredActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
         string countText = $"{actionCount} actions, {boundCount} bound";
         float countTextWidth = FUIRenderer.MeasureText(countText, 9f);
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 9f);
@@ -1038,9 +1038,9 @@ public partial class MainForm
 
         _scCategoryHeaderBounds.Clear();
 
-        if (_scFilteredActions == null || _scFilteredActions.Count == 0)
+        if (_scFilteredActions is null || _scFilteredActions.Count == 0)
         {
-            FUIRenderer.DrawText(canvas, _scActions == null ? "Loading actions..." : "No actions match filter",
+            FUIRenderer.DrawText(canvas, _scActions is null ? "Loading actions..." : "No actions match filter",
                 new SKPoint(leftMargin, scrollY + 20f), FUIColors.TextDim, 11f);
         }
         else
@@ -1085,7 +1085,7 @@ public partial class MainForm
                             SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == categoryName);
                         int categoryBoundCount = _scFilteredActions.Count(a =>
                             SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == categoryName &&
-                            _scExportProfile.GetBinding(a.ActionMap, a.ActionName) != null);
+                            _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null);
 
                         FUIRenderer.DrawText(canvas, categoryName,
                             new SKPoint(leftMargin + 18, scrollY + categoryHeaderHeight / 2 + 4),
@@ -1224,7 +1224,7 @@ public partial class MainForm
                             {
                                 binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
                                 // Check if this binding matches the current column's device
-                                if (binding != null && _scExportProfile.GetSCInstance(binding.VJoyDevice) != col.SCInstance)
+                                if (binding is not null && _scExportProfile.GetSCInstance(binding.VJoyDevice) != col.SCInstance)
                                     binding = null;
                             }
                             else if (col.IsKeyboard)
@@ -1236,7 +1236,7 @@ public partial class MainForm
                                 binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Mouse);
                             }
 
-                            if (binding != null)
+                            if (binding is not null)
                             {
                                 bindingComponents = GetBindingComponents(binding.InputName, binding.Modifiers);
                                 inputType = binding.InputType;
@@ -1876,7 +1876,7 @@ public partial class MainForm
         }
 
         // Selected action info
-        if (_scSelectedActionIndex >= 0 && _scFilteredActions != null && _scSelectedActionIndex < _scFilteredActions.Count)
+        if (_scSelectedActionIndex >= 0 && _scFilteredActions is not null && _scSelectedActionIndex < _scFilteredActions.Count)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
 
@@ -1914,7 +1914,7 @@ public partial class MainForm
 
             _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 8, y, rightMargin, y + btnHeight);
             _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-            bool hasBinding = existingBinding != null;
+            bool hasBinding = existingBinding is not null;
 
             if (hasBinding)
             {
@@ -2572,7 +2572,7 @@ public partial class MainForm
         }
 
         // Clear binding button
-        if (_scClearBindingButtonBounds.Contains(point) && _scSelectedActionIndex >= 0 && _scFilteredActions != null)
+        if (_scClearBindingButtonBounds.Contains(point) && _scSelectedActionIndex >= 0 && _scFilteredActions is not null)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
             _scExportProfile.RemoveBinding(selectedAction.ActionMap, selectedAction.ActionName);
@@ -2607,7 +2607,7 @@ public partial class MainForm
         }
 
         // Action row and cell clicks
-        if (_scBindingsListBounds.Contains(point) && _scFilteredActions != null)
+        if (_scBindingsListBounds.Contains(point) && _scFilteredActions is not null)
         {
             // Find which row was clicked accounting for scroll offset and collapsed categories
             float rowHeight = 28f;
@@ -2650,7 +2650,7 @@ public partial class MainForm
 
                     // Check if click was in a device column cell
                     int clickedCol = GetClickedColumnIndex(point.X);
-                    if (clickedCol >= 0 && _scGridColumns != null && clickedCol < _scGridColumns.Count)
+                    if (clickedCol >= 0 && _scGridColumns is not null && clickedCol < _scGridColumns.Count)
                     {
                         // Cell was clicked - enter listening mode
                         HandleCellClick(i, clickedCol);
@@ -2853,7 +2853,7 @@ public partial class MainForm
     /// </summary>
     private void CheckSCBindingInput()
     {
-        if (!_scIsListeningForInput || _scListeningColumn == null || _scFilteredActions == null)
+        if (!_scIsListeningForInput || _scListeningColumn is null || _scFilteredActions is null)
             return;
 
         // Check for timeout
@@ -2881,7 +2881,7 @@ public partial class MainForm
         if (col.IsKeyboard)
         {
             var detectedKey = DetectKeyboardInput();
-            if (detectedKey != null)
+            if (detectedKey is not null)
             {
                 AssignKeyboardBinding(action, detectedKey.Value.key, detectedKey.Value.modifiers);
                 CancelSCInputListening();
@@ -2890,7 +2890,7 @@ public partial class MainForm
         else if (col.IsMouse)
         {
             var detectedMouse = DetectMouseInput();
-            if (detectedMouse != null)
+            if (detectedMouse is not null)
             {
                 AssignMouseBinding(action, detectedMouse);
                 CancelSCInputListening();
@@ -2900,7 +2900,7 @@ public partial class MainForm
         {
             // Joystick input detection will use physical→vJoy mapping lookup
             var detectedJoystick = DetectJoystickInput(col);
-            if (detectedJoystick != null)
+            if (detectedJoystick is not null)
             {
                 AssignJoystickBinding(action, col, detectedJoystick);
                 CancelSCInputListening();
@@ -3027,7 +3027,7 @@ public partial class MainForm
                 if (device.IsVirtual || !device.IsConnected) continue;
 
                 var state = _inputService.GetDeviceState(idx);
-                if (state != null)
+                if (state is not null)
                 {
                     _scAxisBaseline[device.InstanceGuid] = (float[])state.Axes.Clone();
                     _scButtonBaseline[device.InstanceGuid] = (bool[])state.Buttons.Clone();
@@ -3503,7 +3503,7 @@ public partial class MainForm
 
     private void ExportToSC()
     {
-        if (_scExportService == null || _scInstallations.Count == 0)
+        if (_scExportService is null || _scInstallations.Count == 0)
         {
             _scExportStatus = "No SC installation available";
             _scExportStatusTime = DateTime.Now;
@@ -3673,7 +3673,7 @@ public partial class MainForm
 
     private void AssignSCBinding()
     {
-        if (_scSelectedActionIndex < 0 || _scFilteredActions == null || _scSelectedActionIndex >= _scFilteredActions.Count)
+        if (_scSelectedActionIndex < 0 || _scFilteredActions is null || _scSelectedActionIndex >= _scFilteredActions.Count)
             return;
 
         var action = _scFilteredActions[_scSelectedActionIndex];
@@ -4386,7 +4386,7 @@ public partial class MainForm
 
     private void SaveSCExportProfile()
     {
-        if (_scExportProfileService == null) return;
+        if (_scExportProfileService is null) return;
 
         _scExportProfileService.SaveProfile(_scExportProfile);
         _profileService.LastSCExportProfile = _scExportProfile.ProfileName;
@@ -4460,7 +4460,7 @@ public partial class MainForm
             var newName = textBox.Text.Trim();
 
             // Check for duplicate name
-            if (_scExportProfileService != null && _scExportProfileService.ProfileExists(newName))
+            if (_scExportProfileService is not null && _scExportProfileService.ProfileExists(newName))
             {
                 using var existsDialog = new FUIConfirmDialog(
                     "Profile Exists",
@@ -4492,7 +4492,7 @@ public partial class MainForm
 
     private void DeleteSCExportProfile()
     {
-        if (_scExportProfileService == null || _scExportProfiles.Count == 0) return;
+        if (_scExportProfileService is null || _scExportProfiles.Count == 0) return;
 
         using var confirmDialog = new FUIConfirmDialog(
             "Delete Profile",
@@ -4509,7 +4509,7 @@ public partial class MainForm
             if (_scExportProfiles.Count > 0)
             {
                 var nextProfile = _scExportProfileService.LoadProfile(_scExportProfiles[0].ProfileName);
-                if (nextProfile != null)
+                if (nextProfile is not null)
                 {
                     _scExportProfile = nextProfile;
                     _profileService.LastSCExportProfile = nextProfile.ProfileName;
@@ -4532,10 +4532,10 @@ public partial class MainForm
 
     private void LoadSCExportProfile(string profileName)
     {
-        if (_scExportProfileService == null) return;
+        if (_scExportProfileService is null) return;
 
         var profile = _scExportProfileService.LoadProfile(profileName);
-        if (profile != null)
+        if (profile is not null)
         {
             _scExportProfile = profile;
             _profileService.LastSCExportProfile = profileName;

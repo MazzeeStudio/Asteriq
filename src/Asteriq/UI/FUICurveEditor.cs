@@ -80,7 +80,7 @@ public class FUICurveEditor : UserControl
 
     private void SyncControlPointsFromCurve()
     {
-        if (_curve.Type == CurveType.Custom && _curve.ControlPoints != null && _curve.ControlPoints.Count >= 2)
+        if (_curve.Type == CurveType.Custom && _curve.ControlPoints is not null && _curve.ControlPoints.Count >= 2)
         {
             _controlPoints = _curve.ControlPoints.Select(p => new SKPoint(p.input, p.output)).ToList();
         }

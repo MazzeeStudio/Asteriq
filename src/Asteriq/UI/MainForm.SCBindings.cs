@@ -826,15 +826,13 @@ public partial class MainForm
         var columns = GetSCGridColumns();
         _scGridColumns = columns;
 
-        // Column layout - calculate widths based on available space
+        // Column layout - fixed action column, device columns get remaining space
         float totalWidth = rightMargin - leftMargin;
         float deviceColWidth = _scGridDeviceColWidth;
         float totalDeviceColsWidth = columns.Count * deviceColWidth;
 
-        // Action column gets remaining space after device columns, with minimum width
-        float actionColWidth = Math.Max(_scGridActionColWidth, totalWidth - totalDeviceColsWidth - 15f);
-        // But cap it so we don't squeeze device columns too much
-        actionColWidth = Math.Min(actionColWidth, totalWidth * 0.45f);
+        // Action column is fixed width
+        float actionColWidth = _scGridActionColWidth;
 
         float availableWidth = totalWidth - actionColWidth - 10f;
 

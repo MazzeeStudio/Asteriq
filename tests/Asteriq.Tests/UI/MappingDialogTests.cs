@@ -9,7 +9,7 @@ public class MappingDialogTests
     #region MappingDialogResult Tests
 
     [Fact]
-    public void MappingDialogResult_DefaultValues()
+    public void Constructor_WithNoArguments_SetsDefaultValues()
     {
         var result = new MappingDialogResult();
 
@@ -22,7 +22,7 @@ public class MappingDialogTests
     }
 
     [Fact]
-    public void MappingDialogResult_CanSetAllProperties()
+    public void Properties_WhenSet_ReturnCorrectValues()
     {
         var input = new DetectedInput
         {
@@ -56,7 +56,7 @@ public class MappingDialogTests
     }
 
     [Fact]
-    public void MappingDialogResult_WithAxisCurve()
+    public void AxisCurve_WhenSet_ReturnsCorrectCurveProperties()
     {
         var curve = new AxisCurve
         {
@@ -83,7 +83,7 @@ public class MappingDialogTests
     #region MappingDialogState Tests
 
     [Fact]
-    public void MappingDialogState_HasAllExpectedValues()
+    public void GetValues_WhenCalled_ContainsAllExpectedStates()
     {
         var values = Enum.GetValues<MappingDialogState>();
 
@@ -94,7 +94,7 @@ public class MappingDialogTests
     }
 
     [Fact]
-    public void MappingDialogState_WaitingForInput_IsFirst()
+    public void GetValues_WhenCalled_ReturnsWaitingForInputAsFirstValue()
     {
         var values = Enum.GetValues<MappingDialogState>();
 
@@ -106,7 +106,7 @@ public class MappingDialogTests
     #region Dialog Workflow Tests (without actually showing the dialog)
 
     [Fact]
-    public void ButtonMappingResult_HasCorrectOutputType()
+    public void Output_WithButtonInput_HasVJoyButtonType()
     {
         var result = new MappingDialogResult
         {
@@ -131,7 +131,7 @@ public class MappingDialogTests
     }
 
     [Fact]
-    public void AxisMappingResult_HasCorrectOutputType()
+    public void Output_WithAxisInput_HasVJoyAxisType()
     {
         var result = new MappingDialogResult
         {
@@ -156,7 +156,7 @@ public class MappingDialogTests
     }
 
     [Fact]
-    public void MappingResult_CanBeUsedToCreateButtonMapping()
+    public void ToButtonMapping_WithValidResult_CreatesCorrectMapping()
     {
         var result = new MappingDialogResult
         {
@@ -194,7 +194,7 @@ public class MappingDialogTests
     }
 
     [Fact]
-    public void MappingResult_CanBeUsedToCreateAxisMapping()
+    public void ToAxisMapping_WithValidResult_CreatesCorrectMapping()
     {
         var result = new MappingDialogResult
         {

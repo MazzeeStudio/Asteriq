@@ -195,7 +195,8 @@ public class InputService : IDisposable
         }
         catch (Exception ex)
         {
-            LogAxisTypes($"Failed to get axis types for {info.Name}: {ex.Message}");
+            LogAxisTypes($"Failed to get axis types for device '{info.Name}' (InstanceGuid: {info.InstanceGuid}, " +
+                         $"AxisCount: {info.AxisCount}). Error type: {ex.GetType().Name}, Details: {ex.Message}");
         }
     }
 

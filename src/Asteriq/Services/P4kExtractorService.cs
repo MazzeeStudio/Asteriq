@@ -67,11 +67,11 @@ public class P4kExtractorService : IDisposable
     /// </summary>
     public bool FileExists(string entryPath)
     {
-        if (_zipFile == null)
+        if (_zipFile is null)
             return false;
 
         var entry = _zipFile.GetEntry(entryPath);
-        return entry != null;
+        return entry is not null;
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public class P4kExtractorService : IDisposable
     /// </summary>
     public ZipEntry? FindDefaultProfileEntry()
     {
-        if (_zipFile == null)
+        if (_zipFile is null)
             return null;
 
         System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Searching for defaultProfile.xml in {_zipFile.Count} entries...");
@@ -93,7 +93,7 @@ public class P4kExtractorService : IDisposable
         foreach (var path in AlternativeProfilePaths)
         {
             var entry = _zipFile.GetEntry(path);
-            if (entry != null)
+            if (entry is not null)
             {
                 System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Found default profile at known path: {path} (encrypted: {entry.IsCrypted}, size: {entry.Size})");
                 return entry;
@@ -131,11 +131,11 @@ public class P4kExtractorService : IDisposable
     /// </summary>
     public byte[]? ExtractFile(string entryPath)
     {
-        if (_zipFile == null)
+        if (_zipFile is null)
             return null;
 
         var entry = _zipFile.GetEntry(entryPath);
-        if (entry == null)
+        if (entry is null)
             return null;
 
         return ExtractEntry(entry);
@@ -146,7 +146,7 @@ public class P4kExtractorService : IDisposable
     /// </summary>
     public byte[]? ExtractEntry(ZipEntry entry)
     {
-        if (_zipFile == null || _fileStream == null || entry == null)
+        if (_zipFile is null || _fileStream is null || entry is null)
             return null;
 
         try
@@ -200,7 +200,9 @@ public class P4kExtractorService : IDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to extract entry {entry.Name}: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to extract entry '{entry.Name}' " +
+                                               $"(Size: {entry.Size}, Compressed: {entry.CompressedSize}, Encrypted: {entry.IsCrypted}). " +
+                                               $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return null;
         }
     }
@@ -210,7 +212,7 @@ public class P4kExtractorService : IDisposable
     /// </summary>
     private byte[]? ExtractZstdEntry(ZipEntry entry)
     {
-        if (_fileStream == null)
+        if (_fileStream is null)
             return null;
 
         try
@@ -265,7 +267,9 @@ public class P4kExtractorService : IDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to extract zstd entry {entry.Name}: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to extract Zstandard-compressed entry '{entry.Name}' " +
+                                               $"(Size: {entry.Size}, Compressed: {entry.CompressedSize}). " +
+                                               $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return null;
         }
     }
@@ -279,7 +283,7 @@ public class P4kExtractorService : IDisposable
         System.Diagnostics.Debug.WriteLine("[P4kExtractor] Attempting to extract defaultProfile.xml from p4k...");
 
         var entry = FindDefaultProfileEntry();
-        if (entry == null)
+        if (entry is null)
         {
             System.Diagnostics.Debug.WriteLine("[P4kExtractor] Could not find defaultProfile.xml entry in p4k");
             return null;
@@ -288,7 +292,7 @@ public class P4kExtractorService : IDisposable
         System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Extracting entry: {entry.Name} (size: {entry.Size}, compressed: {entry.CompressedSize}, encrypted: {entry.IsCrypted})");
 
         var data = ExtractEntry(entry);
-        if (data == null || data.Length == 0)
+        if (data is null || data.Length == 0)
         {
             System.Diagnostics.Debug.WriteLine("[P4kExtractor] Extracted empty data for default profile");
             return null;
@@ -302,7 +306,7 @@ public class P4kExtractorService : IDisposable
 
         // Parse the XML (handles both regular XML and CryXmlB)
         var doc = CryXmlService.Deserialize(data);
-        if (doc != null)
+        if (doc is not null)
         {
             System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Successfully parsed XML document, root element: {doc.DocumentElement?.Name}");
         }
@@ -319,7 +323,7 @@ public class P4kExtractorService : IDisposable
     /// </summary>
     public IEnumerable<string> ListEntries(string pattern)
     {
-        if (_zipFile == null)
+        if (_zipFile is null)
             yield break;
 
         foreach (ZipEntry entry in _zipFile)

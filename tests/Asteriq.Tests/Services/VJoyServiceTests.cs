@@ -7,7 +7,7 @@ namespace Asteriq.Tests.Services;
 public class VJoyServiceTests
 {
     [Fact]
-    public void AxisConversion_NegativeOne_ReturnsMin()
+    public void ConvertAxis_WithNegativeOne_ReturnsMinValue()
     {
         // Test the axis conversion formula: -1.0 should map to 0
         float input = -1.0f;
@@ -19,7 +19,7 @@ public class VJoyServiceTests
     }
 
     [Fact]
-    public void AxisConversion_Zero_ReturnsCenter()
+    public void ConvertAxis_WithZero_ReturnsCenterValue()
     {
         // Test the axis conversion formula: 0.0 should map to center (16384)
         float input = 0.0f;
@@ -32,7 +32,7 @@ public class VJoyServiceTests
     }
 
     [Fact]
-    public void AxisConversion_PositiveOne_ReturnsMax()
+    public void ConvertAxis_WithPositiveOne_ReturnsMaxValue()
     {
         // Test the axis conversion formula: 1.0 should map to max (32767)
         float input = 1.0f;
@@ -44,7 +44,7 @@ public class VJoyServiceTests
     }
 
     [Fact]
-    public void AxisConversion_OutOfRange_ClampedToMin()
+    public void ConvertAxis_WithValueBelowRange_ClampsToMin()
     {
         // Values below -1.0 should clamp to min
         float input = -2.0f;
@@ -55,7 +55,7 @@ public class VJoyServiceTests
     }
 
     [Fact]
-    public void AxisConversion_OutOfRange_ClampedToMax()
+    public void ConvertAxis_WithValueAboveRange_ClampsToMax()
     {
         // Values above 1.0 should clamp to max
         float input = 2.0f;
@@ -66,7 +66,7 @@ public class VJoyServiceTests
     }
 
     [Fact]
-    public void AxisConversion_MidPoint_ReturnsQuarter()
+    public void ConvertAxis_WithNegativeHalf_ReturnsQuarterRange()
     {
         // -0.5 should map to ~8192 (quarter range)
         float input = -0.5f;
@@ -83,7 +83,7 @@ public class VJoyServiceTests
     [InlineData(0.0f, 16384)]
     [InlineData(0.5f, 24576)]
     [InlineData(1.0f, 32767)]
-    public void AxisConversion_VariousValues_MapsCorrectly(float input, int expectedApprox)
+    public void ConvertAxis_WithVariousInputs_MapsToExpectedOutput(float input, int expectedApprox)
     {
         int result = ConvertAxis(input);
 
@@ -102,7 +102,7 @@ public class VJoyServiceTests
 public class VJoyDeviceInfoTests
 {
     [Fact]
-    public void VJoyDeviceInfo_DefaultValues()
+    public void Constructor_WithInitValues_SetsPropertiesCorrectly()
     {
         var info = new VJoyDeviceInfo
         {

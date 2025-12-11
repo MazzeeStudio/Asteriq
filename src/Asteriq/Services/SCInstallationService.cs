@@ -324,7 +324,8 @@ public class SCInstallationService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[SCInstallationService] Failed to create mappings directory: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[SCInstallationService] Failed to create mappings directory at " +
+                                               $"'{installation.MappingsPath}'. Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return false;
         }
     }

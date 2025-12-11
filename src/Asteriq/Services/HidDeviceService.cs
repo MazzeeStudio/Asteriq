@@ -96,7 +96,7 @@ public class HidDeviceService
         var devices = EnumerateDevices();
 
         return devices.FirstOrDefault(d =>
-            (excludePaths == null || !excludePaths.Contains(d.DevicePath)) &&
+            (excludePaths is null || !excludePaths.Contains(d.DevicePath)) &&
             d.ProductName.Equals(sdlDeviceName, StringComparison.OrdinalIgnoreCase));
     }
 

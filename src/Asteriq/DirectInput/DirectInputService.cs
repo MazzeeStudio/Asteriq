@@ -46,7 +46,7 @@ public class DirectInputService : IDisposable
             try
             {
                 var deviceInfo = GetDeviceInfo(deviceInstance.guidInstance, deviceInstance);
-                if (deviceInfo != null)
+                if (deviceInfo is not null)
                 {
                     devices.Add(deviceInfo);
                     _deviceCache[deviceInstance.guidInstance] = deviceInfo;
@@ -89,7 +89,7 @@ public class DirectInputService : IDisposable
         var result = new Dictionary<int, DirectInputAxisType>();
         var deviceInfo = GetDeviceByGuid(instanceGuid);
 
-        if (deviceInfo != null)
+        if (deviceInfo is not null)
         {
             foreach (var axis in deviceInfo.Axes)
             {

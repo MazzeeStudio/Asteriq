@@ -5,7 +5,7 @@ namespace Asteriq.Tests.Models;
 public class DeviceInputStateTests
 {
     [Fact]
-    public void DeviceInputState_DefaultValues_AreEmpty()
+    public void Constructor_WithNoArguments_HasEmptyCollections()
     {
         var state = new DeviceInputState();
 
@@ -18,7 +18,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void DeviceInputState_WithValues_StoresCorrectly()
+    public void Properties_WhenSet_StoreValuesCorrectly()
     {
         var guid = Guid.NewGuid();
         var timestamp = DateTime.UtcNow;
@@ -47,7 +47,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_DefaultValues_AreEmpty()
+    public void PhysicalDeviceInfo_WithNoArguments_HasEmptyDefaults()
     {
         var info = new PhysicalDeviceInfo();
 
@@ -62,7 +62,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_IsConnected_DefaultsToTrue()
+    public void IsConnected_WithNewInstance_DefaultsToTrue()
     {
         var info = new PhysicalDeviceInfo();
 
@@ -70,7 +70,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_IsConnected_CanBeSetToFalse()
+    public void IsConnected_WhenSetToFalse_ReturnsFalse()
     {
         var info = new PhysicalDeviceInfo { IsConnected = false };
 
@@ -78,7 +78,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_DeviceIndex_CanBeModified()
+    public void DeviceIndex_WhenModified_ReturnsNewValue()
     {
         var info = new PhysicalDeviceInfo { DeviceIndex = 5 };
 
@@ -88,7 +88,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_HidDevicePath_CanBeSet()
+    public void HidDevicePath_WhenSet_ReturnsCorrectPath()
     {
         var info = new PhysicalDeviceInfo
         {
@@ -99,7 +99,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_ToString_ReturnsExpectedFormat()
+    public void ToString_WithPopulatedInfo_ReturnsFormattedString()
     {
         var info = new PhysicalDeviceInfo
         {
@@ -128,7 +128,7 @@ public class DeviceInputStateTests
     [InlineData(AxisType.RZ, 5)]
     [InlineData(AxisType.Slider, 6)]
     [InlineData(AxisType.Unknown, -1)]
-    public void AxisInfo_ToVJoyAxisIndex_ReturnsCorrectIndex(AxisType type, int expectedIndex)
+    public void ToVJoyAxisIndex_WithAxisType_ReturnsCorrectIndex(AxisType type, int expectedIndex)
     {
         var axisInfo = new AxisInfo { Index = 0, Type = type, Name = "Test" };
 
@@ -146,7 +146,7 @@ public class DeviceInputStateTests
     [InlineData(AxisType.RZ, "RZ")]
     [InlineData(AxisType.Slider, "Slider")]
     [InlineData(AxisType.Unknown, "Unknown")]
-    public void AxisInfo_TypeName_ReturnsCorrectName(AxisType type, string expectedName)
+    public void TypeName_WithAxisType_ReturnsCorrectName(AxisType type, string expectedName)
     {
         var axisInfo = new AxisInfo { Index = 0, Type = type, Name = "Test" };
 
@@ -156,7 +156,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void AxisInfo_DefaultValues_AreCorrect()
+    public void AxisInfo_WithNoArguments_HasCorrectDefaults()
     {
         var axisInfo = new AxisInfo();
 
@@ -170,7 +170,7 @@ public class DeviceInputStateTests
     #region PhysicalDeviceInfo AxisInfos Tests
 
     [Fact]
-    public void PhysicalDeviceInfo_AxisInfos_DefaultsToEmptyList()
+    public void AxisInfos_WithNewInstance_DefaultsToEmptyList()
     {
         var info = new PhysicalDeviceInfo();
 
@@ -179,7 +179,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_GetAxisType_ReturnsCorrectType()
+    public void GetAxisType_WithValidIndex_ReturnsCorrectType()
     {
         var info = new PhysicalDeviceInfo
         {
@@ -197,7 +197,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_GetAxisType_ReturnsUnknownForMissingIndex()
+    public void GetAxisType_WithMissingIndex_ReturnsUnknown()
     {
         var info = new PhysicalDeviceInfo
         {
@@ -211,7 +211,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_GetAxisType_ReturnsUnknownWhenEmpty()
+    public void GetAxisType_WithEmptyAxisInfos_ReturnsUnknown()
     {
         var info = new PhysicalDeviceInfo();
 
@@ -219,7 +219,7 @@ public class DeviceInputStateTests
     }
 
     [Fact]
-    public void PhysicalDeviceInfo_WithTypicalVirpilLayout_MapsCorrectly()
+    public void ToVJoyAxisIndex_WithVirpilLayout_MapsSliderCorrectly()
     {
         // Simulates a Virpil Alpha Prime with X, Y, Z, RX, RY, and a Slider at index 5
         var info = new PhysicalDeviceInfo

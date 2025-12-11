@@ -78,8 +78,9 @@ public partial class MainForm
                 // Find the actual device index in _devices
                 int actualIndex = _devices.IndexOf(filteredDevices[i]);
                 string status = filteredDevices[i].IsConnected ? "ONLINE" : "DISCONNECTED";
+                string vjoyAssignment = GetVJoyAssignmentForDevice(filteredDevices[i]);
                 DrawDeviceListItem(canvas, contentBounds.Left + pad - 10, itemY, contentBounds.Width - pad,
-                    filteredDevices[i].Name, status, actualIndex == _selectedDevice, actualIndex == _hoveredDevice);
+                    filteredDevices[i].Name, status, actualIndex == _selectedDevice, actualIndex == _hoveredDevice, vjoyAssignment);
                 itemY += itemHeight + itemGap;
             }
         }
@@ -123,7 +124,7 @@ public partial class MainForm
 
 
     private void DrawDeviceListItem(SKCanvas canvas, float x, float y, float width,
-        string name, string status, bool isSelected, bool isHovered)
+        string name, string status, bool isSelected, bool isHovered, string vjoyAssignment = "")
     {
         var itemBounds = new SKRect(x, y, x + width, y + 60);
         bool isDisconnected = status == "DISCONNECTED";
@@ -160,9 +161,9 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, status, new SKPoint(x + 35, y + 45), statusTextColor, 11f);
 
         // vJoy assignment indicator (positioned to avoid chevron overlap)
-        if (!isDisconnected)
+        if (!isDisconnected && !string.IsNullOrEmpty(vjoyAssignment))
         {
-            FUIRenderer.DrawText(canvas, "VJOY:1", new SKPoint(x + width - 85, y + 45),
+            FUIRenderer.DrawText(canvas, vjoyAssignment, new SKPoint(x + width - 85, y + 45),
                 FUIColors.TextDim, 11f);
         }
 
@@ -799,26 +800,81 @@ public partial class MainForm
         // Status items
         float statusItemHeight = 32f;
         float itemY = contentBounds.Top + titleBarHeight + pad;
-        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "VJOY DRIVER", "ACTIVE", FUIColors.Active);
+
+        // vJoy driver status
+        bool vjoyActive = _vjoyService.IsInitialized;
+        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "VJOY DRIVER",
+            vjoyActive ? "ACTIVE" : "NOT FOUND", vjoyActive ? FUIColors.Active : FUIColors.Danger);
         itemY += statusItemHeight + itemGap;
-        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "HIDHIDE", "ENABLED", FUIColors.Active);
+
+        // Forwarding status - this is the key item
+        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "FORWARDING",
+            _isForwarding ? "RUNNING" : "STOPPED", _isForwarding ? FUIColors.Active : FUIColors.TextDim);
         itemY += statusItemHeight + itemGap;
+
         DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "INPUT RATE", "100 HZ", FUIColors.TextPrimary);
         itemY += statusItemHeight + itemGap;
-        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "MAPPING", "ACTIVE", FUIColors.Active);
-        itemY += statusItemHeight + itemGap;
-        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "PROFILE", "DEFAULT", FUIColors.TextPrimary);
 
-        // Active layers
-        itemY += statusItemHeight + FUIRenderer.SpaceLG;
-        FUIRenderer.DrawText(canvas, "ACTIVE LAYERS",
-            new SKPoint(bounds.Left + pad, itemY + 12), FUIColors.TextDim, 11f);
-        itemY += FUIRenderer.SpaceLG;
-        float layerBtnWidth = 52f;
-        float layerBtnGap = FUIRenderer.SpaceSM;
-        DrawLayerIndicator(canvas, bounds.Left + pad, itemY, layerBtnWidth, "BASE", true);
-        DrawLayerIndicator(canvas, bounds.Left + pad + layerBtnWidth + layerBtnGap, itemY, layerBtnWidth, "SHIFT", false);
-        DrawLayerIndicator(canvas, bounds.Left + pad + (layerBtnWidth + layerBtnGap) * 2, itemY, layerBtnWidth, "ALT", false);
+        // Profile status
+        string profileName = _mappingEngine.ActiveProfile?.Name ?? "NONE";
+        DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "PROFILE", profileName.ToUpper(), FUIColors.TextPrimary);
+
+        // Start/Stop Forwarding button at bottom
+        float buttonHeight = 36f;
+        float buttonWidth = contentBounds.Width - pad * 2;
+        float buttonY = contentBounds.Bottom - buttonHeight - pad;
+
+        if (_isForwarding)
+        {
+            // Show STOP button
+            _stopForwardingButtonBounds = new SKRect(contentBounds.Left + pad, buttonY,
+                contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
+            _startForwardingButtonBounds = SKRect.Empty;
+            DrawForwardingButton(canvas, _stopForwardingButtonBounds, "STOP FORWARDING",
+                _stopForwardingButtonHovered, isStop: true);
+        }
+        else
+        {
+            // Show START button
+            _startForwardingButtonBounds = new SKRect(contentBounds.Left + pad, buttonY,
+                contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
+            _stopForwardingButtonBounds = SKRect.Empty;
+            DrawForwardingButton(canvas, _startForwardingButtonBounds, "START FORWARDING",
+                _startForwardingButtonHovered, isStop: false);
+        }
+    }
+
+    private void DrawForwardingButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isStop)
+    {
+        // Button colors - green for start, red/orange for stop
+        var accentColor = isStop ? FUIColors.Danger : FUIColors.Active;
+
+        // Button background
+        var bgColor = isHovered
+            ? accentColor.WithAlpha(50)
+            : (isStop ? FUIColors.Danger.WithAlpha(20) : FUIColors.Active.WithAlpha(20));
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = bgColor,
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Button border
+        var borderColor = isHovered ? accentColor : accentColor.WithAlpha(150);
+        using var borderPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = borderColor,
+            StrokeWidth = isHovered ? 2f : 1f,
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds, borderPaint);
+
+        // Button text
+        var textColor = isHovered ? FUIColors.TextBright : accentColor;
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f, isHovered);
     }
 
     private void DrawStatusItem(SKCanvas canvas, float x, float y, float width, string label, string value, SKColor valueColor)
@@ -844,6 +900,146 @@ public partial class MainForm
 
         var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
         FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 10f, isActive);
+    }
+
+    /// <summary>
+    /// Start forwarding physical device input to vJoy virtual devices.
+    /// Uses the active profile's mappings to determine what gets forwarded.
+    /// </summary>
+    private void StartForwarding()
+    {
+        if (_isForwarding) return;
+
+        // Load the active profile into the mapping engine
+        var profile = _profileService.ActiveProfile;
+        if (profile is null)
+        {
+            // No profile - show error to user
+            MessageBox.Show(
+                "No active profile found.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
+                "Cannot Start Forwarding",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        // Check if profile has any mappings
+        if (profile.AxisMappings.Count == 0 && profile.ButtonMappings.Count == 0 && profile.HatMappings.Count == 0)
+        {
+            MessageBox.Show(
+                $"Profile '{profile.Name}' has no mappings.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
+                "Cannot Start Forwarding",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        _mappingEngine.LoadProfile(profile);
+
+        // Check vJoy is initialized
+        if (!_vjoyService.IsInitialized)
+        {
+            MessageBox.Show(
+                "vJoy driver is not initialized.\n\nPlease ensure vJoy is installed correctly.",
+                "Cannot Start Forwarding",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return;
+        }
+
+        // Get the required vJoy devices from the profile
+        var requiredDevices = profile.AxisMappings
+            .Select(m => m.Output.VJoyDevice)
+            .Concat(profile.ButtonMappings.Select(m => m.Output.VJoyDevice))
+            .Concat(profile.HatMappings.Select(m => m.Output.VJoyDevice))
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        // Check each required device
+        foreach (var deviceId in requiredDevices)
+        {
+            var info = _vjoyService.GetDeviceInfo(deviceId);
+            if (!info.Exists)
+            {
+                MessageBox.Show(
+                    $"vJoy device {deviceId} does not exist.\n\nPlease configure vJoy device {deviceId} using 'Configure vJoy'.",
+                    "Cannot Start Forwarding",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+        }
+
+        if (!_mappingEngine.Start())
+        {
+            // Get more detailed error info including owner PID
+            int ourPid = Environment.ProcessId;
+            var statusMessages = requiredDevices
+                .Select(id => {
+                    var info = _vjoyService.GetDeviceInfo(id);
+                    int ownerPid = VJoy.VJoyInterop.GetOwnerPid(id);
+                    return $"vJoy {id}: {info.Status} (Owner PID: {ownerPid}, Our PID: {ourPid})";
+                })
+                .ToList();
+
+            MessageBox.Show(
+                $"Failed to acquire vJoy device(s).\n\nDevice status:\n{string.Join("\n", statusMessages)}\n\nIf Owner PID matches Our PID, try restarting the app.\nIf different, another app owns the device.",
+                "Cannot Start Forwarding",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return;
+        }
+
+        _isForwarding = true;
+        System.Diagnostics.Debug.WriteLine($"Started forwarding with profile: {profile.Name}");
+    }
+
+    /// <summary>
+    /// Stop forwarding physical device input to vJoy virtual devices.
+    /// </summary>
+    private void StopForwarding()
+    {
+        if (!_isForwarding) return;
+
+        _mappingEngine.Stop();
+        _isForwarding = false;
+        System.Diagnostics.Debug.WriteLine("Stopped forwarding");
+    }
+
+    /// <summary>
+    /// Get the vJoy device assignment string for a physical device.
+    /// Looks up which vJoy device(s) this physical device is mapped to in the active profile.
+    /// </summary>
+    private string GetVJoyAssignmentForDevice(PhysicalDeviceInfo device)
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile is null) return "";
+
+        string deviceId = device.InstanceGuid.ToString();
+
+        // Find all vJoy devices this physical device maps to
+        var vjoyIds = new HashSet<uint>();
+
+        foreach (var mapping in profile.AxisMappings)
+        {
+            if (mapping.Inputs.Any(i => i.DeviceId == deviceId) && mapping.Output.VJoyDevice > 0)
+                vjoyIds.Add(mapping.Output.VJoyDevice);
+        }
+        foreach (var mapping in profile.ButtonMappings)
+        {
+            if (mapping.Inputs.Any(i => i.DeviceId == deviceId) && mapping.Output.VJoyDevice > 0)
+                vjoyIds.Add(mapping.Output.VJoyDevice);
+        }
+        foreach (var mapping in profile.HatMappings)
+        {
+            if (mapping.Inputs.Any(i => i.DeviceId == deviceId) && mapping.Output.VJoyDevice > 0)
+                vjoyIds.Add(mapping.Output.VJoyDevice);
+        }
+
+        if (vjoyIds.Count == 0) return "";
+        if (vjoyIds.Count == 1) return $"VJOY:{vjoyIds.First()}";
+        return $"VJOY:{string.Join(",", vjoyIds.OrderBy(x => x))}";
     }
 
     #endregion

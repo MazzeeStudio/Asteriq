@@ -375,6 +375,13 @@ public partial class MainForm : Form
     private SKRect _scDeleteProfileButtonBounds;
     private bool _scDeleteProfileButtonHovered;
 
+    // Input forwarding state (physical → vJoy)
+    private bool _isForwarding = false;
+    private SKRect _startForwardingButtonBounds;
+    private SKRect _stopForwardingButtonBounds;
+    private bool _startForwardingButtonHovered;
+    private bool _stopForwardingButtonHovered;
+
     public MainForm()
     {
         _inputService = new InputService();
@@ -1322,6 +1329,12 @@ public partial class MainForm : Form
 
     private void OnInputReceived(object? sender, DeviceInputState state)
     {
+        // Forward input to vJoy if forwarding is active
+        if (_isForwarding && _mappingEngine.IsRunning)
+        {
+            _mappingEngine.ProcessInput(state);
+        }
+
         if (_selectedDevice >= 0 && _selectedDevice < _devices.Count &&
             state.DeviceIndex == _devices[_selectedDevice].DeviceIndex)
         {
@@ -2029,6 +2042,10 @@ public partial class MainForm : Form
         _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
         _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
         _removeDeviceButtonHovered = !_removeDeviceButtonBounds.IsEmpty && _removeDeviceButtonBounds.Contains(e.X, e.Y);
+        
+        // Forwarding button hover detection
+        _startForwardingButtonHovered = !_startForwardingButtonBounds.IsEmpty && _startForwardingButtonBounds.Contains(e.X, e.Y);
+        _stopForwardingButtonHovered = !_stopForwardingButtonBounds.IsEmpty && _stopForwardingButtonBounds.Contains(e.X, e.Y);
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
@@ -2227,6 +2244,18 @@ public partial class MainForm : Form
             if (_removeDeviceButtonHovered && !_removeDeviceButtonBounds.IsEmpty)
             {
                 RemoveDisconnectedDevice();
+                return;
+            }
+            
+            // Forwarding button clicks
+            if (_startForwardingButtonHovered && !_startForwardingButtonBounds.IsEmpty)
+            {
+                StartForwarding();
+                return;
+            }
+            if (_stopForwardingButtonHovered && !_stopForwardingButtonBounds.IsEmpty)
+            {
+                StopForwarding();
                 return;
             }
         }

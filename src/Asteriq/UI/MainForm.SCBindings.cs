@@ -232,8 +232,7 @@ public partial class MainForm
         if (_scActions is null) return;
 
         var columns = GetSCGridColumns();
-        float fontSize = 9f;
-        float padding = 30f; // Badge padding + cell padding
+        float padding = 12f; // Cell padding
 
         foreach (var col in columns)
         {
@@ -264,9 +263,9 @@ public partial class MainForm
 
                     if (binding is not null && !string.IsNullOrEmpty(binding.InputName))
                     {
-                        var displayText = FormatBindingForCell(binding.InputName, binding.Modifiers);
-                        float textWidth = FUIRenderer.MeasureText(displayText, fontSize) + padding;
-                        maxWidth = Math.Max(maxWidth, textWidth);
+                        var components = GetBindingComponents(binding.InputName, binding.Modifiers);
+                        float badgesWidth = MeasureMultiKeycapWidth(components, binding.InputType) + padding;
+                        maxWidth = Math.Max(maxWidth, badgesWidth);
                     }
                 }
 
@@ -276,9 +275,10 @@ public partial class MainForm
                 if (defaultBinding is not null && !string.IsNullOrEmpty(defaultBinding.Input))
                 {
                     var modifiers = defaultBinding.Modifiers?.Where(m => !string.IsNullOrEmpty(m)).ToList();
-                    var displayText = FormatBindingForCell(defaultBinding.Input, modifiers);
-                    float textWidth = FUIRenderer.MeasureText(displayText, fontSize) + padding;
-                    maxWidth = Math.Max(maxWidth, textWidth);
+                    var components = GetBindingComponents(defaultBinding.Input, modifiers);
+                    // Default bindings don't have input type info
+                    float badgesWidth = MeasureMultiKeycapWidth(components, null) + padding;
+                    maxWidth = Math.Max(maxWidth, badgesWidth);
                 }
             }
 
@@ -1179,7 +1179,7 @@ public partial class MainForm
                                 canvas.DrawRect(cellBounds, hoverPaint);
                             }
 
-                            string? bindingText = null;
+                            List<string>? bindingComponents = null;
                             SKColor textColor = FUIColors.TextPrimary;
                             SCInputType? inputType = null;
                             bool isConflicting = false;
@@ -1206,7 +1206,7 @@ public partial class MainForm
 
                             if (binding != null)
                             {
-                                bindingText = FormatBindingForCell(binding.InputName, binding.Modifiers);
+                                bindingComponents = GetBindingComponents(binding.InputName, binding.Modifiers);
                                 inputType = binding.InputType;
                                 // Check for conflicts (joystick only)
                                 if (col.IsJoystick)
@@ -1225,10 +1225,10 @@ public partial class MainForm
                                 float listeningTextX = colX + (colW - listeningTextWidth) / 2;
                                 FUIRenderer.DrawText(canvas, listeningText, new SKPoint(listeningTextX, textY - 2), FUIColors.Active, listeningFontSize, true);
                             }
-                            else if (!string.IsNullOrEmpty(bindingText))
+                            else if (bindingComponents is not null && bindingComponents.Count > 0)
                             {
-                                // Draw keycap-style badge for binding, centered in cell
-                                DrawBindingBadgeCentered(canvas, cellBounds, bindingText, textColor, false, col.IsJoystick ? inputType : null);
+                                // Draw multiple keycap badges for binding (one per key component)
+                                DrawMultiKeycapBinding(canvas, cellBounds, bindingComponents, textColor, col.IsJoystick ? inputType : null);
 
                                 // Draw conflict warning indicator
                                 if (isConflicting)
@@ -1322,18 +1322,31 @@ public partial class MainForm
     /// </summary>
     private string FormatBindingForCell(string input, List<string>? modifiers)
     {
-        if (modifiers is null || modifiers.Count == 0)
-            return FormatInputName(input);
+        // For single string display (tooltips, width calculation, etc.)
+        var components = GetBindingComponents(input, modifiers);
+        return string.Join(" + ", components);
+    }
 
-        var modStr = string.Join(" + ", modifiers
-            .Select(m => FormatModifierName(m))
-            .Where(m => !string.IsNullOrEmpty(m)));
+    /// <summary>
+    /// Gets the individual key components for a binding (modifiers + main key)
+    /// Each component will be rendered as a separate keycap badge
+    /// </summary>
+    private List<string> GetBindingComponents(string input, List<string>? modifiers)
+    {
+        var components = new List<string>();
 
-        if (string.IsNullOrEmpty(modStr))
-            return FormatInputName(input);
+        if (modifiers is not null)
+        {
+            foreach (var mod in modifiers)
+            {
+                var formatted = FormatModifierName(mod);
+                if (!string.IsNullOrEmpty(formatted))
+                    components.Add(formatted);
+            }
+        }
 
-        // Use bullet separator for visual clarity: "CTRL • A"
-        return $"{modStr} • {FormatInputName(input)}";
+        components.Add(FormatInputName(input));
+        return components;
     }
 
     /// <summary>
@@ -1550,6 +1563,105 @@ public partial class MainForm
         // Center text vertically in badge
         float textY = badgeY + badgeHeight / 2 + 4;
         FUIRenderer.DrawText(canvas, displayText, new SKPoint(textX, textY), color, fontSize);
+    }
+
+    /// <summary>
+    /// Draws multiple keycap badges for a binding (one per modifier + main key)
+    /// Each key component gets its own separate badge, centered within the cell
+    /// </summary>
+    private void DrawMultiKeycapBinding(SKCanvas canvas, SKRect cellBounds, List<string> components, SKColor color, SCInputType? inputType)
+    {
+        if (components.Count == 0) return;
+
+        float fontSize = 10f;
+        float badgeHeight = 18f;
+        float badgePadding = 8f;  // Horizontal padding inside badge
+        float gap = 3f;  // Gap between badges
+
+        // Calculate total width needed
+        float totalWidth = 0f;
+        var badgeWidths = new float[components.Count];
+        for (int i = 0; i < components.Count; i++)
+        {
+            float textWidth = FUIRenderer.MeasureText(components[i], fontSize);
+            // Add indicator space only to the last (main key) badge
+            float indicatorSpace = (i == components.Count - 1 && inputType.HasValue) ? 12f : 0f;
+            badgeWidths[i] = textWidth + badgePadding * 2 + indicatorSpace;
+            totalWidth += badgeWidths[i];
+            if (i > 0) totalWidth += gap;
+        }
+
+        // Start position (centered)
+        float startX = cellBounds.Left + (cellBounds.Width - totalWidth) / 2;
+        float badgeY = cellBounds.Top + (cellBounds.Height - badgeHeight) / 2;
+        float currentX = startX;
+
+        for (int i = 0; i < components.Count; i++)
+        {
+            var comp = components[i];
+            float badgeWidth = badgeWidths[i];
+            bool isMainKey = i == components.Count - 1;
+
+            var badgeBounds = new SKRect(currentX, badgeY, currentX + badgeWidth, badgeY + badgeHeight);
+
+            // Badge background - modifiers slightly dimmer
+            byte bgAlpha = isMainKey ? (byte)50 : (byte)35;
+            using var bgPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = color.WithAlpha(bgAlpha),
+                IsAntialias = true
+            };
+            canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
+
+            // Badge border - modifiers slightly dimmer
+            byte borderAlpha = isMainKey ? (byte)180 : (byte)120;
+            using var borderPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = color.WithAlpha(borderAlpha),
+                StrokeWidth = 1f,
+                IsAntialias = true
+            };
+            canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
+
+            float textX = currentX + badgePadding;
+
+            // Draw type indicator only on main key
+            if (isMainKey && inputType.HasValue)
+            {
+                DrawInputTypeIndicator(canvas, currentX + 4, badgeY + badgeHeight / 2, inputType.Value, color);
+                textX = currentX + 14f;
+            }
+
+            // Draw text
+            float textY = badgeY + badgeHeight / 2 + 3.5f;
+            var textColor = isMainKey ? color : color.WithAlpha(200);
+            FUIRenderer.DrawText(canvas, comp, new SKPoint(textX, textY), textColor, fontSize);
+
+            currentX += badgeWidth + gap;
+        }
+    }
+
+    /// <summary>
+    /// Calculates the total width needed to draw multiple keycap badges
+    /// </summary>
+    private float MeasureMultiKeycapWidth(List<string> components, SCInputType? inputType)
+    {
+        float fontSize = 10f;
+        float badgePadding = 8f;
+        float gap = 3f;
+
+        float totalWidth = 0f;
+        for (int i = 0; i < components.Count; i++)
+        {
+            float textWidth = FUIRenderer.MeasureText(components[i], fontSize);
+            float indicatorSpace = (i == components.Count - 1 && inputType.HasValue) ? 12f : 0f;
+            totalWidth += textWidth + badgePadding * 2 + indicatorSpace;
+            if (i > 0) totalWidth += gap;
+        }
+
+        return totalWidth;
     }
 
     /// <summary>

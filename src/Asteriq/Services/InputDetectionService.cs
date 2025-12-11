@@ -25,12 +25,22 @@ internal static class InputDetectionLog
             Console.WriteLine(line);
             File.AppendAllText(LogPath, line + Environment.NewLine);
         }
-        catch { }
+        catch (Exception)
+        {
+            // Debug logging should never crash the app - silently ignore file write failures
+        }
     }
 
     public static void Clear()
     {
-        try { File.WriteAllText(LogPath, ""); } catch { }
+        try
+        {
+            File.WriteAllText(LogPath, "");
+        }
+        catch (Exception)
+        {
+            // Debug log clear failure is non-critical - silently ignore
+        }
     }
 }
 

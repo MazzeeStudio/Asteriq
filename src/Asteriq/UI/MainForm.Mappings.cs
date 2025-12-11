@@ -3135,7 +3135,17 @@ public partial class MainForm
         _controlDropdownOpen = false;
     }
 
-    private async void StartListeningForInput()
+    /// <summary>
+    /// Starts listening for input. Fire-and-forget from UI.
+    /// All exceptions are handled internally.
+    /// </summary>
+    private void StartListeningForInput()
+    {
+        // Fire-and-forget async operation with internal exception handling
+        _ = StartListeningForInputAsync();
+    }
+
+    private async Task StartListeningForInputAsync()
     {
         if (_isListeningForInput) return;
         if (!_mappingEditorOpen) return;
@@ -3155,7 +3165,7 @@ public partial class MainForm
 
             var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.5f, 15000);
 
-            if (detected != null && _mappingEditorOpen)
+            if (detected is not null && _mappingEditorOpen)
             {
                 _pendingInput = detected;
 
@@ -3171,9 +3181,9 @@ public partial class MainForm
                 _selectedSourceControl = detected.Index;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Cancelled or error
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Input listening cancelled or failed: {ex.Message}");
         }
         finally
         {
@@ -4005,7 +4015,17 @@ public partial class MainForm
         }
     }
 
-    private async void StartInputListening(int rowIndex)
+    /// <summary>
+    /// Starts listening for input on a specific row. Fire-and-forget from UI.
+    /// All exceptions are handled internally.
+    /// </summary>
+    private void StartInputListening(int rowIndex)
+    {
+        // Fire-and-forget async operation with internal exception handling
+        _ = StartInputListeningAsync(rowIndex);
+    }
+
+    private async Task StartInputListeningAsync(int rowIndex)
     {
         if (_isListeningForInput) return;
         if (rowIndex < 0) return;
@@ -4027,17 +4047,17 @@ public partial class MainForm
 
             var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.5f, 15000);
 
-            if (detected != null && _selectedMappingRow == rowIndex)
+            if (detected is not null && _selectedMappingRow == rowIndex)
             {
                 _pendingInput = detected;
                 var inputSource = detected.ToInputSource();
 
                 // Check for duplicate mapping
                 var profile = _profileService.ActiveProfile;
-                if (profile != null)
+                if (profile is not null)
                 {
                     var existingMapping = FindExistingMappingForInput(profile, inputSource);
-                    if (existingMapping != null)
+                    if (existingMapping is not null)
                     {
                         string newTarget = isAxis ? $"vJoy Axis {rowIndex}" : $"vJoy Button {rowIndex + 1}";
                         if (!ConfirmDuplicateMapping(existingMapping, newTarget))
@@ -4054,9 +4074,9 @@ public partial class MainForm
                 SaveMappingForRow(rowIndex, detected, isAxis);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Cancelled or error
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Input listening for row {rowIndex} cancelled or failed: {ex.Message}");
         }
         finally
         {

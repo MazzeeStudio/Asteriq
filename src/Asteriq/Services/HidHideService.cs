@@ -1,12 +1,13 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Asteriq.Models;
 
 namespace Asteriq.Services;
 
 /// <summary>
 /// Information about a HID device from HidHide
 /// </summary>
-public class HidDeviceInfo
+public class HidHideDeviceInfo
 {
     public string DeviceInstancePath { get; init; } = "";
     public string SymbolicLink { get; init; } = "";
@@ -28,10 +29,10 @@ public class HidDeviceInfo
 /// <summary>
 /// Group of HID devices sharing a friendly name (e.g., same physical device with multiple interfaces)
 /// </summary>
-public class HidDeviceGroup
+public class HidHideDeviceGroup
 {
     public string FriendlyName { get; init; } = "";
-    public List<HidDeviceInfo> Devices { get; init; } = new();
+    public List<HidHideDeviceInfo> Devices { get; init; } = new();
 }
 
 /// <summary>
@@ -41,11 +42,25 @@ public class HidHideService
 {
     private readonly string _cliPath;
 
+    /// <summary>
+    /// Creates a new HidHideService with default CLI path
+    /// </summary>
     public HidHideService()
+        : this(new HidHideSettings())
     {
-        _cliPath = @"C:\Program Files\Nefarius Software Solutions\HidHide\x64\HidHideCLI.exe";
     }
 
+    /// <summary>
+    /// Creates a new HidHideService with the specified settings
+    /// </summary>
+    public HidHideService(HidHideSettings settings)
+    {
+        _cliPath = settings.CliPath;
+    }
+
+    /// <summary>
+    /// Creates a new HidHideService with a custom CLI path
+    /// </summary>
     public HidHideService(string cliPath)
     {
         _cliPath = cliPath;
@@ -62,7 +77,7 @@ public class HidHideService
     /// <summary>
     /// Get all gaming HID devices
     /// </summary>
-    public List<HidDeviceGroup> GetGamingDevices()
+    public List<HidHideDeviceGroup> GetGamingDevices()
     {
         var output = RunCommand("--dev-gaming");
         return ParseDeviceJson(output);
@@ -71,7 +86,7 @@ public class HidHideService
     /// <summary>
     /// Get all HID devices
     /// </summary>
-    public List<HidDeviceGroup> GetAllDevices()
+    public List<HidHideDeviceGroup> GetAllDevices()
     {
         var output = RunCommand("--dev-all");
         return ParseDeviceJson(output);
@@ -354,9 +369,9 @@ public class HidHideService
         }
     }
 
-    private List<HidDeviceGroup> ParseDeviceJson(string json)
+    private List<HidHideDeviceGroup> ParseDeviceJson(string json)
     {
-        var groups = new List<HidDeviceGroup>();
+        var groups = new List<HidHideDeviceGroup>();
 
         if (string.IsNullOrWhiteSpace(json))
             return groups;
@@ -368,11 +383,11 @@ public class HidHideService
             foreach (var groupElement in doc.RootElement.EnumerateArray())
             {
                 var friendlyName = groupElement.GetProperty("friendlyName").GetString() ?? "";
-                var devices = new List<HidDeviceInfo>();
+                var devices = new List<HidHideDeviceInfo>();
 
                 foreach (var deviceElement in groupElement.GetProperty("devices").EnumerateArray())
                 {
-                    devices.Add(new HidDeviceInfo
+                    devices.Add(new HidHideDeviceInfo
                     {
                         DeviceInstancePath = deviceElement.GetProperty("deviceInstancePath").GetString() ?? "",
                         SymbolicLink = deviceElement.GetProperty("symbolicLink").GetString() ?? "",
@@ -387,7 +402,7 @@ public class HidHideService
                     });
                 }
 
-                groups.Add(new HidDeviceGroup
+                groups.Add(new HidHideDeviceGroup
                 {
                     FriendlyName = friendlyName,
                     Devices = devices
@@ -396,7 +411,7 @@ public class HidHideService
         }
         catch (JsonException ex)
         {
-            Console.WriteLine($"Failed to parse HidHide JSON: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Failed to parse HidHide JSON: {ex.Message}");
         }
 
         return groups;

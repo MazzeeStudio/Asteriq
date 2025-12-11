@@ -1,3 +1,4 @@
+using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.VJoy;
 

@@ -154,7 +154,10 @@ public class HidDeviceService
             if (!string.IsNullOrWhiteSpace(name))
                 return name;
         }
-        catch { }
+        catch (Exception)
+        {
+            // Some HID devices don't support GetProductName - fall through to try GetFriendlyName
+        }
 
         try
         {
@@ -162,7 +165,10 @@ public class HidDeviceService
             if (!string.IsNullOrWhiteSpace(name))
                 return name;
         }
-        catch { }
+        catch (Exception)
+        {
+            // Some HID devices don't support GetFriendlyName - fall through to default name
+        }
 
         return $"Unknown Device ({device.VendorID:X4}:{device.ProductID:X4})";
     }
@@ -173,8 +179,9 @@ public class HidDeviceService
         {
             return device.GetSerialNumber() ?? "";
         }
-        catch
+        catch (Exception)
         {
+            // Some HID devices don't support serial number retrieval
             return "";
         }
     }

@@ -17,6 +17,7 @@ public class InputService : IDisposable
     private readonly HashSet<int> _knownInstanceIds = new();
     private volatile bool _isPolling;
     private Task? _pollTask;
+    private CancellationTokenSource? _pollCts;
     private bool _isInitialized;
     private HidDeviceService? _hidDeviceService;
     private List<HidDeviceService.HidDeviceInfo>? _hidDevicesCache;
@@ -214,9 +215,10 @@ public class InputService : IDisposable
                 File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
             }
         }
-        catch
+        catch (Exception)
         {
-            // Ignore logging errors - don't crash the app for debug logging
+            // Ignore logging errors - debug logging should never crash the app
+            // This is intentionally swallowed as it's non-critical diagnostic code
         }
     }
 
@@ -279,16 +281,25 @@ public class InputService : IDisposable
         if (_isPolling) return;
 
         _isPolling = true;
+        _pollCts = new CancellationTokenSource();
         int delayMs = 1000 / pollRateHz;
+        var ct = _pollCts.Token;
 
         _pollTask = Task.Run(async () =>
         {
-            while (_isPolling)
+            while (_isPolling && !ct.IsCancellationRequested)
             {
                 PollAllDevices();
-                await Task.Delay(delayMs);
+                try
+                {
+                    await Task.Delay(delayMs, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
-        });
+        }, ct);
     }
 
     /// <summary>
@@ -297,7 +308,51 @@ public class InputService : IDisposable
     public void StopPolling()
     {
         _isPolling = false;
-        _pollTask?.Wait(1000);
+        _pollCts?.Cancel();
+
+        // Wait synchronously with timeout - this is acceptable in Dispose pattern
+        // Using a short timeout to avoid blocking indefinitely
+        if (_pollTask is not null)
+        {
+            try
+            {
+                _pollTask.Wait(1000);
+            }
+            catch (AggregateException)
+            {
+                // Task was cancelled or faulted - this is expected
+            }
+        }
+
+        _pollCts?.Dispose();
+        _pollCts = null;
+    }
+
+    /// <summary>
+    /// Stop polling for input asynchronously
+    /// </summary>
+    public async Task StopPollingAsync(CancellationToken ct = default)
+    {
+        _isPolling = false;
+        _pollCts?.Cancel();
+
+        if (_pollTask is not null)
+        {
+            try
+            {
+                // Wait for the poll task with a timeout
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(1000);
+                await _pollTask.WaitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Task was cancelled or timed out - this is expected
+            }
+        }
+
+        _pollCts?.Dispose();
+        _pollCts = null;
     }
 
     /// <summary>

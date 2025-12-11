@@ -55,7 +55,14 @@ public class SCProfileCacheService
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to load cached profile for {installation.Environment}: {ex.Message}");
 
             // Delete corrupted cache file
-            try { File.Delete(cachePath); } catch { }
+            try
+            {
+                File.Delete(cachePath);
+            }
+            catch (Exception deleteEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to delete corrupted cache file: {deleteEx.Message}");
+            }
             return null;
         }
     }

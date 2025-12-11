@@ -50,7 +50,7 @@ public class DeviceMatchingService
     /// <summary>
     /// Find HidHide device paths that match an SDL device
     /// </summary>
-    public List<HidDeviceInfo> FindMatchingHidDevices(PhysicalDeviceInfo sdlDevice)
+    public List<HidHideDeviceInfo> FindMatchingHidDevices(PhysicalDeviceInfo sdlDevice)
     {
         var (vid, pid) = ExtractVidPidFromSdlGuid(sdlDevice.InstanceGuid);
 
@@ -66,9 +66,9 @@ public class DeviceMatchingService
     /// <summary>
     /// Find HidHide devices by VID/PID
     /// </summary>
-    public List<HidDeviceInfo> FindByVidPid(ushort vid, ushort pid)
+    public List<HidHideDeviceInfo> FindByVidPid(ushort vid, ushort pid)
     {
-        var matches = new List<HidDeviceInfo>();
+        var matches = new List<HidHideDeviceInfo>();
         var vidHex = vid.ToString("X4");
         var pidHex = pid.ToString("X4");
 
@@ -93,9 +93,9 @@ public class DeviceMatchingService
     /// <summary>
     /// Find HidHide devices by name matching (fallback)
     /// </summary>
-    public List<HidDeviceInfo> FindByNameMatch(string sdlName)
+    public List<HidHideDeviceInfo> FindByNameMatch(string sdlName)
     {
-        var matches = new List<HidDeviceInfo>();
+        var matches = new List<HidHideDeviceInfo>();
 
         // Normalize name for comparison
         var normalizedSdlName = NormalizeName(sdlName);
@@ -187,7 +187,7 @@ public class DeviceCorrelation
     public PhysicalDeviceInfo SdlDevice { get; init; } = null!;
     public ushort Vid { get; init; }
     public ushort Pid { get; init; }
-    public List<HidDeviceInfo> HidDevices { get; init; } = new();
+    public List<HidHideDeviceInfo> HidDevices { get; init; } = new();
 
     /// <summary>
     /// Get the primary gaming device path (MI_00 interface)

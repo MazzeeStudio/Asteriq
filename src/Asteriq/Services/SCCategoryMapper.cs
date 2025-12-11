@@ -7,19 +7,33 @@ namespace Asteriq.Services;
 public static class SCCategoryMapper
 {
     /// <summary>
-    /// Mapping from raw actionmap names to user-friendly category names
+    /// Action-level overrides for specific actions that should be in a different category
+    /// than their actionmap would suggest (e.g., emergency actions)
+    /// </summary>
+    private static readonly Dictionary<string, (string Category, int SortOrder)> ActionOverrides = new()
+    {
+        { "v_eject", ("Emergency", 100) },
+        { "v_self_destruct", ("Emergency", 100) },
+        { "v_eject_cinematic", ("Emergency", 100) },
+    };
+
+    /// <summary>
+    /// Mapping from raw actionmap names to user-friendly category names.
+    /// Based on actual SC defaultProfile.xml actionmap names.
     /// </summary>
     private static readonly Dictionary<string, (string Category, int SortOrder)> ActionMapCategories = new()
     {
         // Flight Control
         { "spaceship_movement", ("Flight Control", 1) },
         { "spaceship_quantum", ("Flight Control", 1) },
+        { "ifcs_controls", ("Flight Control", 1) },
 
         // Weapons
         { "spaceship_weapons", ("Weapons", 2) },
 
         // Targeting
         { "spaceship_targeting", ("Targeting", 3) },
+        { "spaceship_targeting_advanced", ("Targeting", 3) },
         { "spaceship_target_hailing", ("Targeting", 3) },
         { "spaceship_scanning", ("Targeting", 3) },
         { "spaceship_ping", ("Targeting", 3) },
@@ -39,30 +53,33 @@ public static class SCCategoryMapper
         { "spaceship_view", ("View & Camera", 7) },
         { "view_director_mode", ("View & Camera", 7) },
         { "spectator", ("View & Camera", 7) },
-        { "default", ("View & Camera", 7) },
 
         // Ship Systems
         { "spaceship_general", ("Ship Systems", 8) },
-        { "spaceship_hud", ("Ship Systems", 8) },
         { "spaceship_docking", ("Ship Systems", 8) },
         { "spaceship_auto_weapons", ("Ship Systems", 8) },
         { "lights_controller", ("Ship Systems", 8) },
         { "spaceship_headtracking", ("Ship Systems", 8) },
+        { "seat_general", ("Ship Systems", 8) },
 
         // Ground Vehicles
         { "vehicle_general", ("Ground Vehicles", 9) },
         { "vehicle_driver", ("Ground Vehicles", 9) },
+        { "vehicle_mfd", ("Ground Vehicles", 9) },
+        { "vehicle_mobiglas", ("Ground Vehicles", 9) },
 
         // On Foot
         { "player", ("On Foot", 10) },
         { "player_choice", ("On Foot", 10) },
         { "player_emotes", ("On Foot", 10) },
         { "player_input_optical_tracking", ("On Foot", 10) },
-        { "zero_gravity_eva", ("On Foot", 10) },
         { "prone", ("On Foot", 10) },
+        { "incapacitated", ("On Foot", 10) },
 
         // EVA
         { "eva", ("EVA", 11) },
+        { "zero_gravity_eva", ("EVA", 11) },
+        { "zero_gravity_traversal", ("EVA", 11) },
 
         // Turrets
         { "turret_main", ("Turrets", 12) },
@@ -74,30 +91,41 @@ public static class SCCategoryMapper
         // Mining
         { "mining", ("Mining", 13) },
         { "mining_turret", ("Mining", 13) },
+        { "spaceship_mining", ("Mining", 13) },
 
-        // Salvage
-        { "salvage", ("Salvage", 14) },
-
-        // Tractor Beam
-        { "tractor_beam", ("Tractor Beam", 15) },
-
-        // Interface
-        { "ui_textfield", ("Interface", 16) },
-        { "ui_notification", ("Interface", 16) },
-        { "starmap", ("Interface", 16) },
-        { "mobiglas", ("Interface", 16) },
-        { "visor_menu", ("Interface", 16) },
-        { "flycam", ("Interface", 16) },
-        { "fixed_camera", ("Interface", 16) },
-        { "selectable_camera", ("Interface", 16) },
+        // Interface (includes HUD)
+        { "spaceship_hud", ("Interface", 14) },
+        { "ui_textfield", ("Interface", 14) },
+        { "ui_notification", ("Interface", 14) },
+        { "starmap", ("Interface", 14) },
+        { "mobiglas", ("Interface", 14) },
+        { "visor_menu", ("Interface", 14) },
+        { "flycam", ("Interface", 14) },
+        { "fixed_camera", ("Interface", 14) },
+        { "selectable_camera", ("Interface", 14) },
+        { "mapui", ("Interface", 14) },
+        { "hacking", ("Interface", 14) },
+        { "character_customizer", ("Interface", 14) },
+        { "default", ("Interface", 14) },
 
         // Communication
-        { "social", ("Communication", 17) },
-        { "voip", ("Communication", 17) },
-        { "foip", ("Communication", 17) },
+        { "social", ("Communication", 15) },
+        { "voip", ("Communication", 15) },
+        { "foip", ("Communication", 15) },
 
-        // Server Operator
-        { "server_operator", ("Server Admin", 18) },
+        // Salvage
+        { "salvage", ("Salvage", 16) },
+        { "spaceship_salvage", ("Salvage", 16) },
+
+        // Tractor Beam
+        { "tractor_beam", ("Tractor Beam", 17) },
+
+        // Server/Debug (usually hidden)
+        { "server_operator", ("Other", 99) },
+        { "server_renderer", ("Other", 99) },
+        { "debug", ("Other", 99) },
+        { "stopwatch", ("Other", 99) },
+        { "remoterigidentitycontroller", ("Other", 99) },
     };
 
     /// <summary>
@@ -118,6 +146,35 @@ public static class SCCategoryMapper
     }
 
     /// <summary>
+    /// Gets the user-friendly category name for a specific action.
+    /// Checks action-level overrides first (e.g., Emergency for v_eject),
+    /// then falls back to actionmap category.
+    /// </summary>
+    public static string GetCategoryNameForAction(string actionMap, string actionName)
+    {
+        // Check action-level overrides first
+        if (!string.IsNullOrEmpty(actionName) && ActionOverrides.TryGetValue(actionName, out var actionInfo))
+            return actionInfo.Category;
+
+        // Fall back to actionmap category
+        return GetCategoryName(actionMap);
+    }
+
+    /// <summary>
+    /// Gets the sort order for a specific action.
+    /// Checks action-level overrides first, then falls back to actionmap/category.
+    /// </summary>
+    public static int GetSortOrderForAction(string actionMap, string actionName)
+    {
+        // Check action-level overrides first
+        if (!string.IsNullOrEmpty(actionName) && ActionOverrides.TryGetValue(actionName, out var actionInfo))
+            return actionInfo.SortOrder;
+
+        // Fall back to category sort order
+        return GetCategorySortOrder(GetCategoryName(actionMap));
+    }
+
+    /// <summary>
     /// Gets the sort order for an actionmap (lower = earlier)
     /// </summary>
     public static int GetSortOrder(string actionMap)
@@ -134,7 +191,7 @@ public static class SCCategoryMapper
     }
 
     /// <summary>
-    /// Category display name to sort order mapping
+    /// Category display name to sort order mapping (matches SCVirtStick order)
     /// </summary>
     private static readonly Dictionary<string, int> CategorySortOrders = new()
     {
@@ -151,12 +208,13 @@ public static class SCCategoryMapper
         { "EVA", 11 },
         { "Turrets", 12 },
         { "Mining", 13 },
-        { "Salvage", 14 },
-        { "Tractor Beam", 15 },
-        { "Interface", 16 },
-        { "Communication", 17 },
+        { "Interface", 14 },
+        { "Communication", 15 },
+        { "Salvage", 16 },
+        { "Tractor Beam", 17 },
         { "Server Admin", 18 },
-        { "Other", 99 }
+        { "Other", 99 },
+        { "Emergency", 100 }
     };
 
     /// <summary>
@@ -173,7 +231,22 @@ public static class SCCategoryMapper
     }
 
     /// <summary>
-    /// Gets all unique categories in sorted order
+    /// Gets all unique categories from actions in sorted order.
+    /// This considers action-level overrides (e.g., Emergency for v_eject).
+    /// </summary>
+    public static IEnumerable<string> GetSortedCategoriesFromActions(IEnumerable<(string ActionMap, string ActionName)> actions)
+    {
+        return actions
+            .Select(a => GetCategoryNameForAction(a.ActionMap, a.ActionName))
+            .Distinct()
+            .Select(c => new { Category = c, Order = GetCategorySortOrder(c) })
+            .OrderBy(x => x.Order)
+            .ThenBy(x => x.Category)
+            .Select(x => x.Category);
+    }
+
+    /// <summary>
+    /// Gets all unique categories in sorted order (from action maps only, no action-level overrides)
     /// </summary>
     public static IEnumerable<string> GetSortedCategories(IEnumerable<string> actionMaps)
     {

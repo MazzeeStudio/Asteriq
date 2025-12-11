@@ -207,6 +207,9 @@ public partial class MainForm
                 // Default: show joystick-relevant actions only
                 RefreshFilteredActions();
 
+                // Calculate dynamic column widths based on binding content
+                CalculateDeviceColumnWidths();
+
                 System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded {_scActions.Count} SC actions from {installation.Environment}");
             }
         }
@@ -216,6 +219,70 @@ public partial class MainForm
             _scActions = null;
             _scFilteredActions = null;
             _scActionMaps.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Calculates dynamic column widths based on the longest binding text in each column.
+    /// </summary>
+    private void CalculateDeviceColumnWidths()
+    {
+        _scGridDeviceColWidths.Clear();
+
+        if (_scActions is null) return;
+
+        var columns = GetSCGridColumns();
+        float fontSize = 9f;
+        float padding = 30f; // Badge padding + cell padding
+
+        foreach (var col in columns)
+        {
+            float maxWidth = _scGridDeviceColMinWidth;
+
+            // Determine device type for this column
+            SCDeviceType? deviceType = col.IsKeyboard ? SCDeviceType.Keyboard :
+                                        col.IsMouse ? SCDeviceType.Mouse :
+                                        col.IsJoystick ? SCDeviceType.Joystick : null;
+
+            foreach (var action in _scActions)
+            {
+                // Check profile bindings for this column
+                if (deviceType.HasValue)
+                {
+                    SCActionBinding? binding = null;
+                    if (col.IsJoystick)
+                    {
+                        binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
+                        // Check if this binding matches the current column's device
+                        if (binding is not null && _scExportProfile.GetSCInstance(binding.VJoyDevice) != col.SCInstance)
+                            binding = null;
+                    }
+                    else
+                    {
+                        binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, deviceType.Value);
+                    }
+
+                    if (binding is not null && !string.IsNullOrEmpty(binding.InputName))
+                    {
+                        var displayText = FormatBindingForCell(binding.InputName, binding.Modifiers);
+                        float textWidth = FUIRenderer.MeasureText(displayText, fontSize) + padding;
+                        maxWidth = Math.Max(maxWidth, textWidth);
+                    }
+                }
+
+                // Also check default bindings
+                var defaultBinding = action.DefaultBindings
+                    .FirstOrDefault(b => b.DevicePrefix.Equals(col.DevicePrefix, StringComparison.OrdinalIgnoreCase));
+                if (defaultBinding is not null && !string.IsNullOrEmpty(defaultBinding.Input))
+                {
+                    var modifiers = defaultBinding.Modifiers?.Where(m => !string.IsNullOrEmpty(m)).ToList();
+                    var displayText = FormatBindingForCell(defaultBinding.Input, modifiers);
+                    float textWidth = FUIRenderer.MeasureText(displayText, fontSize) + padding;
+                    maxWidth = Math.Max(maxWidth, textWidth);
+                }
+            }
+
+            _scGridDeviceColWidths[col.Id] = maxWidth;
         }
     }
 
@@ -826,10 +893,20 @@ public partial class MainForm
         var columns = GetSCGridColumns();
         _scGridColumns = columns;
 
-        // Column layout - fixed action column, device columns get remaining space
+        // Column layout - fixed action column, device columns have dynamic widths
         float totalWidth = rightMargin - leftMargin;
-        float deviceColWidth = _scGridDeviceColWidth;
-        float totalDeviceColsWidth = columns.Count * deviceColWidth;
+
+        // Calculate column widths and X positions
+        var colWidths = new float[columns.Count];
+        var colXPositions = new float[columns.Count];
+        float cumX = 0f;
+        for (int c = 0; c < columns.Count; c++)
+        {
+            colWidths[c] = _scGridDeviceColWidths.TryGetValue(columns[c].Id, out var w) ? w : _scGridDeviceColMinWidth;
+            colXPositions[c] = cumX;
+            cumX += colWidths[c];
+        }
+        float totalDeviceColsWidth = cumX;
 
         // Action column is fixed width
         float actionColWidth = _scGridActionColWidth;
@@ -882,8 +959,9 @@ public partial class MainForm
         // Draw device column headers
         for (int c = 0; c < columns.Count; c++)
         {
-            float colX = deviceColsStart + c * deviceColWidth - _scGridHorizontalScroll;
-            if (colX + deviceColWidth > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
+            float colW = colWidths[c];
+            float colX = deviceColsStart + colXPositions[c] - _scGridHorizontalScroll;
+            if (colX + colW > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
             {
                 var col = columns[c];
 
@@ -891,7 +969,7 @@ public partial class MainForm
                 if (c == _scHighlightedColumn)
                 {
                     using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
-                    canvas.DrawRect(new SKRect(colX, y, colX + deviceColWidth, y + headerRowHeight), highlightPaint);
+                    canvas.DrawRect(new SKRect(colX, y, colX + colW, y + headerRowHeight), highlightPaint);
                 }
 
                 // Use consistent theme colors for all column headers
@@ -900,7 +978,7 @@ public partial class MainForm
 
                 // Center the header text in the column
                 float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
-                float centeredX = colX + (deviceColWidth - headerTextWidth) / 2;
+                float centeredX = colX + (colW - headerTextWidth) / 2;
                 FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), headerColor, 9f, true);
 
                 // Draw column separator on left edge
@@ -1048,11 +1126,12 @@ public partial class MainForm
 
                     for (int c = 0; c < columns.Count; c++)
                     {
-                        float colX = deviceColsStart + c * deviceColWidth - _scGridHorizontalScroll;
-                        if (colX + deviceColWidth > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
+                        float colW = colWidths[c];
+                        float colX = deviceColsStart + colXPositions[c] - _scGridHorizontalScroll;
+                        if (colX + colW > deviceColsStart && colX < deviceColsStart + visibleDeviceWidth)
                         {
                             var col = columns[c];
-                            var cellBounds = new SKRect(colX, scrollY, colX + deviceColWidth, scrollY + rowHeight);
+                            var cellBounds = new SKRect(colX, scrollY, colX + colW, scrollY + rowHeight);
 
                             // Check cell state
                             bool isCellHovered = _scHoveredCell == (i, c);
@@ -1143,7 +1222,7 @@ public partial class MainForm
                                 string listeningText = "PRESS INPUT";
                                 float listeningFontSize = 9f;
                                 float listeningTextWidth = FUIRenderer.MeasureText(listeningText, listeningFontSize);
-                                float listeningTextX = colX + (deviceColWidth - listeningTextWidth) / 2;
+                                float listeningTextX = colX + (colW - listeningTextWidth) / 2;
                                 FUIRenderer.DrawText(canvas, listeningText, new SKPoint(listeningTextX, textY - 2), FUIColors.Active, listeningFontSize, true);
                             }
                             else if (!string.IsNullOrEmpty(bindingText))
@@ -1154,13 +1233,13 @@ public partial class MainForm
                                 // Draw conflict warning indicator
                                 if (isConflicting)
                                 {
-                                    DrawConflictIndicator(canvas, colX + deviceColWidth - 12, cellBounds.MidY - 4);
+                                    DrawConflictIndicator(canvas, colX + colW - 12, cellBounds.MidY - 4);
                                 }
                             }
                             else
                             {
                                 // Draw empty indicator, centered
-                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + deviceColWidth / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 11f);
+                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + colW / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 11f);
                             }
 
                             // Draw column separator
@@ -2346,14 +2425,20 @@ public partial class MainForm
     /// </summary>
     private int GetClickedColumnIndex(float x)
     {
-        if (_scGridColumns == null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
+        if (_scGridColumns is null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
             return -1;
 
         float relativeX = x - _scDeviceColsStart + _scGridHorizontalScroll;
-        int colIndex = (int)(relativeX / _scGridDeviceColWidth);
 
-        if (colIndex >= 0 && colIndex < _scGridColumns.Count)
-            return colIndex;
+        // Walk through columns to find which one contains this X
+        float cumX = 0f;
+        for (int c = 0; c < _scGridColumns.Count; c++)
+        {
+            float colW = _scGridDeviceColWidths.TryGetValue(_scGridColumns[c].Id, out var w) ? w : _scGridDeviceColMinWidth;
+            if (relativeX >= cumX && relativeX < cumX + colW)
+                return c;
+            cumX += colW;
+        }
 
         return -1;
     }

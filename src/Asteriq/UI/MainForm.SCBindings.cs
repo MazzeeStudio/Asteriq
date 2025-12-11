@@ -842,11 +842,11 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+        float lineHeight = FUIRenderer.ScaleLineHeight(16f);
 
         // Title
         FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
-        y += FUIRenderer.ScaleLineHeight(28f);
+        y += FUIRenderer.ScaleLineHeight(24f);
 
         // Installation selector
         float selectorHeight = 26f;
@@ -858,31 +858,22 @@ public partial class MainForm
 
         bool selectorHovered = _scInstallationSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
-        y += selectorHeight + 8f;
+        y += selectorHeight + 6f;
 
-        // Brief details
-        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+        // Bindable actions count (skip redundant environment - already in dropdown)
+        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scActions != null)
         {
-            var installation = _scInstallations[_selectedSCInstallation];
-            FUIRenderer.DrawText(canvas, installation.Environment, new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += lineHeight;
-
-            if (_scActions != null)
-            {
-                var joystickActions = _scSchemaService?.FilterJoystickActions(_scActions);
-                FUIRenderer.DrawText(canvas, $"{joystickActions?.Count ?? 0} bindable actions", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-                y += lineHeight;
-            }
+            var joystickActions = _scSchemaService?.FilterJoystickActions(_scActions);
+            FUIRenderer.DrawText(canvas, $"{joystickActions?.Count ?? 0} bindable actions", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            y += lineHeight + 4f;
         }
 
-        // Refresh button (compact)
-        y = bounds.Bottom - frameInset - 35f;
-        float buttonWidth = 80f;
-        float buttonHeight = 24f;
+        // Refresh button - inline after text
+        float buttonWidth = 70f;
+        float buttonHeight = 22f;
         _scRefreshButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
         _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        FUIRenderer.DrawButton(canvas, _scRefreshButtonBounds, "REFRESH",
-            _scRefreshButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        DrawTextButton(canvas, _scRefreshButtonBounds, "Refresh", _scRefreshButtonHovered);
     }
 
     private void DrawSCBindingsTablePanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1859,21 +1850,17 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+        float lineHeight = FUIRenderer.ScaleLineHeight(16f);
 
         // Title
-        FUIRenderer.DrawText(canvas, "EXPORT", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
-        y += FUIRenderer.ScaleLineHeight(28f);
-
-        // Profile selector - wider dropdown with refresh button
-        FUIRenderer.DrawText(canvas, "PROFILE", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-        y += lineHeight - 4f;
+        FUIRenderer.DrawText(canvas, "PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
+        y += FUIRenderer.ScaleLineHeight(24f);
 
         float dropdownHeight = 26f;
         float refreshBtnWidth = 24f;
-        float buttonGap = 4f;
+        float buttonGap = 6f;
 
-        // Wider profile dropdown (full width minus refresh button)
+        // Profile dropdown (full width minus refresh button)
         float dropdownRight = rightMargin - refreshBtnWidth - buttonGap;
         _scProfileDropdownBounds = new SKRect(leftMargin, y, dropdownRight, y + dropdownHeight);
         bool dropdownHovered = _scProfileDropdownBounds.Contains(_mousePosition.X, _mousePosition.Y);
@@ -1885,13 +1872,13 @@ public partial class MainForm
         bool refreshHovered = refreshBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawProfileRefreshButton(canvas, refreshBounds, refreshHovered);
 
-        y += dropdownHeight + 6f;
+        y += dropdownHeight + 8f;
 
-        // Profile management buttons row (+ New, Save, Delete)
+        // Profile management buttons row (+ New, Save) - aligned to right
         float textBtnWidth = 50f;
         float textBtnHeight = 22f;
-        float totalBtnWidth = textBtnWidth * 3 + buttonGap * 2;
-        float btnStartX = leftMargin;
+        float totalBtnWidth = textBtnWidth * 2 + buttonGap;
+        float btnStartX = rightMargin - totalBtnWidth;
 
         // New button
         _scNewProfileButtonBounds = new SKRect(btnStartX, y, btnStartX + textBtnWidth, y + textBtnHeight);
@@ -1904,23 +1891,18 @@ public partial class MainForm
         _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
 
-        // Delete button
-        float deleteBtnX = saveBtnX + textBtnWidth + buttonGap;
-        _scDeleteProfileButtonBounds = new SKRect(deleteBtnX, y, deleteBtnX + textBtnWidth, y + textBtnHeight);
-        _scDeleteProfileButtonHovered = _scDeleteProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        bool canDelete = _scExportProfiles.Count > 1;  // Can't delete last profile
-        DrawTextButton(canvas, _scDeleteProfileButtonBounds, "Delete", _scDeleteProfileButtonHovered && canDelete, !canDelete);
-
-        y += textBtnHeight + 8f;
+        y += textBtnHeight + 10f;
 
         // Draw profile dropdown list if open (shows both Asteriq profiles and SC mapping files)
+        // Note: This is drawn later in DrawSCOpenDropdowns() to render on top of other elements
         if (_scProfileDropdownOpen)
         {
             int asteriqCount = _scExportProfiles.Count;
             int scFileCount = _scAvailableProfiles.Count;
             int totalItems = asteriqCount + (scFileCount > 0 ? scFileCount + 1 : 0); // +1 for separator
             float listHeight = Math.Min(totalItems * 24f + 8f, 200f);
-            _scProfileDropdownListBounds = new SKRect(leftMargin, y - 10f, dropdownRight, y - 10f + listHeight);
+            // Position dropdown below the buttons row
+            _scProfileDropdownListBounds = new SKRect(leftMargin, _scProfileDropdownBounds.Bottom + 2, rightMargin, _scProfileDropdownBounds.Bottom + 2 + listHeight);
             DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         }
 
@@ -1929,22 +1911,21 @@ public partial class MainForm
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
 
-            using var selBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30), IsAntialias = true };
-            canvas.DrawRect(new SKRect(leftMargin - 5, y - 2, rightMargin + 5, y + 55f), selBgPaint);
+            // Calculate section height for background
+            float sectionStartY = y;
 
             FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 9f, true);
-            y += lineHeight - 2f;
+            y += lineHeight;
 
-            string actionDisplay = selectedAction.ActionName;
-            if (actionDisplay.Length > 28) actionDisplay = actionDisplay.Substring(0, 25) + "...";
+            string actionDisplay = TruncateTextToWidth(selectedAction.ActionName, rightMargin - leftMargin - 10, 10f);
             FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 10f);
-            y += lineHeight - 4f;
+            y += lineHeight;
 
             FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-            y += lineHeight + 8f;
+            y += lineHeight + 6f;
 
             // Assign/Clear buttons
-            float btnWidth = (rightMargin - leftMargin - 5) / 2;
+            float btnWidth = (rightMargin - leftMargin - 8) / 2;
             float btnHeight = 24f;
 
             _scAssignInputButtonBounds = new SKRect(leftMargin, y, leftMargin + btnWidth, y + btnHeight);
@@ -1965,7 +1946,7 @@ public partial class MainForm
                     _scAssignInputButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             }
 
-            _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 5, y, rightMargin, y + btnHeight);
+            _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 8, y, rightMargin, y + btnHeight);
             _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
             bool hasBinding = existingBinding != null;
 
@@ -4346,10 +4327,6 @@ public partial class MainForm
             canvas.DrawLine(bounds.Right - 12, sepY, bounds.Right - 8, sepY, accentLinePaint);
 
             y += 6f;
-
-            // Section header
-            FUIRenderer.DrawText(canvas, "SC MAPPINGS FOLDER", new SKPoint(bounds.Left + 10, y + 3), FUIColors.TextDim, 8f);
-            y += 14f;
 
             // SC mapping files
             int scFileIndexOffset = _scExportProfiles.Count + 1000; // Use offset to distinguish from Asteriq profiles

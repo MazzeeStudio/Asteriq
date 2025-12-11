@@ -144,19 +144,25 @@ public class SCXmlExportService
     /// </summary>
     private static IEnumerable<XElement> CreateActionMapElements(SCExportProfile profile)
     {
-        // Group bindings by action map
-        var bindingsByMap = profile.Bindings
+        // Group bindings by action map, then by action name
+        // An action may have multiple bindings (KB, Mouse, JS)
+        var bindingsByMapAndAction = profile.Bindings
             .GroupBy(b => b.ActionMap)
             .OrderBy(g => g.Key);
 
-        foreach (var mapGroup in bindingsByMap)
+        foreach (var mapGroup in bindingsByMapAndAction)
         {
             var actionMapElement = new XElement("actionmap",
                 new XAttribute("name", mapGroup.Key));
 
-            foreach (var binding in mapGroup.OrderBy(b => b.ActionName))
+            // Group by action name since one action can have multiple device bindings
+            var actionGroups = mapGroup
+                .GroupBy(b => b.ActionName)
+                .OrderBy(g => g.Key);
+
+            foreach (var actionGroup in actionGroups)
             {
-                var actionElement = CreateActionElement(binding, profile);
+                var actionElement = CreateActionElement(actionGroup.ToList(), profile);
                 if (actionElement != null)
                 {
                     actionMapElement.Add(actionElement);
@@ -172,34 +178,61 @@ public class SCXmlExportService
     }
 
     /// <summary>
-    /// Creates an action element with rebind
+    /// Creates an action element with all rebind elements for different devices
     /// </summary>
-    private static XElement? CreateActionElement(SCActionBinding binding, SCExportProfile profile)
+    private static XElement? CreateActionElement(List<SCActionBinding> bindings, SCExportProfile profile)
     {
-        var scInstance = profile.GetSCInstance(binding.VJoyDevice);
-        var inputString = binding.GetSCInputString(scInstance);
+        if (bindings.Count == 0)
+            return null;
 
         var actionElement = new XElement("action",
-            new XAttribute("name", binding.ActionName));
+            new XAttribute("name", bindings[0].ActionName));
 
-        var rebindElement = new XElement("rebind",
-            new XAttribute("input", inputString));
-
-        // Add inversion attribute if applicable (axes only)
-        if (binding.Inverted && binding.InputType == SCInputType.Axis)
+        foreach (var binding in bindings)
         {
-            rebindElement.Add(new XAttribute("invert", "1"));
+            var inputString = GetInputString(binding, profile);
+
+            var rebindElement = new XElement("rebind",
+                new XAttribute("input", inputString));
+
+            // Add inversion attribute if applicable (axes only)
+            if (binding.Inverted && binding.InputType == SCInputType.Axis)
+            {
+                rebindElement.Add(new XAttribute("invert", "1"));
+            }
+
+            // Add activationMode attribute if not default press
+            var activationModeStr = binding.ActivationMode.ToXmlString();
+            if (activationModeStr != null)
+            {
+                rebindElement.Add(new XAttribute("activationMode", activationModeStr));
+            }
+
+            actionElement.Add(rebindElement);
         }
 
-        // Add activationMode attribute if not default press
-        var activationModeStr = binding.ActivationMode.ToXmlString();
-        if (activationModeStr != null)
-        {
-            rebindElement.Add(new XAttribute("activationMode", activationModeStr));
-        }
-
-        actionElement.Add(rebindElement);
         return actionElement;
+    }
+
+    /// <summary>
+    /// Gets the SC input string for a binding based on device type
+    /// </summary>
+    private static string GetInputString(SCActionBinding binding, SCExportProfile profile)
+    {
+        // Handle modifiers prefix (e.g., "kb1_lalt+n")
+        string modifierPrefix = "";
+        if (binding.Modifiers.Count > 0)
+        {
+            modifierPrefix = string.Join("+", binding.Modifiers) + "+";
+        }
+
+        return binding.DeviceType switch
+        {
+            SCDeviceType.Keyboard => $"kb1_{modifierPrefix}{binding.InputName}",
+            SCDeviceType.Mouse => $"mo1_{modifierPrefix}{binding.InputName}",
+            SCDeviceType.Joystick => $"js{profile.GetSCInstance(binding.VJoyDevice)}_{modifierPrefix}{binding.InputName}",
+            _ => binding.InputName
+        };
     }
 
     /// <summary>

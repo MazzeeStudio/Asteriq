@@ -81,12 +81,12 @@ public class SCExportProfile
         : 0;
 
     /// <summary>
-    /// Adds or updates a binding
+    /// Adds or updates a binding for a specific device type
     /// </summary>
     public void SetBinding(string actionMap, string actionName, SCActionBinding binding)
     {
-        // Remove existing binding for this action
-        Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName);
+        // Remove existing binding for this action AND device type
+        Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName && b.DeviceType == binding.DeviceType);
         binding.ActionMap = actionMap;
         binding.ActionName = actionName;
         Bindings.Add(binding);
@@ -94,21 +94,42 @@ public class SCExportProfile
     }
 
     /// <summary>
-    /// Gets a binding for an action
+    /// Gets a joystick binding for an action (backwards compatible)
     /// </summary>
     public SCActionBinding? GetBinding(string actionMap, string actionName)
     {
         return Bindings.FirstOrDefault(b =>
-            b.ActionMap == actionMap && b.ActionName == actionName);
+            b.ActionMap == actionMap && b.ActionName == actionName && b.DeviceType == SCDeviceType.Joystick);
     }
 
     /// <summary>
-    /// Removes a binding
+    /// Gets a binding for an action with specific device type
+    /// </summary>
+    public SCActionBinding? GetBinding(string actionMap, string actionName, SCDeviceType deviceType)
+    {
+        return Bindings.FirstOrDefault(b =>
+            b.ActionMap == actionMap && b.ActionName == actionName && b.DeviceType == deviceType);
+    }
+
+    /// <summary>
+    /// Removes all bindings for an action (backwards compatible - removes all device types)
     /// </summary>
     public bool RemoveBinding(string actionMap, string actionName)
     {
         var removed = Bindings.RemoveAll(b =>
             b.ActionMap == actionMap && b.ActionName == actionName);
+        if (removed > 0)
+            Modified = DateTime.UtcNow;
+        return removed > 0;
+    }
+
+    /// <summary>
+    /// Removes a binding for an action with specific device type
+    /// </summary>
+    public bool RemoveBinding(string actionMap, string actionName, SCDeviceType deviceType)
+    {
+        var removed = Bindings.RemoveAll(b =>
+            b.ActionMap == actionMap && b.ActionName == actionName && b.DeviceType == deviceType);
         if (removed > 0)
             Modified = DateTime.UtcNow;
         return removed > 0;
@@ -124,7 +145,7 @@ public class SCExportProfile
     }
 
     /// <summary>
-    /// Gets all bindings that would conflict with the given input (same device + input).
+    /// Gets all joystick bindings that would conflict with the given input (same device + input).
     /// Excludes the specified action to avoid reporting self-conflicts.
     /// </summary>
     public List<SCActionBinding> GetConflictingBindings(
@@ -134,6 +155,7 @@ public class SCExportProfile
         string? excludeActionName = null)
     {
         return Bindings.Where(b =>
+            b.DeviceType == SCDeviceType.Joystick &&
             b.VJoyDevice == vjoyDevice &&
             b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
             !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
@@ -148,6 +170,16 @@ public class SCExportProfile
         var sanitized = string.Join("_", ProfileName.Split(Path.GetInvalidFileNameChars()));
         return $"layout_{sanitized}_exported.xml";
     }
+}
+
+/// <summary>
+/// Device type for a binding
+/// </summary>
+public enum SCDeviceType
+{
+    Joystick,
+    Keyboard,
+    Mouse
 }
 
 /// <summary>
@@ -166,12 +198,17 @@ public class SCActionBinding
     public string ActionName { get; set; } = string.Empty;
 
     /// <summary>
-    /// The vJoy device ID (1-16)
+    /// The device type (Joystick, Keyboard, Mouse)
+    /// </summary>
+    public SCDeviceType DeviceType { get; set; } = SCDeviceType.Joystick;
+
+    /// <summary>
+    /// The vJoy device ID (1-16) - only used for Joystick type
     /// </summary>
     public uint VJoyDevice { get; set; }
 
     /// <summary>
-    /// The input name on the vJoy device (e.g., "button1", "x", "hat1_up")
+    /// The input name (e.g., "button1", "x", "hat1_up" for joystick, "w", "space" for keyboard)
     /// </summary>
     public string InputName { get; set; } = string.Empty;
 
@@ -191,22 +228,37 @@ public class SCActionBinding
     public SCActivationMode ActivationMode { get; set; } = SCActivationMode.Press;
 
     /// <summary>
-    /// Modifier keys (currently unused for vJoy, but kept for future)
+    /// Modifier keys (e.g., "lshift", "lctrl")
     /// </summary>
     public List<string> Modifiers { get; set; } = new();
 
     /// <summary>
-    /// Gets the full SC input string (e.g., "js1_button5", "js2_x")
+    /// Gets the full SC input string (e.g., "js1_button5", "kb1_w", "mo1_mouse1")
     /// </summary>
-    public string GetSCInputString(int scInstance)
+    public string GetSCInputString(int scInstance = 1)
     {
-        return $"js{scInstance}_{InputName}";
+        return DeviceType switch
+        {
+            SCDeviceType.Keyboard => $"kb1_{InputName}",
+            SCDeviceType.Mouse => $"mo1_{InputName}",
+            _ => $"js{scInstance}_{InputName}"
+        };
     }
 
     /// <summary>
-    /// Unique key for this binding
+    /// Unique key for this binding (includes device type to allow multiple bindings per action)
     /// </summary>
-    public string Key => $"{ActionMap}.{ActionName}";
+    public string Key => $"{ActionMap}.{ActionName}.{DeviceType}";
 
-    public override string ToString() => $"{ActionMap}/{ActionName} -> vJoy{VJoyDevice}_{InputName}";
+    /// <summary>
+    /// Simple key without device type (for backwards compatibility)
+    /// </summary>
+    public string ActionKey => $"{ActionMap}.{ActionName}";
+
+    public override string ToString() => DeviceType switch
+    {
+        SCDeviceType.Keyboard => $"{ActionMap}/{ActionName} -> kb1_{InputName}",
+        SCDeviceType.Mouse => $"{ActionMap}/{ActionName} -> mo1_{InputName}",
+        _ => $"{ActionMap}/{ActionName} -> vJoy{VJoyDevice}_{InputName}"
+    };
 }

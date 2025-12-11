@@ -199,6 +199,13 @@ public partial class MainForm
                     _scActions.Select(a => a.ActionMap).Distinct()
                 ).ToList();
 
+                // If this is a fresh profile (no bindings), populate with SC defaults
+                // This follows SCVirtStick's model: profile contains ALL bindings, no separate "defaults"
+                if (_scExportProfile.Bindings.Count == 0)
+                {
+                    ApplyDefaultBindingsToProfile();
+                }
+
                 // Default: show joystick-relevant actions only
                 RefreshFilteredActions();
 
@@ -212,6 +219,80 @@ public partial class MainForm
             _scFilteredActions = null;
             _scActionMaps.Clear();
         }
+    }
+
+    /// <summary>
+    /// Copies SC default bindings from parsed actions into the export profile.
+    /// This follows SCVirtStick's model where the profile contains ALL bindings.
+    /// </summary>
+    private void ApplyDefaultBindingsToProfile()
+    {
+        if (_scActions == null) return;
+
+        int kbCount = 0, moCount = 0, jsCount = 0;
+
+        foreach (var action in _scActions)
+        {
+            foreach (var defaultBinding in action.DefaultBindings)
+            {
+                // Skip empty bindings (SC uses space for "no binding")
+                if (string.IsNullOrWhiteSpace(defaultBinding.Input) || defaultBinding.Input.Trim() == "")
+                    continue;
+
+                SCDeviceType deviceType;
+                if (defaultBinding.DevicePrefix.StartsWith("kb", StringComparison.OrdinalIgnoreCase))
+                {
+                    deviceType = SCDeviceType.Keyboard;
+                    kbCount++;
+                }
+                else if (defaultBinding.DevicePrefix.StartsWith("mo", StringComparison.OrdinalIgnoreCase))
+                {
+                    deviceType = SCDeviceType.Mouse;
+                    moCount++;
+                }
+                else if (defaultBinding.DevicePrefix.StartsWith("js", StringComparison.OrdinalIgnoreCase))
+                {
+                    deviceType = SCDeviceType.Joystick;
+                    jsCount++;
+                }
+                else
+                {
+                    continue; // Skip gamepad and unknown
+                }
+
+                var binding = new SCActionBinding
+                {
+                    ActionMap = action.ActionMap,
+                    ActionName = action.ActionName,
+                    DeviceType = deviceType,
+                    InputName = defaultBinding.Input,
+                    InputType = InferInputTypeFromName(defaultBinding.Input),
+                    Inverted = defaultBinding.Inverted,
+                    ActivationMode = defaultBinding.ActivationMode,
+                    Modifiers = defaultBinding.Modifiers.ToList()
+                };
+
+                // For joystick bindings, set VJoyDevice based on the js instance in prefix
+                if (deviceType == SCDeviceType.Joystick)
+                {
+                    // Extract instance from "js1", "js2", etc.
+                    if (defaultBinding.DevicePrefix.Length > 2 &&
+                        uint.TryParse(defaultBinding.DevicePrefix.Substring(2), out var jsInstance))
+                    {
+                        binding.VJoyDevice = jsInstance;
+                    }
+                    else
+                    {
+                        binding.VJoyDevice = 1; // Default to js1
+                    }
+                }
+
+                _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
+            }
+        }
+
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+        System.Diagnostics.Debug.WriteLine($"[MainForm] Applied SC defaults to profile: {kbCount} KB, {moCount} Mouse, {jsCount} JS bindings");
     }
 
     private void RefreshFilteredActions()
@@ -540,7 +621,9 @@ public partial class MainForm
         _scExportButtonBounds = new SKRect(buttonX, y, buttonX + buttonWidth, y + buttonHeight);
         _scExportButtonHovered = _scExportButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
 
-        bool canExport = _scInstallations.Count > 0 && _scExportProfile.VJoyToSCInstance.Count > 0;
+        // Can export if: SC installation exists AND (no JS bindings OR has vJoy mappings)
+        var hasJsBindings = _scExportProfile.Bindings.Any(b => b.DeviceType == SCDeviceType.Joystick);
+        bool canExport = _scInstallations.Count > 0 && (!hasJsBindings || _scExportProfile.VJoyToSCInstance.Count > 0);
         DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
         y += buttonHeight + 15f;
 
@@ -1011,44 +1094,38 @@ public partial class MainForm
                             }
 
                             string? bindingText = null;
-                            SKColor textColor = FUIColors.TextDim;
-                            bool isDefault = false;
+                            SKColor textColor = FUIColors.TextPrimary;
                             SCInputType? inputType = null;
                             bool isConflicting = false;
 
-                            // Check for user binding (from export profile) for joystick columns
+                            // All bindings now come from the profile (SCVirtStick model)
+                            // No separate "defaults" - profile contains everything
+                            SCActionBinding? binding = null;
+
                             if (col.IsJoystick)
                             {
-                                var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
-                                if (userBinding != null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
-                                {
-                                    bindingText = FormatBindingForCell(userBinding.InputName, userBinding.Modifiers);
-                                    // Check if this binding conflicts with another (for warning indicator only)
-                                    isConflicting = _scConflictingBindings.Contains(userBinding.Key);
-                                    textColor = FUIColors.Active;  // Always use Active color - conflicts are valid
-                                    inputType = userBinding.InputType;
-                                }
+                                binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
+                                // Check if this binding matches the current column's device
+                                if (binding != null && _scExportProfile.GetSCInstance(binding.VJoyDevice) != col.SCInstance)
+                                    binding = null;
+                            }
+                            else if (col.IsKeyboard)
+                            {
+                                binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Keyboard);
+                            }
+                            else if (col.IsMouse)
+                            {
+                                binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Mouse);
                             }
 
-                            // Check for default binding (from SC's defaultProfile.xml)
-                            if (bindingText == null && action.DefaultBindings.Count > 0)
+                            if (binding != null)
                             {
-                                var defaultBinding = action.DefaultBindings.FirstOrDefault(b =>
-                                    b.DevicePrefix.StartsWith(col.DevicePrefix, StringComparison.OrdinalIgnoreCase) ||
-                                    (col.IsKeyboard && b.DevicePrefix.StartsWith("kb", StringComparison.OrdinalIgnoreCase)) ||
-                                    (col.IsMouse && b.DevicePrefix.StartsWith("mo", StringComparison.OrdinalIgnoreCase)));
-
-                                if (defaultBinding != null)
+                                bindingText = FormatBindingForCell(binding.InputName, binding.Modifiers);
+                                inputType = binding.InputType;
+                                // Check for conflicts (joystick only)
+                                if (col.IsJoystick)
                                 {
-                                    bindingText = FormatBindingForCell(defaultBinding.Input, defaultBinding.Modifiers);
-                                    // Use muted theme colors for default (SC) bindings to distinguish from user bindings
-                                    textColor = col.IsKeyboard ? FUIColors.TextPrimary :
-                                               col.IsMouse ? FUIColors.TextPrimary :
-                                               FUIColors.TextDim;
-                                    isDefault = true;
-                                    // Determine input type from input name for joystick bindings only
-                                    if (col.IsJoystick)
-                                        inputType = DetectInputTypeFromName(defaultBinding.Input);
+                                    isConflicting = _scConflictingBindings.Contains(binding.Key);
                                 }
                             }
 
@@ -1065,7 +1142,7 @@ public partial class MainForm
                             else if (!string.IsNullOrEmpty(bindingText))
                             {
                                 // Draw keycap-style badge for binding, centered in cell
-                                DrawBindingBadgeCentered(canvas, cellBounds, bindingText, textColor, isDefault, col.IsJoystick ? inputType : null);
+                                DrawBindingBadgeCentered(canvas, cellBounds, bindingText, textColor, false, col.IsJoystick ? inputType : null);
 
                                 // Draw conflict warning indicator
                                 if (isConflicting)
@@ -1675,8 +1752,34 @@ public partial class MainForm
             y += btnHeight + 10f;
         }
 
+        // Clear All / Reset Defaults buttons
+        y = bounds.Bottom - frameInset - 95f;
+        float smallBtnWidth = (rightMargin - leftMargin - 5) / 2;
+        float smallBtnHeight = 24f;
+
+        _scClearAllButtonBounds = new SKRect(leftMargin, y, leftMargin + smallBtnWidth, y + smallBtnHeight);
+        _scClearAllButtonHovered = _scClearAllButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        bool hasBoundActions = _scExportProfile.Bindings.Count > 0;
+        if (hasBoundActions)
+        {
+            FUIRenderer.DrawButton(canvas, _scClearAllButtonBounds, "CLEAR ALL",
+                _scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        }
+        else
+        {
+            using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+            canvas.DrawRect(_scClearAllButtonBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "CLEAR ALL", _scClearAllButtonBounds, FUIColors.TextDim.WithAlpha(100), 9f);
+        }
+
+        _scResetDefaultsButtonBounds = new SKRect(leftMargin + smallBtnWidth + 5, y, rightMargin, y + smallBtnHeight);
+        _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _scResetDefaultsButtonBounds, "RESET DFLTS",
+            _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+
+        y += smallBtnHeight + 8f;
+
         // Export button at bottom
-        y = bounds.Bottom - frameInset - 50f;
         float buttonWidth = rightMargin - leftMargin;
         float buttonHeight = 32f;
         _scExportButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
@@ -2052,6 +2155,20 @@ public partial class MainForm
             return;
         }
 
+        // Clear All bindings button
+        if (_scClearAllButtonBounds.Contains(point) && _scExportProfile.Bindings.Count > 0)
+        {
+            ClearAllBindings();
+            return;
+        }
+
+        // Reset Defaults button
+        if (_scResetDefaultsButtonBounds.Contains(point))
+        {
+            ResetToDefaults();
+            return;
+        }
+
         // Assign input button
         if (_scAssignInputButtonBounds.Contains(point) && _scSelectedActionIndex >= 0)
         {
@@ -2064,6 +2181,8 @@ public partial class MainForm
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
             _scExportProfile.RemoveBinding(selectedAction.ActionMap, selectedAction.ActionName);
+            _scExportProfileService?.SaveProfile(_scExportProfile);
+            UpdateConflictingBindings();
             _scAssigningInput = false;
             return;
         }
@@ -2252,15 +2371,37 @@ public partial class MainForm
         // Clear binding for this action on this column's device
         if (col.IsJoystick)
         {
-            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
+            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
             if (userBinding is not null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
             {
-                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName);
+                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
+                _scExportProfileService?.SaveProfile(_scExportProfile);
                 UpdateConflictingBindings();
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared binding for {action.ActionName} on {col.Header}");
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared JS binding for {action.ActionName} on {col.Header}");
             }
         }
-        // For keyboard/mouse, we don't clear default bindings (they're read-only from SC)
+        else if (col.Header == "KB")
+        {
+            // Clear user keyboard binding
+            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Keyboard);
+            if (userBinding is not null)
+            {
+                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName, SCDeviceType.Keyboard);
+                _scExportProfileService?.SaveProfile(_scExportProfile);
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared KB binding for {action.ActionName}");
+            }
+        }
+        else if (col.Header == "Mouse")
+        {
+            // Clear user mouse binding
+            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Mouse);
+            if (userBinding is not null)
+            {
+                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName, SCDeviceType.Mouse);
+                _scExportProfileService?.SaveProfile(_scExportProfile);
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared Mouse binding for {action.ActionName}");
+            }
+        }
     }
 
     /// <summary>
@@ -2469,205 +2610,129 @@ public partial class MainForm
         return null;
     }
 
-    // State tracking for joystick input detection during SC binding listening mode
-    private Dictionary<string, DeviceInputState>? _scPreviousInputStates;
-    private Dictionary<string, float[]>? _scAxisBaseline; // Baseline axis values at start of listening
-    private (string deviceId, int axisIndex, float maxDeflection)? _scBestAxisCandidate; // Track largest axis movement
+    // State tracking for SDL2-based joystick input detection
+    private Dictionary<Guid, float[]>? _scAxisBaseline;    // Baseline axis values
+    private Dictionary<Guid, bool[]>? _scButtonBaseline;   // Baseline button values
+    private Dictionary<Guid, int[]>? _scHatBaseline;       // Baseline hat values
+    private int _scBaselineFrames = 0;                     // Frames since baseline capture
 
     /// <summary>
-    /// Detects joystick input by polling all physical devices and finding inputs
-    /// that map to the target vJoy device.
+    /// Detects joystick input using SDL2 with axis TYPE info for proper slider detection.
+    ///
+    /// Design: SC Bindings detection accepts input from ANY physical joystick and assigns it
+    /// to the clicked column's vJoy device. Uses AxisInfo to properly identify sliders.
     /// </summary>
     private string? DetectJoystickInput(SCGridColumn col)
     {
-        // Get the active profile for mapping lookup
-        var profile = _profileService.ActiveProfile;
-        if (profile is null)
-        {
-            System.Diagnostics.Debug.WriteLine("[SCBindings] DetectJoystickInput: No active profile");
-            return null;
-        }
+        const float AxisThreshold = 0.15f; // 15% threshold like SCVirtStick/Gremlin
 
-        // Initialize states on first call - capture baseline for all devices
-        if (_scPreviousInputStates is null)
+        // Initialize on first call - capture baseline from SDL2
+        if (_scAxisBaseline is null)
         {
-            _scPreviousInputStates = new Dictionary<string, DeviceInputState>();
-            _scAxisBaseline = new Dictionary<string, float[]>();
-            _scBestAxisCandidate = null;
+            _scAxisBaseline = new Dictionary<Guid, float[]>();
+            _scButtonBaseline = new Dictionary<Guid, bool[]>();
+            _scHatBaseline = new Dictionary<Guid, int[]>();
+            _scBaselineFrames = 0;
 
-            foreach (var device in _devices.Where(d => !d.IsVirtual && d.IsConnected))
+            // Capture baseline from current SDL2 state
+            for (int idx = 0; idx < _devices.Count; idx++)
             {
-                var state = _inputService.GetDeviceState(device.DeviceIndex);
-                if (state is not null)
+                var device = _devices[idx];
+                if (device.IsVirtual || !device.IsConnected) continue;
+
+                var state = _inputService.GetDeviceState(idx);
+                if (state != null)
                 {
-                    string deviceId = device.InstanceGuid.ToString();
-                    _scPreviousInputStates[deviceId] = state;
-                    // Store baseline axis values (copy to avoid reference issues)
-                    _scAxisBaseline[deviceId] = state.Axes.ToArray();
+                    _scAxisBaseline[device.InstanceGuid] = (float[])state.Axes.Clone();
+                    _scButtonBaseline[device.InstanceGuid] = (bool[])state.Buttons.Clone();
+                    _scHatBaseline[device.InstanceGuid] = (int[])state.Hats.Clone();
                 }
             }
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized input states for {_scPreviousInputStates.Count} devices with axis baselines");
+
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized SDL2 input detection for {_scAxisBaseline.Count} devices");
             return null; // First frame - just capture baseline
         }
 
-        // Poll all connected physical devices for input changes
-        foreach (var device in _devices.Where(d => !d.IsVirtual && d.IsConnected))
+        _scBaselineFrames++;
+
+        // Skip first few frames to let baseline stabilize
+        if (_scBaselineFrames < 3)
+            return null;
+
+        // Check each physical device for input changes
+        for (int idx = 0; idx < _devices.Count; idx++)
         {
-            var currentState = _inputService.GetDeviceState(device.DeviceIndex);
-            if (currentState is null) continue;
+            var device = _devices[idx];
+            if (device.IsVirtual || !device.IsConnected) continue;
 
-            string deviceId = device.InstanceGuid.ToString();
-            _scPreviousInputStates.TryGetValue(deviceId, out var previousState);
-            _scAxisBaseline!.TryGetValue(deviceId, out var baseline);
+            var state = _inputService.GetDeviceState(idx);
+            if (state is null) continue;
 
-            // Check for button presses (transition from not pressed to pressed)
-            for (int i = 0; i < currentState.Buttons.Length; i++)
+            _scAxisBaseline.TryGetValue(device.InstanceGuid, out var baselineAxes);
+            _scButtonBaseline!.TryGetValue(device.InstanceGuid, out var baselineButtons);
+            _scHatBaseline!.TryGetValue(device.InstanceGuid, out var baselineHats);
+
+            // Check for button presses - immediately return on first press
+            for (int i = 0; i < state.Buttons.Length; i++)
             {
-                bool wasPressed = previousState is not null && i < previousState.Buttons.Length && previousState.Buttons[i];
-                bool isPressed = currentState.Buttons[i];
+                bool wasPressed = baselineButtons is not null && i < baselineButtons.Length && baselineButtons[i];
+                bool isPressed = state.Buttons[i];
 
                 if (isPressed && !wasPressed)
                 {
-                    // Button was just pressed - look up vJoy mapping
-                    var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Button, i);
-                    if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected button {i} on {device.Name} -> vJoy{output.VJoyDevice} button{output.Index + 1}");
-                        ResetJoystickDetectionState();
-                        return $"button{output.Index + 1}";
-                    }
-
-                    // If no mapping found, check if this device is assigned to the target vJoy device
-                    // and use 1:1 mapping (physical button N -> vJoy button N)
-                    var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
-                    if (vJoyDevice == col.VJoyDeviceId)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} button {i} -> vJoy{vJoyDevice} button{i + 1}");
-                        ResetJoystickDetectionState();
-                        return $"button{i + 1}";
-                    }
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected button {i + 1} on {device.Name}");
+                    ResetJoystickDetectionState();
+                    return $"button{i + 1}";
                 }
             }
 
-            // Check for axis movement - track the axis with the largest deflection from baseline
-            for (int i = 0; i < currentState.Axes.Length; i++)
+            // Check for axis movement - look up vJoy output axis from mapping profile
+            for (int i = 0; i < state.Axes.Length; i++)
             {
-                float baselineValue = baseline is not null && i < baseline.Length ? baseline[i] : 0f;
-                float currValue = currentState.Axes[i];
-                float deflectionFromBaseline = Math.Abs(currValue - baselineValue);
+                float baselineValue = baselineAxes is not null && i < baselineAxes.Length ? baselineAxes[i] : 0f;
+                float currValue = state.Axes[i];
+                float deflection = Math.Abs(currValue - baselineValue);
 
-                // Track the axis with the largest deflection (threshold: 40% movement from baseline)
-                if (deflectionFromBaseline > 0.4f)
+                if (deflection > AxisThreshold)
                 {
-                    // Check if this axis maps to target vJoy device
-                    var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Axis, i);
-                    int? targetVJoy = (int?)output?.VJoyDevice;
-                    if (targetVJoy is null)
-                    {
-                        // 1:1 fallback
-                        targetVJoy = (int?)profile.GetVJoyDeviceForPhysical(deviceId);
-                    }
-
-                    if (targetVJoy == col.VJoyDeviceId)
-                    {
-                        // Update best candidate if this is larger deflection
-                        if (_scBestAxisCandidate is null || deflectionFromBaseline > _scBestAxisCandidate.Value.maxDeflection)
-                        {
-                            _scBestAxisCandidate = (deviceId, i, deflectionFromBaseline);
-                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Tracking axis {i} on {device.Name}, deflection: {deflectionFromBaseline:F2}");
-                        }
-                    }
+                    // Look up the vJoy output axis from the mapping profile
+                    // This ensures SC Bindings exports match where the data actually goes
+                    string axisName = GetVJoyAxisNameFromMapping(device, i, col);
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> vJoy {axisName} on {device.Name}, deflection: {deflection:F2}");
+                    ResetJoystickDetectionState();
+                    return axisName;
                 }
             }
 
-            // If we have a best axis candidate and it's now returning toward baseline (user released),
-            // or the deflection is very large (>70%), register it immediately
-            if (_scBestAxisCandidate is not null && _scBestAxisCandidate.Value.deviceId == deviceId)
+            // Check for hat movement
+            for (int i = 0; i < state.Hats.Length; i++)
             {
-                int candidateAxisIndex = _scBestAxisCandidate.Value.axisIndex;
-                if (candidateAxisIndex < currentState.Axes.Length)
+                int baselineHat = baselineHats is not null && i < baselineHats.Length ? baselineHats[i] : -1;
+                int currHat = state.Hats[i];
+
+                // Hat changed from centered to a direction
+                if (currHat >= 0 && baselineHat < 0)
                 {
-                    float baselineVal = baseline is not null && candidateAxisIndex < baseline.Length ? baseline[candidateAxisIndex] : 0f;
-                    float currVal = currentState.Axes[candidateAxisIndex];
-                    float currentDeflection = Math.Abs(currVal - baselineVal);
-                    float prevDeflection = _scBestAxisCandidate.Value.maxDeflection;
-
-                    // Register axis if: large deflection (>70%) OR user started returning toward baseline
-                    bool largeDeflection = prevDeflection > 0.7f;
-                    bool returningToBaseline = currentDeflection < prevDeflection - 0.1f && prevDeflection > 0.5f;
-
-                    if (largeDeflection || returningToBaseline)
-                    {
-                        var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Axis, candidateAxisIndex);
-                        if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Registered axis {candidateAxisIndex} on {device.Name} -> vJoy{output.VJoyDevice} axis{output.Index} (deflection: {prevDeflection:F2})");
-                            ResetJoystickDetectionState();
-                            return GetSCAxisName(output.Index);
-                        }
-
-                        // 1:1 fallback
-                        var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
-                        if (vJoyDevice == col.VJoyDeviceId)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Using 1:1 mapping: {device.Name} axis {candidateAxisIndex} -> vJoy{vJoyDevice} axis{candidateAxisIndex} (deflection: {prevDeflection:F2})");
-                            ResetJoystickDetectionState();
-                            return GetSCAxisName(candidateAxisIndex);
-                        }
-                    }
-
-                    // Update max deflection if still increasing
-                    if (currentDeflection > prevDeflection)
-                    {
-                        _scBestAxisCandidate = (deviceId, candidateAxisIndex, currentDeflection);
-                    }
+                    string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected hat {i + 1} {hatDir} on {device.Name}");
+                    ResetJoystickDetectionState();
+                    return $"hat{i + 1}_{hatDir}";
                 }
             }
-
-            // Check for hat inputs
-            for (int i = 0; i < currentState.Hats.Length; i++)
-            {
-                int prevHat = previousState is not null && i < previousState.Hats.Length ? previousState.Hats[i] : -1;
-                int currHat = currentState.Hats[i];
-
-                // Detect hat movement (from center to a direction)
-                if (currHat >= 0 && prevHat < 0)
-                {
-                    var output = profile.GetVJoyOutputForPhysicalInput(deviceId, Models.InputType.Hat, i);
-                    if (output is not null && output.VJoyDevice == col.VJoyDeviceId)
-                    {
-                        string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
-                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Detected hat {i} {hatDir} on {device.Name}");
-                        ResetJoystickDetectionState();
-                        return $"hat{i + 1}_{hatDir}";
-                    }
-
-                    // 1:1 fallback
-                    var vJoyDevice = profile.GetVJoyDeviceForPhysical(deviceId);
-                    if (vJoyDevice == col.VJoyDeviceId)
-                    {
-                        string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
-                        ResetJoystickDetectionState();
-                        return $"hat{i + 1}_{hatDir}";
-                    }
-                }
-            }
-
-            // Update previous state for next iteration
-            _scPreviousInputStates[deviceId] = currentState;
         }
 
         return null;
     }
 
     /// <summary>
-    /// Resets joystick detection state tracking variables
+    /// Resets joystick detection state
     /// </summary>
     private void ResetJoystickDetectionState()
     {
-        _scPreviousInputStates = null;
         _scAxisBaseline = null;
-        _scBestAxisCandidate = null;
+        _scButtonBaseline = null;
+        _scHatBaseline = null;
+        _scBaselineFrames = 0;
     }
 
     /// <summary>
@@ -2705,6 +2770,116 @@ public partial class MainForm
         };
     }
 
+    /// <summary>
+    /// Gets the vJoy output axis name from the mapping profile.
+    /// This ensures SC Bindings export matches where the data actually goes in vJoy.
+    /// </summary>
+    private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex, SCGridColumn col)
+    {
+        // Look up the mapping in the active profile
+        var profile = _profileService.ActiveProfile;
+        if (profile is not null)
+        {
+            // Try to find a mapping for this physical input using GUID
+            var deviceId = device.InstanceGuid.ToString();
+            var output = profile.GetVJoyOutputForPhysicalInput(deviceId, InputType.Axis, physicalAxisIndex);
+
+            if (output is not null && output.Type == OutputType.VJoyAxis)
+            {
+                // Found a mapping - return the vJoy output axis name
+                string axisName = VJoyAxisIndexToSCName(output.Index);
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Found mapping: {device.Name} axis {physicalAxisIndex} -> vJoy axis {output.Index} ({axisName})");
+                return axisName;
+            }
+        }
+
+        // No mapping found - fall back to sequential index-based naming
+        // This assumes physical axis N maps to vJoy axis N
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] No mapping found for {device.Name} axis {physicalAxisIndex}, using index-based fallback");
+        return VJoyAxisIndexToSCName(physicalAxisIndex);
+    }
+
+    /// <summary>
+    /// Convert vJoy axis index to SC axis name.
+    /// vJoy: 0=X, 1=Y, 2=Z, 3=RX, 4=RY, 5=RZ, 6=Slider1, 7=Slider2
+    /// SC uses: x, y, z, rx, ry, rz, slider1, slider2
+    /// </summary>
+    private static string VJoyAxisIndexToSCName(int vjoyAxisIndex)
+    {
+        return vjoyAxisIndex switch
+        {
+            0 => "x",
+            1 => "y",
+            2 => "z",
+            3 => "rx",
+            4 => "ry",
+            5 => "rz",
+            6 => "slider1",
+            7 => "slider2",
+            _ => $"axis{vjoyAxisIndex}"
+        };
+    }
+
+    /// <summary>
+    /// Gets the SC axis name using HID axis type info from the device.
+    /// This properly identifies sliders by their HID usage ID rather than SDL index.
+    /// NOTE: This is kept for reference but GetVJoyAxisNameFromMapping should be used
+    /// for SC Bindings to ensure export matches where data actually goes.
+    /// </summary>
+    private static string GetSCAxisNameFromDevice(int axisIndex, PhysicalDeviceInfo? device)
+    {
+        // Use HID axis type info if available (this properly detects sliders)
+        if (device is not null && device.AxisInfos.Count > 0)
+        {
+            var axisInfo = device.AxisInfos.FirstOrDefault(a => a.Index == axisIndex);
+            if (axisInfo is not null)
+            {
+                return axisInfo.Type switch
+                {
+                    AxisType.X => "x",
+                    AxisType.Y => "y",
+                    AxisType.Z => "z",
+                    AxisType.RX => "rx",
+                    AxisType.RY => "ry",
+                    AxisType.RZ => "rz",
+                    AxisType.Slider => GetSliderName(axisIndex, device),
+                    _ => $"axis{axisIndex}"
+                };
+            }
+        }
+
+        // Fallback to index-based mapping if no HID info
+        return axisIndex switch
+        {
+            0 => "x",
+            1 => "y",
+            2 => "z",
+            3 => "rx",
+            4 => "ry",
+            5 => "rz",
+            6 => "slider1",
+            7 => "slider2",
+            _ => $"axis{axisIndex}"
+        };
+    }
+
+    /// <summary>
+    /// Gets the slider name (slider1 or slider2) based on which slider this is on the device
+    /// </summary>
+    private static string GetSliderName(int axisIndex, PhysicalDeviceInfo device)
+    {
+        // Count how many sliders come before this one
+        int sliderNumber = 1;
+        foreach (var axis in device.AxisInfos.OrderBy(a => a.Index))
+        {
+            if (axis.Index == axisIndex)
+                break;
+            if (axis.Type == AxisType.Slider)
+                sliderNumber++;
+        }
+        return $"slider{sliderNumber}";
+    }
+
     private static string GetSCAxisName(int axisIndex)
     {
         return axisIndex switch
@@ -2733,48 +2908,85 @@ public partial class MainForm
         };
     }
 
+    /// <summary>
+    /// Infers the SC input type from the input name string.
+    /// Matches SCVirtStick's InferJoystickInputType logic.
+    /// </summary>
+    private static SCInputType InferInputTypeFromName(string inputName)
+    {
+        if (string.IsNullOrEmpty(inputName))
+            return SCInputType.Button;
+
+        var lower = inputName.ToLowerInvariant();
+
+        // Button inputs (check first since it's most common)
+        if (lower.StartsWith("button"))
+            return SCInputType.Button;
+
+        // Hat/POV inputs
+        if (lower.StartsWith("hat"))
+            return SCInputType.Hat;
+
+        // Known axis names (matches SCVirtStick exactly)
+        if (lower is "x" or "y" or "z" or "rx" or "ry" or "rz" or
+            "slider1" or "slider2" or "throttle" or "rotz" or "rotx" or "roty")
+            return SCInputType.Axis;
+
+        // Slider axes (any slider*)
+        if (lower.StartsWith("slider"))
+            return SCInputType.Axis;
+
+        // Fallback axis names (axis0, axis1, etc.)
+        if (lower.StartsWith("axis"))
+            return SCInputType.Axis;
+
+        // Default to button (same as SCVirtStick)
+        return SCInputType.Button;
+    }
+
     private void AssignKeyboardBinding(SCAction action, Keys key, List<string> modifiers)
     {
         // Store as SC-format keyboard binding
         string inputName = KeyToSCInput(key);
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning KB binding: {action.ActionName} = {string.Join("+", modifiers)}+{inputName}");
 
-        // Update the default binding in the action (for display purposes)
-        // Note: KB/Mouse bindings are stored differently from joystick bindings
-        var existingBinding = action.DefaultBindings.FirstOrDefault(b => b.DevicePrefix.StartsWith("kb"));
-        if (existingBinding != null)
+        // Store in the export profile (persisted and clearable)
+        var binding = new SCActionBinding
         {
-            existingBinding.Input = inputName;
-            existingBinding.Modifiers = modifiers;
-        }
-        else
-        {
-            action.DefaultBindings.Add(new SCDefaultBinding
-            {
-                DevicePrefix = "kb1",
-                Input = inputName,
-                Modifiers = modifiers
-            });
-        }
+            ActionMap = action.ActionMap,
+            ActionName = action.ActionName,
+            DeviceType = SCDeviceType.Keyboard,
+            InputName = inputName,
+            InputType = SCInputType.Button,
+            Modifiers = modifiers
+        };
+
+        _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+
+        _scExportStatus = $"Bound {action.ActionName} to kb1_{inputName}";
+        _scExportStatusTime = DateTime.Now;
     }
 
     private void AssignMouseBinding(SCAction action, string inputName)
     {
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning Mouse binding: {action.ActionName} = {inputName}");
 
-        var existingBinding = action.DefaultBindings.FirstOrDefault(b => b.DevicePrefix.StartsWith("mo"));
-        if (existingBinding != null)
+        // Store in the export profile (persisted and clearable)
+        var binding = new SCActionBinding
         {
-            existingBinding.Input = inputName;
-        }
-        else
-        {
-            action.DefaultBindings.Add(new SCDefaultBinding
-            {
-                DevicePrefix = "mo1",
-                Input = inputName
-            });
-        }
+            ActionMap = action.ActionMap,
+            ActionName = action.ActionName,
+            DeviceType = SCDeviceType.Mouse,
+            InputName = inputName,
+            InputType = SCInputType.Button
+        };
+
+        _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+
+        _scExportStatus = $"Bound {action.ActionName} to mo1_{inputName}";
+        _scExportStatusTime = DateTime.Now;
     }
 
     private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName)
@@ -2822,27 +3034,32 @@ public partial class MainForm
         }
 
         // Determine input type from input name
-        var inputType = SCInputType.Button;
-        if (inputName == "x" || inputName == "y" || inputName == "z" ||
-            inputName == "rx" || inputName == "ry" || inputName == "rz" ||
-            inputName.StartsWith("slider"))
-        {
-            inputType = SCInputType.Axis;
-        }
+        var inputType = InferInputTypeFromName(inputName);
 
         // Set the binding (removes any existing binding for this action first)
         _scExportProfile.SetBinding(action.ActionMap, action.ActionName, new SCActionBinding
         {
             ActionMap = action.ActionMap,
             ActionName = action.ActionName,
+            DeviceType = SCDeviceType.Joystick,
             VJoyDevice = col.VJoyDeviceId,
             InputName = inputName,
             InputType = inputType
         });
 
+        // Ensure this vJoy device has an SC instance mapping (required for export)
+        if (!_scExportProfile.VJoyToSCInstance.ContainsKey(col.VJoyDeviceId))
+        {
+            _scExportProfile.SetSCInstance(col.VJoyDeviceId, col.SCInstance);
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Set vJoy{col.VJoyDeviceId} -> js{col.SCInstance} mapping");
+        }
+
         // Save the profile and update conflict detection
         _scExportProfileService?.SaveProfile(_scExportProfile);
         UpdateConflictingBindings();
+
+        _scExportStatus = $"Bound {action.ActionName} to js{col.SCInstance}_{inputName}";
+        _scExportStatusTime = DateTime.Now;
     }
 
     private static string KeyToSCInput(Keys key)
@@ -2907,9 +3124,11 @@ public partial class MainForm
             return;
         }
 
-        if (_scExportProfile.VJoyToSCInstance.Count == 0)
+        // Only require vJoy mappings if there are joystick bindings
+        var hasJoystickBindings = _scExportProfile.Bindings.Any(b => b.DeviceType == SCDeviceType.Joystick);
+        if (hasJoystickBindings && _scExportProfile.VJoyToSCInstance.Count == 0)
         {
-            _scExportStatus = "No vJoy mappings configured";
+            _scExportStatus = "No vJoy mappings configured for joystick bindings";
             _scExportStatusTime = DateTime.Now;
             return;
         }
@@ -2939,6 +3158,57 @@ public partial class MainForm
             _scExportStatus = $"Export failed: {ex.Message}";
             _scExportStatusTime = DateTime.Now;
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC export failed: {ex}");
+        }
+    }
+
+    private void ClearAllBindings()
+    {
+        var result = MessageBox.Show(
+            $"Clear all {_scExportProfile.Bindings.Count} binding(s) from profile '{_scExportProfile.ProfileName}'?\n\nThis will remove ALL bindings. Use 'Reset to Defaults' to restore SC default bindings.",
+            "Clear All Bindings",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+
+        if (result == DialogResult.Yes)
+        {
+            int count = _scExportProfile.Bindings.Count;
+            _scExportProfile.ClearBindings();
+            _scExportProfileService?.SaveProfile(_scExportProfile);
+            UpdateConflictingBindings();
+
+            _scExportStatus = $"Cleared {count} binding(s)";
+            _scExportStatusTime = DateTime.Now;
+
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Cleared all SC bindings");
+        }
+    }
+
+    private void ResetToDefaults()
+    {
+        var result = MessageBox.Show(
+            "Reset all bindings to default values from Star Citizen's defaultProfile.xml?\n\nThis will clear your custom bindings and reload the defaults.",
+            "Reset to Defaults",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (result == DialogResult.Yes)
+        {
+            // Clear existing bindings
+            _scExportProfile.ClearBindings();
+
+            // Reload schema from currently selected installation
+            if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+            {
+                LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+            }
+
+            UpdateConflictingBindings();
+            _scExportProfileService?.SaveProfile(_scExportProfile);
+
+            _scExportStatus = "Reset to defaults";
+            _scExportStatusTime = DateTime.Now;
+
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Reset SC bindings to defaults");
         }
     }
 
@@ -3074,18 +3344,23 @@ public partial class MainForm
             ForeColor = Color.White
         };
 
+        // Always show both axes and buttons - user can assign any input type to any action
+        // Group axes first (more commonly needed for throttle/slider assignments)
+        inputCombo.Items.AddRange(new[] { "x", "y", "z", "rx", "ry", "rz", "slider1", "slider2" });
+        inputCombo.Items.Add("---"); // Separator
+        for (int i = 1; i <= 32; i++)
+        {
+            inputCombo.Items.Add($"button{i}");
+        }
+        // Default selection based on action's expected input type
         if (action.InputType == SCInputType.Axis)
         {
-            inputCombo.Items.AddRange(new[] { "x", "y", "z", "rx", "ry", "rz", "slider1", "slider2" });
+            inputCombo.SelectedIndex = 0; // Default to "x" for axis actions
         }
         else
         {
-            for (int i = 1; i <= 32; i++)
-            {
-                inputCombo.Items.Add($"button{i}");
-            }
+            inputCombo.SelectedIndex = 9; // Default to "button1" (after 8 axes + separator)
         }
-        inputCombo.SelectedIndex = 0;
 
         var invertCheck = new CheckBox
         {
@@ -3128,6 +3403,13 @@ public partial class MainForm
             var vjoyId = availableVJoy[vjoyCombo.SelectedIndex].Id;
             var inputName = inputCombo.SelectedItem?.ToString() ?? "button1";
 
+            // Skip if separator was selected
+            if (inputName == "---")
+            {
+                _scAssigningInput = false;
+                return;
+            }
+
             // Check for conflicts - is this input already bound to another action?
             var conflicts = FindSCBindingConflicts(vjoyId, inputName, action.ActionMap, action.ActionName);
 
@@ -3151,13 +3433,17 @@ public partial class MainForm
                 // else ApplyAnyway - just add the binding, allow duplicate
             }
 
+            // Infer input type from the selected input name (not from action's expected type)
+            var inputType = InferInputTypeFromName(inputName);
+
             var binding = new SCActionBinding
             {
                 ActionMap = action.ActionMap,
                 ActionName = action.ActionName,
+                DeviceType = SCDeviceType.Joystick,
                 VJoyDevice = vjoyId,
                 InputName = inputName,
-                InputType = action.InputType,
+                InputType = inputType,
                 Inverted = invertCheck.Checked
             };
 
@@ -3168,6 +3454,10 @@ public partial class MainForm
             {
                 _scExportProfile.SetSCInstance(vjoyId, (int)vjoyId);
             }
+
+            // Save the profile and update conflict detection
+            _scExportProfileService?.SaveProfile(_scExportProfile);
+            UpdateConflictingBindings();
 
             _scExportStatus = $"Bound {action.ActionName} to js{_scExportProfile.GetSCInstance(vjoyId)}_{inputName}";
             _scExportStatusTime = DateTime.Now;

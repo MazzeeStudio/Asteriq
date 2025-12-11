@@ -677,6 +677,7 @@ public class MappingProfile
 
     /// <summary>
     /// Convert vJoy axis index to SC axis name
+    /// SC uses: x, y, z, rx, ry, rz, slider1, slider2
     /// </summary>
     private static string GetSCAxisName(int axisIndex)
     {
@@ -686,9 +687,9 @@ public class MappingProfile
             0 => "x",
             1 => "y",
             2 => "z",
-            3 => "rotx",
-            4 => "roty",
-            5 => "rotz",
+            3 => "rx",
+            4 => "ry",
+            5 => "rz",
             6 => "slider1",
             7 => "slider2",
             _ => $"axis{axisIndex}"

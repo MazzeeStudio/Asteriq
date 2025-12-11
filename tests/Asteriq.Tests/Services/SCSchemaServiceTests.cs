@@ -391,8 +391,11 @@ public class SCSchemaServiceTests
     #region FilterJoystickActions Tests
 
     [Fact]
-    public void FilterJoystickActions_IncludesActionsWithJoystickBindings()
+    public void FilterJoystickActions_IncludesAllActions()
     {
+        // FilterJoystickActions now includes all actions since any action can be bound to a joystick
+        // This was changed to fix the issue where actions like VTOL (which only have keyboard defaults)
+        // were being filtered out and users couldn't find them
         var actions = new List<SCAction>
         {
             new()
@@ -410,20 +413,7 @@ public class SCSchemaServiceTests
                 {
                     new() { DevicePrefix = "kb1", Input = "w" }
                 }
-            }
-        };
-
-        var filtered = _service.FilterJoystickActions(actions);
-
-        Assert.Single(filtered);
-        Assert.Equal("js_action", filtered[0].ActionName);
-    }
-
-    [Fact]
-    public void FilterJoystickActions_IncludesAxisActions()
-    {
-        var actions = new List<SCAction>
-        {
+            },
             new()
             {
                 ActionMap = "test", ActionName = "axis_action",
@@ -440,8 +430,12 @@ public class SCSchemaServiceTests
 
         var filtered = _service.FilterJoystickActions(actions);
 
-        Assert.Single(filtered);
-        Assert.Equal("axis_action", filtered[0].ActionName);
+        // All actions should be included - users can bind any action to their joystick
+        Assert.Equal(4, filtered.Count);
+        Assert.Contains(filtered, a => a.ActionName == "js_action");
+        Assert.Contains(filtered, a => a.ActionName == "kb_action");
+        Assert.Contains(filtered, a => a.ActionName == "axis_action");
+        Assert.Contains(filtered, a => a.ActionName == "button_action");
     }
 
     #endregion

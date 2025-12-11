@@ -83,6 +83,11 @@
   - MainForm.Devices.cs: Devices tab (850 lines)
   - MainForm.SCBindings.cs: SC Bindings tab (1,388 lines)
   - MainForm.Settings.cs: Settings tab (646 lines)
+- [x] Input forwarding UI (Start/Stop Forwarding button in Status panel)
+- [x] vJoy acquisition with Gremlin-style retry logic and PID checking
+- [x] Device drag-to-reorder in device list
+- [x] Device order controls vJoy slot assignment (1st device -> vJoy 1, etc.)
+- [x] Fix button index off-by-one (vJoy buttons are 1-indexed)
 
 ## Phase 8: Star Citizen Integration
 **Goal**: Export vJoy mappings as SC actionmaps.xml (export-only, never modify user's files)
@@ -151,10 +156,10 @@ Reference implementation: `C:\Users\mhams\source\repos\SCVirtStick\SCVirtStick\C
 ## Current Focus
 
 **Phase 7** - Configuration UI (FUI):
-1. FUI theme system with multiple color schemes
-2. Custom borderless window chrome
-3. Device list with live input visualization
-4. Mapping editor with curve preview
+- Input forwarding is working (physical devices -> vJoy)
+- Device order drag-to-reorder controls vJoy slot assignment
+- Next: System tray icon (user mentioned needing this to avoid SCVirtStick conflicts)
+- Next: Shift layer configuration UI
 
 ## Dependencies Between Phases
 

@@ -842,14 +842,20 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = FUIRenderer.ScaleLineHeight(16f);
 
-        // Title
-        FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
-        y += FUIRenderer.ScaleLineHeight(24f);
+        // Title row with Refresh button
+        FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
+
+        float buttonWidth = 55f;
+        float buttonHeight = 18f;
+        _scRefreshButtonBounds = new SKRect(rightMargin - buttonWidth, y - 3, rightMargin, y - 3 + buttonHeight);
+        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawTextButton(canvas, _scRefreshButtonBounds, "Refresh", _scRefreshButtonHovered);
+
+        y += 20f;
 
         // Installation selector
-        float selectorHeight = 26f;
+        float selectorHeight = 24f;
         _scInstallationSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorHeight);
 
         string installationText = _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
@@ -858,22 +864,6 @@ public partial class MainForm
 
         bool selectorHovered = _scInstallationSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
-        y += selectorHeight + 6f;
-
-        // Bindable actions count (skip redundant environment - already in dropdown)
-        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scActions != null)
-        {
-            var joystickActions = _scSchemaService?.FilterJoystickActions(_scActions);
-            FUIRenderer.DrawText(canvas, $"{joystickActions?.Count ?? 0} bindable actions", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += lineHeight + 4f;
-        }
-
-        // Refresh button - inline after text
-        float buttonWidth = 70f;
-        float buttonHeight = 22f;
-        _scRefreshButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
-        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawTextButton(canvas, _scRefreshButtonBounds, "Refresh", _scRefreshButtonHovered);
     }
 
     private void DrawSCBindingsTablePanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1850,15 +1840,30 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = FUIRenderer.ScaleLineHeight(16f);
+        float lineHeight = FUIRenderer.ScaleLineHeight(14f);
 
-        // Title
-        FUIRenderer.DrawText(canvas, "PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
-        y += FUIRenderer.ScaleLineHeight(24f);
+        // Title row with + New and Save buttons
+        FUIRenderer.DrawText(canvas, "PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
 
-        float dropdownHeight = 26f;
-        float refreshBtnWidth = 24f;
-        float buttonGap = 6f;
+        float textBtnWidth = 45f;
+        float textBtnHeight = 18f;
+        float buttonGap = 4f;
+
+        // Save button (rightmost)
+        _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y - 3, rightMargin, y - 3 + textBtnHeight);
+        _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
+
+        // New button (left of Save)
+        float newBtnX = rightMargin - textBtnWidth * 2 - buttonGap;
+        _scNewProfileButtonBounds = new SKRect(newBtnX, y - 3, newBtnX + textBtnWidth, y - 3 + textBtnHeight);
+        _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        DrawTextButton(canvas, _scNewProfileButtonBounds, "+ New", _scNewProfileButtonHovered);
+
+        y += 20f;
+
+        float dropdownHeight = 24f;
+        float refreshBtnWidth = 22f;
 
         // Profile dropdown (full width minus refresh button)
         float dropdownRight = rightMargin - refreshBtnWidth - buttonGap;
@@ -1874,34 +1879,13 @@ public partial class MainForm
 
         y += dropdownHeight + 8f;
 
-        // Profile management buttons row (+ New, Save) - aligned to right
-        float textBtnWidth = 50f;
-        float textBtnHeight = 22f;
-        float totalBtnWidth = textBtnWidth * 2 + buttonGap;
-        float btnStartX = rightMargin - totalBtnWidth;
-
-        // New button
-        _scNewProfileButtonBounds = new SKRect(btnStartX, y, btnStartX + textBtnWidth, y + textBtnHeight);
-        _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawTextButton(canvas, _scNewProfileButtonBounds, "+ New", _scNewProfileButtonHovered);
-
-        // Save button
-        float saveBtnX = btnStartX + textBtnWidth + buttonGap;
-        _scSaveProfileButtonBounds = new SKRect(saveBtnX, y, saveBtnX + textBtnWidth, y + textBtnHeight);
-        _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
-
-        y += textBtnHeight + 10f;
-
         // Draw profile dropdown list if open (shows both Asteriq profiles and SC mapping files)
-        // Note: This is drawn later in DrawSCOpenDropdowns() to render on top of other elements
         if (_scProfileDropdownOpen)
         {
             int asteriqCount = _scExportProfiles.Count;
             int scFileCount = _scAvailableProfiles.Count;
             int totalItems = asteriqCount + (scFileCount > 0 ? scFileCount + 1 : 0); // +1 for separator
             float listHeight = Math.Min(totalItems * 24f + 8f, 200f);
-            // Position dropdown below the buttons row
             _scProfileDropdownListBounds = new SKRect(leftMargin, _scProfileDropdownBounds.Bottom + 2, rightMargin, _scProfileDropdownBounds.Bottom + 2 + listHeight);
             DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         }
@@ -1910,9 +1894,6 @@ public partial class MainForm
         if (_scSelectedActionIndex >= 0 && _scFilteredActions != null && _scSelectedActionIndex < _scFilteredActions.Count)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
-
-            // Calculate section height for background
-            float sectionStartY = y;
 
             FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 9f, true);
             y += lineHeight;

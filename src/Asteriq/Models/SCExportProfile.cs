@@ -86,7 +86,17 @@ public class SCExportProfile
     public void SetBinding(string actionMap, string actionName, SCActionBinding binding)
     {
         // Remove existing binding for this action AND device type
-        Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName && b.DeviceType == binding.DeviceType);
+        // For joystick bindings, also consider the vJoy device to allow multiple joystick bindings
+        // (e.g., js1_button5 and js2_button3 for the same action)
+        if (binding.DeviceType == SCDeviceType.Joystick)
+        {
+            Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName &&
+                b.DeviceType == SCDeviceType.Joystick && b.VJoyDevice == binding.VJoyDevice);
+        }
+        else
+        {
+            Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName && b.DeviceType == binding.DeviceType);
+        }
         binding.ActionMap = actionMap;
         binding.ActionName = actionName;
         Bindings.Add(binding);

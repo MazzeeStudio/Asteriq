@@ -311,23 +311,44 @@ public class SCXmlExportService
                 ?? Path.GetFileNameWithoutExtension(filePath);
 
             // Parse all actionmap/action/rebind elements
-            foreach (var actionMap in root.Elements("actionmap"))
+            int totalRebinds = 0;
+            int jsRebinds = 0;
+            int skippedEmpty = 0;
+            int skippedOther = 0;
+
+            // Parse all actionmap elements
+            var actionMaps = root.Elements("actionmap").ToList();
+
+            foreach (var actionMap in actionMaps)
             {
                 var mapName = actionMap.Attribute("name")?.Value;
                 if (string.IsNullOrEmpty(mapName))
                     continue;
 
-                foreach (var action in actionMap.Elements("action"))
+                var actions = actionMap.Elements("action").ToList();
+
+                foreach (var action in actions)
                 {
                     var actionName = action.Attribute("name")?.Value;
                     if (string.IsNullOrEmpty(actionName))
                         continue;
 
-                    foreach (var rebind in action.Elements("rebind"))
+                    var rebinds = action.Elements("rebind").ToList();
+
+                    foreach (var rebind in rebinds)
                     {
                         var inputStr = rebind.Attribute("input")?.Value;
+                        totalRebinds++;
+
                         if (string.IsNullOrEmpty(inputStr))
+                        {
+                            skippedEmpty++;
                             continue;
+                        }
+
+                        // Track JS bindings for logging
+                        if (inputStr.StartsWith("js"))
+                            jsRebinds++;
 
                         var binding = ParseRebindInput(mapName, actionName, inputStr);
                         if (binding is not null)
@@ -343,9 +364,18 @@ public class SCXmlExportService
 
                             result.Bindings.Add(binding);
                         }
+                        else
+                        {
+                            skippedOther++;
+                            // Log first few skipped for debugging
+                            if (skippedOther <= 5)
+                                System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Skipped binding: {inputStr}");
+                        }
                     }
                 }
             }
+
+            System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Parsed {result.Bindings.Count} bindings ({jsRebinds} JS) from {actionMaps.Count} actionmaps, skipped {skippedOther}");
 
             result.Success = true;
             System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Imported {result.Bindings.Count} bindings from {filePath}");
@@ -373,6 +403,10 @@ public class SCXmlExportService
 
         var devicePrefix = inputStr.Substring(0, underscoreIdx);
         var remainder = inputStr.Substring(underscoreIdx + 1);
+
+        // Skip bindings with empty/whitespace input names (SC uses space for "no binding")
+        if (string.IsNullOrWhiteSpace(remainder))
+            return null;
 
         // Determine device type
         SCDeviceType deviceType;

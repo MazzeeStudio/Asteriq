@@ -2381,10 +2381,12 @@ public partial class MainForm
                 // Click on dropdown item
                 if (_scHoveredProfileIndex >= 0)
                 {
-                    if (_scHoveredProfileIndex >= 1000)
+                    // SC files use offset: _scExportProfiles.Count + 1000 + i
+                    int scFileIndexOffset = _scExportProfiles.Count + 1000;
+                    if (_scHoveredProfileIndex >= scFileIndexOffset)
                     {
                         // SC mapping file - import it
-                        int scFileIndex = _scHoveredProfileIndex - 1000;
+                        int scFileIndex = _scHoveredProfileIndex - scFileIndexOffset;
                         if (scFileIndex >= 0 && scFileIndex < _scAvailableProfiles.Count)
                         {
                             ImportSCProfile(_scAvailableProfiles[scFileIndex]);
@@ -2412,10 +2414,14 @@ public partial class MainForm
         {
             if (_scImportDropdownBounds.Contains(point))
             {
-                // Click on dropdown item
-                if (_scHoveredImportProfile >= 0 && _scHoveredImportProfile < _scAvailableProfiles.Count)
+                // Calculate which item was clicked based on Y position
+                float itemHeight = 28f;
+                float relativeY = point.Y - _scImportDropdownBounds.Top - 2;
+                int clickedIndex = (int)(relativeY / itemHeight);
+
+                if (clickedIndex >= 0 && clickedIndex < _scAvailableProfiles.Count)
                 {
-                    ImportSCProfile(_scAvailableProfiles[_scHoveredImportProfile]);
+                    ImportSCProfile(_scAvailableProfiles[clickedIndex]);
                 }
                 _scImportDropdownOpen = false;
                 return;
@@ -4573,6 +4579,13 @@ public partial class MainForm
             return;
         }
 
+        // Log import stats for debugging
+        var kbCount = importResult.Bindings.Count(b => b.DeviceType == SCDeviceType.Keyboard);
+        var moCount = importResult.Bindings.Count(b => b.DeviceType == SCDeviceType.Mouse);
+        var jsCount = importResult.Bindings.Count(b => b.DeviceType == SCDeviceType.Joystick);
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Import parsed: {kbCount} KB, {moCount} Mouse, {jsCount} Joystick bindings");
+
+
         // Clear existing bindings and add imported ones
         _scExportProfile.ClearBindings();
         foreach (var binding in importResult.Bindings)
@@ -4596,7 +4609,13 @@ public partial class MainForm
         // Update conflicts
         UpdateConflictingBindings();
 
-        _scExportStatus = $"Imported {importResult.Bindings.Count} bindings from '{mappingFile.DisplayName}'";
+        // Log final profile stats
+        var finalKb = _scExportProfile.Bindings.Count(b => b.DeviceType == SCDeviceType.Keyboard);
+        var finalMo = _scExportProfile.Bindings.Count(b => b.DeviceType == SCDeviceType.Mouse);
+        var finalJs = _scExportProfile.Bindings.Count(b => b.DeviceType == SCDeviceType.Joystick);
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Profile after save: {finalKb} KB, {finalMo} Mouse, {finalJs} Joystick bindings");
+
+        _scExportStatus = $"Imported {importResult.Bindings.Count} bindings ({jsCount} JS, {kbCount} KB, {moCount} Mouse)";
         _scExportStatusTime = DateTime.Now;
 
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Imported {importResult.Bindings.Count} bindings from {mappingFile.FilePath}");

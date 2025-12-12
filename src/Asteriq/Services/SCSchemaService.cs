@@ -108,6 +108,12 @@ public class SCSchemaService
                 var prefix = GetDevicePrefix(deviceAttr);
                 var (mainInput, modifiers) = ParseInputWithModifiers(inputValue);
 
+                // Handle mouse inputs that SC sometimes puts in keyboard element
+                if (deviceAttr == "keyboard" && IsMouseInput(mainInput))
+                {
+                    prefix = "mo1";
+                }
+
                 bindings.Add(new SCDefaultBinding
                 {
                     DevicePrefix = prefix,

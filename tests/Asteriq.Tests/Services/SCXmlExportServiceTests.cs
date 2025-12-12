@@ -597,4 +597,412 @@ public class SCXmlExportServiceTests
     }
 
     #endregion
+
+    #region Import Tests
+
+    [Fact]
+    public void ImportFromFile_SkipsEmptyInputNames()
+    {
+        // Create a test XML with empty input names (just whitespace after prefix)
+        var xml = @"<ActionMaps version=""1"" optionsVersion=""2"" rebindVersion=""2"" profileName=""test"">
+            <actionmap name=""test_map"">
+                <action name=""valid_action"">
+                    <rebind input=""js1_button5""/>
+                </action>
+                <action name=""empty_action"">
+                    <rebind input=""js1_ ""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            Assert.Equal("valid_action", result.Bindings[0].ActionName);
+            Assert.Equal("button5", result.Bindings[0].InputName);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesJoystickBindings()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""spaceship_movement"">
+                <action name=""v_strafe_forward"">
+                    <rebind input=""js1_y""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            var binding = result.Bindings[0];
+            Assert.Equal("spaceship_movement", binding.ActionMap);
+            Assert.Equal("v_strafe_forward", binding.ActionName);
+            Assert.Equal(SCDeviceType.Joystick, binding.DeviceType);
+            Assert.Equal(1u, binding.VJoyDevice);
+            Assert.Equal("y", binding.InputName);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesMouseBindings()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""spaceship_weapons"">
+                <action name=""v_attack1"">
+                    <rebind input=""mo1_mouse1""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            var binding = result.Bindings[0];
+            Assert.Equal(SCDeviceType.Mouse, binding.DeviceType);
+            Assert.Equal("mouse1", binding.InputName);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesKeyboardBindings()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""spaceship_movement"">
+                <action name=""v_strafe_forward"">
+                    <rebind input=""kb1_w""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            var binding = result.Bindings[0];
+            Assert.Equal(SCDeviceType.Keyboard, binding.DeviceType);
+            Assert.Equal("w", binding.InputName);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesModifiers()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""spaceship_targeting"">
+                <action name=""v_target_hostile"">
+                    <rebind input=""js1_rctrl+button5""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            var binding = result.Bindings[0];
+            Assert.Equal("button5", binding.InputName);
+            Assert.Single(binding.Modifiers);
+            Assert.Equal("rctrl", binding.Modifiers[0]);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesActivationMode()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""seat_general"">
+                <action name=""v_eject"">
+                    <rebind input=""js1_button5"" activationMode=""double_tap""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            Assert.Equal(SCActivationMode.DoubleTap, result.Bindings[0].ActivationMode);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesInvertedAxes()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""spaceship_movement"">
+                <action name=""v_pitch"">
+                    <rebind input=""js1_y"" invert=""1""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            Assert.True(result.Bindings[0].Inverted);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesMultipleJoystickInstances()
+    {
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""spaceship_movement"">
+                <action name=""v_pitch"">
+                    <rebind input=""js1_y""/>
+                </action>
+                <action name=""v_roll"">
+                    <rebind input=""js2_x""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Equal(2, result.Bindings.Count);
+            Assert.Equal(1u, result.Bindings[0].VJoyDevice);
+            Assert.Equal(2u, result.Bindings[1].VJoyDevice);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_ParsesModifiersWithJoystick()
+    {
+        // Test that js1_rctrl+button7 parses correctly
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""seat_general"">
+                <action name=""v_eject"">
+                    <rebind input=""js2_rctrl+button7"" activationMode=""double_tap""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            Assert.Single(result.Bindings);
+            var binding = result.Bindings[0];
+            Assert.Equal(SCDeviceType.Joystick, binding.DeviceType);
+            Assert.Equal(2u, binding.VJoyDevice);
+            Assert.Equal("button7", binding.InputName);
+            Assert.Single(binding.Modifiers);
+            Assert.Equal("rctrl", binding.Modifiers[0]);
+            Assert.Equal(SCActivationMode.DoubleTap, binding.ActivationMode);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void ImportFromFile_RealWorldProfile_CountsBindingsCorrectly()
+    {
+        // Test with a snippet similar to the user's real profile
+        var xml = @"<ActionMaps version=""1"" profileName=""test"">
+            <actionmap name=""seat_general"">
+                <action name=""v_eject"">
+                    <rebind input=""js2_rctrl+button7"" activationMode=""double_tap""/>
+                </action>
+                <action name=""v_enter_remote_turret_1"">
+                    <rebind input=""js2_button24""/>
+                </action>
+                <action name=""v_toggle_mining_mode"">
+                    <rebind input=""js1_ "" activationMode=""double_tap""/>
+                </action>
+            </actionmap>
+            <actionmap name=""spaceship_movement"">
+                <action name=""v_roll"">
+                    <rebind input=""js1_z""/>
+                </action>
+                <action name=""v_strafe_lateral"">
+                    <rebind input=""js2_x""/>
+                </action>
+            </actionmap>
+        </ActionMaps>";
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, xml);
+
+            var result = _service.ImportFromFile(tempFile);
+
+            Assert.True(result.Success);
+            // Should have 4 bindings (the js1_ with space should be skipped)
+            Assert.Equal(4, result.Bindings.Count);
+            Assert.All(result.Bindings, b => Assert.Equal(SCDeviceType.Joystick, b.DeviceType));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    #endregion
+
+    #region SetBinding Multiple VJoy Instances Tests
+
+    [Fact]
+    public void SetBinding_PreservesBindingsForDifferentVJoyDevices()
+    {
+        var profile = new SCExportProfile();
+
+        var binding1 = new SCActionBinding
+        {
+            DeviceType = SCDeviceType.Joystick,
+            VJoyDevice = 1,
+            InputName = "button5"
+        };
+        var binding2 = new SCActionBinding
+        {
+            DeviceType = SCDeviceType.Joystick,
+            VJoyDevice = 2,
+            InputName = "button3"
+        };
+
+        profile.SetBinding("test", "action1", binding1);
+        profile.SetBinding("test", "action1", binding2);
+
+        Assert.Equal(2, profile.Bindings.Count);
+        Assert.Contains(profile.Bindings, b => b.VJoyDevice == 1 && b.InputName == "button5");
+        Assert.Contains(profile.Bindings, b => b.VJoyDevice == 2 && b.InputName == "button3");
+    }
+
+    [Fact]
+    public void SetBinding_ReplacesBindingForSameVJoyDevice()
+    {
+        var profile = new SCExportProfile();
+
+        var binding1 = new SCActionBinding
+        {
+            DeviceType = SCDeviceType.Joystick,
+            VJoyDevice = 1,
+            InputName = "button5"
+        };
+        var binding2 = new SCActionBinding
+        {
+            DeviceType = SCDeviceType.Joystick,
+            VJoyDevice = 1,
+            InputName = "button10"
+        };
+
+        profile.SetBinding("test", "action1", binding1);
+        profile.SetBinding("test", "action1", binding2);
+
+        Assert.Single(profile.Bindings);
+        Assert.Equal("button10", profile.Bindings[0].InputName);
+    }
+
+    [Fact]
+    public void SetBinding_AllowsKeyboardAndJoystickForSameAction()
+    {
+        var profile = new SCExportProfile();
+
+        var kbBinding = new SCActionBinding
+        {
+            DeviceType = SCDeviceType.Keyboard,
+            InputName = "w"
+        };
+        var jsBinding = new SCActionBinding
+        {
+            DeviceType = SCDeviceType.Joystick,
+            VJoyDevice = 1,
+            InputName = "y"
+        };
+
+        profile.SetBinding("test", "action1", kbBinding);
+        profile.SetBinding("test", "action1", jsBinding);
+
+        Assert.Equal(2, profile.Bindings.Count);
+        Assert.Contains(profile.Bindings, b => b.DeviceType == SCDeviceType.Keyboard);
+        Assert.Contains(profile.Bindings, b => b.DeviceType == SCDeviceType.Joystick);
+    }
+
+    #endregion
 }

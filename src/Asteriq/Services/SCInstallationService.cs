@@ -345,13 +345,46 @@ public class SCInstallationService
             foreach (var file in Directory.GetFiles(installation.MappingsPath, "*.xml"))
             {
                 var fileInfo = new FileInfo(file);
-                profiles.Add(new SCMappingFile
+                var mappingFile = new SCMappingFile
                 {
                     FileName = fileInfo.Name,
                     FilePath = file,
                     FileSize = fileInfo.Length,
                     LastModified = fileInfo.LastWriteTime
-                });
+                };
+
+                // Try to read profile name from inside the XML
+                try
+                {
+                    using var reader = new StreamReader(file);
+                    // Read just enough to find the profileName attribute (first ~2KB)
+                    var buffer = new char[2048];
+                    int read = reader.Read(buffer, 0, buffer.Length);
+                    var content = new string(buffer, 0, read);
+
+                    // Look for profileName="..." in the content
+                    var match = System.Text.RegularExpressions.Regex.Match(content, @"profileName=""([^""]+)""");
+                    if (match.Success)
+                    {
+                        mappingFile.ProfileName = match.Groups[1].Value;
+                    }
+
+                    // Also check CustomisationUIHeader label
+                    if (string.IsNullOrEmpty(mappingFile.ProfileName))
+                    {
+                        match = System.Text.RegularExpressions.Regex.Match(content, @"<CustomisationUIHeader\s+label=""([^""]+)""");
+                        if (match.Success)
+                        {
+                            mappingFile.ProfileName = match.Groups[1].Value;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore errors reading profile name - will fall back to filename
+                }
+
+                profiles.Add(mappingFile);
             }
 
             // Sort by last modified (newest first)
@@ -377,7 +410,14 @@ public class SCMappingFile
     public DateTime LastModified { get; set; }
 
     /// <summary>
-    /// Display name (filename without extension)
+    /// Profile name extracted from inside the XML file
     /// </summary>
-    public string DisplayName => Path.GetFileNameWithoutExtension(FileName);
+    public string? ProfileName { get; set; }
+
+    /// <summary>
+    /// Display name - uses profile name from XML if available, otherwise filename
+    /// </summary>
+    public string DisplayName => !string.IsNullOrEmpty(ProfileName)
+        ? ProfileName
+        : Path.GetFileNameWithoutExtension(FileName);
 }

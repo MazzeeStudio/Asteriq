@@ -187,6 +187,13 @@ public class DeviceMapEditorForm : Form
             {
                 LoadSvgFile(map.SvgFile);
             }
+
+            // Debug: Show where file was loaded from
+            System.Diagnostics.Debug.WriteLine($"Loaded from: {path}");
+        }
+        else
+        {
+            MessageBox.Show($"Failed to load file:\n{path}", "Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -231,6 +238,10 @@ public class DeviceMapEditorForm : Form
             File.WriteAllText(savePath, json);
             _currentJsonPath = savePath;
             _hasUnsavedChanges = false;
+
+            // Debug: Show what was saved
+            MessageBox.Show($"Saved to:\n{savePath}\n\nFile size: {new FileInfo(savePath).Length} bytes",
+                "Save Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
@@ -1294,10 +1305,12 @@ public class DeviceMapEditorForm : Form
 
         if (_loadButtonBounds.Contains(pt))
         {
+            // Try to open from source directory, not bin output
+            var sourceDir = FindSourceMapsDirectory();
             using var ofd = new OpenFileDialog
             {
                 Filter = "JSON files (*.json)|*.json",
-                InitialDirectory = Path.Combine(_imagesDir, "Maps")
+                InitialDirectory = sourceDir ?? Path.Combine(_imagesDir, "Maps")
             };
             if (ofd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {

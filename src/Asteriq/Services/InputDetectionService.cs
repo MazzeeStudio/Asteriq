@@ -404,11 +404,36 @@ public class InputDetectionService : IDisposable
         // Initialize movement confirmation counters
         _axisMovementConfirmCount[guid] = new int[state.Axes.Length];
 
-        // Capture button/hat initial state
+        // Capture button/hat initial state - these will be IGNORED during detection
+        // to prevent "always active" buttons from triggering
         _initialButtons[guid] = (bool[])state.Buttons.Clone();
         _initialHats[guid] = (int[])state.Hats.Clone();
         _previousButtons[guid] = (bool[])state.Buttons.Clone();
         _previousHats[guid] = (int[])state.Hats.Clone();
+
+        // Log which buttons are initially pressed (will be ignored)
+        var pressedButtons = new List<int>();
+        for (int i = 0; i < state.Buttons.Length; i++)
+        {
+            if (state.Buttons[i])
+                pressedButtons.Add(i);
+        }
+        if (pressedButtons.Count > 0)
+        {
+            InputDetectionLog.Log($"[InputDetection] {state.DeviceName}: Ignoring initially-pressed buttons: {string.Join(", ", pressedButtons)}");
+        }
+
+        // Log which hats are initially active
+        var activeHats = new List<string>();
+        for (int i = 0; i < state.Hats.Length; i++)
+        {
+            if (state.Hats[i] >= 0)
+                activeHats.Add($"Hat{i}={state.Hats[i]}°");
+        }
+        if (activeHats.Count > 0)
+        {
+            InputDetectionLog.Log($"[InputDetection] {state.DeviceName}: Ignoring initially-active hats: {string.Join(", ", activeHats)}");
+        }
     }
 
     private DetectedInput? DetectInputChange(DeviceInputState state)
@@ -435,8 +460,21 @@ public class InputDetectionService : IDisposable
         // Check buttons first (most common for mapping)
         if (_filter.HasFlag(InputDetectionFilter.Buttons))
         {
+            // Get initial button state (captured at baseline) to filter out already-pressed buttons
+            if (!_initialButtons.TryGetValue(guid, out var initialButtons))
+                initialButtons = new bool[state.Buttons.Length];
+
             for (int i = 0; i < state.Buttons.Length && i < prevButtons.Length; i++)
             {
+                // CRITICAL: Skip buttons that were already pressed when detection started.
+                // This fixes the "always active" button issue for flip triggers and similar
+                // dual-position switches that report as continuously pressed buttons.
+                // Following JoystickGremlinEx approach: ignore initially-active inputs.
+                if (i < initialButtons.Length && initialButtons[i])
+                {
+                    continue; // Button was pressed at start - ignore it entirely
+                }
+
                 // Detect button press TRANSITION (was not pressed LAST FRAME, now is pressed)
                 if (state.Buttons[i] && !prevButtons[i])
                 {
@@ -511,8 +549,18 @@ public class InputDetectionService : IDisposable
         // Check hats
         if (_filter.HasFlag(InputDetectionFilter.Hats))
         {
+            // Get initial hat state to filter out already-active hats
+            if (!_initialHats.TryGetValue(guid, out var initialHats))
+                initialHats = new int[state.Hats.Length];
+
             for (int i = 0; i < state.Hats.Length && i < prevHats.Length; i++)
             {
+                // Skip hats that were already active when detection started
+                if (i < initialHats.Length && initialHats[i] >= 0)
+                {
+                    continue; // Hat was active at start - ignore it entirely
+                }
+
                 // Detect hat movement transition (was centered last frame, now has direction)
                 if (state.Hats[i] >= 0 && prevHats[i] < 0)
                 {

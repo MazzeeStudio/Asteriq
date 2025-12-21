@@ -198,6 +198,12 @@ public partial class MainForm : Form
     private DateTime _inputListeningStartTime = DateTime.MinValue;
     private const int InputListeningTimeoutMs = 15000; // 15 second timeout for input listening
 
+    // Pending keyboard binding - when user assigns keyboard key to empty slot
+    private string? _pendingKeyboardKey;
+    private List<string>? _pendingKeyboardModifiers;
+    private int _pendingKeyboardOutputIndex = -1;
+    private uint _pendingKeyboardVJoyDevice = 0;
+
     // Double-click detection for binding rows
     private DateTime _lastRowClickTime = DateTime.MinValue;
     private int _lastClickedRow = -1;

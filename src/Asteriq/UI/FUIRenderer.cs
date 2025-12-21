@@ -615,6 +615,7 @@ public static class FUIRenderer
         ButtonState state, SKColor? accentColor = null)
     {
         var accent = accentColor ?? FUIColors.Active;
+        bool hasCustomAccent = accentColor.HasValue;
 
         SKColor bgColor, frameColor, textColor;
         bool withGlow = false;
@@ -624,13 +625,13 @@ public static class FUIRenderer
             case ButtonState.Hover:
                 bgColor = accent.WithAlpha(30);
                 frameColor = accent;
-                textColor = FUIColors.TextBright;
+                textColor = hasCustomAccent ? accent : FUIColors.TextBright;
                 withGlow = true;
                 break;
             case ButtonState.Active:
                 bgColor = accent.WithAlpha(60);
                 frameColor = accent;
-                textColor = FUIColors.TextBright;
+                textColor = hasCustomAccent ? accent : FUIColors.TextBright;
                 withGlow = true;
                 break;
             case ButtonState.Disabled:

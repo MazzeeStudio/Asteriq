@@ -1389,23 +1389,8 @@ public partial class MainForm
             var clearBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
             _clearAllButtonBounds = clearBounds;
 
-            using var clearBgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = _clearAllButtonHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2
-            };
-            canvas.DrawRoundRect(clearBounds, 3, 3, clearBgPaint);
-
-            using var clearFramePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = _clearAllButtonHovered ? FUIColors.Warning : FUIColors.Warning.WithAlpha(150),
-                StrokeWidth = _clearAllButtonHovered ? 2f : 1f
-            };
-            canvas.DrawRoundRect(clearBounds, 3, 3, clearFramePaint);
-
-            FUIRenderer.DrawTextCentered(canvas, "Clear Mapping", clearBounds,
-                _clearAllButtonHovered ? FUIColors.Warning : FUIColors.Warning.WithAlpha(200), 11f);
+            var state = _clearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+            FUIRenderer.DrawButton(canvas, clearBounds, "CLEAR MAPPING", state, FUIColors.Danger);
         }
     }
 

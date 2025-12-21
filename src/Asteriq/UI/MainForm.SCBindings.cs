@@ -2729,6 +2729,13 @@ public partial class MainForm
             _scIsListeningForInput = true;
             _scListeningStartTime = DateTime.Now;
             _scListeningColumn = col;
+
+            // Clear stale key presses from search box input before detecting
+            if (col.IsKeyboard)
+            {
+                ClearStaleKeyPresses();
+            }
+
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
         }
         else
@@ -3501,6 +3508,32 @@ public partial class MainForm
         // and low bit set if key was pressed since last call
         short state = GetAsyncKeyState(vk);
         return (state & 0x0001) != 0; // Check "was pressed" bit
+    }
+
+    /// <summary>
+    /// Clears stale "was pressed" bits for all monitored keys.
+    /// This prevents keys typed in search box from being detected as bindings.
+    /// </summary>
+    private static void ClearStaleKeyPresses()
+    {
+        // Clear A-Z
+        for (int vk = 0x41; vk <= 0x5A; vk++)
+            GetAsyncKeyState(vk);
+
+        // Clear 0-9
+        for (int vk = 0x30; vk <= 0x39; vk++)
+            GetAsyncKeyState(vk);
+
+        // Clear F1-F12
+        for (int vk = 0x70; vk <= 0x7B; vk++)
+            GetAsyncKeyState(vk);
+
+        // Clear common keys
+        int[] commonKeys = { 0x20, 0x0D, 0x08, 0x09, 0x2E, 0x2D, 0x24, 0x23, 0x21, 0x22,
+                            0x25, 0x26, 0x27, 0x28,
+                            0xC0, 0xBD, 0xBB, 0xDB, 0xDD, 0xDC, 0xBA, 0xDE, 0xBC, 0xBE, 0xBF };
+        foreach (var vk in commonKeys)
+            GetAsyncKeyState(vk);
     }
 
     #endregion

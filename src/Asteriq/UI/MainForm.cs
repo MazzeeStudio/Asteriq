@@ -188,7 +188,15 @@ public partial class MainForm : Form
     private List<string>? _selectedModifiers = null;
     private SKRect _keyCaptureBounds;
     private bool _keyCaptureBoundsHovered;
+    private SKRect _keyClearButtonBounds;
+    private bool _keyClearButtonHovered;
     private bool _isCapturingKey = false;
+    private DateTime _keyCaptureStartTime = DateTime.MinValue;
+    private const int KeyCaptureTimeoutMs = 10000; // 10 second timeout for key capture
+
+    // Input listening timeout
+    private DateTime _inputListeningStartTime = DateTime.MinValue;
+    private const int InputListeningTimeoutMs = 15000; // 15 second timeout for input listening
 
     // Double-click detection for binding rows
     private DateTime _lastRowClickTime = DateTime.MinValue;
@@ -208,6 +216,15 @@ public partial class MainForm : Form
     private SKRect _cancelButtonBounds;
     private bool _saveButtonHovered;
     private bool _cancelButtonHovered;
+
+    // Input-to-mapping highlight (attention effect when physical input is pressed)
+    private int _highlightedMappingRow = -1;  // Which row to highlight (-1 = none)
+    private uint _highlightedVJoyDevice = 0;  // Which vJoy device the highlighted row belongs to
+    private DateTime _highlightStartTime = DateTime.MinValue;
+    private const int HighlightDurationMs = 1500; // How long the attention highlight lasts (1.5 seconds)
+    private Dictionary<string, bool[]> _highlightPrevButtonState = new(); // Previous frame button states (for rising-edge detection)
+    private Dictionary<string, DateTime> _highlightDebounce = new(); // Debounce: last highlight time per button
+    private const int HighlightDebounceCooldownMs = 500; // Minimum time between highlights for same button
 
     // Curve editor state
     private SKRect _curveEditorBounds;
@@ -915,12 +932,35 @@ public partial class MainForm : Form
         // Handle key capture for keyboard output mapping
         if (_isCapturingKey)
         {
-            // Extract modifiers and key name
+            // Get the base key without modifiers
+            var baseKey = keyData & Keys.KeyCode;
+
+            // Check if this is a modifier-only key press (e.g., just RCtrl)
+            bool isModifierOnly = baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
+                baseKey == Keys.Menu || baseKey == Keys.Control ||
+                baseKey == Keys.Shift || baseKey == Keys.Alt ||
+                baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
+                baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
+                baseKey == Keys.LMenu || baseKey == Keys.RMenu;
+
+            if (isModifierOnly)
+            {
+                // Capture just the modifier key itself (e.g., just RCtrl or just LShift)
+                _selectedKeyName = GetModifierKeyName(baseKey);
+                _selectedModifiers = null; // No additional modifiers when capturing a modifier itself
+                _outputTypeIsKeyboard = true; // Capturing a key means keyboard output mode
+                _isCapturingKey = false;
+                UpdateKeyNameForSelected();
+                return true;
+            }
+
+            // Extract modifiers and key name for regular keys
             var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
             if (!string.IsNullOrEmpty(keyName))
             {
                 _selectedKeyName = keyName;
                 _selectedModifiers = modifiers.Count > 0 ? modifiers : null;
+                _outputTypeIsKeyboard = true; // Capturing a key means keyboard output mode
                 _isCapturingKey = false;
                 UpdateKeyNameForSelected();
             }
@@ -1213,6 +1253,39 @@ public partial class MainForm : Form
 
     private static bool IsKeyHeld(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
+    /// <summary>
+    /// Get the specific modifier key name (left/right variant) for modifier-only key presses
+    /// </summary>
+    private static string GetModifierKeyName(Keys key)
+    {
+        // Use GetAsyncKeyState to determine if it's left or right variant
+        if (key == Keys.ControlKey || key == Keys.Control)
+        {
+            if (IsKeyHeld(VK_RCONTROL)) return "RCtrl";
+            return "LCtrl";
+        }
+        if (key == Keys.LControlKey) return "LCtrl";
+        if (key == Keys.RControlKey) return "RCtrl";
+
+        if (key == Keys.ShiftKey || key == Keys.Shift)
+        {
+            if (IsKeyHeld(VK_RSHIFT)) return "RShift";
+            return "LShift";
+        }
+        if (key == Keys.LShiftKey) return "LShift";
+        if (key == Keys.RShiftKey) return "RShift";
+
+        if (key == Keys.Menu || key == Keys.Alt)
+        {
+            if (IsKeyHeld(VK_RMENU)) return "RAlt";
+            return "LAlt";
+        }
+        if (key == Keys.LMenu) return "LAlt";
+        if (key == Keys.RMenu) return "RAlt";
+
+        return key.ToString();
+    }
+
     private void InitializeCanvas()
     {
         _canvas = new SKControl
@@ -1349,6 +1422,72 @@ public partial class MainForm : Form
             // Track input activity for dynamic lead-lines
             TrackInputActivity(state);
         }
+
+        // Check for button presses to highlight corresponding mapping in Mappings tab
+        if (_activeTab == 1 && _profileService.ActiveProfile is not null)
+        {
+            int prevHighlightRow = _highlightedMappingRow;
+            uint prevHighlightDevice = _highlightedVJoyDevice;
+
+            CheckForMappingHighlight(state);
+
+            // Invalidate canvas if highlight changed to show the shimmer effect
+            if (_highlightedMappingRow != prevHighlightRow || _highlightedVJoyDevice != prevHighlightDevice)
+            {
+                _canvas.Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Check if any pressed input maps to a vJoy output and highlight it
+    /// </summary>
+    private void CheckForMappingHighlight(DeviceInputState state)
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile is null) return;
+
+        // Get previous button state for this device (for rising-edge detection)
+        _highlightPrevButtonState.TryGetValue(state.DeviceName, out var prevButtons);
+
+        // Check button presses - only trigger on rising edge (was NOT pressed, now IS pressed)
+        for (int i = 0; i < state.Buttons.Length; i++)
+        {
+            bool isPressed = state.Buttons[i];
+            bool wasPressed = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
+
+            // Only trigger on rising edge (transition from not-pressed to pressed)
+            if (!isPressed || wasPressed) continue;
+
+            // Check debounce - don't re-highlight the same button too quickly
+            string debounceKey = $"{state.DeviceName}:{i}";
+            if (_highlightDebounce.TryGetValue(debounceKey, out var lastTime))
+            {
+                var elapsed = (DateTime.Now - lastTime).TotalMilliseconds;
+                if (elapsed < HighlightDebounceCooldownMs)
+                    continue; // Skip - too soon since last highlight for this button
+            }
+
+            // Look for button mapping from this device/button (match by device name and input)
+            var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Inputs.Any(input =>
+                    input.DeviceName == state.DeviceName &&
+                    input.Type == InputType.Button &&
+                    input.Index == i));
+
+            if (mapping is not null)
+            {
+                // Found a mapping - highlight this row
+                _highlightedMappingRow = mapping.Output.Index;
+                _highlightedVJoyDevice = mapping.Output.VJoyDevice;
+                _highlightStartTime = DateTime.Now;
+                _highlightDebounce[debounceKey] = DateTime.Now; // Record highlight time for debounce
+                break;
+            }
+        }
+
+        // Store current button state for next frame comparison
+        _highlightPrevButtonState[state.DeviceName] = (bool[])state.Buttons.Clone();
     }
 
     private void TrackInputActivity(DeviceInputState state)
@@ -1713,6 +1852,7 @@ public partial class MainForm : Form
             _hoveredButtonMode = -1;
             _hoveredOutputType = -1;
             _keyCaptureBoundsHovered = false;
+            _keyClearButtonHovered = false;
             _addInputButtonHovered = false;
             _clearAllButtonHovered = false;
             _hoveredInputSourceRemove = -1;
@@ -1777,10 +1917,26 @@ public partial class MainForm : Form
                     return;
                 }
 
+                // Key clear button (check before key capture field so it takes precedence)
+                if (_outputTypeIsKeyboard && !_keyClearButtonBounds.IsEmpty && _keyClearButtonBounds.Contains(e.X, e.Y))
+                {
+                    _keyClearButtonHovered = true;
+                    Cursor = Cursors.Hand;
+                    return;
+                }
+
                 // Key capture field
                 if (_outputTypeIsKeyboard && _keyCaptureBounds.Contains(e.X, e.Y))
                 {
                     _keyCaptureBoundsHovered = true;
+                    Cursor = Cursors.Hand;
+                    return;
+                }
+
+                // Clear Mapping button
+                if (_clearAllButtonBounds.Contains(e.X, e.Y))
+                {
+                    _clearAllButtonHovered = true;
                     Cursor = Cursors.Hand;
                     return;
                 }
@@ -2339,6 +2495,14 @@ public partial class MainForm : Form
                         _draggingBgSlider = null;
                         _draggingPulseDuration = false;
                         _draggingHoldDuration = false;
+
+                        // Reset highlight state when switching to Mappings tab
+                        if (i == 1)
+                        {
+                            _highlightPrevButtonState.Clear();
+                            _highlightDebounce.Clear();
+                            _highlightedMappingRow = -1;
+                        }
                     }
                     _activeTab = i;
                     break;
@@ -2427,10 +2591,25 @@ public partial class MainForm : Form
                 return;
             }
 
+            // Right panel: Key clear button (button category)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _outputTypeIsKeyboard && _keyClearButtonHovered)
+            {
+                ClearKeyboardBinding();
+                return;
+            }
+
             // Right panel: Key capture field (button category)
             if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _outputTypeIsKeyboard && _keyCaptureBoundsHovered)
             {
                 _isCapturingKey = true;
+                _keyCaptureStartTime = DateTime.Now;
+                return;
+            }
+
+            // Right panel: Clear Mapping button (button category)
+            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _clearAllButtonHovered)
+            {
+                ClearSelectedButtonMapping();
                 return;
             }
 

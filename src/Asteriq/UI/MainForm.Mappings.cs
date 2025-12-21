@@ -300,7 +300,40 @@ public partial class MainForm
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
         bool hasKeyParts = keyParts is not null && keyParts.Count > 0;
 
-        // Background
+        // Check for attention highlight (physical input was pressed that maps to this output)
+        bool hasAttentionHighlight = false;
+        float attentionIntensity = 0f;
+        if (_highlightedMappingRow >= 0 &&
+            _vjoyDevices.Count > 0 && _selectedVJoyDeviceIndex < _vjoyDevices.Count)
+        {
+            var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+            // Parse output index from the outputName (e.g., "Button 5" -> 4, "Axis 0" -> 0)
+            int outputIndex = -1;
+            if (outputName.StartsWith("Button ") && int.TryParse(outputName.Substring(7), out int btnNum))
+                outputIndex = btnNum - 1; // Buttons are 1-indexed in display
+            else if (outputName.StartsWith("Axis ") && int.TryParse(outputName.Substring(5), out int axisNum))
+                outputIndex = axisNum;
+
+            if (outputIndex == _highlightedMappingRow && vjoyDevice.Id == _highlightedVJoyDevice)
+            {
+                var elapsed = (DateTime.Now - _highlightStartTime).TotalMilliseconds;
+                if (elapsed < HighlightDurationMs)
+                {
+                    hasAttentionHighlight = true;
+                    // Ease-out fade: starts bright and fades slowly, then accelerates fade at end
+                    // Using cubic ease-in for the FADE (so highlight fades slowly at first, faster at end)
+                    float t = (float)(elapsed / HighlightDurationMs); // 0 to 1
+                    float easeIn = t * t * t; // Cubic ease-in: 0 to 1, starts slow, ends fast
+                    attentionIntensity = 1f - easeIn; // 1 to 0, fades slowly at first, faster at end
+                }
+                else
+                {
+                    _highlightedMappingRow = -1; // Clear expired highlight
+                }
+            }
+        }
+
+        // Background - selection state is independent of attention highlight
         SKColor bgColor;
         if (isSelected)
             bgColor = FUIColors.Active.WithAlpha(50);
@@ -312,12 +345,44 @@ public partial class MainForm
         using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
         canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
 
+        // Draw attention highlight as overlay (additive, doesn't replace selection)
+        if (hasAttentionHighlight)
+        {
+            // Pulsing glow effect that fades out - use theme active color
+            byte glowAlpha = (byte)(100 * attentionIntensity);
+            using var glowPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Active.WithAlpha(glowAlpha)
+            };
+            canvas.DrawRoundRect(bounds, 4, 4, glowPaint);
+        }
+
         // Frame
+        SKColor frameColor;
+        float frameWidth;
+        if (hasAttentionHighlight)
+        {
+            // Attention frame pulses with the highlight - use theme active color
+            frameColor = FUIColors.Active.WithAlpha((byte)(200 * attentionIntensity + 55));
+            frameWidth = 2f + attentionIntensity; // Slightly thicker when fresh
+        }
+        else if (isSelected)
+        {
+            frameColor = FUIColors.Active;
+            frameWidth = 2f;
+        }
+        else
+        {
+            frameColor = isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(100);
+            frameWidth = 1f;
+        }
+
         using var framePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = isSelected ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(100)),
-            StrokeWidth = isSelected ? 2f : 1f
+            Color = frameColor,
+            StrokeWidth = frameWidth
         };
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
@@ -596,26 +661,54 @@ public partial class MainForm
             }
         }
 
-        // Listening indicator
+        // Listening indicator with timeout bar
         if (isListening)
         {
-            var listenBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
-            byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
-
-            using var listenBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(40) };
-            canvas.DrawRoundRect(listenBounds, 3, 3, listenBgPaint);
-
-            using var listenFramePaint = new SKPaint
+            // Check for timeout
+            var elapsed = (DateTime.Now - _inputListeningStartTime).TotalMilliseconds;
+            if (elapsed >= InputListeningTimeoutMs)
             {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Warning.WithAlpha(alpha),
-                StrokeWidth = 2f
-            };
-            canvas.DrawRoundRect(listenBounds, 3, 3, listenFramePaint);
+                CancelInputListening(); // Timeout - cancel listening
+            }
+            else
+            {
+                var listenBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
+                byte alpha = (byte)(180 + MathF.Sin(_pulsePhase * 3) * 60);
 
-            FUIRenderer.DrawText(canvas, "Press input...", new SKPoint(leftMargin + 10, y + 18),
-                FUIColors.Warning.WithAlpha(alpha), 11f);
-            y += rowHeight + rowGap;
+                using var listenBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40) };
+                canvas.DrawRoundRect(listenBounds, 3, 3, listenBgPaint);
+
+                // Draw timeout progress bar
+                float progress = Math.Min(1f, (float)(elapsed / InputListeningTimeoutMs));
+                float remaining = 1f - progress;
+                float progressWidth = (listenBounds.Width - 6) * remaining;
+                if (progressWidth > 0)
+                {
+                    var progressRect = new SKRect(
+                        listenBounds.Left + 3,
+                        listenBounds.Top + 3,
+                        listenBounds.Left + 3 + progressWidth,
+                        listenBounds.Bottom - 3);
+                    using var progressPaint = new SKPaint
+                    {
+                        Style = SKPaintStyle.Fill,
+                        Color = FUIColors.Active.WithAlpha(80)
+                    };
+                    canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
+                }
+
+                using var listenFramePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = FUIColors.Active.WithAlpha(alpha),
+                    StrokeWidth = 2f
+                };
+                canvas.DrawRoundRect(listenBounds, 3, 3, listenFramePaint);
+
+                FUIRenderer.DrawText(canvas, "Press input...", new SKPoint(leftMargin + 10, y + 18),
+                    FUIColors.Active.WithAlpha(alpha), 11f);
+                y += rowHeight + rowGap;
+            }
         }
 
         // Add input button [+]
@@ -1138,16 +1231,51 @@ public partial class MainForm
             float keyFieldHeight = 32f;
             _keyCaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
 
-            // Draw key capture field
+            // Check for key capture timeout
+            if (_isCapturingKey)
+            {
+                var elapsed = (DateTime.Now - _keyCaptureStartTime).TotalMilliseconds;
+                if (elapsed >= KeyCaptureTimeoutMs)
+                {
+                    _isCapturingKey = false; // Timeout - cancel capture
+                }
+            }
+
+            // Draw key capture field background
             var keyBgColor = _isCapturingKey
-                ? FUIColors.Warning.WithAlpha(40)
+                ? FUIColors.Active.WithAlpha(40)
                 : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
             using var keyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = keyBgColor };
             canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyBgPaint);
 
+            // Draw timeout progress bar when capturing
+            if (_isCapturingKey)
+            {
+                var elapsed = (DateTime.Now - _keyCaptureStartTime).TotalMilliseconds;
+                float progress = Math.Min(1f, (float)(elapsed / KeyCaptureTimeoutMs));
+                float remaining = 1f - progress;
+
+                // Progress bar fills the field and shrinks from right to left
+                float progressWidth = (_keyCaptureBounds.Width - 6) * remaining;
+                if (progressWidth > 0)
+                {
+                    var progressRect = new SKRect(
+                        _keyCaptureBounds.Left + 3,
+                        _keyCaptureBounds.Top + 3,
+                        _keyCaptureBounds.Left + 3 + progressWidth,
+                        _keyCaptureBounds.Bottom - 3);
+                    using var progressPaint = new SKPaint
+                    {
+                        Style = SKPaintStyle.Fill,
+                        Color = FUIColors.Active.WithAlpha(80)
+                    };
+                    canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
+                }
+            }
+
             var keyFrameColor = _isCapturingKey
-                ? FUIColors.Warning
+                ? FUIColors.Active
                 : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
 
             using var keyFramePaint = new SKPaint
@@ -1276,7 +1404,7 @@ public partial class MainForm
             };
             canvas.DrawRoundRect(clearBounds, 3, 3, clearFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, "Clear Binding", clearBounds,
+            FUIRenderer.DrawTextCentered(canvas, "Clear Mapping", clearBounds,
                 _clearAllButtonHovered ? FUIColors.Warning : FUIColors.Warning.WithAlpha(200), 11f);
         }
     }
@@ -2758,8 +2886,12 @@ public partial class MainForm
         // Clear button if there's a key
         if (!string.IsNullOrEmpty(_selectedKeyName) && !_isCapturingKey)
         {
-            var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
-            DrawSmallIconButton(canvas, clearBounds, "×", false, true);
+            _keyClearButtonBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
+            DrawSmallIconButton(canvas, _keyClearButtonBounds, "×", _keyClearButtonHovered, true);
+        }
+        else
+        {
+            _keyClearButtonBounds = SKRect.Empty;
         }
     }
 
@@ -3151,6 +3283,7 @@ public partial class MainForm
         if (!_mappingEditorOpen) return;
 
         _isListeningForInput = true;
+        _inputListeningStartTime = DateTime.Now;
         _pendingInput = null;
 
         // Determine input type based on what we're editing
@@ -4002,6 +4135,7 @@ public partial class MainForm
         if (rowIndex < 0) return;
 
         _isListeningForInput = true;
+        _inputListeningStartTime = DateTime.Now;
         _pendingInput = null;
 
         // Determine input type based on current mapping category tab
@@ -4337,10 +4471,86 @@ public partial class MainForm
 
         if (mapping is not null)
         {
+            // When setting a key name, the output type must be Keyboard
+            if (!string.IsNullOrEmpty(_selectedKeyName))
+            {
+                mapping.Output.Type = OutputType.Keyboard;
+            }
             mapping.Output.KeyName = _selectedKeyName;
             mapping.Output.Modifiers = _selectedModifiers?.ToList();
             profile.ModifiedAt = DateTime.UtcNow;
             _profileService.SaveActiveProfile();
+        }
+    }
+
+    /// <summary>
+    /// Clear all bindings (keyboard and input sources) for the selected button mapping
+    /// </summary>
+    private void ClearSelectedButtonMapping()
+    {
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile is null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow;
+
+        // Find and remove the mapping
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping is not null)
+        {
+            profile.ButtonMappings.Remove(mapping);
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+
+            // Reset UI state
+            _selectedKeyName = "";
+            _selectedModifiers = null;
+            _outputTypeIsKeyboard = false;
+            _selectedButtonMode = ButtonMode.Normal;
+        }
+    }
+
+    /// <summary>
+    /// Clear just the keyboard binding for the selected button mapping (keeps physical inputs)
+    /// </summary>
+    private void ClearKeyboardBinding()
+    {
+        // Only for button category
+        if (_mappingCategory != 0) return;
+        if (_selectedMappingRow < 0) return;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile is null) return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow;
+
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+
+        if (mapping is not null)
+        {
+            // Clear keyboard binding but keep mapping
+            mapping.Output.Type = OutputType.VJoyButton;
+            mapping.Output.KeyName = null;
+            mapping.Output.Modifiers = null;
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+
+            // Update UI state
+            _selectedKeyName = "";
+            _selectedModifiers = null;
+            _outputTypeIsKeyboard = false;
         }
     }
 

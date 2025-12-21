@@ -847,6 +847,12 @@ public class DeviceMapEditorForm : Form
         // Control count
         var countText = $"Controls: {_deviceMap.Controls.Count}";
         FUIRenderer.DrawText(canvas, countText, new SKPoint(420, _statusBarBounds.Top + 18), FUIColors.TextDim, 10f);
+
+        // Help hint
+        var helpText = _selectedControlKey is not null
+            ? "Shift+Click to reposition anchor"
+            : "Click on SVG to add control";
+        FUIRenderer.DrawText(canvas, helpText, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.TextDisabled, 10f);
     }
 
     private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
@@ -1230,6 +1236,20 @@ public class DeviceMapEditorForm : Form
     private void HandleSvgPanelClick(MouseEventArgs e)
     {
         var viewBoxPos = ScreenToViewBox(e.X, e.Y);
+        bool shiftHeld = (Control.ModifierKeys & Keys.Shift) != 0;
+
+        // Shift+Click: Reposition anchor of selected control to click position
+        if (shiftHeld && _selectedControlKey is not null)
+        {
+            if (_deviceMap.Controls.TryGetValue(_selectedControlKey, out var control))
+            {
+                control.Anchor ??= new Point2D();
+                control.Anchor.X = viewBoxPos.X;
+                control.Anchor.Y = viewBoxPos.Y;
+                _hasUnsavedChanges = true;
+            }
+            return;
+        }
 
         // First, check if clicking on lead line segment handles (only for selected control)
         if (_selectedControlKey is not null &&
@@ -1296,10 +1316,13 @@ public class DeviceMapEditorForm : Form
         {
             if (_deviceMap.Controls.TryGetValue(_selectedControlKey, out var control))
             {
-                control.Anchor ??= new Point2D();
-                control.Anchor.X = viewBoxPos.X;
-                control.Anchor.Y = viewBoxPos.Y;
-                _hasUnsavedChanges = true;
+                if (control.Anchor is null)
+                {
+                    control.Anchor = new Point2D();
+                    control.Anchor.X = viewBoxPos.X;
+                    control.Anchor.Y = viewBoxPos.Y;
+                    _hasUnsavedChanges = true;
+                }
             }
         }
         else

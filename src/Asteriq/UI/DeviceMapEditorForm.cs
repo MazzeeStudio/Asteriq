@@ -529,17 +529,15 @@ public class DeviceMapEditorForm : Form
             }
         }
 
-        // Only draw final segment to label if there are NO defined segments
-        // (otherwise all segments are user-controlled via the segments list)
-        if (leadLine.Segments is null || leadLine.Segments.Count == 0)
-        {
-            path.LineTo(label);
-        }
+        // Always draw final connector to label
+        path.LineTo(label);
 
         canvas.DrawPath(path, linePaint);
 
-        // Draw draggable handles only for selected control
-        if (selected)
+        // Draw draggable handles only for selected control WITH segments
+        // (without segments, the lead line is in "simple mode" - shelf + auto line to label)
+        // The handles let users control segment angles/lengths; the final connector to label is automatic
+        if (selected && leadLine.Segments is not null && leadLine.Segments.Count > 0)
         {
             DrawSegmentHandles(canvas, anchor, leadLine);
         }

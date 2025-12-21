@@ -3637,8 +3637,10 @@ public partial class MainForm
                 LoadSCSchema(_scInstallations[_selectedSCInstallation]);
             }
 
+            // Apply default bindings from the loaded schema
+            ApplyDefaultBindingsToProfile();
+
             UpdateConflictingBindings();
-            _scExportProfileService?.SaveProfile(_scExportProfile);
 
             _scExportStatus = "Reset to defaults";
             _scExportStatusTime = DateTime.Now;

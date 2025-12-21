@@ -752,7 +752,7 @@ public partial class MainForm
 
                 // Clear mappings button
                 _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDestructive: true);
+                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDangerous: true);
                 y += buttonHeight + buttonGap;
 
                 // Remove device button (dangerous - removes all trace)
@@ -771,7 +771,7 @@ public partial class MainForm
 
                 // Clear mappings button
                 _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDestructive: true);
+                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDangerous: true);
             }
         }
         else

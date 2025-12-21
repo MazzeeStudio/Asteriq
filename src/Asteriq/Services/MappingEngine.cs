@@ -355,12 +355,6 @@ public class MappingEngine : IDisposable
         if (relevantInputs.Count == 0)
             return;
 
-        // Debug: Log keyboard mappings being processed
-        if (mapping.Output.Type == OutputType.Keyboard)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MappingEngine] Processing keyboard mapping: {mapping.Name}, KeyName={mapping.Output.KeyName}, InputCount={relevantInputs.Count}");
-        }
-
         // Get combined input state
         bool inputPressed = false;
 
@@ -398,7 +392,6 @@ public class MappingEngine : IDisposable
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
-            System.Diagnostics.Debug.WriteLine($"[MappingEngine] Sending keyboard key: {mapping.Output.KeyName}, pressed={outputPressed}");
             _keyboard.SetKey(mapping.Output.KeyName, outputPressed, mapping.Output.Modifiers);
         }
     }

@@ -4194,6 +4194,92 @@ public partial class MainForm
         }
     }
 
+    /// <summary>
+    /// Start input listening when user has assigned a keyboard key to an empty button slot.
+    /// When physical input is detected, creates a new mapping with the pending keyboard output.
+    /// </summary>
+    private async Task StartPendingKeyboardInputListeningAsync()
+    {
+        if (_isListeningForInput) return;
+        if (_pendingKeyboardKey is null) return;
+
+        _isListeningForInput = true;
+        _inputListeningStartTime = DateTime.Now;
+        _pendingInput = null;
+
+        _inputDetectionService ??= new InputDetectionService(_inputService);
+
+        try
+        {
+            // Small delay to let user release any currently pressed buttons
+            await Task.Delay(200);
+
+            var detected = await _inputDetectionService.WaitForInputAsync(InputDetectionFilter.Buttons, 0.15f, 15000);
+
+            if (detected is not null && _pendingKeyboardKey is not null)
+            {
+                var profile = _profileService.ActiveProfile;
+                if (profile is null) return;
+
+                var newInputSource = detected.ToInputSource();
+
+                // Check for duplicate mapping
+                var existingMapping = FindExistingMappingForInput(profile, newInputSource);
+                if (existingMapping is not null)
+                {
+                    string newTarget = $"Keyboard: {FormatKeyComboForDisplay(_pendingKeyboardKey, _pendingKeyboardModifiers)}";
+                    if (!ConfirmDuplicateMapping(existingMapping, newTarget))
+                    {
+                        // User cancelled, clear pending state
+                        ClearPendingKeyboardState();
+                        return;
+                    }
+                    // User confirmed, remove existing mapping first
+                    RemoveExistingMappingsForInput(profile, newInputSource);
+                }
+
+                // Create new button mapping with keyboard output
+                var mapping = new ButtonMapping
+                {
+                    Name = $"{detected.DeviceName} Button {detected.Index + 1} -> {FormatKeyComboForDisplay(_pendingKeyboardKey, _pendingKeyboardModifiers)}",
+                    Inputs = new List<InputSource> { newInputSource },
+                    Output = new OutputTarget
+                    {
+                        Type = OutputType.Keyboard,
+                        VJoyDevice = _pendingKeyboardVJoyDevice,
+                        Index = _pendingKeyboardOutputIndex,
+                        KeyName = _pendingKeyboardKey,
+                        Modifiers = _pendingKeyboardModifiers
+                    },
+                    Mode = _selectedButtonMode
+                };
+                profile.ButtonMappings.Add(mapping);
+                profile.ModifiedAt = DateTime.UtcNow;
+                _profileService.SaveActiveProfile();
+
+                // Update the pending input so UI can show it
+                _pendingInput = detected;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Pending keyboard input listening cancelled or failed: {ex.Message}");
+        }
+        finally
+        {
+            _isListeningForInput = false;
+            ClearPendingKeyboardState();
+        }
+    }
+
+    private void ClearPendingKeyboardState()
+    {
+        _pendingKeyboardKey = null;
+        _pendingKeyboardModifiers = null;
+        _pendingKeyboardOutputIndex = -1;
+        _pendingKeyboardVJoyDevice = 0;
+    }
+
     private void SaveMappingForRow(int rowIndex, DetectedInput input, bool isAxis)
     {
         var profile = _profileService.ActiveProfile;
@@ -4469,9 +4555,23 @@ public partial class MainForm
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
+        if (mapping is null && !string.IsNullOrEmpty(_selectedKeyName))
+        {
+            // No existing mapping - need to capture a physical input first
+            // Store the keyboard key and start listening for physical input
+            _pendingKeyboardKey = _selectedKeyName;
+            _pendingKeyboardModifiers = _selectedModifiers?.ToList();
+            _pendingKeyboardOutputIndex = outputIndex;
+            _pendingKeyboardVJoyDevice = vjoyDevice.Id;
+
+            // Start async input detection for pending keyboard binding
+            _ = StartPendingKeyboardInputListeningAsync();
+            return;
+        }
+
         if (mapping is not null)
         {
-            // When setting a key name, the output type must be Keyboard
+            // Update existing mapping
             if (!string.IsNullOrEmpty(_selectedKeyName))
             {
                 mapping.Output.Type = OutputType.Keyboard;

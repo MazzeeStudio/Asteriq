@@ -19,6 +19,13 @@ public class KeyboardService : IDisposable
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+    // MapVirtualKey types
+    private const uint MAPVK_VK_TO_VSC = 0;
+    private const uint MAPVK_VK_TO_VSC_EX = 4;
+
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
     {
@@ -138,6 +145,18 @@ public class KeyboardService : IDisposable
     /// </summary>
     private void SendKey(int virtualKeyCode, bool press)
     {
+        // Get the scan code for this virtual key
+        // Use MAPVK_VK_TO_VSC_EX to get extended scan code info
+        uint scanCodeEx = MapVirtualKey((uint)virtualKeyCode, MAPVK_VK_TO_VSC_EX);
+        ushort scanCode = (ushort)(scanCodeEx & 0xFF);
+        bool isExtended = IsExtendedKey(virtualKeyCode) || (scanCodeEx & 0xE000) != 0;
+
+        uint flags = press ? 0u : KEYEVENTF_KEYUP;
+        if (isExtended)
+        {
+            flags |= KEYEVENTF_EXTENDEDKEY;
+        }
+
         var input = new INPUT
         {
             type = INPUT_KEYBOARD,
@@ -146,19 +165,13 @@ public class KeyboardService : IDisposable
                 ki = new KEYBDINPUT
                 {
                     wVk = (ushort)virtualKeyCode,
-                    wScan = 0,
-                    dwFlags = press ? 0 : KEYEVENTF_KEYUP,
+                    wScan = scanCode,
+                    dwFlags = flags,
                     time = 0,
                     dwExtraInfo = IntPtr.Zero
                 }
             }
         };
-
-        // Extended keys (right ctrl, right alt, etc.)
-        if (IsExtendedKey(virtualKeyCode))
-        {
-            input.u.ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
-        }
 
         SendInput(1, new[] { input }, Marshal.SizeOf<INPUT>());
     }

@@ -529,8 +529,12 @@ public class DeviceMapEditorForm : Form
             }
         }
 
-        // Final segment to label
-        path.LineTo(label);
+        // Only draw final segment to label if there are NO defined segments
+        // (otherwise all segments are user-controlled via the segments list)
+        if (leadLine.Segments is null || leadLine.Segments.Count == 0)
+        {
+            path.LineTo(label);
+        }
 
         canvas.DrawPath(path, linePaint);
 

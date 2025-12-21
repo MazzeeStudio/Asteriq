@@ -750,28 +750,32 @@ public partial class MainForm
                 // Disconnected device: Show Clear Mappings and Remove Device buttons
                 _map1to1ButtonBounds = SKRect.Empty;
 
-                // Clear mappings button
+                // Clear mappings button - use FUIRenderer.DrawButton for consistent styling
                 _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDangerous: true);
+                var clearState = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState, FUIColors.Danger);
                 y += buttonHeight + buttonGap;
 
-                // Remove device button (dangerous - removes all trace)
+                // Remove device button - use FUIRenderer.DrawButton for consistent styling
                 _removeDeviceButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                DrawDeviceActionButton(canvas, _removeDeviceButtonBounds, "REMOVE DEVICE", _removeDeviceButtonHovered, isDangerous: true);
+                var removeState = _removeDeviceButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _removeDeviceButtonBounds, "REMOVE DEVICE", removeState, FUIColors.Danger);
             }
             else
             {
                 // Connected device: Show Map 1:1 and Clear Mappings buttons
                 _removeDeviceButtonBounds = SKRect.Empty;
 
-                // Map 1:1 to vJoy button
+                // Map 1:1 to vJoy button - use FUIRenderer.DrawButton for consistent styling
                 _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                DrawDeviceActionButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", _map1to1ButtonHovered);
+                var mapState = _map1to1ButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", mapState);
                 y += buttonHeight + buttonGap;
 
-                // Clear mappings button
+                // Clear mappings button - use FUIRenderer.DrawButton for consistent styling
                 _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                DrawDeviceActionButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", _clearMappingsButtonHovered, isDangerous: true);
+                var clearState2 = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, FUIColors.Danger);
             }
         }
         else

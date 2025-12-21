@@ -63,7 +63,9 @@ public class MappingEngine : IDisposable
     /// <summary>
     /// Start processing mappings
     /// </summary>
-    public bool Start()
+    /// <param name="initialStates">Optional initial device states for synchronization.
+    /// If provided, vJoy outputs will be set to match current hardware positions.</param>
+    public bool Start(IEnumerable<DeviceInputState>? initialStates = null)
     {
         if (_activeProfile is null)
             return false;
@@ -74,13 +76,103 @@ public class MappingEngine : IDisposable
         {
             if (!_vjoy.AcquireDevice(deviceId))
             {
-                Console.WriteLine($"Failed to acquire vJoy device {deviceId}");
+                System.Diagnostics.Debug.WriteLine($"Failed to acquire vJoy device {deviceId}");
                 return false;
             }
         }
 
         _isRunning = true;
+
+        // Synchronize vJoy outputs with current hardware state
+        if (initialStates is not null)
+        {
+            SynchronizeInitialState(initialStates);
+        }
+
         return true;
+    }
+
+    /// <summary>
+    /// Synchronize vJoy outputs with current hardware state.
+    /// This prevents axes from jumping when forwarding starts.
+    /// </summary>
+    private void SynchronizeInitialState(IEnumerable<DeviceInputState> deviceStates)
+    {
+        if (_activeProfile is null)
+            return;
+
+        foreach (var state in deviceStates)
+        {
+            // Cache device values
+            _deviceAxisValues[state.DeviceName] = state.Axes;
+            _deviceButtonValues[state.DeviceName] = state.Buttons;
+            _deviceHatValues[state.DeviceName] = state.Hats;
+
+            // Process all axis mappings for this device
+            foreach (var mapping in _activeProfile.AxisMappings)
+            {
+                foreach (var input in mapping.Inputs)
+                {
+                    if (input.DeviceName == state.DeviceName && input.Index < state.Axes.Length)
+                    {
+                        float value = state.Axes[input.Index];
+
+                        // Apply curve if present
+                        if (mapping.Curve is not null)
+                        {
+                            value = mapping.Curve.Apply(value);
+                        }
+
+                        // Output to vJoy
+                        var axis = IndexToHidUsage(mapping.Output.Index);
+                        _vjoy.SetAxis(mapping.Output.VJoyDevice, axis, value);
+                    }
+                }
+            }
+
+            // Process all button mappings for this device
+            foreach (var mapping in _activeProfile.ButtonMappings)
+            {
+                foreach (var input in mapping.Inputs)
+                {
+                    if (input.DeviceName == state.DeviceName && input.Index < state.Buttons.Length)
+                    {
+                        bool pressed = state.Buttons[input.Index];
+
+                        // Handle inversion
+                        if (mapping.Invert)
+                            pressed = !pressed;
+
+                        // Output to vJoy (button indices are 1-based in vJoy)
+                        _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index + 1, pressed);
+                    }
+                }
+            }
+
+            // Process all hat mappings for this device
+            foreach (var mapping in _activeProfile.HatMappings)
+            {
+                foreach (var input in mapping.Inputs)
+                {
+                    if (input.DeviceName == state.DeviceName && input.Index < state.Hats.Length)
+                    {
+                        int angle = state.Hats[input.Index];
+
+                        if (mapping.UseContinuous)
+                        {
+                            _vjoy.SetContinuousPov(mapping.Output.VJoyDevice, (uint)mapping.Output.Index, angle);
+                        }
+                        else
+                        {
+                            int discrete = HatAngleToDiscrete(angle);
+                            _vjoy.SetDiscretePov(mapping.Output.VJoyDevice, (uint)mapping.Output.Index, discrete);
+                        }
+                    }
+                }
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine($"Synchronized initial state for {deviceStates.Count()} devices");
     }
 
     /// <summary>

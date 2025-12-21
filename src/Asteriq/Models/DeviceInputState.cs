@@ -116,6 +116,12 @@ public class PhysicalDeviceInfo
     public string HidDevicePath { get; set; } = string.Empty;
 
     /// <summary>
+    /// DirectInput instance GUID for this device.
+    /// Used for DirectInput-based input reading.
+    /// </summary>
+    public Guid DirectInputGuid { get; set; } = Guid.Empty;
+
+    /// <summary>
     /// Detailed axis information including types (from HID report descriptor).
     /// May be empty if HID info is not available.
     /// </summary>

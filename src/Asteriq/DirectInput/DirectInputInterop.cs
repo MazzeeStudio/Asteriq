@@ -57,9 +57,31 @@ internal static class DirectInputInterop
     public const int IDirectInput8_CreateDevice = 3;
 
     // IDirectInputDevice8 vtable indices
-    public const int IDirectInputDevice8_EnumObjects = 12;
-    public const int IDirectInputDevice8_GetCapabilities = 4;
     public const int IDirectInputDevice8_Release = 2;
+    public const int IDirectInputDevice8_GetCapabilities = 4;
+    public const int IDirectInputDevice8_SetDataFormat = 7;
+    public const int IDirectInputDevice8_SetCooperativeLevel = 13;
+    public const int IDirectInputDevice8_Acquire = 8;
+    public const int IDirectInputDevice8_Unacquire = 9;
+    public const int IDirectInputDevice8_GetDeviceState = 10;
+    public const int IDirectInputDevice8_Poll = 6;
+    public const int IDirectInputDevice8_EnumObjects = 12;
+
+    // Data format for joystick (c_dfDIJoystick2)
+    // We'll define a simplified DIJOYSTATE2 structure
+    public const int DIJOFS_X = 0;
+    public const int DIJOFS_Y = 4;
+    public const int DIJOFS_Z = 8;
+    public const int DIJOFS_RX = 12;
+    public const int DIJOFS_RY = 16;
+    public const int DIJOFS_RZ = 20;
+    public const int DIJOFS_SLIDER0 = 24;
+    public const int DIJOFS_SLIDER1 = 28;
+    public const int DIJOFS_POV0 = 32;
+    public const int DIJOFS_POV1 = 36;
+    public const int DIJOFS_POV2 = 40;
+    public const int DIJOFS_POV3 = 44;
+    public const int DIJOFS_BUTTON0 = 48;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct DIDEVICEINSTANCEW
@@ -125,6 +147,92 @@ internal static class DirectInputInterop
     public const int DIENUM_CONTINUE = 1;
     public const int DIENUM_STOP = 0;
     public const int DI_OK = 0;
+    public const int DIERR_INPUTLOST = unchecked((int)0x8007001E);
+    public const int DIERR_NOTACQUIRED = unchecked((int)0x8007000C);
+
+    // DIJOYSTATE2 - Extended joystick state (matches c_dfDIJoystick2)
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DIJOYSTATE2
+    {
+        public int lX;                    // X axis
+        public int lY;                    // Y axis
+        public int lZ;                    // Z axis
+        public int lRx;                   // X rotation
+        public int lRy;                   // Y rotation
+        public int lRz;                   // Z rotation
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public int[] rglSlider;           // 2 sliders
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public uint[] rgdwPOV;            // 4 POV hats
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
+        public byte[] rgbButtons;         // 128 buttons
+        public int lVX;                   // X velocity
+        public int lVY;                   // Y velocity
+        public int lVZ;                   // Z velocity
+        public int lVRx;                  // X rotation velocity
+        public int lVRy;                  // Y rotation velocity
+        public int lVRz;                  // Z rotation velocity
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public int[] rglVSlider;          // 2 slider velocities
+        public int lAX;                   // X acceleration
+        public int lAY;                   // Y acceleration
+        public int lAZ;                   // Z acceleration
+        public int lARx;                  // X rotation acceleration
+        public int lARy;                  // Y rotation acceleration
+        public int lARz;                  // Z rotation acceleration
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public int[] rglASlider;          // 2 slider accelerations
+        public int lFX;                   // X force
+        public int lFY;                   // Y force
+        public int lFZ;                   // Z force
+        public int lFRx;                  // X rotation force
+        public int lFRy;                  // Y rotation force
+        public int lFRz;                  // Z rotation force
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public int[] rglFSlider;          // 2 slider forces
+
+        public static DIJOYSTATE2 Create()
+        {
+            return new DIJOYSTATE2
+            {
+                rglSlider = new int[2],
+                rgdwPOV = new uint[4] { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF },
+                rgbButtons = new byte[128],
+                rglVSlider = new int[2],
+                rglASlider = new int[2],
+                rglFSlider = new int[2]
+            };
+        }
+    }
+
+    // DIOBJECTDATAFORMAT - Describes a single object in a data format
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DIOBJECTDATAFORMAT
+    {
+        public IntPtr pguid;     // Pointer to GUID (can be null)
+        public uint dwOfs;       // Offset in data packet
+        public uint dwType;      // Type of object (axis, button, etc.)
+        public uint dwFlags;     // Flags
+    }
+
+    // DIDATAFORMAT - Describes the data format for a device
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DIDATAFORMAT
+    {
+        public uint dwSize;      // Size of this structure
+        public uint dwObjSize;   // Size of DIOBJECTDATAFORMAT
+        public uint dwFlags;     // DIDF_ABSAXIS or DIDF_RELAXIS
+        public uint dwDataSize;  // Size of data packet
+        public uint dwNumObjs;   // Number of objects
+        public IntPtr rgodf;     // Pointer to array of DIOBJECTDATAFORMAT
+    }
+
+    // Data format flags
+    public const uint DIDF_ABSAXIS = 0x00000001;
+    public const uint DIDF_RELAXIS = 0x00000002;
+
+    // POV centered value
+    public const uint POV_CENTERED = 0xFFFFFFFF;
 }
 
 /// <summary>

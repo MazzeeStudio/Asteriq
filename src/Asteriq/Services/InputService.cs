@@ -1,11 +1,23 @@
 using SDL2;
 using Asteriq.Models;
+using Asteriq.DirectInput;
 using System.Collections.Concurrent;
 
 namespace Asteriq.Services;
 
 /// <summary>
-/// Handles physical device input using SDL2
+/// Input polling backend selection
+/// </summary>
+public enum InputPollingBackend
+{
+    /// <summary>Use SDL2 for input (simpler but less reliable for some devices)</summary>
+    SDL2,
+    /// <summary>Use DirectInput for input (more reliable for dual-role controls)</summary>
+    DirectInput
+}
+
+/// <summary>
+/// Handles physical device input using SDL2 or DirectInput
 /// </summary>
 public class InputService : IDisposable
 {
@@ -23,10 +35,20 @@ public class InputService : IDisposable
     private List<HidDeviceService.HidDeviceInfo>? _hidDevicesCache;
     private readonly HashSet<string> _matchedHidDevicePaths = new();
 
+    // DirectInput support
+    private DirectInputReader? _directInputReader;
+    private DirectInputService? _directInputService;
+    private readonly ConcurrentDictionary<int, Guid> _sdlToDirectInputGuid = new();
+
     /// <summary>
     /// When true, only fires InputReceived when state changes. Default: false (fire every poll)
     /// </summary>
     public bool OnlyFireOnChange { get; set; } = false;
+
+    /// <summary>
+    /// Input backend to use for reading device state. Default: DirectInput (more reliable)
+    /// </summary>
+    public InputPollingBackend InputBackend { get; set; } = InputPollingBackend.DirectInput;
 
     /// <summary>
     /// Fired when input state changes on any device
@@ -44,7 +66,7 @@ public class InputService : IDisposable
     public event EventHandler<int>? DeviceDisconnected;
 
     /// <summary>
-    /// Initialize SDL2 joystick subsystem
+    /// Initialize SDL2 joystick subsystem and DirectInput
     /// </summary>
     public bool Initialize()
     {
@@ -53,7 +75,7 @@ public class InputService : IDisposable
         if (SDL.SDL_Init(SDL.SDL_INIT_JOYSTICK) < 0)
         {
             var error = SDL.SDL_GetError();
-            Console.WriteLine($"SDL2 init failed: {error}");
+            System.Diagnostics.Debug.WriteLine($"SDL2 init failed: {error}");
             return false;
         }
 
@@ -67,8 +89,21 @@ public class InputService : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"HidSharp initialization failed (axis types will be unknown): {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"HidSharp initialization failed (axis types will be unknown): {ex.Message}");
             // Continue without HidSharp - we'll just not have axis type info
+        }
+
+        // Initialize DirectInput for input reading
+        try
+        {
+            _directInputService = new DirectInputService();
+            _directInputReader = new DirectInputReader();
+            System.Diagnostics.Debug.WriteLine("DirectInput initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"DirectInput initialization failed (will use SDL2): {ex.Message}");
+            InputBackend = InputPollingBackend.SDL2; // Fall back to SDL2
         }
 
         _isInitialized = true;
@@ -116,7 +151,16 @@ public class InputService : IDisposable
             {
                 // Update SDL state first
                 SDL.SDL_JoystickUpdate();
-                return ReadDeviceState(joystick, info);
+
+                // Poll DirectInput if using it
+                if (InputBackend == InputPollingBackend.DirectInput &&
+                    _directInputReader is not null &&
+                    _sdlToDirectInputGuid.TryGetValue(instanceId, out var diGuid))
+                {
+                    _directInputReader.PollDevice(diGuid);
+                }
+
+                return ReadDeviceState(instanceId, joystick, info);
             }
         }
 
@@ -158,7 +202,52 @@ public class InputService : IDisposable
         _deviceInfo[instanceId] = info;
         _knownInstanceIds.Add(instanceId);
 
+        // Map SDL device to DirectInput GUID for input reading
+        MapToDirectInput(instanceId, info);
+
         return (info, instanceId);
+    }
+
+    /// <summary>
+    /// Map SDL device to DirectInput GUID and open for DirectInput polling
+    /// </summary>
+    private void MapToDirectInput(int sdlInstanceId, PhysicalDeviceInfo info)
+    {
+        if (_directInputService is null || _directInputReader is null)
+            return;
+
+        try
+        {
+            // Enumerate DirectInput devices and find matching one by name
+            var diDevices = _directInputService.EnumerateDevices();
+
+            foreach (var diDevice in diDevices)
+            {
+                // Match by product name (more reliable than instance name)
+                if (DeviceNamesMatch(diDevice.ProductName, info.Name) ||
+                    DeviceNamesMatch(diDevice.InstanceName, info.Name))
+                {
+                    // Check if this DirectInput device is already mapped to another SDL device
+                    if (_sdlToDirectInputGuid.Values.Contains(diDevice.InstanceGuid))
+                        continue;
+
+                    _sdlToDirectInputGuid[sdlInstanceId] = diDevice.InstanceGuid;
+                    info.DirectInputGuid = diDevice.InstanceGuid;
+
+                    // Open the device for DirectInput reading
+                    _directInputReader.OpenDevice(diDevice.InstanceGuid);
+
+                    LogAxisTypes($"Mapped SDL device '{info.Name}' (instanceId={sdlInstanceId}) to DirectInput GUID {diDevice.InstanceGuid}");
+                    return;
+                }
+            }
+
+            LogAxisTypes($"No DirectInput match found for SDL device '{info.Name}'");
+        }
+        catch (Exception ex)
+        {
+            LogAxisTypes($"Failed to map SDL device to DirectInput: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -397,6 +486,15 @@ public class InputService : IDisposable
         // Check for newly connected devices
         CheckForNewDevices();
 
+        // Poll DirectInput devices if using DirectInput input source
+        if (InputBackend == InputPollingBackend.DirectInput && _directInputReader is not null)
+        {
+            foreach (var kvp in _sdlToDirectInputGuid)
+            {
+                _directInputReader.PollDevice(kvp.Value);
+            }
+        }
+
         foreach (var kvp in _openJoysticks)
         {
             int instanceId = kvp.Key;
@@ -412,7 +510,7 @@ public class InputService : IDisposable
             if (!_deviceInfo.TryGetValue(instanceId, out var info))
                 continue;
 
-            var state = ReadDeviceState(joystick, info);
+            var state = ReadDeviceState(instanceId, joystick, info);
 
             if (OnlyFireOnChange)
             {
@@ -456,9 +554,64 @@ public class InputService : IDisposable
     }
 
     /// <summary>
-    /// Read current state from a joystick
+    /// Read current state from a joystick using either SDL2 or DirectInput
     /// </summary>
-    private DeviceInputState ReadDeviceState(IntPtr joystick, PhysicalDeviceInfo info)
+    private DeviceInputState ReadDeviceState(int instanceId, IntPtr joystick, PhysicalDeviceInfo info)
+    {
+        // Use DirectInput if configured and available for this device
+        if (InputBackend == InputPollingBackend.DirectInput &&
+            _directInputReader is not null &&
+            _sdlToDirectInputGuid.TryGetValue(instanceId, out var diGuid))
+        {
+            return ReadDeviceStateDirectInput(diGuid, info);
+        }
+
+        // Fall back to SDL2
+        return ReadDeviceStateSDL(joystick, info);
+    }
+
+    /// <summary>
+    /// Read device state using DirectInput
+    /// </summary>
+    private DeviceInputState ReadDeviceStateDirectInput(Guid diGuid, PhysicalDeviceInfo info)
+    {
+        // Read axes
+        var axes = new float[info.AxisCount];
+        for (int i = 0; i < info.AxisCount; i++)
+        {
+            axes[i] = _directInputReader!.GetAxis(diGuid, i);
+        }
+
+        // Read buttons
+        var buttons = new bool[info.ButtonCount];
+        for (int i = 0; i < info.ButtonCount; i++)
+        {
+            buttons[i] = _directInputReader!.GetButton(diGuid, i);
+        }
+
+        // Read hats
+        var hats = new int[info.HatCount];
+        for (int i = 0; i < info.HatCount; i++)
+        {
+            hats[i] = _directInputReader!.GetPov(diGuid, i);
+        }
+
+        return new DeviceInputState
+        {
+            DeviceIndex = info.DeviceIndex,
+            DeviceName = info.Name,
+            InstanceGuid = info.InstanceGuid,
+            Timestamp = DateTime.UtcNow,
+            Axes = axes,
+            Buttons = buttons,
+            Hats = hats
+        };
+    }
+
+    /// <summary>
+    /// Read device state using SDL2
+    /// </summary>
+    private DeviceInputState ReadDeviceStateSDL(IntPtr joystick, PhysicalDeviceInfo info)
     {
         // Read axes (normalize from -32768..32767 to -1.0..1.0)
         var axes = new float[info.AxisCount];
@@ -569,6 +722,12 @@ public class InputService : IDisposable
             }
         }
 
+        // Close DirectInput device if mapped
+        if (_sdlToDirectInputGuid.TryRemove(instanceId, out var diGuid))
+        {
+            _directInputReader?.CloseDevice(diGuid);
+        }
+
         if (_openJoysticks.TryRemove(instanceId, out var joystick))
         {
             SDL.SDL_JoystickClose(joystick);
@@ -587,6 +746,12 @@ public class InputService : IDisposable
     public void Dispose()
     {
         StopPolling();
+
+        // Dispose DirectInput resources
+        _directInputReader?.Dispose();
+        _directInputReader = null;
+        _directInputService = null;
+        _sdlToDirectInputGuid.Clear();
 
         foreach (var joystick in _openJoysticks.Values)
         {

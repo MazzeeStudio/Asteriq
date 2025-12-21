@@ -23,6 +23,15 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+#if DEBUG
+        if (args.Contains("--map-editor"))
+        {
+            ApplicationConfiguration.Initialize();
+            Application.Run(new UI.DeviceMapEditorForm());
+            return;
+        }
+#endif
+
         if (args.Contains("--help") || args.Contains("-h") || args.Contains("/?"))
         {
             if (!AttachConsole(-1))

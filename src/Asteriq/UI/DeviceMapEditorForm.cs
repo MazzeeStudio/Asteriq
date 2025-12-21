@@ -192,21 +192,68 @@ public class DeviceMapEditorForm : Form
 
     private void SaveJsonFile()
     {
-        var mapsDir = Path.Combine(_imagesDir, "Maps");
-        if (!Directory.Exists(mapsDir))
-            Directory.CreateDirectory(mapsDir);
-
-        var path = Path.Combine(mapsDir, _jsonFileName);
-        var options = new JsonSerializerOptions
+        try
         {
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
+            string savePath;
 
-        var json = JsonSerializer.Serialize(_deviceMap, options);
-        File.WriteAllText(path, json);
-        _currentJsonPath = path;
-        _hasUnsavedChanges = false;
+            // If we have a current path from loading, use that directory
+            // Otherwise show save dialog
+            if (!string.IsNullOrEmpty(_currentJsonPath) && File.Exists(_currentJsonPath))
+            {
+                savePath = _currentJsonPath;
+            }
+            else
+            {
+                // Try to find source directory for Maps
+                var sourceDir = FindSourceMapsDirectory();
+
+                using var sfd = new SaveFileDialog
+                {
+                    Filter = "JSON files (*.json)|*.json",
+                    FileName = _jsonFileName,
+                    InitialDirectory = sourceDir ?? Path.Combine(_imagesDir, "Maps")
+                };
+
+                if (sfd.ShowDialog() != DialogResult.OK)
+                    return;
+
+                savePath = sfd.FileName;
+                _jsonFileName = Path.GetFileName(savePath);
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            var json = JsonSerializer.Serialize(_deviceMap, options);
+            File.WriteAllText(savePath, json);
+            _currentJsonPath = savePath;
+            _hasUnsavedChanges = false;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to save: {ex.Message}",
+                "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private string? FindSourceMapsDirectory()
+    {
+        // Try to find the source directory by walking up from bin folder
+        var dir = AppDomain.CurrentDomain.BaseDirectory;
+        for (int i = 0; i < 6; i++)
+        {
+            var parent = Directory.GetParent(dir);
+            if (parent is null) break;
+            dir = parent.FullName;
+
+            var srcPath = Path.Combine(dir, "src", "Asteriq", "Images", "Devices", "Maps");
+            if (Directory.Exists(srcPath))
+                return srcPath;
+        }
+        return null;
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -430,21 +477,30 @@ public class DeviceMapEditorForm : Form
             };
             canvas.DrawCircle(anchorScreen, radius, outlinePaint);
 
-            // Calculate label position
+            // Calculate label position (offset from anchor in viewbox coords)
             float labelX = control.Anchor.X + (control.LabelOffset?.X ?? 50);
             float labelY = control.Anchor.Y + (control.LabelOffset?.Y ?? 0);
             var labelScreen = ViewBoxToScreen(labelX, labelY);
 
-            // Draw lead line
-            DrawLeadLine(canvas, anchorScreen, labelScreen, control.LeadLine, isSelected);
-
-            // Draw label background
+            // Measure label text
             var labelText = control.Label ?? key;
             var labelBounds = MeasureText(labelText, 11f);
-            var labelRect = new SKRect(
-                labelScreen.X - 4, labelScreen.Y - labelBounds.Height - 2,
-                labelScreen.X + labelBounds.Width + 4, labelScreen.Y + 4);
+            float padding = 6f;
 
+            // Calculate label box - text position is top-left of text
+            var labelRect = new SKRect(
+                labelScreen.X - padding,
+                labelScreen.Y - padding,
+                labelScreen.X + labelBounds.Width + padding,
+                labelScreen.Y + labelBounds.Height + padding);
+
+            // Lead line connects to left edge center of label box
+            var leadLineEnd = new SKPoint(labelRect.Left, labelRect.MidY);
+
+            // Draw lead line (to left edge of label box)
+            DrawLeadLine(canvas, anchorScreen, leadLineEnd, control.LeadLine, isSelected);
+
+            // Draw label background
             using var labelBgPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
@@ -460,8 +516,11 @@ public class DeviceMapEditorForm : Form
             };
             canvas.DrawRoundRect(labelRect, 3, 3, labelFramePaint);
 
-            // Draw label text
-            FUIRenderer.DrawText(canvas, labelText, new SKPoint(labelScreen.X, labelScreen.Y),
+            // Draw label text (baseline adjusted)
+            using var textPaint = new SKPaint { TextSize = 11f, IsAntialias = true };
+            var metrics = textPaint.FontMetrics;
+            float textY = labelScreen.Y - metrics.Ascent; // Adjust for baseline
+            FUIRenderer.DrawText(canvas, labelText, new SKPoint(labelScreen.X, textY),
                 isSelected ? FUIColors.Active : FUIColors.TextPrimary, 11f);
         }
     }
@@ -989,9 +1048,11 @@ public class DeviceMapEditorForm : Form
 
     private SKRect MeasureText(string text, float size)
     {
-        using var paint = new SKPaint { TextSize = size };
+        using var paint = new SKPaint { TextSize = size, IsAntialias = true };
         var width = paint.MeasureText(text);
-        return new SKRect(0, 0, width, size);
+        var metrics = paint.FontMetrics;
+        var height = metrics.Descent - metrics.Ascent;
+        return new SKRect(0, 0, width, height);
     }
 
     #endregion

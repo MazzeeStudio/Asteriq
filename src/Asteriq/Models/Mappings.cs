@@ -584,6 +584,12 @@ public class MappingProfile
     /// <summary>User-defined device display order (list of device GUIDs)</summary>
     public List<string> DeviceOrder { get; set; } = new();
 
+    /// <summary>
+    /// Primary physical device for each vJoy slot (vJoy ID → physical device GUID).
+    /// Used to inherit device appearance/map for visualization.
+    /// </summary>
+    public Dictionary<uint, string> VJoyPrimaryDevices { get; set; } = new();
+
     /// <summary>When created</summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -613,6 +619,59 @@ public class MappingProfile
     public DeviceAssignment? GetAssignmentForVJoy(uint vJoyDevice)
     {
         return DeviceAssignments.FirstOrDefault(a => a.VJoyDevice == vJoyDevice);
+    }
+
+    /// <summary>Get the primary physical device GUID for a vJoy slot</summary>
+    public string? GetPrimaryDeviceForVJoy(uint vJoyDevice)
+    {
+        return VJoyPrimaryDevices.TryGetValue(vJoyDevice, out var guid) ? guid : null;
+    }
+
+    /// <summary>Set the primary physical device for a vJoy slot</summary>
+    public void SetPrimaryDeviceForVJoy(uint vJoyDevice, string? deviceGuid)
+    {
+        if (string.IsNullOrEmpty(deviceGuid))
+            VJoyPrimaryDevices.Remove(vJoyDevice);
+        else
+            VJoyPrimaryDevices[vJoyDevice] = deviceGuid;
+        ModifiedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Auto-detect primary device for a vJoy slot based on mapping count</summary>
+    public string? DetectPrimaryDeviceForVJoy(uint vJoyDevice)
+    {
+        var deviceCounts = new Dictionary<string, int>();
+
+        foreach (var m in AxisMappings.Where(m => m.Output.VJoyDevice == vJoyDevice))
+            foreach (var input in m.Inputs)
+                deviceCounts[input.DeviceId] = deviceCounts.GetValueOrDefault(input.DeviceId) + 1;
+
+        foreach (var m in ButtonMappings.Where(m => m.Output.VJoyDevice == vJoyDevice))
+            foreach (var input in m.Inputs)
+                deviceCounts[input.DeviceId] = deviceCounts.GetValueOrDefault(input.DeviceId) + 1;
+
+        foreach (var m in HatMappings.Where(m => m.Output.VJoyDevice == vJoyDevice))
+            foreach (var input in m.Inputs)
+                deviceCounts[input.DeviceId] = deviceCounts.GetValueOrDefault(input.DeviceId) + 1;
+
+        return deviceCounts.OrderByDescending(kv => kv.Value).FirstOrDefault().Key;
+    }
+
+    /// <summary>Update primary devices for all vJoy slots based on current mappings</summary>
+    public void UpdateAllPrimaryDevices()
+    {
+        // Get all vJoy slots that have mappings
+        var vJoySlots = AxisMappings.Select(m => m.Output.VJoyDevice)
+            .Concat(ButtonMappings.Select(m => m.Output.VJoyDevice))
+            .Concat(HatMappings.Select(m => m.Output.VJoyDevice))
+            .Distinct();
+
+        foreach (var slot in vJoySlots)
+        {
+            var detected = DetectPrimaryDeviceForVJoy(slot);
+            if (!string.IsNullOrEmpty(detected))
+                VJoyPrimaryDevices[slot] = detected;
+        }
     }
 
     /// <summary>

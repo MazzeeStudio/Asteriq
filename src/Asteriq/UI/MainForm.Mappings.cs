@@ -484,13 +484,15 @@ public partial class MainForm
             bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(150), 30f, 8f);
 
-        // If we have a selected binding with a device, show the device silhouette
-        // For now, show placeholder
+        // Show device silhouette - use primary device's map if available
         float centerX = bounds.MidX;
         float centerY = bounds.MidY;
 
-        // Draw the joystick SVG if available - use same brightness as device tab
-        if (_joystickSvg?.Picture is not null)
+        // Get the appropriate SVG based on primary device map
+        var svg = GetSvgForDeviceMap(_mappingsPrimaryDeviceMap) ?? _joystickSvg;
+        bool shouldMirror = _mappingsPrimaryDeviceMap?.Mirror ?? false;
+
+        if (svg?.Picture is not null)
         {
             // Limit size to 900px max and apply same rendering as device tab
             float maxSize = 900f;
@@ -507,9 +509,7 @@ public partial class MainForm
                 centerY + constrainedHeight / 2
             );
 
-            // Mappings tab always shows joystick SVG (vJoy is a virtual joystick)
-            // Don't use _deviceMap here - that's for the Devices tab context
-            DrawSvgInBounds(canvas, _joystickSvg, constrainedBounds, false);
+            DrawSvgInBounds(canvas, svg, constrainedBounds, shouldMirror);
         }
         else
         {
@@ -3362,6 +3362,7 @@ public partial class MainForm
         }
 
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
         CloseMappingEditor();
     }
 
@@ -3534,6 +3535,7 @@ public partial class MainForm
 
         // Save the profile
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
 
         // Refresh profiles list
         _profiles = _profileService.ListProfiles();
@@ -3829,6 +3831,7 @@ public partial class MainForm
         int hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
 
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
 
         FUIMessageBox.ShowInfo(this,
             $"Removed {axisRemoved} axis, {buttonRemoved} button, and {hatRemoved} hat mappings.",
@@ -3869,6 +3872,7 @@ public partial class MainForm
             buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
             hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
             _profileService.SaveActiveProfile();
+            OnMappingsChanged();
         }
 
         // Remove from disconnected devices list
@@ -3938,6 +3942,7 @@ public partial class MainForm
         }
 
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
     }
 
     private void RemoveBindingAtRow(int rowIndex, bool save = true)
@@ -3978,6 +3983,7 @@ public partial class MainForm
         if (save)
         {
             _profileService.SaveActiveProfile();
+            OnMappingsChanged();
         }
     }
 
@@ -4241,6 +4247,7 @@ public partial class MainForm
                 profile.ButtonMappings.Add(mapping);
                 profile.ModifiedAt = DateTime.UtcNow;
                 _profileService.SaveActiveProfile();
+                OnMappingsChanged();
 
                 // Update the pending input so UI can show it
                 _pendingInput = detected;
@@ -4369,6 +4376,7 @@ public partial class MainForm
 
         profile.ModifiedAt = DateTime.UtcNow;
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
         _pendingInput = null;
     }
 
@@ -4422,6 +4430,7 @@ public partial class MainForm
 
         profile.ModifiedAt = DateTime.UtcNow;
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
     }
 
     private void LoadOutputTypeStateForRow()
@@ -4594,6 +4603,7 @@ public partial class MainForm
             profile.ButtonMappings.Remove(mapping);
             profile.ModifiedAt = DateTime.UtcNow;
             _profileService.SaveActiveProfile();
+            OnMappingsChanged();
 
             // Reset UI state
             _selectedKeyName = "";
@@ -4870,6 +4880,7 @@ public partial class MainForm
 
             // Save the profile
             _profileService.SaveActiveProfile();
+            OnMappingsChanged();
         }
     }
 
@@ -4955,6 +4966,7 @@ public partial class MainForm
 
             // Save the profile
             _profileService.SaveActiveProfile();
+            OnMappingsChanged();
         }
     }
 

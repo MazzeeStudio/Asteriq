@@ -108,9 +108,12 @@ public partial class MainForm
                 }
 
                 string status = filteredDevices[i].IsConnected ? "ONLINE" : "DISCONNECTED";
-                string vjoyAssignment = GetVJoyAssignmentForDevice(filteredDevices[i]);
+                // For physical devices show vJoy assignment, for virtual devices show primary device
+                string assignment = filteredDevices[i].IsVirtual
+                    ? GetPrimaryDeviceForVJoyDevice(filteredDevices[i])
+                    : GetVJoyAssignmentForDevice(filteredDevices[i]);
                 DrawDeviceListItem(canvas, contentBounds.Left + pad - 10, itemY, contentBounds.Width - pad,
-                    filteredDevices[i].Name, status, actualIndex == _selectedDevice, actualIndex == _hoveredDevice, vjoyAssignment);
+                    filteredDevices[i].Name, status, actualIndex == _selectedDevice, actualIndex == _hoveredDevice, assignment);
                 itemY += itemHeight + itemGap;
             }
 
@@ -119,7 +122,9 @@ public partial class MainForm
             {
                 var draggedDevice = _devices[_dragDeviceIndex];
                 string status = draggedDevice.IsConnected ? "ONLINE" : "DISCONNECTED";
-                string vjoyAssignment = GetVJoyAssignmentForDevice(draggedDevice);
+                string assignment = draggedDevice.IsVirtual
+                    ? GetPrimaryDeviceForVJoyDevice(draggedDevice)
+                    : GetVJoyAssignmentForDevice(draggedDevice);
 
                 // Draw with transparency at cursor position
                 canvas.Save();
@@ -128,7 +133,7 @@ public partial class MainForm
                 using var ghostPaint = new SKPaint { Color = SKColors.White.WithAlpha(180) };
                 DrawDeviceListItem(canvas, contentBounds.Left + pad - 10,
                     _deviceItemBounds.Count > 0 ? _deviceItemBounds[0].Top + (_dragDeviceIndex * (itemHeight + itemGap)) : contentBounds.Top + 50,
-                    contentBounds.Width - pad, draggedDevice.Name, status, true, false, vjoyAssignment);
+                    contentBounds.Width - pad, draggedDevice.Name, status, true, false, assignment);
                 canvas.Restore();
             }
         }
@@ -1088,6 +1093,44 @@ public partial class MainForm
         if (vjoyIds.Count == 0) return "";
         if (vjoyIds.Count == 1) return $"VJOY:{vjoyIds.First()}";
         return $"VJOY:{string.Join(",", vjoyIds.OrderBy(x => x))}";
+    }
+
+    /// <summary>
+    /// Get the primary physical device name for a virtual (vJoy) device
+    /// </summary>
+    private string GetPrimaryDeviceForVJoyDevice(PhysicalDeviceInfo vjoyDevice)
+    {
+        if (!vjoyDevice.IsVirtual) return "";
+
+        var profile = _profileService.ActiveProfile;
+        if (profile is null) return "";
+
+        // Extract vJoy ID from device name (e.g., "vJoy Device 1" -> 1)
+        uint vjoyId = 0;
+        var match = System.Text.RegularExpressions.Regex.Match(vjoyDevice.Name, @"\d+");
+        if (match.Success && uint.TryParse(match.Value, out uint parsedId))
+        {
+            vjoyId = parsedId;
+        }
+
+        if (vjoyId == 0) return "";
+
+        // Get the primary physical device GUID for this vJoy slot
+        var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyId);
+        if (string.IsNullOrEmpty(primaryGuid)) return "";
+
+        // Find the physical device by GUID
+        var primaryDevice = _devices.FirstOrDefault(d =>
+            !d.IsVirtual && d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
+
+        if (primaryDevice is null) return "";
+
+        // Return a shortened name for display
+        string name = primaryDevice.Name;
+        if (name.Length > 20)
+            name = name.Substring(0, 17) + "...";
+
+        return $"→ {name}";
     }
 
     #endregion

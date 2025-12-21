@@ -119,6 +119,7 @@ public partial class MainForm : Form
 
     // Device mapping and active input tracking
     private DeviceMap? _deviceMap;
+    private DeviceMap? _mappingsPrimaryDeviceMap; // Device map for Mappings tab based on vJoy primary device
     private readonly ActiveInputTracker _activeInputTracker = new();
 
     // Mappings tab UI state - Left panel (output list)
@@ -443,6 +444,10 @@ public partial class MainForm : Form
         _profileService.Initialize();
         RefreshProfileList();
 
+        // Initialize primary devices for loaded profile
+        _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
+        UpdateMappingsPrimaryDeviceMap();
+
         // Apply font size setting
         FUIRenderer.FontSizeOption = _profileService.FontSize;
 
@@ -532,6 +537,8 @@ public partial class MainForm : Form
         if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
         {
             _profileService.CreateAndActivateProfile(textBox.Text.Trim());
+            // New profile has no mappings yet, but initialize primary device tracking
+            UpdateMappingsPrimaryDeviceMap();
             RefreshProfileList();
         }
     }
@@ -552,6 +559,9 @@ public partial class MainForm : Form
             if (imported is not null)
             {
                 _profileService.ActivateProfile(imported.Id);
+                // Initialize primary devices for imported profile
+                _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
+                UpdateMappingsPrimaryDeviceMap();
                 RefreshProfileList();
             }
             else
@@ -702,6 +712,130 @@ public partial class MainForm : Form
         var defaultMapPath2 = Path.Combine(mapsDir, "joystick.json");
         _deviceMap = DeviceMap.Load(defaultMapPath2);
         System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json");
+    }
+
+    /// <summary>
+    /// Load device map by name and return it (doesn't modify _deviceMap field)
+    /// </summary>
+    private DeviceMap? LoadDeviceMapByName(string? deviceName)
+    {
+        var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+
+        if (!string.IsNullOrEmpty(deviceName))
+        {
+            var allMaps = new List<(string path, DeviceMap map)>();
+            foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
+            {
+                if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var map = DeviceMap.Load(mapFile);
+                if (map is not null)
+                    allMaps.Add((mapFile, map));
+            }
+
+            // Try exact device name match
+            foreach (var (path, map) in allMaps)
+            {
+                if (!string.IsNullOrEmpty(map.Device) &&
+                    !map.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (deviceName.Contains(map.Device, StringComparison.OrdinalIgnoreCase) ||
+                        map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return map;
+                    }
+                }
+            }
+
+            // Try device type match
+            string detectedType = DetectDeviceType(deviceName);
+            if (detectedType != "Joystick")
+            {
+                foreach (var (path, map) in allMaps)
+                {
+                    if (map.DeviceType.Equals(detectedType, StringComparison.OrdinalIgnoreCase))
+                        return map;
+                }
+            }
+
+            // Check left-hand and apply mirror
+            bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
+                              deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
+                              deviceName.EndsWith(" L", StringComparison.OrdinalIgnoreCase);
+
+            var defaultMap = DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
+            if (defaultMap is not null && isLeftHand)
+                defaultMap.Mirror = true;
+            return defaultMap;
+        }
+
+        return DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
+    }
+
+    /// <summary>
+    /// Get the appropriate SVG for a given device map
+    /// </summary>
+    private SKSvg? GetSvgForDeviceMap(DeviceMap? map)
+    {
+        if (map is null)
+            return _joystickSvg;
+
+        var svgFile = map.SvgFile?.ToLowerInvariant() ?? "";
+        if (svgFile.Contains("throttle"))
+            return _throttleSvg ?? _joystickSvg;
+
+        return _joystickSvg;
+    }
+
+    /// <summary>
+    /// Update the device map used for Mappings tab visualization based on vJoy primary device
+    /// </summary>
+    private void UpdateMappingsPrimaryDeviceMap()
+    {
+        _mappingsPrimaryDeviceMap = null;
+
+        // Ensure vJoy devices are populated
+        if (_vjoyDevices.Count == 0 && _vjoyService.IsInitialized)
+        {
+            _vjoyDevices = _vjoyService.EnumerateDevices();
+        }
+
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
+            return;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        var profile = _profileService.ActiveProfile;
+        if (profile is null)
+            return;
+
+        var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyDevice.Id);
+        if (string.IsNullOrEmpty(primaryGuid))
+            return;
+
+        // Find the physical device by GUID
+        var primaryDevice = _devices.FirstOrDefault(d =>
+            d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
+
+        if (primaryDevice is not null)
+        {
+            _mappingsPrimaryDeviceMap = LoadDeviceMapByName(primaryDevice.Name);
+        }
+    }
+
+    /// <summary>
+    /// Called when mappings are created or removed to update primary device detection
+    /// </summary>
+    private void OnMappingsChanged()
+    {
+        var profile = _profileService.ActiveProfile;
+        if (profile is null)
+            return;
+
+        // Re-detect primary devices for all vJoy slots based on current mappings
+        profile.UpdateAllPrimaryDevices();
+
+        // Refresh the visualization map for current vJoy device
+        UpdateMappingsPrimaryDeviceMap();
     }
 
     /// <summary>
@@ -2329,6 +2463,9 @@ public partial class MainForm : Form
                 {
                     // Select existing profile
                     _profileService.ActivateProfile(_profiles[_hoveredProfileIndex].Id);
+                    // Initialize primary devices for migration of old profiles
+                    _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
+                    UpdateMappingsPrimaryDeviceMap();
                     _profileDropdownOpen = false;
                     return;
                 }
@@ -2508,6 +2645,7 @@ public partial class MainForm : Form
                             _highlightPrevButtonState.Clear();
                             _highlightDebounce.Clear();
                             _highlightedMappingRow = -1;
+                            UpdateMappingsPrimaryDeviceMap();
                         }
                     }
                     _activeTab = i;
@@ -2671,6 +2809,7 @@ public partial class MainForm : Form
                 _selectedMappingRow = -1;
                 _bindingsScrollOffset = 0; // Reset scroll when changing device
                 CancelInputListening();
+                UpdateMappingsPrimaryDeviceMap();
                 return;
             }
             if (_vjoyNextHovered && _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1)
@@ -2679,6 +2818,7 @@ public partial class MainForm : Form
                 _selectedMappingRow = -1;
                 _bindingsScrollOffset = 0; // Reset scroll when changing device
                 CancelInputListening();
+                UpdateMappingsPrimaryDeviceMap();
                 return;
             }
 

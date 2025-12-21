@@ -1,7 +1,7 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VPC Alpha Prime Grip - R",
+  "device": "Alpha-R",
   "vidPid": "3344:0194",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",
@@ -53,7 +53,7 @@
       "bindings": ["button8", "button9", "button10", "button11", "button12"],
       "label": "Top Hat",
       "description": "5-way top hat: Center=button8, Up=button9, Left=button10, Down=button11, Right=button12",
-      "anchor": { "x": 900, "y": 180 },
+      "anchor": { "x": 620, "y": 180 },
       "labelOffset": { "x": 120, "y": -50 }
     },
     "castle_left": {
@@ -129,9 +129,9 @@
       "id": "control_slider",
       "type": "Slider",
       "bindings": ["slider1", "button32"],
-      "label": "Brake Lever",
+      "label": "Slider",
       "description": "Analog brake lever + button: Axis=slider1, Button=button32",
-      "anchor": { "x": 900, "y": 680 },
+      "anchor": { "x": 645, "y": 600 },
       "labelOffset": { "x": 100, "y": 40 }
     }
   }

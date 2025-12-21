@@ -1,7 +1,7 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VPC Alpha Prime Grip - L",
+  "device": "Alpha-L",
   "vidPid": "3344:8194",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",

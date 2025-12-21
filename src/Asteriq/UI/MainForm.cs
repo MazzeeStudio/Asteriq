@@ -638,7 +638,6 @@ public partial class MainForm : Form
                         map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
-                        System.Diagnostics.Debug.WriteLine($"Loaded device map (name match): {path} for device: {deviceName}");
                         return;
                     }
                 }
@@ -672,11 +671,6 @@ public partial class MainForm : Form
             {
                 // Override mirror setting for left-hand devices using generic map
                 _deviceMap.Mirror = true;
-                System.Diagnostics.Debug.WriteLine($"Loaded default device map with MIRROR for left-hand device: {deviceName}");
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json for device: {deviceName}");
             }
             return;
         }

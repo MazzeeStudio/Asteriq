@@ -468,8 +468,12 @@ public class DeviceMapEditorForm : Form
 
     private void DrawLeadLine(SKCanvas canvas, SKPoint anchor, SKPoint label, LeadLineDefinition? leadLine, bool selected)
     {
-        // Clear segment handle positions
-        _segmentEndHandles.Clear();
+        // Only track handle positions for the selected control
+        if (selected)
+        {
+            _segmentEndHandles.Clear();
+            _shelfEndHandle = default;
+        }
 
         using var linePaint = new SKPaint
         {
@@ -483,7 +487,6 @@ public class DeviceMapEditorForm : Form
         {
             // Simple straight line
             canvas.DrawLine(anchor, label, linePaint);
-            _shelfEndHandle = default;
             return;
         }
 
@@ -497,8 +500,11 @@ public class DeviceMapEditorForm : Form
         var shelfEnd = new SKPoint(shelfEndX, anchor.Y);
         path.LineTo(shelfEnd);
 
-        // Store shelf end handle position
-        _shelfEndHandle = shelfEnd;
+        // Store shelf end handle position (only for selected)
+        if (selected)
+        {
+            _shelfEndHandle = shelfEnd;
+        }
 
         // Additional segments
         var currentPoint = shelfEnd;
@@ -515,8 +521,11 @@ public class DeviceMapEditorForm : Form
                 currentPoint = new SKPoint(currentPoint.X + dx, currentPoint.Y + dy);
                 path.LineTo(currentPoint);
 
-                // Store segment end handle position
-                _segmentEndHandles.Add(currentPoint);
+                // Store segment end handle position (only for selected)
+                if (selected)
+                {
+                    _segmentEndHandles.Add(currentPoint);
+                }
             }
         }
 
@@ -848,10 +857,28 @@ public class DeviceMapEditorForm : Form
         var countText = $"Controls: {_deviceMap.Controls.Count}";
         FUIRenderer.DrawText(canvas, countText, new SKPoint(420, _statusBarBounds.Top + 18), FUIColors.TextDim, 10f);
 
-        // Help hint
-        var helpText = _selectedControlKey is not null
-            ? "Shift+Click to reposition anchor"
-            : "Click on SVG to add control";
+        // Help hint - context sensitive
+        string helpText;
+        if (_selectedControlKey is not null)
+        {
+            // Check if hovering over a segment handle
+            bool hoveringSegment = false;
+            for (int i = 0; i < _segmentEndHandles.Count; i++)
+            {
+                if (SKPoint.Distance(_segmentEndHandles[i], _mousePos) < HandleHitRadius)
+                {
+                    hoveringSegment = true;
+                    break;
+                }
+            }
+            helpText = hoveringSegment
+                ? "Drag to move, Right-click to remove"
+                : "Shift+Click to reposition anchor";
+        }
+        else
+        {
+            helpText = "Click on SVG to add control";
+        }
         FUIRenderer.DrawText(canvas, helpText, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.TextDisabled, 10f);
     }
 
@@ -1138,6 +1165,27 @@ public class DeviceMapEditorForm : Form
         {
             Close();
             return;
+        }
+
+        // Right-click on segment handles to remove them
+        if (e.Button == MouseButtons.Right && _svgPanelBounds.Contains(pt) &&
+            _selectedControlKey is not null &&
+            _deviceMap.Controls.TryGetValue(_selectedControlKey, out var control) &&
+            control.LeadLine?.Segments is not null)
+        {
+            for (int i = 0; i < _segmentEndHandles.Count; i++)
+            {
+                float segDist = SKPoint.Distance(_segmentEndHandles[i], _mousePos);
+                if (segDist < HandleHitRadius)
+                {
+                    // Remove this segment
+                    control.LeadLine.Segments.RemoveAt(i);
+                    if (control.LeadLine.Segments.Count == 0)
+                        control.LeadLine.Segments = null;
+                    _hasUnsavedChanges = true;
+                    return;
+                }
+            }
         }
 
         // SVG dropdown

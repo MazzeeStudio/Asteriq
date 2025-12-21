@@ -95,6 +95,10 @@ public class DeviceMapEditorForm : Form
     // Text input state (simple focus tracking)
     private string _jsonFileName = "new_device.json";
 
+    // Save status for footer display
+    private string? _lastSaveMessage;
+    private DateTime _lastSaveTime;
+
     // Window dragging
     private bool _isDragging = false;
     private Point _dragStart;
@@ -238,10 +242,8 @@ public class DeviceMapEditorForm : Form
             File.WriteAllText(savePath, json);
             _currentJsonPath = savePath;
             _hasUnsavedChanges = false;
-
-            // Debug: Show what was saved
-            MessageBox.Show($"Saved to:\n{savePath}\n\nFile size: {new FileInfo(savePath).Length} bytes",
-                "Save Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _lastSaveMessage = $"Saved to {Path.GetFileName(savePath)}";
+            _lastSaveTime = DateTime.Now;
         }
         catch (Exception ex)
         {
@@ -497,6 +499,10 @@ public class DeviceMapEditorForm : Form
             var labelText = control.Label ?? key;
             var labelBounds = MeasureText(labelText, 11f);
             float padding = 6f;
+            float shelfLength = 10f;
+
+            // Determine if anchor is to the left or right of the label
+            bool anchorOnLeft = anchorScreen.X < labelScreen.X;
 
             // Calculate label box - text position is top-left of text
             var labelRect = new SKRect(
@@ -505,11 +511,33 @@ public class DeviceMapEditorForm : Form
                 labelScreen.X + labelBounds.Width + padding,
                 labelScreen.Y + labelBounds.Height + padding);
 
-            // Lead line connects to left edge center of label box
-            var leadLineEnd = new SKPoint(labelRect.Left, labelRect.MidY);
+            // Shelf extends horizontally from the appropriate side of the label box
+            SKPoint shelfStart, shelfEnd;
+            if (anchorOnLeft)
+            {
+                // Shelf extends left from left edge of label box
+                shelfStart = new SKPoint(labelRect.Left, labelRect.MidY);
+                shelfEnd = new SKPoint(labelRect.Left - shelfLength, labelRect.MidY);
+            }
+            else
+            {
+                // Shelf extends right from right edge of label box
+                shelfStart = new SKPoint(labelRect.Right, labelRect.MidY);
+                shelfEnd = new SKPoint(labelRect.Right + shelfLength, labelRect.MidY);
+            }
 
-            // Draw lead line (to left edge of label box)
-            DrawLeadLine(canvas, anchorScreen, leadLineEnd, control.LeadLine, isSelected);
+            // Draw lead line (connects to end of shelf)
+            DrawLeadLine(canvas, anchorScreen, shelfEnd, control.LeadLine, isSelected);
+
+            // Draw the shelf connector line
+            using var shelfPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = isSelected ? FUIColors.Active : FUIColors.Primary.WithAlpha(150),
+                StrokeWidth = isSelected ? 2f : 1f,
+                IsAntialias = true
+            };
+            canvas.DrawLine(shelfStart, shelfEnd, shelfPaint);
 
             // Draw label background
             using var labelBgPaint = new SKPaint
@@ -929,29 +957,37 @@ public class DeviceMapEditorForm : Form
         var countText = $"Controls: {_deviceMap.Controls.Count}";
         FUIRenderer.DrawText(canvas, countText, new SKPoint(420, _statusBarBounds.Top + 18), FUIColors.TextDim, 10f);
 
-        // Help hint - context sensitive
-        string helpText;
-        if (_selectedControlKey is not null)
+        // Show save message for 3 seconds, otherwise show help hint
+        if (_lastSaveMessage is not null && (DateTime.Now - _lastSaveTime).TotalSeconds < 3)
         {
-            // Check if hovering over a segment handle
-            bool hoveringSegment = false;
-            for (int i = 0; i < _segmentEndHandles.Count; i++)
-            {
-                if (SKPoint.Distance(_segmentEndHandles[i], _mousePos) < HandleHitRadius)
-                {
-                    hoveringSegment = true;
-                    break;
-                }
-            }
-            helpText = hoveringSegment
-                ? "Drag to move, Right-click to remove"
-                : "Shift+Click to reposition anchor";
+            FUIRenderer.DrawText(canvas, _lastSaveMessage, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.Active, 10f);
         }
         else
         {
-            helpText = "Click on SVG to add control";
+            // Help hint - context sensitive
+            string helpText;
+            if (_selectedControlKey is not null)
+            {
+                // Check if hovering over a segment handle
+                bool hoveringSegment = false;
+                for (int i = 0; i < _segmentEndHandles.Count; i++)
+                {
+                    if (SKPoint.Distance(_segmentEndHandles[i], _mousePos) < HandleHitRadius)
+                    {
+                        hoveringSegment = true;
+                        break;
+                    }
+                }
+                helpText = hoveringSegment
+                    ? "Drag to move, Right-click to remove"
+                    : "Shift+Click to reposition anchor";
+            }
+            else
+            {
+                helpText = "Click on SVG to add control";
+            }
+            FUIRenderer.DrawText(canvas, helpText, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.TextDisabled, 10f);
         }
-        FUIRenderer.DrawText(canvas, helpText, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.TextDisabled, 10f);
     }
 
     private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
@@ -1059,7 +1095,9 @@ public class DeviceMapEditorForm : Form
 
     private SKRect MeasureText(string text, float size)
     {
-        using var paint = new SKPaint { TextSize = size, IsAntialias = true };
+        // Use the same scaled size as FUIRenderer.DrawText
+        float scaledSize = FUIRenderer.ScaleFont(size);
+        using var paint = new SKPaint { TextSize = scaledSize, IsAntialias = true };
         var width = paint.MeasureText(text);
         var metrics = paint.FontMetrics;
         var height = metrics.Descent - metrics.Ascent;

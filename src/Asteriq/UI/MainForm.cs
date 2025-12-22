@@ -218,6 +218,10 @@ public partial class MainForm : Form
     private bool _clearAllButtonHovered;
     private int _hoveredInputSourceRemove = -1;
 
+    // Merge operation selector (for axes with multiple inputs)
+    private SKRect[] _mergeOpButtonBounds = new SKRect[4]; // Average, Maximum, Minimum, Sum
+    private int _hoveredMergeOpButton = -1;
+
     // Mapping editor - action buttons
     private SKRect _saveButtonBounds;
     private SKRect _cancelButtonBounds;
@@ -1996,6 +2000,7 @@ public partial class MainForm : Form
             _addInputButtonHovered = false;
             _clearAllButtonHovered = false;
             _hoveredInputSourceRemove = -1;
+            _hoveredMergeOpButton = -1;
 
             // Right panel: Add input button
             if (_addInputButtonBounds.Contains(e.X, e.Y))
@@ -2013,6 +2018,20 @@ public partial class MainForm : Form
                     _hoveredInputSourceRemove = i;
                     Cursor = Cursors.Hand;
                     return;
+                }
+            }
+
+            // Right panel: Merge operation buttons (for axis category with 2+ inputs)
+            if (_mappingCategory == 1 && _selectedMappingRow >= 0)
+            {
+                for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
+                {
+                    if (!_mergeOpButtonBounds[i].IsEmpty && _mergeOpButtonBounds[i].Contains(e.X, e.Y))
+                    {
+                        _hoveredMergeOpButton = i;
+                        Cursor = Cursors.Hand;
+                        return;
+                    }
                 }
             }
 
@@ -2688,6 +2707,13 @@ public partial class MainForm : Form
             if (_hoveredInputSourceRemove >= 0)
             {
                 RemoveInputSourceAtIndex(_hoveredInputSourceRemove);
+                return;
+            }
+
+            // Right panel: Merge operation selection (axis category with 2+ inputs)
+            if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _hoveredMergeOpButton >= 0)
+            {
+                UpdateMergeOperationForSelected(_hoveredMergeOpButton);
                 return;
             }
 

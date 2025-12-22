@@ -2856,8 +2856,9 @@ public partial class MainForm : Form
                     // Selecting a different row - cancel listening
                     CancelInputListening();
                     _selectedMappingRow = _hoveredMappingRow;
-                    // Load output type state for button rows
-                    LoadOutputTypeStateForRow();
+                    // Load settings for the selected row
+                    LoadOutputTypeStateForRow();  // For buttons
+                    LoadAxisSettingsForRow();     // For axes
                 }
                 else
                 {
@@ -2991,6 +2992,7 @@ public partial class MainForm : Form
         {
             _draggingCurvePoint = -1;
             _draggingDeadzoneHandle = -1;
+            SaveAxisSettingsForRow();  // Persist curve/deadzone changes
             _canvas.Invalidate();
         }
 

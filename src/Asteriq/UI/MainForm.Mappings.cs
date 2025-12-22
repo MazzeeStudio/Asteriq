@@ -2341,6 +2341,7 @@ public partial class MainForm
                     };
                 }
 
+                SaveAxisSettingsForRow();  // Persist curve type change
                 _canvas.Invalidate();
                 return true;
             }
@@ -2350,6 +2351,7 @@ public partial class MainForm
         if (_invertToggleBounds.Contains(pt))
         {
             _axisInverted = !_axisInverted;
+            SaveAxisSettingsForRow();  // Persist invert change
             _canvas.Invalidate();
             return true;
         }
@@ -2363,6 +2365,7 @@ public partial class MainForm
                 // When enabling symmetry, mirror existing points around center
                 MakeCurveSymmetrical();
             }
+            SaveAxisSettingsForRow();  // Persist symmetry change
             _canvas.Invalidate();
             return true;
         }
@@ -2388,6 +2391,7 @@ public partial class MainForm
                 if (_selectedDeadzoneHandle == 1 || _selectedDeadzoneHandle == 2)
                     _selectedDeadzoneHandle = -1;
             }
+            SaveAxisSettingsForRow();  // Persist center deadzone change
             _canvas.Invalidate();
             return true;
         }
@@ -2419,6 +2423,7 @@ public partial class MainForm
                             _deadzoneMax = 1.0f - presetVal;
                             break;
                     }
+                    SaveAxisSettingsForRow();  // Persist deadzone preset change
                     _canvas.Invalidate();
                     return true;
                 }
@@ -4543,6 +4548,93 @@ public partial class MainForm
             _profileService.SaveActiveProfile();
         }
         OnMappingsChanged();
+    }
+
+    private void LoadAxisSettingsForRow()
+    {
+        // Reset to defaults
+        _selectedCurveType = CurveType.Linear;
+        _curveControlPoints = new List<SKPoint> { new(0, 0), new(1, 1) };
+        _curveSymmetrical = false;
+        _deadzoneMin = -1.0f;
+        _deadzoneCenterMin = 0.0f;
+        _deadzoneCenterMax = 0.0f;
+        _deadzoneMax = 1.0f;
+        _deadzoneCenterEnabled = false;
+        _axisInverted = false;
+
+        // Only for axis category
+        if (_mappingCategory != 1) return;
+        if (_selectedMappingRow < 0) return;
+
+        var axisMapping = GetCurrentAxisMapping();
+        if (axisMapping is null) return;
+
+        // Load curve settings from mapping
+        var curve = axisMapping.Curve;
+        _selectedCurveType = curve.Type;
+        _curveSymmetrical = curve.Symmetrical;
+        _axisInverted = axisMapping.Invert;
+
+        // Load deadzone settings
+        _deadzoneMin = curve.DeadzoneLow;
+        _deadzoneCenterMin = curve.DeadzoneCenterLow;
+        _deadzoneCenterMax = curve.DeadzoneCenterHigh;
+        _deadzoneMax = curve.DeadzoneHigh;
+        _deadzoneCenterEnabled = curve.DeadzoneCenterLow != 0 || curve.DeadzoneCenterHigh != 0;
+
+        // Load control points for custom curve
+        if (curve.Type == CurveType.Custom && curve.ControlPoints is not null && curve.ControlPoints.Count >= 2)
+        {
+            _curveControlPoints = curve.ControlPoints.Select(p => new SKPoint(p.Input, p.Output)).ToList();
+        }
+        else
+        {
+            // Generate default control points based on curve type
+            _curveControlPoints = curve.Type switch
+            {
+                CurveType.SCurve => new List<SKPoint> { new(0, 0), new(0.25f, 0.1f), new(0.75f, 0.9f), new(1, 1) },
+                CurveType.Exponential => new List<SKPoint> { new(0, 0), new(0.5f, 0.25f), new(1, 1) },
+                _ => new List<SKPoint> { new(0, 0), new(1, 1) }
+            };
+        }
+    }
+
+    private void SaveAxisSettingsForRow()
+    {
+        // Only for axis category
+        if (_mappingCategory != 1) return;
+        if (_selectedMappingRow < 0) return;
+
+        var axisMapping = GetCurrentAxisMapping();
+        if (axisMapping is null) return;
+
+        // Save curve settings to mapping
+        axisMapping.Curve.Type = _selectedCurveType;
+        axisMapping.Curve.Symmetrical = _curveSymmetrical;
+        axisMapping.Invert = _axisInverted;
+
+        // Save deadzone settings
+        axisMapping.Curve.DeadzoneLow = _deadzoneMin;
+        axisMapping.Curve.DeadzoneCenterLow = _deadzoneCenterEnabled ? _deadzoneCenterMin : 0f;
+        axisMapping.Curve.DeadzoneCenterHigh = _deadzoneCenterEnabled ? _deadzoneCenterMax : 0f;
+        axisMapping.Curve.DeadzoneHigh = _deadzoneMax;
+
+        // Save control points for custom curve
+        if (_selectedCurveType == CurveType.Custom)
+        {
+            axisMapping.Curve.ControlPoints = _curveControlPoints
+                .Select(p => new CurvePoint(p.X, p.Y))
+                .ToList();
+        }
+
+        // Persist
+        var profile = _profileService.ActiveProfile;
+        if (profile is not null)
+        {
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+        }
     }
 
     private void LoadOutputTypeStateForRow()

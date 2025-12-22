@@ -82,7 +82,7 @@ public class FUICurveEditor : UserControl
     {
         if (_curve.Type == CurveType.Custom && _curve.ControlPoints is not null && _curve.ControlPoints.Count >= 2)
         {
-            _controlPoints = _curve.ControlPoints.Select(p => new SKPoint(p.input, p.output)).ToList();
+            _controlPoints = _curve.ControlPoints.Select(p => new SKPoint(p.Input, p.Output)).ToList();
         }
         else
         {
@@ -693,7 +693,7 @@ public class FUICurveEditor : UserControl
     private void SyncCurveFromControlPoints()
     {
         _curve.Type = CurveType.Custom;
-        _curve.ControlPoints = _controlPoints.Select(p => (p.X, p.Y)).ToList();
+        _curve.ControlPoints = _controlPoints.Select(p => new CurvePoint(p.X, p.Y)).ToList();
         CurveChanged?.Invoke(this, _curve);
     }
 }

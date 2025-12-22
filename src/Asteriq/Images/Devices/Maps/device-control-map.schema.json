@@ -30,6 +30,11 @@
       "type": "string",
       "description": "SVG filename (without path)"
     },
+    "mirror": {
+      "type": "boolean",
+      "description": "If true, flip SVG horizontally for left-hand display",
+      "default": false
+    },
     "viewBox": {
       "type": "object",
       "description": "SVG viewBox dimensions for coordinate mapping",

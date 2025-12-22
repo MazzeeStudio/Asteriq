@@ -2099,7 +2099,16 @@ public partial class MainForm
             // Interior points: constrain X between neighbors
             float minX = _curveControlPoints[_draggingCurvePoint - 1].X + 0.02f;
             float maxX = _curveControlPoints[_draggingCurvePoint + 1].X - 0.02f;
-            graphPt.X = Math.Clamp(graphPt.X, minX, maxX);
+            // Ensure minX <= maxX (neighbors might be very close)
+            if (minX > maxX)
+            {
+                float midX = (_curveControlPoints[_draggingCurvePoint - 1].X + _curveControlPoints[_draggingCurvePoint + 1].X) / 2f;
+                graphPt.X = midX;
+            }
+            else
+            {
+                graphPt.X = Math.Clamp(graphPt.X, minX, maxX);
+            }
         }
 
         _curveControlPoints[_draggingCurvePoint] = graphPt;

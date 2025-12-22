@@ -735,7 +735,79 @@ public partial class MainForm
         string addText = isListening ? "Cancel" : "+ Add Input";
         FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
             addHovered ? FUIColors.Active : FUIColors.TextPrimary, 11f);
-        y += 28 + 15;
+        y += 28 + 8;  // Button height + small gap
+
+        // Merge operation selector (only for axes with 2+ inputs)
+        bool isAxis = _mappingCategory == 1;
+        if (isAxis && inputs.Count >= 2)
+        {
+            y = DrawMergeOperationSelector(canvas, leftMargin, rightMargin, y);
+        }
+        else
+        {
+            // Clear merge button bounds when not shown
+            for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
+                _mergeOpButtonBounds[i] = SKRect.Empty;
+            y += 8;  // Extra spacing when no merge selector
+        }
+
+        return y;
+    }
+
+    private float DrawMergeOperationSelector(SKCanvas canvas, float leftMargin, float rightMargin, float y)
+    {
+        var axisMapping = GetCurrentAxisMapping();
+        if (axisMapping is null) return y;
+
+        // Section header with top margin
+        y += 12;  // Space before section
+        FUIRenderer.DrawText(canvas, "MERGE MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        y += 16;
+
+        // Four merge operation buttons in a row
+        string[] labels = { "AVG", "MAX", "MIN", "SUM" };
+        MergeOperation[] ops = { MergeOperation.Average, MergeOperation.Maximum, MergeOperation.Minimum, MergeOperation.Sum };
+
+        float width = rightMargin - leftMargin;
+        float buttonWidth = (width - 9) / 4; // 3 gaps of 3px each
+        float buttonHeight = 24f;
+
+        for (int i = 0; i < 4; i++)
+        {
+            var btnBounds = new SKRect(
+                leftMargin + i * (buttonWidth + 3), y,
+                leftMargin + i * (buttonWidth + 3) + buttonWidth, y + buttonHeight);
+            _mergeOpButtonBounds[i] = btnBounds;
+
+            bool isActive = axisMapping.MergeOp == ops[i];
+            bool isHovered = _hoveredMergeOpButton == i;
+
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+            var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
+            var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRoundRect(btnBounds, 3, 3, bgPaint);
+
+            using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
+            canvas.DrawRoundRect(btnBounds, 3, 3, framePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 10f);
+        }
+
+        y += buttonHeight + 14;  // Move well below buttons
+
+        // Description of current merge mode
+        string description = axisMapping.MergeOp switch
+        {
+            MergeOperation.Average => "Averages all input values",
+            MergeOperation.Maximum => "Uses highest input value",
+            MergeOperation.Minimum => "Uses lowest input value",
+            MergeOperation.Sum => "Adds values (clamped -1 to 1)",
+            _ => ""
+        };
+        FUIRenderer.DrawText(canvas, description, new SKPoint(leftMargin, y), FUIColors.TextDisabled, 9f);
+        y += 16;  // Space after description before next section
 
         return y;
     }
@@ -795,13 +867,34 @@ public partial class MainForm
         }
     }
 
+    /// <summary>
+    /// Gets the current axis mapping for the selected output, or null if not an axis or not found.
+    /// </summary>
+    private AxisMapping? GetCurrentAxisMapping()
+    {
+        if (_selectedMappingRow < 0 || _mappingCategory != 1) return null;
+        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return null;
+
+        var profile = _profileService.ActiveProfile;
+        if (profile is null) return null;
+
+        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow;
+
+        return profile.AxisMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyAxis &&
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == outputIndex);
+    }
+
     private void DrawAxisSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
     {
         float width = rightMargin - leftMargin;
 
-        // Response Curve header
+        // Response Curve header (with top margin for section separation)
+        y += 8;  // Section separation
         FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += FUIRenderer.ScaleLineHeight(18f);
+        y += FUIRenderer.ScaleLineHeight(16f);
 
         // Symmetrical, Centre, and Invert checkboxes on their own row
         // Symmetrical on left, Centre and Invert on right
@@ -4430,6 +4523,25 @@ public partial class MainForm
 
         profile.ModifiedAt = DateTime.UtcNow;
         _profileService.SaveActiveProfile();
+        OnMappingsChanged();
+    }
+
+    private void UpdateMergeOperationForSelected(int mergeOpIndex)
+    {
+        var axisMapping = GetCurrentAxisMapping();
+        if (axisMapping is null) return;
+
+        MergeOperation[] ops = { MergeOperation.Average, MergeOperation.Maximum, MergeOperation.Minimum, MergeOperation.Sum };
+        if (mergeOpIndex < 0 || mergeOpIndex >= ops.Length) return;
+
+        axisMapping.MergeOp = ops[mergeOpIndex];
+
+        var profile = _profileService.ActiveProfile;
+        if (profile is not null)
+        {
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileService.SaveActiveProfile();
+        }
         OnMappingsChanged();
     }
 

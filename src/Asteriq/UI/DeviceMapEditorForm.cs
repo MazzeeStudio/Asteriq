@@ -69,6 +69,10 @@ public class DeviceMapEditorForm : Form
     // Save button
     private SKRect _saveButtonBounds;
 
+    // Mirror checkbox
+    private SKRect _mirrorCheckboxBounds;
+    private bool _mirrorCheckboxHovered;
+
     // Lead line editing buttons
     private SKRect _shelfSideButtonBounds;
     private SKRect _shelfLengthMinusBounds;
@@ -401,9 +405,44 @@ public class DeviceMapEditorForm : Form
         DrawButton(canvas, _loadButtonBounds, "LOAD", _loadButtonHovered);
         x += 80;
 
+        // Mirror checkbox
+        FUIRenderer.DrawText(canvas, "Mirror (L):", new SKPoint(x, y + 12), FUIColors.TextDim, 10f);
+        x += 65;
+        _mirrorCheckboxBounds = new SKRect(x, y + 3, x + 24, y + 27);
+        DrawCheckbox(canvas, _mirrorCheckboxBounds, _deviceMap.Mirror, _mirrorCheckboxHovered);
+        x += 40;
+
         // Save button (right side)
         _saveButtonBounds = new SKRect(_toolbarBounds.Right - 100, y, _toolbarBounds.Right - 20, y + 30);
         DrawButton(canvas, _saveButtonBounds, "SAVE", _saveButtonHovered, true);
+    }
+
+    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool hovered)
+    {
+        var bgColor = hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
+
+        var frameColor = isChecked ? FUIColors.Active : (hovered ? FUIColors.Primary : FUIColors.Frame);
+        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = hovered ? 2f : 1f };
+        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+
+        if (isChecked)
+        {
+            // Draw checkmark
+            using var checkPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active,
+                StrokeWidth = 2.5f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            };
+            float cx = bounds.MidX;
+            float cy = bounds.MidY;
+            canvas.DrawLine(cx - 5, cy, cx - 1, cy + 4, checkPaint);
+            canvas.DrawLine(cx - 1, cy + 4, cx + 6, cy - 4, checkPaint);
+        }
     }
 
     private void DrawSvgPanel(SKCanvas canvas)
@@ -888,14 +927,31 @@ public class DeviceMapEditorForm : Form
         canvas.DrawRect(_controlsListBounds, framePaint);
 
         // Header
-        float y = _controlsListBounds.Top + 15;
-        FUIRenderer.DrawText(canvas, "CONTROLS", new SKPoint(_controlsListBounds.Left + 15, y),
+        float headerY = _controlsListBounds.Top + 15;
+        FUIRenderer.DrawText(canvas, "CONTROLS", new SKPoint(_controlsListBounds.Left + 15, headerY),
             FUIColors.Active, 11f, true);
-        y += 25;
+
+        // Content area (between header and buttons)
+        float contentTop = _controlsListBounds.Top + 40;
+        float contentBottom = _controlsListBounds.Bottom - 50;
+        var contentBounds = new SKRect(_controlsListBounds.Left, contentTop, _controlsListBounds.Right, contentBottom);
+
+        // Calculate total content height
+        float itemHeight = 24;
+        float itemGap = 2;
+        float totalContentHeight = _deviceMap.Controls.Count * (itemHeight + itemGap);
+
+        // Clamp scroll offset
+        float maxScroll = Math.Max(0, totalContentHeight - contentBounds.Height);
+        _controlsListScroll = Math.Clamp(_controlsListScroll, 0, maxScroll);
+
+        // Clip to content area
+        canvas.Save();
+        canvas.ClipRect(contentBounds);
 
         // Control list items
         _controlListItemBounds.Clear();
-        float itemHeight = 24;
+        float y = contentTop - _controlsListScroll;
         int index = 0;
 
         foreach (var kvp in _deviceMap.Controls)
@@ -904,25 +960,43 @@ public class DeviceMapEditorForm : Form
                 _controlsListBounds.Right - 10, y + itemHeight);
             _controlListItemBounds.Add(itemBounds);
 
-            bool isSelected = kvp.Key == _selectedControlKey;
-            bool isHovered = index == _hoveredControlListItem;
-
-            if (isSelected || isHovered)
+            // Only draw if visible
+            if (y + itemHeight > contentTop && y < contentBottom)
             {
-                using var hlPaint = new SKPaint
+                bool isSelected = kvp.Key == _selectedControlKey;
+                bool isHovered = index == _hoveredControlListItem;
+
+                if (isSelected || isHovered)
                 {
-                    Style = SKPaintStyle.Fill,
-                    Color = isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Primary.WithAlpha(20)
-                };
-                canvas.DrawRoundRect(itemBounds, 3, 3, hlPaint);
+                    using var hlPaint = new SKPaint
+                    {
+                        Style = SKPaintStyle.Fill,
+                        Color = isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Primary.WithAlpha(20)
+                    };
+                    canvas.DrawRoundRect(itemBounds, 3, 3, hlPaint);
+                }
+
+                var indicator = isSelected ? "> " : "  ";
+                FUIRenderer.DrawText(canvas, indicator + kvp.Key, new SKPoint(itemBounds.Left + 5, y + 14),
+                    isSelected ? FUIColors.Active : FUIColors.TextPrimary, 10f);
             }
 
-            var indicator = isSelected ? "> " : "  ";
-            FUIRenderer.DrawText(canvas, indicator + kvp.Key, new SKPoint(itemBounds.Left + 5, y + 14),
-                isSelected ? FUIColors.Active : FUIColors.TextPrimary, 10f);
-
-            y += itemHeight + 2;
+            y += itemHeight + itemGap;
             index++;
+        }
+
+        canvas.Restore();
+
+        // Draw scroll indicator if needed
+        if (totalContentHeight > contentBounds.Height)
+        {
+            float scrollbarHeight = (contentBounds.Height / totalContentHeight) * contentBounds.Height;
+            float scrollbarY = contentTop + (_controlsListScroll / totalContentHeight) * contentBounds.Height;
+            var scrollbarBounds = new SKRect(_controlsListBounds.Right - 6, scrollbarY,
+                _controlsListBounds.Right - 2, scrollbarY + scrollbarHeight);
+
+            using var scrollPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(100) };
+            canvas.DrawRoundRect(scrollbarBounds, 2, 2, scrollPaint);
         }
 
         // Add/Delete buttons
@@ -1230,6 +1304,7 @@ public class DeviceMapEditorForm : Form
         _saveButtonHovered = _saveButtonBounds.Contains(pt);
         _newButtonHovered = _newButtonBounds.Contains(pt);
         _loadButtonHovered = _loadButtonBounds.Contains(pt);
+        _mirrorCheckboxHovered = _mirrorCheckboxBounds.Contains(pt);
 
         // Controls list
         _addControlHovered = _addControlButtonBounds.Contains(pt);
@@ -1354,6 +1429,13 @@ public class DeviceMapEditorForm : Form
             {
                 LoadJsonFile(ofd.FileName);
             }
+            return;
+        }
+
+        if (_mirrorCheckboxBounds.Contains(pt))
+        {
+            _deviceMap.Mirror = !_deviceMap.Mirror;
+            _hasUnsavedChanges = true;
             return;
         }
 
@@ -1616,7 +1698,15 @@ public class DeviceMapEditorForm : Form
 
     private void OnMouseWheel(object? sender, MouseEventArgs e)
     {
-        // Could implement zoom here in the future
+        var pt = new SKPoint(e.X, e.Y);
+
+        // Scroll controls list when mouse is over it
+        if (_controlsListBounds.Contains(pt))
+        {
+            float scrollAmount = -e.Delta / 4f; // Adjust scroll speed
+            _controlsListScroll += scrollAmount;
+            _canvas.Invalidate();
+        }
     }
 
     #endregion

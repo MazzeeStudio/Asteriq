@@ -1,40 +1,57 @@
 {
-  "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
   "device": "Alpha-L",
-  "vidPid": "3344:8194",
+  "vidPid": "3344:80D4",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",
   "mirror": true,
-  "viewBox": { "x": 2048, "y": 2048 },
+  "viewBox": {
+    "x": 2048,
+    "y": 2048
+  },
   "controls": {
     "trigger": {
       "id": "control_trigger",
       "type": "Button",
-      "bindings": ["button4", "button5"],
+      "bindings": [
+        "button4",
+        "button5"
+      ],
       "label": "Trigger",
       "description": "Dual-stage trigger: Stage1=button4, Stage2=button5",
-      "anchor": { "x": 950, "y": 450 },
-      "labelOffset": { "x": 150, "y": -50 },
+      "anchor": {
+        "x": 605.2632,
+        "y": 427.97784
+      },
+      "labelOffset": {
+        "x": 214.6814,
+        "y": 30.470917
+      },
       "leadLine": {
-        "shelfSide": "left",
-        "shelfLength": 100,
-        "segments": [
-          { "angle": 120, "length": 120 },
-          { "angle": 180, "length": 80 }
-        ]
+        "shelfSide": "right",
+        "shelfLength": 30
       }
     },
     "ministick": {
       "id": "control_ministick",
       "type": "Ministick",
-      "bindings": ["rx", "ry", "button6"],
+      "bindings": [
+        "rx",
+        "ry",
+        "button6"
+      ],
       "label": "Ministick",
       "description": "Analog ministick: X=rX, Y=rY, Push=button6",
-      "anchor": { "x": 350, "y": 153 },
-      "labelOffset": { "x": 200, "y": 50 },
+      "anchor": {
+        "x": 350.4155,
+        "y": 155.12465
+      },
+      "labelOffset": {
+        "x": -139.88918,
+        "y": -12.465363
+      },
       "leadLine": {
-        "shelfSide": "right",
+        "shelfSide": "left",
         "shelfLength": 40,
         "segments": []
       }
@@ -42,98 +59,186 @@
     "top_button": {
       "id": "control_top_button",
       "type": "Button",
-      "bindings": ["button7"],
-      "label": "Top Button",
+      "bindings": [
+        "button7"
+      ],
+      "label": "[L] Top Button",
       "description": "Top center button: button7",
-      "anchor": { "x": 600, "y": 150 },
-      "labelOffset": { "x": 0, "y": -60 }
+      "anchor": {
+        "x": 560.94183,
+        "y": 99.72299
+      },
+      "labelOffset": {
+        "x": 179.77838,
+        "y": -100.138504
+      }
     },
     "top_hat": {
       "id": "control_top_hat",
       "type": "Hat",
-      "bindings": ["button8", "button9", "button10", "button11", "button12"],
-      "label": "Top Hat",
+      "bindings": [
+        "button8",
+        "button9",
+        "button10",
+        "button11",
+        "button12"
+      ],
+      "label": "[L] Top Hat",
       "description": "5-way top hat: Center=button8, Up=button9, Left=button10, Down=button11, Right=button12",
-      "anchor": { "x": 900, "y": 180 },
-      "labelOffset": { "x": -120, "y": -50 }
+      "anchor": {
+        "x": 631.5789,
+        "y": 148.19945
+      },
+      "labelOffset": {
+        "x": 181.44049,
+        "y": -95.56787
+      }
     },
     "castle_left": {
       "id": "control_castle_left",
       "type": "Hat",
-      "bindings": ["button14", "button15", "button16", "button17", "button18"],
+      "bindings": [
+        "button14",
+        "button15",
+        "button16",
+        "button17",
+        "button18"
+      ],
       "label": "Castle Switch",
       "description": "5-way castle: Center=button14, Up=button15, Left=button16, Down=button17, Right=button18",
-      "anchor": { "x": 350, "y": 380 },
-      "labelOffset": { "x": 130, "y": 0 },
+      "anchor": {
+        "x": 465.37396,
+        "y": 236.8421
+      },
+      "labelOffset": {
+        "x": -182.8255,
+        "y": -13.850418
+      },
       "leadLine": {
-        "shelfSide": "right",
-        "shelfLength": 80,
-        "segments": [
-          { "angle": 135, "length": 100 },
-          { "angle": 180, "length": 60 }
-        ]
+        "shelfSide": "left",
+        "shelfLength": 80
       }
     },
     "side_button": {
       "id": "control_side_button",
       "type": "Button",
-      "bindings": ["button13"],
+      "bindings": [
+        "button13"
+      ],
       "label": "Side Button",
       "description": "Side button: button13",
-      "anchor": { "x": 1100, "y": 350 },
-      "labelOffset": { "x": -110, "y": 0 }
+      "anchor": {
+        "x": 614.95844,
+        "y": 246.5374
+      },
+      "labelOffset": {
+        "x": 265.92798,
+        "y": -120.49862
+      }
     },
     "flip_trigger": {
       "id": "control_flip_trigger",
       "type": "Toggle",
-      "bindings": ["button2", "button3"],
+      "bindings": [
+        "button2",
+        "button3"
+      ],
       "label": "Flip Trigger",
       "description": "Flip trigger safety: button2, button3",
-      "anchor": { "x": 300, "y": 450 },
-      "labelOffset": { "x": 140, "y": 0 }
+      "anchor": {
+        "x": 670.3601,
+        "y": 376.7313
+      },
+      "labelOffset": {
+        "x": 308.86426,
+        "y": -5.540161
+      }
     },
     "toggle": {
       "id": "control_toggle",
       "type": "Toggle",
-      "bindings": ["button19", "button20", "button21", "button22"],
+      "bindings": [
+        "button19",
+        "button20",
+        "button21",
+        "button22"
+      ],
       "label": "Toggle Switch",
-      "description": "2-way toggle + buttons: Center=button19, Toggle=button20, Up=button21, Down=button22",
-      "anchor": { "x": 300, "y": 550 },
-      "labelOffset": { "x": 140, "y": 0 }
+      "description": "2-way toggle \u002B buttons: Center=button19, Toggle=button20, Up=button21, Down=button22",
+      "anchor": {
+        "x": 479.22437,
+        "y": 307.47922
+      },
+      "labelOffset": {
+        "x": -232.68697,
+        "y": -12.465363
+      },
+      "leadLine": {
+        "shelfSide": "left",
+        "shelfLength": 10
+      }
     },
     "thumb_hat": {
       "id": "control_thumb_hat",
       "type": "Hat",
-      "bindings": ["button23", "button24", "button25", "button26", "button27"],
+      "bindings": [
+        "button23",
+        "button24",
+        "button25",
+        "button26",
+        "button27"
+      ],
       "label": "Thumb Hat",
       "description": "5-way thumb hat: Push=button23, Up=button24, Left=button25, Down=button26, Right=button27",
-      "anchor": { "x": 700, "y": 750 },
-      "labelOffset": { "x": 0, "y": 80 }
+      "anchor": {
+        "x": 332.40997,
+        "y": 355.9557
+      },
+      "labelOffset": {
+        "x": -77.56233,
+        "y": 63.711914
+      }
     },
     "two_way_hat": {
       "id": "control_two_way_hat",
       "type": "Hat",
-      "bindings": ["button28", "button29", "button30"],
-      "label": "2-Way Hat",
-      "description": "2-way hat + push: Center=button28, Up=button29, Down=button30",
-      "anchor": { "x": 807, "y": 245 },
-      "labelOffset": { "x": -130, "y": 0 },
+      "bindings": [
+        "button28",
+        "button29",
+        "button30"
+      ],
+      "label": "[L] 2-Way Hat",
+      "description": "2-way hat \u002B push: Center=button28, Up=button29, Down=button30",
+      "anchor": {
+        "x": 817.1745,
+        "y": 245.15236
+      },
+      "labelOffset": {
+        "x": 227.14679,
+        "y": -56.786713
+      },
       "leadLine": {
-        "shelfSide": "left",
-        "shelfLength": 80,
-        "segments": [
-          { "angle": -150, "length": 100 }
-        ]
+        "shelfSide": "right",
+        "shelfLength": 80
       }
     },
     "slider": {
       "id": "control_slider",
       "type": "Slider",
-      "bindings": ["slider1", "button32"],
+      "bindings": [
+        "slider1",
+        "button32"
+      ],
       "label": "Brake Lever",
-      "description": "Analog brake lever + button: Axis=slider1, Button=button32",
-      "anchor": { "x": 900, "y": 680 },
-      "labelOffset": { "x": -100, "y": 40 }
+      "description": "Analog brake lever \u002B button: Axis=slider1, Button=button32",
+      "anchor": {
+        "x": 660.6648,
+        "y": 580.3324
+      },
+      "labelOffset": {
+        "x": 223.26868,
+        "y": 95.62329
+      }
     }
   }
 }

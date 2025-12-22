@@ -646,17 +646,22 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Load the appropriate device map based on device name.
-    /// Searches for maps matching the device name, falls back to device type, then generic joystick.json.
+    /// Load the appropriate device map based on device info.
+    /// Searches for maps matching VID:PID first, then device name, falls back to device type, then generic joystick.json.
     /// Also detects left-hand devices by "LEFT" prefix and sets mirror flag.
     /// </summary>
-    private void LoadDeviceMapForDevice(string? deviceName)
+    private void LoadDeviceMapForDevice(PhysicalDeviceInfo? device)
     {
         var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+        string? deviceName = device?.Name;
 
-        // Try to find a device-specific map by matching device name
-        if (!string.IsNullOrEmpty(deviceName))
+        // Try to find a device-specific map
+        if (device is not null && !string.IsNullOrEmpty(deviceName))
         {
+            // Extract VID:PID from device's InstanceGuid
+            var (vid, pid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+            string vidPidStr = vid > 0 ? $"{vid:X4}:{pid:X4}" : "";
+
             // Load all device maps
             var allMaps = new List<(string path, DeviceMap map)>();
             foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
@@ -669,7 +674,22 @@ public partial class MainForm : Form
                     allMaps.Add((mapFile, map));
             }
 
-            // Step 1: Try exact device name match (skip generic maps)
+            // Step 1: Try VID:PID match (most reliable)
+            if (!string.IsNullOrEmpty(vidPidStr))
+            {
+                foreach (var (path, map) in allMaps)
+                {
+                    if (!string.IsNullOrEmpty(map.VidPid) &&
+                        map.VidPid.Equals(vidPidStr, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _deviceMap = map;
+                        System.Diagnostics.Debug.WriteLine($"Loaded device map (VID:PID match '{vidPidStr}'): {path}");
+                        return;
+                    }
+                }
+            }
+
+            // Step 2: Try device name match (skip generic maps)
             foreach (var (path, map) in allMaps)
             {
                 if (!string.IsNullOrEmpty(map.Device) &&
@@ -679,12 +699,13 @@ public partial class MainForm : Form
                         map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
+                        System.Diagnostics.Debug.WriteLine($"Loaded device map (name match): {path} for device: {deviceName}");
                         return;
                     }
                 }
             }
 
-            // Step 2: Try device type match based on keywords in device name
+            // Step 3: Try device type match based on keywords in device name
             string detectedType = DetectDeviceType(deviceName);
             if (detectedType != "Joystick")
             {
@@ -699,7 +720,7 @@ public partial class MainForm : Form
                 }
             }
 
-            // Step 3: No specific map found - check if device name indicates left-hand
+            // Step 4: No specific map found - check if device name indicates left-hand
             // and apply mirror to the default joystick map
             bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
                               deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
@@ -713,6 +734,7 @@ public partial class MainForm : Form
                 // Override mirror setting for left-hand devices using generic map
                 _deviceMap.Mirror = true;
             }
+            System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json for device: {deviceName} (left={isLeftHand})");
             return;
         }
 
@@ -723,14 +745,19 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Load device map by name and return it (doesn't modify _deviceMap field)
+    /// Load device map for a device and return it (doesn't modify _deviceMap field)
     /// </summary>
-    private DeviceMap? LoadDeviceMapByName(string? deviceName)
+    private DeviceMap? LoadDeviceMapForDeviceInfo(PhysicalDeviceInfo? device)
     {
         var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+        string? deviceName = device?.Name;
 
-        if (!string.IsNullOrEmpty(deviceName))
+        if (device is not null && !string.IsNullOrEmpty(deviceName))
         {
+            // Extract VID:PID from device's InstanceGuid
+            var (vid, pid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+            string vidPidStr = vid > 0 ? $"{vid:X4}:{pid:X4}" : "";
+
             var allMaps = new List<(string path, DeviceMap map)>();
             foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
             {
@@ -741,7 +768,20 @@ public partial class MainForm : Form
                     allMaps.Add((mapFile, map));
             }
 
-            // Try exact device name match
+            // Try VID:PID match first (most reliable)
+            if (!string.IsNullOrEmpty(vidPidStr))
+            {
+                foreach (var (path, map) in allMaps)
+                {
+                    if (!string.IsNullOrEmpty(map.VidPid) &&
+                        map.VidPid.Equals(vidPidStr, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return map;
+                    }
+                }
+            }
+
+            // Try device name match
             foreach (var (path, map) in allMaps)
             {
                 if (!string.IsNullOrEmpty(map.Device) &&
@@ -826,7 +866,7 @@ public partial class MainForm : Form
 
         if (primaryDevice is not null)
         {
-            _mappingsPrimaryDeviceMap = LoadDeviceMapByName(primaryDevice.Name);
+            _mappingsPrimaryDeviceMap = LoadDeviceMapForDeviceInfo(primaryDevice);
         }
     }
 
@@ -1549,7 +1589,7 @@ public partial class MainForm : Form
             _selectedDevice = _devices.IndexOf(filteredDevices[0]);
             if (_selectedDevice >= 0)
             {
-                LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+                LoadDeviceMapForDevice(_devices[_selectedDevice]);
             }
         }
     }
@@ -1778,7 +1818,7 @@ public partial class MainForm : Form
         // Load device map for the selected device
         if (_selectedDevice >= 0 && _selectedDevice < _devices.Count)
         {
-            LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+            LoadDeviceMapForDevice(_devices[_selectedDevice]);
         }
     }
 
@@ -2598,7 +2638,7 @@ public partial class MainForm : Form
             _selectedDevice = _hoveredDevice;
             _currentInputState = null;
             // Load device map for the selected device
-            LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+            LoadDeviceMapForDevice(_devices[_selectedDevice]);
             _activeInputTracker.Clear(); // Clear lead-lines when switching devices
 
             // Start potential drag - will only become a drag if mouse moves enough
@@ -2611,7 +2651,7 @@ public partial class MainForm : Form
             // Non-draggable device selection (virtual devices tab)
             _selectedDevice = _hoveredDevice;
             _currentInputState = null;
-            LoadDeviceMapForDevice(_devices[_selectedDevice].Name);
+            LoadDeviceMapForDevice(_devices[_selectedDevice]);
             _activeInputTracker.Clear();
         }
 

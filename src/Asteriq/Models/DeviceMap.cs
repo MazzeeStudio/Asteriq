@@ -21,6 +21,9 @@ public class DeviceMap
     [JsonPropertyName("device")]
     public string Device { get; set; } = "";
 
+    [JsonPropertyName("vidPid")]
+    public string? VidPid { get; set; }
+
     [JsonPropertyName("deviceType")]
     public string DeviceType { get; set; } = "Generic";
 

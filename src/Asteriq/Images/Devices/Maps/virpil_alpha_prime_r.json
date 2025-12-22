@@ -5,33 +5,62 @@
   "vidPid": "3344:0194",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",
-  "viewBox": { "x": 2048, "y": 2048 },
+  "mirror": false,
+  "viewBox": {
+    "x": 2048,
+    "y": 2048
+  },
   "controls": {
     "trigger": {
       "id": "control_trigger",
       "type": "Button",
-      "bindings": ["button4", "button5"],
+      "bindings": [
+        "button4",
+        "button5"
+      ],
       "label": "Trigger",
       "description": "Dual-stage trigger: Stage1=button4, Stage2=button5",
-      "anchor": { "x": 950, "y": 450 },
-      "labelOffset": { "x": -150, "y": -50 },
+      "anchor": {
+        "x": 614.95844,
+        "y": 403.0471
+      },
+      "labelOffset": {
+        "x": 192.52081,
+        "y": 166.20499
+      },
       "leadLine": {
         "shelfSide": "right",
-        "shelfLength": 100,
+        "shelfLength": 10,
         "segments": [
-          { "angle": 60, "length": 120 },
-          { "angle": 0, "length": 80 }
+          {
+            "angle": -45,
+            "length": 70.32098
+          },
+          {
+            "angle": -65,
+            "length": 142.51195
+          }
         ]
       }
     },
     "ministick": {
       "id": "control_ministick",
       "type": "Ministick",
-      "bindings": ["rx", "ry", "button6"],
+      "bindings": [
+        "rx",
+        "ry",
+        "button6"
+      ],
       "label": "Ministick",
       "description": "Analog ministick: X=rX, Y=rY, Push=button6",
-      "anchor": { "x": 350, "y": 153 },
-      "labelOffset": { "x": -200, "y": 50 },
+      "anchor": {
+        "x": 350,
+        "y": 153
+      },
+      "labelOffset": {
+        "x": -169.9446,
+        "y": -89.288086
+      },
       "leadLine": {
         "shelfSide": "left",
         "shelfLength": 40,
@@ -41,98 +70,212 @@
     "top_button": {
       "id": "control_top_button",
       "type": "Button",
-      "bindings": ["button7"],
+      "bindings": [
+        "button7"
+      ],
       "label": "Top Button",
       "description": "Top center button: button7",
-      "anchor": { "x": 600, "y": 150 },
-      "labelOffset": { "x": 0, "y": -60 }
+      "anchor": {
+        "x": 518.00555,
+        "y": 95.56786
+      },
+      "labelOffset": {
+        "x": -210.52634,
+        "y": -99.72299
+      }
     },
     "top_hat": {
       "id": "control_top_hat",
       "type": "Hat",
-      "bindings": ["button8", "button9", "button10", "button11", "button12"],
+      "bindings": [
+        "button8",
+        "button9",
+        "button10",
+        "button11",
+        "button12"
+      ],
       "label": "Top Hat",
       "description": "5-way top hat: Center=button8, Up=button9, Left=button10, Down=button11, Right=button12",
-      "anchor": { "x": 620, "y": 180 },
-      "labelOffset": { "x": 120, "y": -50 }
+      "anchor": {
+        "x": 630.1939,
+        "y": 150.96953
+      },
+      "labelOffset": {
+        "x": 164.81995,
+        "y": -110.80332
+      }
     },
     "castle_left": {
       "id": "control_castle_left",
       "type": "Hat",
-      "bindings": ["button14", "button15", "button16", "button17", "button18"],
+      "bindings": [
+        "button14",
+        "button15",
+        "button16",
+        "button17",
+        "button18"
+      ],
       "label": "Castle Switch",
       "description": "5-way castle: Center=button14, Up=button15, Left=button16, Down=button17, Right=button18",
-      "anchor": { "x": 350, "y": 380 },
-      "labelOffset": { "x": -130, "y": 0 },
+      "anchor": {
+        "x": 475,
+        "y": 215
+      },
+      "labelOffset": {
+        "x": -344.8061,
+        "y": 30.152359
+      },
       "leadLine": {
         "shelfSide": "left",
         "shelfLength": 80,
         "segments": [
-          { "angle": 45, "length": 100 },
-          { "angle": 0, "length": 60 }
+          {
+            "angle": 0,
+            "length": 68.13094
+          }
         ]
       }
     },
     "side_button": {
       "id": "control_side_button",
       "type": "Button",
-      "bindings": ["button13"],
+      "bindings": [
+        "button13"
+      ],
       "label": "Side Button",
       "description": "Side button: button13",
-      "anchor": { "x": 1100, "y": 350 },
-      "labelOffset": { "x": 110, "y": 0 }
+      "anchor": {
+        "x": 615,
+        "y": 250
+      },
+      "labelOffset": {
+        "x": 162.0083,
+        "y": 110.11081
+      }
     },
     "flip_trigger": {
       "id": "control_flip_trigger",
       "type": "Toggle",
-      "bindings": ["button2", "button3"],
+      "bindings": [
+        "button2",
+        "button3"
+      ],
       "label": "Flip Trigger",
-      "description": "Flip trigger safety: button2, button3",
-      "anchor": { "x": 300, "y": 450 },
-      "labelOffset": { "x": -140, "y": 0 }
+      "description": "Flip trigger safety: button1, button2, button3",
+      "anchor": {
+        "x": 660.6648,
+        "y": 380.8864
+      },
+      "labelOffset": {
+        "x": 152.35461,
+        "y": 98.33795
+      },
+      "leadLine": {
+        "shelfSide": "right",
+        "shelfLength": 10,
+        "segments": [
+          {
+            "angle": -60,
+            "length": 123.60571
+          }
+        ]
+      }
     },
     "toggle": {
       "id": "control_toggle",
       "type": "Toggle",
-      "bindings": ["button19", "button20", "button21", "button22"],
+      "bindings": [
+        "button19",
+        "button20",
+        "button21",
+        "button22"
+      ],
       "label": "Toggle Switch",
-      "description": "2-way toggle + buttons: Center=button19, Toggle=button20, Up=button21, Down=button22",
-      "anchor": { "x": 300, "y": 550 },
-      "labelOffset": { "x": -140, "y": 0 }
+      "description": "2-way toggle \u002B buttons: Center=button19, Toggle=button20, Up=button21, Down=button22",
+      "anchor": {
+        "x": 465.37396,
+        "y": 321.32965
+      },
+      "labelOffset": {
+        "x": -368.42105,
+        "y": -9.6953125
+      },
+      "leadLine": {
+        "shelfSide": "right",
+        "shelfLength": 10
+      }
     },
     "thumb_hat": {
       "id": "control_thumb_hat",
       "type": "Hat",
-      "bindings": ["button23", "button24", "button25", "button26", "button27"],
+      "bindings": [
+        "button23",
+        "button24",
+        "button25",
+        "button26",
+        "button27"
+      ],
       "label": "Thumb Hat",
       "description": "5-way thumb hat: Push=button23, Up=button24, Left=button25, Down=button26, Right=button27",
-      "anchor": { "x": 700, "y": 750 },
-      "labelOffset": { "x": 0, "y": 80 }
+      "anchor": {
+        "x": 333.795,
+        "y": 365.65097
+      },
+      "labelOffset": {
+        "x": -196.6759,
+        "y": 76.17728
+      },
+      "leadLine": {
+        "shelfSide": "left",
+        "shelfLength": 40
+      }
     },
     "two_way_hat": {
       "id": "control_two_way_hat",
       "type": "Hat",
-      "bindings": ["button28", "button29", "button30"],
+      "bindings": [
+        "button28",
+        "button29",
+        "button30"
+      ],
       "label": "2-Way Hat",
-      "description": "2-way hat + push: Center=button28, Up=button29, Down=button30",
-      "anchor": { "x": 807, "y": 245 },
-      "labelOffset": { "x": 130, "y": 0 },
+      "description": "2-way hat \u002B push: Center=button28, Up=button29, Down=button30",
+      "anchor": {
+        "x": 810,
+        "y": 260
+      },
+      "labelOffset": {
+        "x": 196.92523,
+        "y": -84.09972
+      },
       "leadLine": {
         "shelfSide": "right",
         "shelfLength": 80,
         "segments": [
-          { "angle": -30, "length": 100 }
+          {
+            "angle": -0,
+            "length": 19.97604
+          }
         ]
       }
     },
     "slider": {
       "id": "control_slider",
       "type": "Slider",
-      "bindings": ["slider1", "button32"],
+      "bindings": [
+        "slider1",
+        "button32"
+      ],
       "label": "Slider",
-      "description": "Analog brake lever + button: Axis=slider1, Button=button32",
-      "anchor": { "x": 645, "y": 600 },
-      "labelOffset": { "x": 100, "y": 40 }
+      "description": "Analog slider \u002B button: Axis=slider1, Button=button32",
+      "anchor": {
+        "x": 652.35455,
+        "y": 554.0166
+      },
+      "labelOffset": {
+        "x": 95.56787,
+        "y": 174.51526
+      }
     }
   }
 }

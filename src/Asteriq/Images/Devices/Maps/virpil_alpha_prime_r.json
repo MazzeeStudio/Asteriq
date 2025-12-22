@@ -2,7 +2,7 @@
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
   "device": "Alpha-R",
-  "vidPid": "3344:0194",
+  "vidPid": "3344:40D5",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",
   "mirror": false,

@@ -328,7 +328,9 @@ public partial class MainForm
                 var labelScreen = ViewBoxToScreen(labelVbX, labelVbY);
                 labelX = labelScreen.X;
                 labelY = labelScreen.Y;
-                goesRight = control.LabelOffset.X >= 0;
+                // When mirrored, positive X offset appears on left side of screen
+                bool offsetGoesRight = control.LabelOffset.X >= 0;
+                goesRight = _svgMirrored ? !offsetGoesRight : offsetGoesRight;
             }
             else
             {
@@ -479,10 +481,12 @@ public partial class MainForm
 
         // Use JSON-defined lead-line shape
         bool shelfGoesRight = leadLine.ShelfSide.Equals("right", StringComparison.OrdinalIgnoreCase);
+        // When mirrored, screen direction is inverted from viewbox direction
+        bool screenGoesRight = _svgMirrored ? !shelfGoesRight : shelfGoesRight;
         float scaledShelfLength = leadLine.ShelfLength * _svgScale;
 
         // Shelf (horizontal)
-        float shelfEndX = shelfGoesRight ? anchor.X + scaledShelfLength : anchor.X - scaledShelfLength;
+        float shelfEndX = screenGoesRight ? anchor.X + scaledShelfLength : anchor.X - scaledShelfLength;
         var shelfEndPoint = new SKPoint(shelfEndX, anchor.Y);
         points.Add(shelfEndPoint);
 
@@ -490,7 +494,7 @@ public partial class MainForm
         if (leadLine.Segments is not null && leadLine.Segments.Count > 0)
         {
             var currentPoint = shelfEndPoint;
-            int shelfDirection = shelfGoesRight ? 1 : -1;
+            int shelfDirection = screenGoesRight ? 1 : -1;
 
             // Process all but the last segment normally
             for (int i = 0; i < leadLine.Segments.Count - 1; i++)

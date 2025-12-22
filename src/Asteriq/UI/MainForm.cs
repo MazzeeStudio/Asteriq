@@ -683,7 +683,6 @@ public partial class MainForm : Form
                         map.VidPid.Equals(vidPidStr, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
-                        System.Diagnostics.Debug.WriteLine($"Loaded device map (VID:PID match '{vidPidStr}'): {path}");
                         return;
                     }
                 }
@@ -741,7 +740,6 @@ public partial class MainForm : Form
         // Fall back to generic joystick map
         var defaultMapPath2 = Path.Combine(mapsDir, "joystick.json");
         _deviceMap = DeviceMap.Load(defaultMapPath2);
-        System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json");
     }
 
     /// <summary>

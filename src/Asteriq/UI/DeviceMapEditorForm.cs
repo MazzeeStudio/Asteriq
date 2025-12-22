@@ -23,6 +23,7 @@ public class DeviceMapEditorForm : Form
     private SKSvg? _currentSvg;
     private float _svgScale = 1f;
     private SKPoint _svgOffset;
+    private float _svgScaledWidth; // For mirror coordinate conversion
     private string _imagesDir = "";
     private List<string> _availableSvgFiles = new();
 
@@ -491,10 +492,22 @@ public class DeviceMapEditorForm : Form
 
         _svgScale = scale;
         _svgOffset = new SKPoint(offsetX, offsetY);
+        _svgScaledWidth = scaledWidth;
 
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
-        canvas.Scale(scale);
+
+        if (_deviceMap.Mirror)
+        {
+            // Flip horizontally: translate to right edge, then scale X by -1
+            canvas.Translate(scaledWidth, 0);
+            canvas.Scale(-scale, scale);
+        }
+        else
+        {
+            canvas.Scale(scale);
+        }
+
         canvas.DrawPicture(svg.Picture);
         canvas.Restore();
     }
@@ -631,9 +644,11 @@ public class DeviceMapEditorForm : Form
         var path = new SKPath();
         path.MoveTo(anchor);
 
-        // Shelf segment
+        // Shelf segment - when mirrored, screen direction is inverted
         bool goesRight = leadLine.ShelfSide == "right";
-        float shelfEndX = anchor.X + (goesRight ? 1 : -1) * leadLine.ShelfLength * _svgScale;
+        // When mirrored, a "right" shelf in viewbox goes LEFT on screen
+        bool screenGoesRight = _deviceMap.Mirror ? !goesRight : goesRight;
+        float shelfEndX = anchor.X + (screenGoesRight ? 1 : -1) * leadLine.ShelfLength * _svgScale;
         var shelfEnd = new SKPoint(shelfEndX, anchor.Y);
         path.LineTo(shelfEnd);
 
@@ -653,7 +668,7 @@ public class DeviceMapEditorForm : Form
                 float dx = MathF.Cos(angleRad) * seg.Length * _svgScale;
                 float dy = -MathF.Sin(angleRad) * seg.Length * _svgScale; // Y is inverted
 
-                if (!goesRight) dx = -dx; // Mirror for left shelf
+                if (!screenGoesRight) dx = -dx; // Mirror for left shelf (screen direction)
 
                 currentPoint = new SKPoint(currentPoint.X + dx, currentPoint.Y + dy);
                 path.LineTo(currentPoint);
@@ -1184,15 +1199,37 @@ public class DeviceMapEditorForm : Form
 
     private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
     {
-        float screenX = _svgOffset.X + viewBoxX * _svgScale;
-        float screenY = _svgOffset.Y + viewBoxY * _svgScale;
+        float screenX, screenY;
+
+        if (_deviceMap.Mirror)
+        {
+            // When mirrored, X is inverted: viewBox 0 -> right edge, viewBox max -> left edge
+            screenX = _svgOffset.X + _svgScaledWidth - viewBoxX * _svgScale;
+        }
+        else
+        {
+            screenX = _svgOffset.X + viewBoxX * _svgScale;
+        }
+
+        screenY = _svgOffset.Y + viewBoxY * _svgScale;
         return new SKPoint(screenX, screenY);
     }
 
     private SKPoint ScreenToViewBox(float screenX, float screenY)
     {
-        float viewBoxX = (screenX - _svgOffset.X) / _svgScale;
-        float viewBoxY = (screenY - _svgOffset.Y) / _svgScale;
+        float viewBoxX, viewBoxY;
+
+        if (_deviceMap.Mirror)
+        {
+            // When mirrored, invert X conversion
+            viewBoxX = (_svgOffset.X + _svgScaledWidth - screenX) / _svgScale;
+        }
+        else
+        {
+            viewBoxX = (screenX - _svgOffset.X) / _svgScale;
+        }
+
+        viewBoxY = (screenY - _svgOffset.Y) / _svgScale;
         return new SKPoint(viewBoxX, viewBoxY);
     }
 
@@ -1239,8 +1276,10 @@ public class DeviceMapEditorForm : Form
                     float dx = _mousePos.X - anchorScreen.X;
 
                     // Shelf is horizontal, so we only care about X distance
+                    // When mirrored, screen direction is inverted from viewbox direction
                     bool goesRight = control.LeadLine.ShelfSide == "right";
-                    float newLength = (goesRight ? dx : -dx) / _svgScale;
+                    bool screenGoesRight = _deviceMap.Mirror ? !goesRight : goesRight;
+                    float newLength = (screenGoesRight ? dx : -dx) / _svgScale;
                     control.LeadLine.ShelfLength = Math.Max(10, newLength);
                     _hasUnsavedChanges = true;
                 }
@@ -1251,9 +1290,10 @@ public class DeviceMapEditorForm : Form
                     // Calculate the start point of this segment
                     var anchorScreen = ViewBoxToScreen(control.Anchor.X, control.Anchor.Y);
                     bool goesRight = control.LeadLine.ShelfSide == "right";
+                    bool screenGoesRight = _deviceMap.Mirror ? !goesRight : goesRight;
 
                     // Start from shelf end
-                    float shelfEndX = anchorScreen.X + (goesRight ? 1 : -1) * control.LeadLine.ShelfLength * _svgScale;
+                    float shelfEndX = anchorScreen.X + (screenGoesRight ? 1 : -1) * control.LeadLine.ShelfLength * _svgScale;
                     var segmentStart = new SKPoint(shelfEndX, anchorScreen.Y);
 
                     // Walk through previous segments to find the start of the dragged segment
@@ -1263,7 +1303,7 @@ public class DeviceMapEditorForm : Form
                         float angleRad = prevSeg.Angle * MathF.PI / 180f;
                         float dx = MathF.Cos(angleRad) * prevSeg.Length * _svgScale;
                         float dy = -MathF.Sin(angleRad) * prevSeg.Length * _svgScale;
-                        if (!goesRight) dx = -dx;
+                        if (!screenGoesRight) dx = -dx;
                         segmentStart = new SKPoint(segmentStart.X + dx, segmentStart.Y + dy);
                     }
 
@@ -1271,8 +1311,8 @@ public class DeviceMapEditorForm : Form
                     float deltaX = _mousePos.X - segmentStart.X;
                     float deltaY = _mousePos.Y - segmentStart.Y;
 
-                    // Mirror X for left-side shelf
-                    if (!goesRight) deltaX = -deltaX;
+                    // Mirror X for left-side shelf (screen direction)
+                    if (!screenGoesRight) deltaX = -deltaX;
 
                     // Calculate length (in screen units, then convert to viewbox)
                     float screenLength = MathF.Sqrt(deltaX * deltaX + deltaY * deltaY);

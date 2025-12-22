@@ -9,6 +9,12 @@ namespace Asteriq.Models;
 /// </summary>
 public class DeviceMap
 {
+    /// <summary>
+    /// Path this map was loaded from (not serialized)
+    /// </summary>
+    [JsonIgnore]
+    public string? LoadedFromPath { get; set; }
+
     [JsonPropertyName("schemaVersion")]
     public string SchemaVersion { get; set; } = "1.1";
 
@@ -53,16 +59,46 @@ public class DeviceMap
         try
         {
             var json = File.ReadAllText(jsonPath);
-            return JsonSerializer.Deserialize<DeviceMap>(json, new JsonSerializerOptions
+            var map = JsonSerializer.Deserialize<DeviceMap>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
+            if (map is not null)
+            {
+                map.LoadedFromPath = jsonPath;
+            }
+            return map;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load device map from '{jsonPath}'. " +
                                                $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Save this device map back to its source file
+    /// </summary>
+    public bool Save()
+    {
+        if (string.IsNullOrEmpty(LoadedFromPath)) return false;
+
+        try
+        {
+            var json = JsonSerializer.Serialize(this, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            });
+            File.WriteAllText(LoadedFromPath, json);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to save device map to '{LoadedFromPath}'. " +
+                                               $"Error: {ex.Message}");
+            return false;
         }
     }
 }

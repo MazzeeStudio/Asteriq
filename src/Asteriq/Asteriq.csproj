@@ -6,7 +6,29 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Version configuration -->
+    <MajorVersion>0</MajorVersion>
+    <MinorVersion>7</MinorVersion>
+    <!-- Disable git hash suffix on version -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+
+  <!-- Generate build number from git commit count -->
+  <Target Name="SetBuildNumber" BeforeTargets="InitializeSourceControlInformation;GetAssemblyVersion;GenerateNuspec">
+    <Exec Command="git rev-list --count HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitCount" />
+      <Output TaskParameter="ExitCode" PropertyName="GitExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <BuildNumber Condition="'$(GitExitCode)' == '0'">$(GitCommitCount)</BuildNumber>
+      <BuildNumber Condition="'$(GitExitCode)' != '0'">0</BuildNumber>
+      <Version>$(MajorVersion).$(MinorVersion).$(BuildNumber)</Version>
+      <AssemblyVersion>$(MajorVersion).$(MinorVersion).$(BuildNumber).0</AssemblyVersion>
+      <FileVersion>$(MajorVersion).$(MinorVersion).$(BuildNumber).0</FileVersion>
+      <InformationalVersion>$(Version)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.1.0" />

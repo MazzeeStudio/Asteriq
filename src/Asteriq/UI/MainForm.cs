@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Xml.Linq;
 using Asteriq.Models;
@@ -37,6 +38,10 @@ public partial class MainForm : Form
     // Window sizing
     private const int ResizeBorder = 6;
     private const int TitleBarHeight = 75;
+
+    // Version from assembly (set at build time via MSBuild)
+    private static readonly string AppVersion = Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
     // Services
     private readonly InputService _inputService;
@@ -3709,7 +3714,7 @@ public partial class MainForm : Form
             new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 12f);
 
         // Right: version
-        FUIRenderer.DrawText(canvas, $"v0.7.0 | {DateTime.Now:HH:mm:ss}",
+        FUIRenderer.DrawText(canvas, $"v{AppVersion} | {DateTime.Now:HH:mm:ss}",
             new SKPoint(bounds.Right - 160, y + 22), FUIColors.TextDim, 12f);
     }
 

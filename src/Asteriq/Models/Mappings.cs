@@ -1,6 +1,22 @@
 namespace Asteriq.Models;
 
 /// <summary>
+/// A point on a response curve (for custom curves)
+/// </summary>
+public class CurvePoint
+{
+    public float Input { get; set; }
+    public float Output { get; set; }
+
+    public CurvePoint() { }
+    public CurvePoint(float input, float output)
+    {
+        Input = input;
+        Output = output;
+    }
+}
+
+/// <summary>
 /// Types of input sources
 /// </summary>
 public enum InputType
@@ -203,7 +219,10 @@ public class AxisCurve
     public bool Inverted { get; set; } = false;
 
     /// <summary>Custom curve control points (for CurveType.Custom)</summary>
-    public List<(float input, float output)>? ControlPoints { get; set; }
+    public List<CurvePoint>? ControlPoints { get; set; }
+
+    /// <summary>When true, custom curve is symmetrical around center (mirrored)</summary>
+    public bool Symmetrical { get; set; } = false;
 
     /// <summary>
     /// Apply the curve to an input value (-1 to 1 range)
@@ -352,8 +371,10 @@ public class AxisCurve
         // Catmull-Rom spline interpolation for smooth curves
         for (int i = 0; i < ControlPoints.Count - 1; i++)
         {
-            var (x1, y1) = ControlPoints[i];
-            var (x2, y2) = ControlPoints[i + 1];
+            var p1 = ControlPoints[i];
+            var p2 = ControlPoints[i + 1];
+            float x1 = p1.Input, y1 = p1.Output;
+            float x2 = p2.Input, y2 = p2.Output;
 
             if (x >= x1 && x <= x2)
             {
@@ -362,8 +383,8 @@ public class AxisCurve
 
                 // Get surrounding points for Catmull-Rom spline
                 // p0 = point before p1, p3 = point after p2
-                float y0 = i > 0 ? ControlPoints[i - 1].output : y1 - (y2 - y1);
-                float y3 = i < ControlPoints.Count - 2 ? ControlPoints[i + 2].output : y2 + (y2 - y1);
+                float y0 = i > 0 ? ControlPoints[i - 1].Output : y1 - (y2 - y1);
+                float y3 = i < ControlPoints.Count - 2 ? ControlPoints[i + 2].Output : y2 + (y2 - y1);
 
                 return CatmullRomInterpolate(y0, y1, y2, y3, t);
             }

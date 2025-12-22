@@ -211,11 +211,11 @@ public class AxisCurveTests
             Type = CurveType.Custom,
             Deadzone = 0f,
             Saturation = 1f,
-            ControlPoints = new List<(float input, float output)>
+            ControlPoints = new List<CurvePoint>
             {
-                (0f, 0f),
-                (0.5f, 0.25f),  // Half input maps to quarter output
-                (1f, 1f)
+                new(0f, 0f),
+                new(0.5f, 0.25f),  // Half input maps to quarter output
+                new(1f, 1f)
             }
         };
 

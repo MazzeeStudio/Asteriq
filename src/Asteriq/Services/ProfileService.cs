@@ -271,9 +271,14 @@ public class ProfileService
                 {
                     Type = mapping.Curve.Type,
                     Curvature = mapping.Curve.Curvature,
-                    Deadzone = mapping.Curve.Deadzone,
                     Saturation = mapping.Curve.Saturation,
-                    ControlPoints = mapping.Curve.ControlPoints?.ToList()
+                    DeadzoneLow = mapping.Curve.DeadzoneLow,
+                    DeadzoneCenterLow = mapping.Curve.DeadzoneCenterLow,
+                    DeadzoneCenterHigh = mapping.Curve.DeadzoneCenterHigh,
+                    DeadzoneHigh = mapping.Curve.DeadzoneHigh,
+                    DeadzoneMode = mapping.Curve.DeadzoneMode,
+                    ControlPoints = mapping.Curve.ControlPoints?.Select(p => new CurvePoint(p.Input, p.Output)).ToList(),
+                    Symmetrical = mapping.Curve.Symmetrical
                 }
             });
         }

@@ -943,10 +943,29 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, label, new SKPoint(x, y + 12), FUIColors.TextDim, 11f);
 
         var dotColor = valueColor == FUIColors.Active ? valueColor : FUIColors.Primary.WithAlpha(100);
-        float dotX = x + width - 70;
+        float dotX = x + width - 110; // Increased from 70 to 110 for more text space
         FUIRenderer.DrawGlowingDot(canvas, new SKPoint(dotX, y + 8), dotColor, 2f, 4f);
 
-        FUIRenderer.DrawText(canvas, value, new SKPoint(dotX + 10, y + 12), valueColor, 11f);
+        // Truncate value text if too long to fit in available space
+        // Available width is from text start position to right edge with padding
+        float textStartX = dotX + 10;
+        float rightEdge = x + width;
+        float maxValueWidth = rightEdge - textStartX - 8; // 8px padding from right edge
+
+        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, FUIRenderer.ScaleFont(11f));
+        string displayValue = value;
+        float textWidth = measurePaint.MeasureText(displayValue);
+
+        if (textWidth > maxValueWidth)
+        {
+            while (displayValue.Length > 1 && measurePaint.MeasureText(displayValue + "…") > maxValueWidth)
+            {
+                displayValue = displayValue.Substring(0, displayValue.Length - 1);
+            }
+            displayValue += "…";
+        }
+
+        FUIRenderer.DrawText(canvas, displayValue, new SKPoint(textStartX, y + 12), valueColor, 11f);
     }
 
     private void DrawLayerIndicator(SKCanvas canvas, float x, float y, float width, string name, bool isActive)

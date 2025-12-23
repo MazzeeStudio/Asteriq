@@ -2462,8 +2462,12 @@ public partial class MainForm
 
     private void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, bool on)
     {
+        bool isHovered = bounds.Contains(_mousePosition.X, _mousePosition.Y);
+
         // Track
-        SKColor trackColor = on ? FUIColors.Active.WithAlpha(150) : FUIColors.Background2;
+        SKColor trackColor = on
+            ? FUIColors.Active.WithAlpha(150)
+            : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
         using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = trackColor };
         canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, trackPaint);
 
@@ -2471,7 +2475,7 @@ public partial class MainForm
         using var framePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = on ? FUIColors.Active : FUIColors.Frame,
+            Color = on ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
             StrokeWidth = 1f
         };
         canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, framePaint);

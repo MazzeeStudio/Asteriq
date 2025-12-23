@@ -310,8 +310,14 @@ public partial class MainForm
             _trayIconTypeButtonBounds[i] = iconBounds;
 
             bool isSelected = _profileService.TrayIconType == trayIconValues[i];
-            var bgColor = isSelected ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
-            var frameColor = isSelected ? FUIColors.Active : FUIColors.Frame;
+            bool isHovered = iconBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+            var bgColor = isSelected
+                ? FUIColors.Active.WithAlpha(60)
+                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+            var frameColor = isSelected
+                ? FUIColors.Active
+                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isSelected ? FUIColors.TextBright : FUIColors.TextDim;
 
             using var iconBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
@@ -353,8 +359,14 @@ public partial class MainForm
             _fontSizeButtonBounds[i] = fontBounds;
 
             bool isActive = _profileService.FontSize == fontSizeValues[i];
-            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
-            var frameColor = isActive ? FUIColors.Active : FUIColors.Frame;
+            bool isHovered = fontBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+            var bgColor = isActive
+                ? FUIColors.Active.WithAlpha(60)
+                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+            var frameColor = isActive
+                ? FUIColors.Active
+                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
             using var fontBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
@@ -386,8 +398,14 @@ public partial class MainForm
             _fontFamilyButtonBounds[i] = fontFamilyBounds;
 
             bool isActive = _profileService.FontFamily == fontFamilyValues[i];
-            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
-            var frameColor = isActive ? FUIColors.Active : FUIColors.Frame;
+            bool isHovered = fontFamilyBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+            var bgColor = isActive
+                ? FUIColors.Active.WithAlpha(60)
+                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+            var frameColor = isActive
+                ? FUIColors.Active
+                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
             using var fontFamilyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
@@ -640,8 +658,14 @@ public partial class MainForm
 
     private void DrawThemeButton(SKCanvas canvas, SKRect bounds, string name, SKColor previewColor, bool isActive)
     {
-        var bgColor = isActive ? previewColor.WithAlpha(60) : FUIColors.Background2;
-        var frameColor = isActive ? previewColor : FUIColors.Frame;
+        bool isHovered = bounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+        var bgColor = isActive
+            ? previewColor.WithAlpha(60)
+            : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+        var frameColor = isActive
+            ? previewColor
+            : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
         using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };

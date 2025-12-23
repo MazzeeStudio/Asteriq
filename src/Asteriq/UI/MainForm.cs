@@ -3713,9 +3713,11 @@ public partial class MainForm : Form
         FUIRenderer.DrawText(canvas, "READY",
             new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 12f);
 
-        // Right: version
-        FUIRenderer.DrawText(canvas, $"v{AppVersion} | {DateTime.Now:HH:mm:ss}",
-            new SKPoint(bounds.Right - 160, y + 22), FUIColors.TextDim, 12f);
+        // Right: version and time
+        string versionTime = $"v{AppVersion} | {DateTime.Now:HH:mm:ss}";
+        float versionWidth = FUIRenderer.MeasureText(versionTime, 12f);
+        FUIRenderer.DrawText(canvas, versionTime,
+            new SKPoint(bounds.Right - versionWidth - 20, y + 22), FUIColors.TextDim, 12f);
     }
 
     private void DrawOverlayLayer(SKCanvas canvas, SKRect bounds)

@@ -73,8 +73,8 @@ public static class IconRenderer
         canvas.DrawPicture(svg.Picture);
         canvas.Restore();
 
-        // Add 6-pointed asterisk star in top-left corner
-        DrawAsteriskStar(canvas, size);
+        // Add 8-pointed compass star in top-left corner
+        DrawCompassStar(canvas, size);
 
         // Encode to PNG
         using var image = surface.Snapshot();
@@ -83,11 +83,11 @@ public static class IconRenderer
     }
 
     /// <summary>
-    /// Draws a 6-pointed asterisk star in the top-left corner.
+    /// Draws an 8-pointed compass star in the top-left corner.
     /// </summary>
-    private static void DrawAsteriskStar(SKCanvas canvas, int iconSize)
+    private static void DrawCompassStar(SKCanvas canvas, int iconSize)
     {
-        // Star size relative to icon size (smaller for tiny icons)
+        // Star size relative to icon size
         float starSize = iconSize switch
         {
             >= 256 => iconSize * 0.18f,  // 18% of icon size for large icons
@@ -100,32 +100,49 @@ public static class IconRenderer
         float centerX = padding + starSize / 2;
         float centerY = padding + starSize / 2;
 
-        // Draw 6-pointed asterisk (3 lines crossing at center)
+        // Draw 8-pointed star with filled triangular points
         using var paint = new SKPaint
         {
-            Style = SKPaintStyle.Stroke,
+            Style = SKPaintStyle.Fill,
             Color = ForegroundColor,
-            StrokeWidth = iconSize >= 48 ? 2.5f : 1.5f,
-            StrokeCap = SKStrokeCap.Round,
             IsAntialias = true
         };
 
-        float radius = starSize / 2;
+        float outerRadius = starSize / 2;
+        float innerRadius = outerRadius * 0.3f; // Inner circle is 30% of outer radius
+        float pointWidth = outerRadius * 0.25f; // Width of each point at the base
 
-        // Draw 3 lines at 60° intervals (creating 6 points)
-        for (int i = 0; i < 3; i++)
+        // Draw 8 points at 45° intervals
+        for (int i = 0; i < 8; i++)
         {
-            float angle = (float)(i * Math.PI / 3); // 60° in radians
+            float angle = (float)(i * Math.PI / 4); // 45° in radians
             float cos = (float)Math.Cos(angle);
             float sin = (float)Math.Sin(angle);
 
-            // Draw line from one point through center to opposite point
-            canvas.DrawLine(
-                centerX - radius * cos,
-                centerY - radius * sin,
-                centerX + radius * cos,
-                centerY + radius * sin,
-                paint);
+            // Calculate perpendicular direction for point width
+            float perpCos = (float)Math.Cos(angle + Math.PI / 2);
+            float perpSin = (float)Math.Sin(angle + Math.PI / 2);
+
+            // Create a triangular point
+            using var path = new SKPath();
+
+            // Start at the tip of the point
+            path.MoveTo(
+                centerX + outerRadius * cos,
+                centerY + outerRadius * sin);
+
+            // Left base corner
+            path.LineTo(
+                centerX + innerRadius * cos + pointWidth * perpCos,
+                centerY + innerRadius * sin + pointWidth * perpSin);
+
+            // Right base corner
+            path.LineTo(
+                centerX + innerRadius * cos - pointWidth * perpCos,
+                centerY + innerRadius * sin - pointWidth * perpSin);
+
+            path.Close();
+            canvas.DrawPath(path, paint);
         }
 
         // For larger icons, add a subtle glow effect
@@ -133,26 +150,33 @@ public static class IconRenderer
         {
             using var glowPaint = new SKPaint
             {
-                Style = SKPaintStyle.Stroke,
-                Color = ForegroundColor.WithAlpha(60),
-                StrokeWidth = paint.StrokeWidth + 2,
-                StrokeCap = SKStrokeCap.Round,
+                Style = SKPaintStyle.Fill,
+                Color = ForegroundColor.WithAlpha(40),
                 IsAntialias = true,
-                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 2f)
+                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3f)
             };
 
-            for (int i = 0; i < 3; i++)
+            // Draw glow layer slightly larger
+            for (int i = 0; i < 8; i++)
             {
-                float angle = (float)(i * Math.PI / 3);
+                float angle = (float)(i * Math.PI / 4);
                 float cos = (float)Math.Cos(angle);
                 float sin = (float)Math.Sin(angle);
+                float perpCos = (float)Math.Cos(angle + Math.PI / 2);
+                float perpSin = (float)Math.Sin(angle + Math.PI / 2);
 
-                canvas.DrawLine(
-                    centerX - radius * cos,
-                    centerY - radius * sin,
-                    centerX + radius * cos,
-                    centerY + radius * sin,
-                    glowPaint);
+                using var path = new SKPath();
+                path.MoveTo(
+                    centerX + outerRadius * cos,
+                    centerY + outerRadius * sin);
+                path.LineTo(
+                    centerX + innerRadius * cos + pointWidth * perpCos,
+                    centerY + innerRadius * sin + pointWidth * perpSin);
+                path.LineTo(
+                    centerX + innerRadius * cos - pointWidth * perpCos,
+                    centerY + innerRadius * sin - pointWidth * perpSin);
+                path.Close();
+                canvas.DrawPath(path, glowPaint);
             }
         }
     }

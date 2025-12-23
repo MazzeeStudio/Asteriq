@@ -41,4 +41,14 @@ public class AppSettings
 
     // System tray settings
     public bool CloseToTray { get; set; } = false; // Default: clicking X exits the app
+    public TrayIconType TrayIconType { get; set; } = TrayIconType.Joystick; // Default: joystick icon
+}
+
+/// <summary>
+/// System tray icon type options
+/// </summary>
+public enum TrayIconType
+{
+    Joystick,
+    Throttle
 }

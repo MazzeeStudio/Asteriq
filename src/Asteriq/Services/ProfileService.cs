@@ -640,6 +640,24 @@ public class ProfileService
     }
 
     /// <summary>
+    /// Get or set the system tray icon type (joystick or throttle)
+    /// </summary>
+    public TrayIconType TrayIconType
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.TrayIconType;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.TrayIconType = value;
+            SaveSettings(settings);
+        }
+    }
+
+    /// <summary>
     /// Activate a profile by ID, making it the current active profile
     /// </summary>
     public bool ActivateProfile(Guid profileId)

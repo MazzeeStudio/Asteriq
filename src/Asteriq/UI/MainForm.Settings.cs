@@ -67,7 +67,7 @@ public partial class MainForm
 
             float nameTextY = y + (nameBoxHeight - FUIRenderer.ScaleFont(FUIRenderer.FontBody)) / 2 + FUIRenderer.ScaleFont(FUIRenderer.FontBody) - 3;
             FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, FUIRenderer.FontBody, true);
-            y += nameBoxHeight + FUIRenderer.ScaleLineHeight(12f);
+            y += nameBoxHeight + FUIRenderer.ScaleLineHeight(24f);
 
             // Profile stats section
             float lineHeight = metrics.RowHeight;

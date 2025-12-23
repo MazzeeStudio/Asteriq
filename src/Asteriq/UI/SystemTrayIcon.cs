@@ -2,6 +2,7 @@ using SkiaSharp;
 using Svg.Skia;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using Asteriq.Models;
 
 namespace Asteriq.UI;
 
@@ -12,13 +13,15 @@ namespace Asteriq.UI;
 public sealed class SystemTrayIcon : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
-    private readonly string _svgPath;
+    private string _svgPath;
     private bool _isActive;
     private Icon? _currentIcon;
+    private TrayIconType _iconType;
 
-    public SystemTrayIcon(string toolTipText = "Asteriq")
+    public SystemTrayIcon(string toolTipText = "Asteriq", TrayIconType iconType = TrayIconType.Joystick)
     {
-        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "joystick.svg");
+        _iconType = iconType;
+        UpdateSvgPath();
         _notifyIcon = new NotifyIcon
         {
             Text = toolTipText,
@@ -66,9 +69,9 @@ public sealed class SystemTrayIcon : IDisposable
                 // Render SVG to SKBitmap
                 var bounds = svg.Picture.CullRect;
 
-                // Scale to fill more of the canvas - multiply by 1.8 to make icon bigger
+                // Scale to fill more of the canvas - multiply by 1.5 to make icon bigger without clipping
                 var baseScale = Math.Min(size / bounds.Width, size / bounds.Height);
-                var scale = baseScale * 1.8f;
+                var scale = baseScale * 1.5f;
 
                 using var surface = SKSurface.Create(new SKImageInfo(size, size));
                 var canvas = surface.Canvas;
@@ -207,6 +210,27 @@ public sealed class SystemTrayIcon : IDisposable
     public void RefreshThemeColors()
     {
         UpdateIcon();
+    }
+
+    /// <summary>
+    /// Change the icon type (joystick or throttle) and regenerate.
+    /// </summary>
+    public void SetIconType(TrayIconType iconType)
+    {
+        if (_iconType == iconType) return;
+
+        _iconType = iconType;
+        UpdateSvgPath();
+        UpdateIcon();
+    }
+
+    /// <summary>
+    /// Update the SVG path based on current icon type.
+    /// </summary>
+    private void UpdateSvgPath()
+    {
+        var svgFileName = _iconType == TrayIconType.Joystick ? "joystick.svg" : "throttle.svg";
+        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", svgFileName);
     }
 
     /// <summary>

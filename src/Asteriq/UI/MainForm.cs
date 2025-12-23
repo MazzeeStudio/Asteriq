@@ -326,6 +326,7 @@ public partial class MainForm : Form
     private SKRect _bgVignetteSliderBounds;
     private SKRect _autoLoadToggleBounds;
     private SKRect _closeToTrayToggleBounds;
+    private SKRect[] _trayIconTypeButtonBounds = new SKRect[2];  // Joystick, Throttle
     private string? _draggingBgSlider;  // Which slider is being dragged
 
     // Star Citizen bindings tab state
@@ -465,7 +466,7 @@ public partial class MainForm : Form
         _mappingEngine = new MappingEngine(_vjoyService);
 
         // Initialize system tray icon
-        _trayIcon = new SystemTrayIcon($"Asteriq v{s_appVersion}");
+        _trayIcon = new SystemTrayIcon($"Asteriq v{s_appVersion}", _profileService.TrayIconType);
         InitializeTrayMenu();
 
         InitializeForm();

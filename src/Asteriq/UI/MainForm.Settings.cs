@@ -288,6 +288,50 @@ public partial class MainForm
         DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _profileService.CloseToTray);
         y += rowHeight + sectionSpacing;
 
+        // Tray icon type selection (Joystick / Throttle)
+        TrayIconType[] trayIconValues = { TrayIconType.Joystick, TrayIconType.Throttle };
+        string[] trayIconLabels = { "Joystick", "Throttle" };
+        float iconBtnWidth = 72f;   // 4px aligned
+        float iconBtnHeight = 32f;  // 4px aligned
+        float iconBtnGap = 4f;      // 4px aligned
+        float iconBtnsWidth = iconBtnWidth * 2 + iconBtnGap;
+        float iconLabelMaxWidth = contentWidth - iconBtnsWidth - minControlGap;
+
+        FUIRenderer.DrawTextTruncated(canvas, "Tray icon", new SKPoint(leftMargin, y + 6),
+            iconLabelMaxWidth, FUIColors.TextPrimary, 11f);
+
+        float iconBtnsStartX = rightMargin - iconBtnsWidth;
+
+        for (int i = 0; i < trayIconValues.Length; i++)
+        {
+            var iconBounds = new SKRect(
+                iconBtnsStartX + i * (iconBtnWidth + iconBtnGap), y,
+                iconBtnsStartX + i * (iconBtnWidth + iconBtnGap) + iconBtnWidth, y + iconBtnHeight);
+            _trayIconTypeButtonBounds[i] = iconBounds;
+
+            bool isSelected = _profileService.TrayIconType == trayIconValues[i];
+            var bgColor = isSelected ? FUIColors.Active : FUIColors.Background2;
+            var textColor = isSelected ? FUIColors.TextPrimary : FUIColors.TextDim;
+
+            using var iconBgPaint = new SKPaint { Color = bgColor, IsAntialias = true };
+            canvas.DrawRoundRect(iconBounds, 4, 4, iconBgPaint);
+
+            using var iconBorderPaint = new SKPaint
+            {
+                Color = isSelected ? FUIColors.Active : FUIColors.FrameDim,
+                IsAntialias = true,
+                IsStroke = true,
+                StrokeWidth = 1
+            };
+            canvas.DrawRoundRect(iconBounds, 4, 4, iconBorderPaint);
+
+            FUIRenderer.DrawText(canvas, trayIconLabels[i],
+                new SKPoint(iconBounds.MidX - FUIRenderer.MeasureText(trayIconLabels[i], 10f) / 2,
+                    iconBounds.MidY + FUIRenderer.ScaleFont(10f) / 2 - 2),
+                textColor, 10f);
+        }
+        y += iconBtnHeight + sectionSpacing;
+
         // Font size section - show Windows scale factor and adjustment buttons
         FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
         string[] fontSizeLabels = { "-", "=", "+" };
@@ -607,6 +651,7 @@ public partial class MainForm
             {
                 FUIColors.SetTheme(themes[i]);
                 _profileService.Theme = themes[i];
+                _trayIcon.RefreshThemeColors();  // Update tray icon with new theme color
                 _canvas.Invalidate();
                 return;
             }
@@ -626,6 +671,19 @@ public partial class MainForm
             _profileService.CloseToTray = !_profileService.CloseToTray;
             _canvas.Invalidate();
             return;
+        }
+
+        // Check tray icon type button clicks
+        for (int i = 0; i < _trayIconTypeButtonBounds.Length; i++)
+        {
+            if (_trayIconTypeButtonBounds[i].Contains(pt))
+            {
+                var newType = (TrayIconType)i;
+                _profileService.TrayIconType = newType;
+                _trayIcon.SetIconType(newType);
+                _canvas.Invalidate();
+                return;
+            }
         }
 
         // Check background slider clicks (start drag)

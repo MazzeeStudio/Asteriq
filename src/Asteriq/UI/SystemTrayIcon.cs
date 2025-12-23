@@ -65,13 +65,16 @@ public sealed class SystemTrayIcon : IDisposable
             {
                 // Render SVG to SKBitmap
                 var bounds = svg.Picture.CullRect;
-                var scale = Math.Min(size / bounds.Width, size / bounds.Height);
+
+                // Scale to fill more of the canvas - multiply by 1.8 to make icon bigger
+                var baseScale = Math.Min(size / bounds.Width, size / bounds.Height);
+                var scale = baseScale * 1.8f;
 
                 using var surface = SKSurface.Create(new SKImageInfo(size, size));
                 var canvas = surface.Canvas;
                 canvas.Clear(SKColors.Transparent);
 
-                // Center and scale
+                // Center the scaled icon
                 canvas.Translate((size - bounds.Width * scale) / 2, (size - bounds.Height * scale) / 2);
                 canvas.Scale(scale);
 

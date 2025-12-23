@@ -8,7 +8,7 @@ namespace Asteriq.UI;
 
 /// <summary>
 /// Manages the system tray icon with color-changing based on forwarding state.
-/// Loads joystick.svg and colorizes it based on forwarding state and current theme.
+/// Loads throttle.svg (or joystick.svg) and colorizes it based on forwarding state and current theme.
 /// </summary>
 public sealed class SystemTrayIcon : IDisposable
 {
@@ -18,7 +18,7 @@ public sealed class SystemTrayIcon : IDisposable
     private Icon? _currentIcon;
     private TrayIconType _iconType;
 
-    public SystemTrayIcon(string toolTipText = "Asteriq", TrayIconType iconType = TrayIconType.Joystick)
+    public SystemTrayIcon(string toolTipText = "Asteriq", TrayIconType iconType = TrayIconType.Throttle)
     {
         _iconType = iconType;
         UpdateSvgPath();

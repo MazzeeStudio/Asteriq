@@ -87,6 +87,11 @@ public partial class MainForm : Form
     private float _dashPhase = 0f;
     private float _pulsePhase = 0f;
     private float _leadLineProgress = 0f;
+
+    // Performance optimization
+    private bool _isDirty = true;  // Force initial render
+    private bool _enableAnimations = true;  // Can be toggled for performance
+
     private int _hoveredDevice = -1;
     private int _selectedDevice = -1;  // Start with no selection, will be set in RefreshDevices
     private List<PhysicalDeviceInfo> _devices = new();
@@ -1558,22 +1563,37 @@ public partial class MainForm : Form
 
     private void OnAnimationTick(object? sender, EventArgs e)
     {
-        // Update animation states
-        _scanLineProgress += 0.005f;
-        if (_scanLineProgress > 1f) _scanLineProgress = 0f;
+        bool needsUpdate = false;
 
-        _dashPhase += 0.5f;
-        if (_dashPhase > 10f) _dashPhase = 0f;
+        // Only update animations if enabled
+        if (_enableAnimations)
+        {
+            // Update animation states
+            _scanLineProgress += 0.005f;
+            if (_scanLineProgress > 1f) _scanLineProgress = 0f;
 
-        _pulsePhase += 0.05f;
-        if (_pulsePhase > MathF.PI * 2) _pulsePhase = 0f;
+            _dashPhase += 0.5f;
+            if (_dashPhase > 10f) _dashPhase = 0f;
 
-        // Lead line animation
-        _leadLineProgress += 0.02f;
-        if (_leadLineProgress > 1.3f) _leadLineProgress = 0f;
+            _pulsePhase += 0.05f;
+            if (_pulsePhase > MathF.PI * 2) _pulsePhase = 0f;
+
+            // Lead line animation
+            _leadLineProgress += 0.02f;
+            if (_leadLineProgress > 1.3f) _leadLineProgress = 0f;
+
+            // Update background animations
+            _background.Update(0.016f);
+
+            needsUpdate = true;
+        }
 
         // Update active input animations (~16ms per tick = 0.016s)
-        _activeInputTracker.UpdateAnimations(0.016f);
+        // Always update these as they track real device input
+        if (_activeInputTracker.UpdateAnimations(0.016f))
+        {
+            needsUpdate = true;
+        }
 
         // Check for SC binding input when in listening mode
         if (_activeTab == 2 && _scIsListeningForInput)
@@ -1581,10 +1601,12 @@ public partial class MainForm : Form
             CheckSCBindingInput();
         }
 
-        // Update background animations
-        _background.Update(0.016f);
-
-        _canvas.Invalidate();
+        // Only invalidate if animations ran or something is dirty
+        if (needsUpdate || _isDirty)
+        {
+            _canvas.Invalidate();
+            _isDirty = false;
+        }
     }
 
     private void RefreshDevices()

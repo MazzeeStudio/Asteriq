@@ -170,17 +170,22 @@ public class ActiveInputTracker
     /// <summary>
     /// Update animation progress for all active inputs
     /// </summary>
-    public void UpdateAnimations(float deltaTime)
+    /// <returns>True if any inputs are animating (need redraw), false otherwise</returns>
+    public bool UpdateAnimations(float deltaTime)
     {
         lock (_lock)
         {
+            bool anyAnimating = false;
             foreach (var input in _activeInputs.Values)
             {
                 if (input.AppearProgress < 1f)
                 {
                     input.AppearProgress = Math.Min(1f, input.AppearProgress + deltaTime * 3f); // 0.33s to appear
+                    anyAnimating = true;
                 }
             }
+            // Also return true if any inputs are visible (even if not animating)
+            return anyAnimating || _activeInputs.Count > 0;
         }
     }
 

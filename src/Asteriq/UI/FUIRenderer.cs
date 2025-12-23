@@ -199,6 +199,82 @@ public static class FUIRenderer
     /// </summary>
     public static bool IsLargeWindow(float windowWidth) => windowWidth >= BreakpointLarge;
 
+    /// <summary>
+    /// Layout result for responsive panel calculations
+    /// </summary>
+    public struct ResponsiveLayout
+    {
+        public float LeftPanelWidth;
+        public float CenterWidth;
+        public float RightPanelWidth;
+        public float Gutter;
+        public bool ShowLeftPanel;
+        public bool ShowRightPanel;
+        public bool IsCompact;
+    }
+
+    /// <summary>
+    /// Calculate responsive three-column layout based on window width
+    /// </summary>
+    public static ResponsiveLayout CalculateLayout(float contentWidth, float minLeftPanel = 320f, float minRightPanel = 280f)
+    {
+        float gutter = GetGutter(contentWidth);
+        bool isSmall = IsSmallWindow(contentWidth);
+        bool isLarge = IsLargeWindow(contentWidth);
+
+        if (isSmall)
+        {
+            // Single column - full width, no side panels
+            return new ResponsiveLayout
+            {
+                LeftPanelWidth = contentWidth,
+                CenterWidth = 0,
+                RightPanelWidth = 0,
+                Gutter = gutter,
+                ShowLeftPanel = true,
+                ShowRightPanel = false,
+                IsCompact = true
+            };
+        }
+        else if (isLarge)
+        {
+            // Three columns with minimum widths respected
+            float availableForPanels = contentWidth - gutter * 2;
+            float leftWidth = Math.Max(minLeftPanel, availableForPanels * 0.28f);
+            float rightWidth = Math.Max(minRightPanel, availableForPanels * 0.24f);
+            float centerWidth = availableForPanels - leftWidth - rightWidth;
+
+            return new ResponsiveLayout
+            {
+                LeftPanelWidth = leftWidth,
+                CenterWidth = centerWidth,
+                RightPanelWidth = rightWidth,
+                Gutter = gutter,
+                ShowLeftPanel = true,
+                ShowRightPanel = true,
+                IsCompact = false
+            };
+        }
+        else
+        {
+            // Medium: Two columns - left panel + combined center/right
+            float availableWidth = contentWidth - gutter;
+            float leftWidth = Math.Max(minLeftPanel, availableWidth * 0.40f);
+            float rightWidth = availableWidth - leftWidth;
+
+            return new ResponsiveLayout
+            {
+                LeftPanelWidth = leftWidth,
+                CenterWidth = rightWidth,
+                RightPanelWidth = 0,
+                Gutter = gutter,
+                ShowLeftPanel = true,
+                ShowRightPanel = false,
+                IsCompact = false
+            };
+        }
+    }
+
     #region Frame Drawing
 
     public static SKPath CreateFrame(SKRect bounds, float cornerSize = CornerRadius)

@@ -40,6 +40,11 @@ public partial class MainForm
         float y = metrics.Y;
         float leftMargin = metrics.LeftMargin;
         float rightMargin = metrics.RightMargin;
+        float bottom = bounds.Bottom - frameInset - FUIRenderer.SpaceLG;
+
+        // Clip content to panel bounds to prevent overflow
+        canvas.Save();
+        canvas.ClipRect(new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom - frameInset));
 
         // Panel title
         y = FUIRenderer.DrawPanelHeader(canvas, "PROFILE MANAGEMENT", leftMargin, y);
@@ -111,8 +116,8 @@ public partial class MainForm
             profile is not null ? "Export" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
-        // Delete button (danger)
-        if (profile is not null)
+        // Delete button (danger) - only draw if space available
+        if (profile is not null && y + buttonHeight <= bottom)
         {
             var deleteBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
             using var delBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(30) };
@@ -124,9 +129,15 @@ public partial class MainForm
             FUIRenderer.DrawTextCentered(canvas, "Delete Profile", deleteBounds, FUIColors.Danger, 11f);
             y += buttonHeight + FUIRenderer.ScaleLineHeight(20f);
 
-            // Shift Layers section
-            DrawShiftLayersSection(canvas, leftMargin, rightMargin, y, bounds.Bottom - FUIRenderer.FrameInset - FUIRenderer.SpaceLG, profile);
+            // Shift Layers section (only if space available)
+            if (y < bottom - 60)
+            {
+                DrawShiftLayersSection(canvas, leftMargin, rightMargin, y, bottom, profile);
+            }
         }
+
+        // Restore clip state
+        canvas.Restore();
     }
 
     private void DrawShiftLayersSection(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom, MappingProfile profile)
@@ -216,9 +227,9 @@ public partial class MainForm
     private void DrawApplicationSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         // Split into left (system settings) and right (visual settings) sub-panels
-        float gap = 10f;
-        float leftWidth = (bounds.Width - gap) * 0.45f;  // System settings - narrower
-        float rightWidth = (bounds.Width - gap) * 0.55f; // Visual settings - wider for sliders
+        float gap = FUIRenderer.SpaceSM;  // 8px - was 10f
+        float leftWidth = (bounds.Width - gap) * 0.52f;  // System settings - more space for labels
+        float rightWidth = (bounds.Width - gap) * 0.48f; // Visual settings
 
         var leftBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + leftWidth, bounds.Bottom);
         var rightBounds = new SKRect(bounds.Left + leftWidth + gap, bounds.Top, bounds.Right, bounds.Bottom);
@@ -260,7 +271,7 @@ public partial class MainForm
         float toggleHeight = 24f;  // 4px aligned - was 22f, meets TouchTargetMinHeight
         float autoLoadLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float autoLoadLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
-        FUIRenderer.DrawTextTruncated(canvas, "Auto-load last profile", new SKPoint(leftMargin, autoLoadLabelY),
+        FUIRenderer.DrawTextTruncated(canvas, "Auto-load profile", new SKPoint(leftMargin, autoLoadLabelY),
             autoLoadLabelMaxWidth, FUIColors.TextPrimary, 11f);
         float toggleY = y + (rowHeight - toggleHeight) / 2;  // Center toggle in row
         _autoLoadToggleBounds = new SKRect(rightMargin - toggleWidth, toggleY, rightMargin, toggleY + toggleHeight);
@@ -311,7 +322,7 @@ public partial class MainForm
 
         var devices = _vjoyService.EnumerateDevices();
         bool vjoyEnabled = devices.Count > 0;
-        string vjoyStatus = vjoyEnabled ? "Driver installed and active" : "Driver not available";
+        string vjoyStatus = vjoyEnabled ? "Driver active" : "Not available";
         var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
 
         // Measure text height for proper vertical centering of dot
@@ -345,13 +356,13 @@ public partial class MainForm
         float textVerticalOffset = (fieldHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 2;
         float labelY = y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Key repeat delay (ms)", new SKPoint(leftMargin, labelY),
+        FUIRenderer.DrawTextTruncated(canvas, "Repeat delay (ms)", new SKPoint(leftMargin, labelY),
             labelMaxWidth, FUIColors.TextPrimary, 11f);
         DrawSettingsValueField(canvas, new SKRect(rightMargin - fieldWidth, y, rightMargin, y + fieldHeight), "50");
         y += fieldHeight + 8;
 
         labelY = y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4;
-        FUIRenderer.DrawTextTruncated(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, labelY),
+        FUIRenderer.DrawTextTruncated(canvas, "Repeat rate (ms)", new SKPoint(leftMargin, labelY),
             labelMaxWidth, FUIColors.TextPrimary, 11f);
         DrawSettingsValueField(canvas, new SKRect(rightMargin - fieldWidth, y, rightMargin, y + fieldHeight), "30");
     }

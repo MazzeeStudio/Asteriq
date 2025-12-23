@@ -1076,7 +1076,7 @@ public partial class MainForm : Form
     private void InitializeForm()
     {
         Text = "Asteriq";
-        MinimumSize = new Size(1024, 768);
+        MinimumSize = new Size(1024, 1000);  // Increased to fit Settings panel content
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Color.Black;
         DoubleBuffered = true;
@@ -2408,10 +2408,13 @@ public partial class MainForm : Form
             }
         }
 
-        // Device list hover detection
+        // Device list hover detection - use same responsive layout as DrawStructureLayer
         float sideTabPad = FUIRenderer.SpaceSM;  // 8px - Reduced padding for side-tabbed panels
+        float contentPad = FUIRenderer.SpaceXL;  // 24px
         float contentTop = 88;  // 4px aligned - matches DrawStructureLayer
-        float leftPanelWidth = 400f;  // Matches Settings panel width
+        float contentWidth = ClientSize.Width - sideTabPad - contentPad;
+        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f);
+        float leftPanelWidth = layout.LeftPanelWidth;
         float sideTabWidth = 28f;
 
         if (e.X >= sideTabPad + sideTabWidth && e.X <= sideTabPad + leftPanelWidth)
@@ -3194,17 +3197,22 @@ public partial class MainForm : Form
 
         // Main content area - all values 4px aligned
         float pad = FUIRenderer.SpaceXL;  // 24px
-        float gap = FUIRenderer.SpaceLG;  // 16px
-        float contentTop = 88;  // 4px aligned - was 90
-        float contentBottom = bounds.Bottom - 56;  // 4px aligned - was 55
+        float contentTop = 88;  // 4px aligned
+        float contentBottom = bounds.Bottom - 56;  // 4px aligned
 
-        // Calculate panel widths
-        // Side-tabbed panels (Devices, Mappings) use reduced left padding to put tabs closer to edge
+        // Calculate responsive panel widths based on window size
+        // Side-tabbed panels (Devices, Mappings) use reduced left padding
         float sideTabPad = FUIRenderer.SpaceSM;  // 8px
-        float leftPanelWidth = 400f;  // Match Settings panel width
-        float rightPanelWidth = 328f;  // 4px aligned - was 330f
+        float contentWidth = bounds.Width - sideTabPad - pad;
+        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f);
+
+        float leftPanelWidth = layout.LeftPanelWidth;
+        float rightPanelWidth = layout.RightPanelWidth;
+        float gap = layout.Gutter;
         float centerStart = sideTabPad + leftPanelWidth + gap;
-        float centerEnd = bounds.Right - pad - rightPanelWidth - gap;
+        float centerEnd = layout.ShowRightPanel
+            ? bounds.Right - pad - rightPanelWidth - gap
+            : bounds.Right - pad;
 
         // Content based on active tab
         if (_activeTab == 1) // MAPPINGS tab
@@ -3231,17 +3239,21 @@ public partial class MainForm : Form
             DrawDeviceDetailsPanel(canvas, detailsBounds);
 
             // Right panel: Split into Device Actions (top) and Status (bottom)
-            float rightPanelX = bounds.Right - pad - rightPanelWidth;
-            float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
-            float panelGap = 8f;
+            // Only show if window is large enough for three columns
+            if (layout.ShowRightPanel)
+            {
+                float rightPanelX = bounds.Right - pad - rightPanelWidth;
+                float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
+                float panelGap = FUIRenderer.SpaceSM;  // 8px
 
-            // Top half: Device Actions panel
-            var deviceActionsBounds = new SKRect(rightPanelX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
-            DrawDeviceActionsPanel(canvas, deviceActionsBounds);
+                // Top half: Device Actions panel
+                var deviceActionsBounds = new SKRect(rightPanelX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
+                DrawDeviceActionsPanel(canvas, deviceActionsBounds);
 
-            // Bottom half: Status panel
-            var statusBounds = new SKRect(rightPanelX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
-            DrawStatusPanel(canvas, statusBounds);
+                // Bottom half: Status panel
+                var statusBounds = new SKRect(rightPanelX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
+                DrawStatusPanel(canvas, statusBounds);
+            }
         }
 
         // Status bar

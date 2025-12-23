@@ -1,72 +1,136 @@
 {
-  "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
   "device": "Generic Throttle",
   "deviceType": "Throttle",
   "svgFile": "throttle.svg",
-  "viewBox": { "x": 2048, "y": 2048 },
+  "mirror": false,
+  "viewBox": {
+    "x": 2048,
+    "y": 2048
+  },
   "controls": {
     "throttle_main": {
       "id": "control_throttle",
       "type": "Slider",
-      "bindings": ["z", "throttle"],
+      "bindings": [
+        "z",
+        "throttle"
+      ],
       "label": "Throttle",
       "description": "Primary throttle lever",
-      "anchor": { "x": 800, "y": 1000 },
-      "labelOffset": { "x": -150, "y": 0 }
+      "anchor": {
+        "x": 880.8864,
+        "y": 767.313
+      },
+      "labelOffset": {
+        "x": 103.87811,
+        "y": -69.252075
+      }
     },
     "throttle_left": {
       "id": "control_throttle_left",
       "type": "Slider",
-      "bindings": ["slider1"],
+      "bindings": [
+        "slider1"
+      ],
       "label": "Left Throttle",
       "description": "Left engine throttle (dual throttle)",
-      "anchor": { "x": 700, "y": 900 },
-      "labelOffset": { "x": -160, "y": -40 }
+      "anchor": {
+        "x": 468.14404,
+        "y": 95.56786
+      },
+      "labelOffset": {
+        "x": -243.76732,
+        "y": -87.257614
+      }
     },
     "throttle_right": {
       "id": "control_throttle_right",
       "type": "Slider",
-      "bindings": ["slider2"],
+      "bindings": [
+        "slider2"
+      ],
       "label": "Right Throttle",
       "description": "Right engine throttle (dual throttle)",
-      "anchor": { "x": 900, "y": 900 },
-      "labelOffset": { "x": 160, "y": -40 }
+      "anchor": {
+        "x": 757.61774,
+        "y": 160.66483
+      },
+      "labelOffset": {
+        "x": 182.8255,
+        "y": -114.95845
+      }
     },
     "ministick": {
       "id": "control_ministick",
       "type": "Ministick",
-      "bindings": ["rx", "ry", "button15"],
+      "bindings": [
+        "rx",
+        "ry",
+        "button15"
+      ],
       "label": "Ministick",
       "description": "Analog ministick with push button",
-      "anchor": { "x": 600, "y": 500 },
-      "labelOffset": { "x": -140, "y": 0 }
+      "anchor": {
+        "x": 825.48474,
+        "y": 186.9806
+      },
+      "labelOffset": {
+        "x": 114.958496,
+        "y": -62.326866
+      }
     },
     "encoder1": {
       "id": "control_encoder1",
       "type": "Encoder",
-      "bindings": ["button20", "button21"],
+      "bindings": [
+        "button20",
+        "button21"
+      ],
       "label": "Rotary 1",
       "description": "Rotary encoder (CW/CCW as button presses)",
-      "anchor": { "x": 400, "y": 400 },
-      "labelOffset": { "x": -120, "y": -50 }
+      "anchor": {
+        "x": 385.04156,
+        "y": 113.57341
+      },
+      "labelOffset": {
+        "x": -128.80887,
+        "y": -54.016624
+      }
     },
     "button1": {
       "id": "control_button1",
       "type": "Button",
-      "bindings": ["button1"],
+      "bindings": [
+        "button1"
+      ],
       "label": "Button 1",
-      "anchor": { "x": 500, "y": 600 },
-      "labelOffset": { "x": -100, "y": -30 }
+      "anchor": {
+        "x": 782.54846,
+        "y": 326.8698
+      },
+      "labelOffset": {
+        "x": 92.79773,
+        "y": -44.32132
+      }
     },
     "toggle1": {
       "id": "control_toggle1",
       "type": "Toggle",
-      "bindings": ["button10", "button11"],
+      "bindings": [
+        "button10",
+        "button11"
+      ],
       "label": "Toggle 1",
       "description": "Two-position toggle switch (up/down positions)",
-      "anchor": { "x": 300, "y": 700 },
-      "labelOffset": { "x": -130, "y": 0 }
+      "anchor": {
+        "x": 331.02493,
+        "y": 455.67868
+      },
+      "labelOffset": {
+        "x": -116.34349,
+        "y": -95.56787
+      }
     }
   }
 }

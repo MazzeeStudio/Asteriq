@@ -679,6 +679,64 @@ public static class FUIRenderer
 
     #endregion
 
+    #region Semantic Typography Helpers
+
+    /// <summary>
+    /// Draws caption text (12px) - for labels, secondary text, metadata
+    /// This is the minimum readable size per Windows UX guidelines
+    /// </summary>
+    public static void DrawCaption(SKCanvas canvas, string text, SKPoint position,
+        SKColor? color = null, bool withGlow = false)
+    {
+        DrawText(canvas, text, position, color ?? FUIColors.TextDim, FontCaption, withGlow);
+    }
+
+    /// <summary>
+    /// Draws body text (14px) - for primary content
+    /// </summary>
+    public static void DrawBody(SKCanvas canvas, string text, SKPoint position,
+        SKColor? color = null, bool withGlow = false)
+    {
+        DrawText(canvas, text, position, color ?? FUIColors.TextPrimary, FontBody, withGlow);
+    }
+
+    /// <summary>
+    /// Draws subtitle text (20px semibold) - for section headers
+    /// </summary>
+    public static void DrawSubtitle(SKCanvas canvas, string text, SKPoint position,
+        SKColor? color = null, bool withGlow = false)
+    {
+        // Note: Currently using same weight, could add bold parameter if needed
+        DrawText(canvas, text, position, color ?? FUIColors.TextBright, FontSubtitle, withGlow);
+    }
+
+    /// <summary>
+    /// Draws title text (28px) - for panel/page titles
+    /// </summary>
+    public static void DrawTitle(SKCanvas canvas, string text, SKPoint position,
+        SKColor? color = null, bool withGlow = false)
+    {
+        DrawText(canvas, text, position, color ?? FUIColors.TextBright, FontTitle, withGlow);
+    }
+
+    /// <summary>
+    /// Gets the scaled line height for a given typography style
+    /// </summary>
+    public static float GetLineHeight(float fontSize)
+    {
+        // Map font sizes to their line heights
+        return fontSize switch
+        {
+            <= FontCaption => ScaleLineHeight(LineHeightCaption),
+            <= FontBody => ScaleLineHeight(LineHeightBody),
+            <= FontBodyLarge => ScaleLineHeight(LineHeightBodyLarge),
+            <= FontSubtitle => ScaleLineHeight(LineHeightSubtitle),
+            _ => ScaleLineHeight(LineHeightTitle)
+        };
+    }
+
+    #endregion
+
     #region Window Controls
 
     public static void DrawWindowControls(SKCanvas canvas, float x, float y,
@@ -814,6 +872,79 @@ public static class FUIRenderer
             ImageFilter = SKImageFilter.CreateBlur(blur, blur)
         };
         canvas.DrawRect(shadowBounds, shadowPaint);
+    }
+
+    #endregion
+
+    #region Panel Layout Helpers
+
+    /// <summary>
+    /// Stores layout metrics for a panel - reduces repeated calculations
+    /// </summary>
+    public struct PanelMetrics
+    {
+        public float Y;              // Current Y position for content
+        public float LeftMargin;     // Left content edge
+        public float RightMargin;    // Right content edge
+        public float ContentWidth;   // Available content width
+        public float RowHeight;      // Standard row height
+        public float SectionSpacing; // Space between sections
+    }
+
+    /// <summary>
+    /// Draws standard panel chrome (background + L-corner frame) and returns layout metrics
+    /// </summary>
+    public static PanelMetrics DrawPanelChrome(SKCanvas canvas, SKRect bounds, SKColor? frameColor = null)
+    {
+        frameColor ??= FUIColors.Primary;
+
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(FrameInset, FrameInset), bgPaint);
+        DrawLCornerFrame(canvas, bounds, frameColor.Value, 30f, 8f);
+
+        // Calculate standard layout metrics
+        float cornerPadding = SpaceXL;  // 24px
+        return new PanelMetrics
+        {
+            Y = bounds.Top + FrameInset + cornerPadding,
+            LeftMargin = bounds.Left + FrameInset + cornerPadding,
+            RightMargin = bounds.Right - FrameInset - SpaceLG,
+            ContentWidth = (bounds.Right - FrameInset - SpaceLG) - (bounds.Left + FrameInset + cornerPadding),
+            RowHeight = ScaleLineHeight(LineHeightBody),
+            SectionSpacing = ScaleLineHeight(LineHeightBody)
+        };
+    }
+
+    /// <summary>
+    /// Draws a panel title with glow effect and returns updated Y position
+    /// </summary>
+    public static float DrawPanelHeader(SKCanvas canvas, string title, float x, float y)
+    {
+        DrawText(canvas, title, new SKPoint(x, y), FUIColors.TextBright, FontBody, true);
+        return y + ScaleLineHeight(LineHeightTitle);  // 36px line height for title
+    }
+
+    /// <summary>
+    /// Draws a section header (caption style) and returns updated Y position
+    /// </summary>
+    public static float DrawSectionHeader(SKCanvas canvas, string text, float x, float y)
+    {
+        DrawCaption(canvas, text, new SKPoint(x, y));
+        return y + ScaleLineHeight(LineHeightBody);  // Add standard line height after header
+    }
+
+    /// <summary>
+    /// Calculates row Y positions based on line count
+    /// </summary>
+    public static float AdvanceRow(float currentY, float lineHeight = 0)
+    {
+        return currentY + (lineHeight > 0 ? lineHeight : ScaleLineHeight(LineHeightBody));
     }
 
     #endregion

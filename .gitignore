@@ -31,5 +31,9 @@ Thumbs.db
 # Project specific
 *.log
 
+# Generated files
+src/Asteriq/asteriq.ico
+test.ico
+
 # Mockups (design exploration, not part of main codebase)
 mockups/

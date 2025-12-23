@@ -12,6 +12,9 @@
     <MinorVersion>7</MinorVersion>
     <!-- Disable git hash suffix on version -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <!-- Application icon -->
+    <ApplicationIcon>asteriq.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Generate build number from git commit count -->
@@ -28,6 +31,21 @@
       <FileVersion>$(MajorVersion).$(MinorVersion).$(BuildNumber).0</FileVersion>
       <InformationalVersion>$(Version)</InformationalVersion>
     </PropertyGroup>
+  </Target>
+
+  <!-- Generate application icon from SVG -->
+  <Target Name="GenerateAppIcon" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <IconGeneratorProject>$(MSBuildThisFileDirectory)..\Tools\IconGenerator\IconGenerator.csproj</IconGeneratorProject>
+      <IconOutputPath>$(MSBuildProjectDirectory)\asteriq.ico</IconOutputPath>
+      <IconSvgPath>$(MSBuildProjectDirectory)\Images\Devices\throttle.svg</IconSvgPath>
+    </PropertyGroup>
+
+    <!-- Run icon generator if ico doesn't exist -->
+    <Exec Command="dotnet run --project &quot;$(IconGeneratorProject)&quot; -- &quot;$(IconOutputPath)&quot; &quot;$(IconSvgPath)&quot;"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          Condition="!Exists('$(IconOutputPath)')" />
   </Target>
 
   <ItemGroup>

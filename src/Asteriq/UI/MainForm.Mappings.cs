@@ -955,8 +955,14 @@ public partial class MainForm
             };
 
             bool isActive = _selectedCurveType == presetType;
-            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
-            var frameColor = isActive ? FUIColors.Active : FUIColors.Frame;
+            bool isHovered = presetBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+            var bgColor = isActive
+                ? FUIColors.Active.WithAlpha(60)
+                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+            var frameColor = isActive
+                ? FUIColors.Active
+                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
             using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
@@ -1175,11 +1181,15 @@ public partial class MainForm
 
     private void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked)
     {
+        bool isHovered = bounds.Contains(_mousePosition.X, _mousePosition.Y);
+
         // Box background
         using var bgPaint = new SKPaint
         {
             Style = SKPaintStyle.Fill,
-            Color = isChecked ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2
+            Color = isChecked
+                ? FUIColors.Active.WithAlpha(60)
+                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2)
         };
         canvas.DrawRoundRect(bounds, 2, 2, bgPaint);
 
@@ -1187,7 +1197,9 @@ public partial class MainForm
         using var framePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = isChecked ? FUIColors.Active : FUIColors.Frame,
+            Color = isChecked
+                ? FUIColors.Active
+                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
             StrokeWidth = 1f
         };
         canvas.DrawRoundRect(bounds, 2, 2, framePaint);

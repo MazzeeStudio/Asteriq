@@ -892,7 +892,7 @@ public partial class MainForm
         // Filter row: [search...] [☐] Bound only    [All Categories ▼]
         float filterRowHeight = 32f;
         float checkboxSize = 16f;
-        float filterWidth = 196f;  // 40% wider than original
+        float filterWidth = 220f;  // Width for category selector
         float gap = 10f;
 
         // Category filter dropdown on the right
@@ -2138,7 +2138,7 @@ public partial class MainForm
     private void DrawSCActionMapFilterDropdown(SKCanvas canvas)
     {
         float itemHeight = 24f;
-        float dropdownWidth = _scActionMapFilterBounds.Width + 60f;
+        float dropdownWidth = _scActionMapFilterBounds.Width;  // Match selector width exactly
         int itemCount = _scActionMaps.Count + 1; // +1 for "All Categories"
         float totalContentHeight = itemCount * itemHeight + 4;
         float maxDropdownHeight = 300f;

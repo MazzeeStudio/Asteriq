@@ -3661,8 +3661,9 @@ public partial class MainForm : Form
             ? _profileService.ActiveProfile!.Name
             : "No Profile";
 
-        // Measure text to determine truncation
-        float maxTextWidth = width - 25f; // Account for arrow and padding
+        // Measure text to determine truncation (reserve space for arrow on right)
+        float arrowWidth = 12f;
+        float maxTextWidth = width - arrowWidth - 15f; // Space for arrow and padding
         using var measurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, FUIRenderer.ScaleFont(11f));
         float textWidth = measurePaint.MeasureText(profileName);
 
@@ -3696,11 +3697,30 @@ public partial class MainForm : Form
         };
         canvas.DrawRect(_profileSelectorBounds, borderPaint);
 
-        // Profile name (with dropdown arrow prefix)
-        string displayText = $"▾ {profileName}";
+        // Profile name text
         float textY = y + height / 2 + 4;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, textY),
+        FUIRenderer.DrawText(canvas, profileName, new SKPoint(x + 8, textY),
             _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+
+        // Dropdown arrow on right side (custom drawn triangle)
+        float arrowSize = 4f;
+        float arrowX = x + width - 12f;
+        float arrowY = y + height / 2;
+        var arrowColor = _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary;
+
+        using var arrowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = arrowColor,
+            IsAntialias = true
+        };
+
+        using var arrowPath = new SKPath();
+        arrowPath.MoveTo(arrowX - arrowSize, arrowY - arrowSize / 2);  // Top left
+        arrowPath.LineTo(arrowX + arrowSize, arrowY - arrowSize / 2);  // Top right
+        arrowPath.LineTo(arrowX, arrowY + arrowSize / 2);              // Bottom center
+        arrowPath.Close();
+        canvas.DrawPath(arrowPath, arrowPaint);
 
         // Note: Dropdown is drawn separately in DrawOpenDropdowns() to render on top of all panels
     }

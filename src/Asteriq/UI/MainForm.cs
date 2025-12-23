@@ -2409,8 +2409,8 @@ public partial class MainForm : Form
         }
 
         // Device list hover detection
-        float sideTabPad = 8f;  // Reduced padding for side-tabbed panels
-        float contentTop = 90;
+        float sideTabPad = FUIRenderer.SpaceSM;  // 8px - Reduced padding for side-tabbed panels
+        float contentTop = 88;  // 4px aligned - matches DrawStructureLayer
         float leftPanelWidth = 400f;  // Matches Settings panel width
         float sideTabWidth = 28f;
 
@@ -2452,12 +2452,12 @@ public partial class MainForm : Form
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
-        float btnSize = 28f;
-        float btnGap = 8f;
-        float btnTotalWidth = btnSize * 3 + btnGap * 2; // 100px
+        float btnSize = FUIRenderer.TouchTargetCompact;  // 32px - matches DrawWindowControls
+        float btnGap = FUIRenderer.SpaceSM;  // 8px
+        float btnTotalWidth = btnSize * 3 + btnGap * 2; // 112px with 32px buttons
         float windowControlsX = ClientSize.Width - pad - btnTotalWidth; // Align with page padding
-        float titleBarY = 15;
-        if (e.Y >= titleBarY + 12 && e.Y <= titleBarY + 40)
+        float titleBarY = FUIRenderer.TitleBarPadding;  // 16px
+        if (e.Y >= titleBarY + 12 && e.Y <= titleBarY + FUIRenderer.TitleBarHeightExpanded)
         {
             float relX = e.X - windowControlsX;
 
@@ -3306,8 +3306,8 @@ public partial class MainForm : Form
 
     private void DrawTitleBar(SKCanvas canvas, SKRect bounds)
     {
-        float titleBarY = 15;
-        float titleBarHeight = 50;
+        float titleBarY = FUIRenderer.TitleBarPadding;  // 16px - was 15
+        // Note: Title bar uses TitleBarHeightExpanded (48px) for the full title area
         float pad = FUIRenderer.SpaceLG;
 
         // Title text - aligned with left panel L-corner frame

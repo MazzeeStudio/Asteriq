@@ -384,12 +384,13 @@ public partial class MainForm
         float statusLineHeight = statusTextSize + 4;
         float statusDotRadius = 4f;
         float statusDotY = y + (statusLineHeight / 2);
+        float statusTextY = y + (statusLineHeight / 2) + 4; // Center text vertically with dot
         float statusTextX = leftMargin + statusDotRadius * 2 + 8;
         float statusMaxWidth = contentWidth - (statusTextX - leftMargin);
 
         using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
         canvas.DrawCircle(leftMargin + statusDotRadius + 1, statusDotY, statusDotRadius, statusDot);
-        FUIRenderer.DrawTextTruncated(canvas, vjoyStatus, new SKPoint(statusTextX, y), statusMaxWidth,
+        FUIRenderer.DrawTextTruncated(canvas, vjoyStatus, new SKPoint(statusTextX, statusTextY), statusMaxWidth,
             vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
         y += rowHeight;
 

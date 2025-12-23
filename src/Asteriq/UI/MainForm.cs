@@ -457,7 +457,10 @@ public partial class MainForm : Form
         _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
         UpdateMappingsPrimaryDeviceMap();
 
-        // Apply font size setting
+        // Initialize font scaling (reads Windows text scale setting)
+        FUIRenderer.InitializeFontScaling();
+
+        // Apply user's font size preference
         FUIRenderer.FontSizeOption = _profileService.FontSize;
 
         // Apply theme setting
@@ -2681,18 +2684,28 @@ public partial class MainForm : Form
         float btnTotalWidth = 28f * 3 + 8f * 2; // Window control buttons
         float windowControlsX = ClientSize.Width - pad - btnTotalWidth;
         float tabWindowGap = 40f;
-        float tabSpacing = 90f;
-        float lastTabWidth = 70f; // Approximate width of "SETTINGS"
-        float totalTabsWidth = tabSpacing * (_tabNames.Length - 1) + lastTabWidth;
+        float tabGap = FUIRenderer.ScaleSpacing(15f);
+
+        // Measure tab widths to match drawing
+        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
+        float[] tabWidths = new float[_tabNames.Length];
+        float totalTabsWidth = 0;
+        for (int i = 0; i < _tabNames.Length; i++)
+        {
+            tabWidths[i] = tabMeasurePaint.MeasureText(_tabNames[i]);
+            totalTabsWidth += tabWidths[i];
+            if (i < _tabNames.Length - 1) totalTabsWidth += tabGap;
+        }
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
         float tabY = 15;
 
         if (e.Y >= tabY + 20 && e.Y <= tabY + 50)
         {
+            float tabX = tabStartX;
             for (int i = 0; i < _tabNames.Length; i++)
             {
-                float tabX = tabStartX + i * tabSpacing;
-                if (e.X >= tabX && e.X < tabX + tabSpacing - 10)
+                float tabHitWidth = tabWidths[i] + (i < _tabNames.Length - 1 ? tabGap / 2 : 0);
+                if (e.X >= tabX && e.X < tabX + tabHitWidth)
                 {
                     if (_activeTab != i)
                     {
@@ -2713,6 +2726,7 @@ public partial class MainForm : Form
                     _activeTab = i;
                     break;
                 }
+                tabX += tabWidths[i] + tabGap;
             }
         }
 
@@ -3299,6 +3313,10 @@ public partial class MainForm : Form
         // Title text - aligned with left panel L-corner frame
         // Panel starts at sideTabPad(8) + sideTabWidth(28) = 36
         float titleX = 36f;
+
+        // Measure actual title width (title uses scaled font)
+        using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, FUIRenderer.ScaleFont(26f));
+        float titleWidth = titlePaint.MeasureText("ASTERIQ");
         FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 26f, true);
 
         // Window controls - always at fixed position from right edge
@@ -3307,30 +3325,45 @@ public partial class MainForm : Form
 
         // Navigation tabs - positioned with 40px gap from window controls
         float tabWindowGap = 40f;
-        float tabSpacing = 90f;
+        float tabGap = FUIRenderer.ScaleSpacing(15f);  // Gap between tabs
         using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
 
-        // Calculate total tabs width
-        float totalTabsWidth = tabSpacing * (_tabNames.Length - 1) + tabMeasurePaint.MeasureText(_tabNames[_tabNames.Length - 1]);
+        // Calculate total tabs width by measuring each tab
+        float[] tabWidths = new float[_tabNames.Length];
+        float totalTabsWidth = 0;
+        for (int i = 0; i < _tabNames.Length; i++)
+        {
+            tabWidths[i] = tabMeasurePaint.MeasureText(_tabNames[i]);
+            totalTabsWidth += tabWidths[i];
+            if (i < _tabNames.Length - 1) totalTabsWidth += tabGap;
+        }
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
 
-        // Left side elements positioning (title starts at titleX, title is ~145px wide)
-        float subtitleX = titleX + 160;
-        float profileSelectorWidth = 130f;
+        // Left side elements positioning - measure actual widths
+        float elementGap = 20f;  // Gap between title/subtitle/profile selector
+        float subtitleX = titleX + titleWidth + elementGap;
+
+        // Measure subtitle width
+        using var subtitlePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(12f));
+        float subtitleWidth = subtitlePaint.MeasureText("UNIFIED HOTAS MANAGEMENT SYSTEM");
+
+        // Profile selector width scales slightly with font
+        float profileSelectorWidth = FUIRenderer.ScaleSpacing(140f);
         float profileGap = 15f;
 
-        // Subtitle - show if there's room before tabs
-        bool showSubtitle = subtitleX + 280 < tabStartX - profileSelectorWidth - profileGap - 20;
+        // Subtitle - show if there's room before tabs (need space for separator line too)
+        float separatorWidth = 30f; // Space for separator line
+        bool showSubtitle = subtitleX + separatorWidth + subtitleWidth + elementGap + profileSelectorWidth + profileGap < tabStartX;
 
         // Profile selector position - after subtitle (or after title if no subtitle)
         float profileSelectorX;
         if (showSubtitle)
         {
-            profileSelectorX = subtitleX + 290; // After subtitle
+            profileSelectorX = subtitleX + separatorWidth + subtitleWidth + elementGap;
         }
         else
         {
-            profileSelectorX = titleX + 160; // After title, where subtitle would be
+            profileSelectorX = titleX + titleWidth + elementGap;
         }
 
         // Check if profile selector fits before tabs
@@ -3347,16 +3380,16 @@ public partial class MainForm : Form
                 IsAntialias = true
             })
             {
-                canvas.DrawLine(subtitleX - 15, titleBarY + 18, subtitleX - 15, titleBarY + 48, sepPaint);
+                canvas.DrawLine(subtitleX + 10, titleBarY + 18, subtitleX + 10, titleBarY + 48, sepPaint);
             }
-            FUIRenderer.DrawText(canvas, "UNIFIED HOTAS MANAGEMENT SYSTEM", new SKPoint(subtitleX, titleBarY + 38),
+            FUIRenderer.DrawText(canvas, "UNIFIED HOTAS MANAGEMENT SYSTEM", new SKPoint(subtitleX + separatorWidth, titleBarY + 38),
                 FUIColors.TextDim, 12f);
         }
 
         // Profile selector (on the left, after subtitle or title)
         if (showProfileSelector)
         {
-            DrawProfileSelector(canvas, profileSelectorX, titleBarY + 22);
+            DrawProfileSelector(canvas, profileSelectorX, titleBarY + 22, profileSelectorWidth);
         }
 
         // Draw navigation tabs
@@ -3370,15 +3403,13 @@ public partial class MainForm : Form
 
             if (isActive)
             {
-                float actualTextWidth = tabMeasurePaint.MeasureText(_tabNames[i]);
-
                 using var paint = new SKPaint
                 {
                     Color = FUIColors.Active,
                     StrokeWidth = 2f,
                     IsAntialias = true
                 };
-                canvas.DrawLine(tabX, titleBarY + 44, tabX + actualTextWidth, titleBarY + 44, paint);
+                canvas.DrawLine(tabX, titleBarY + 44, tabX + tabWidths[i], titleBarY + 44, paint);
 
                 using var glowPaint = new SKPaint
                 {
@@ -3386,10 +3417,10 @@ public partial class MainForm : Form
                     StrokeWidth = 6f,
                     ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
                 };
-                canvas.DrawLine(tabX, titleBarY + 44, tabX + actualTextWidth, titleBarY + 44, glowPaint);
+                canvas.DrawLine(tabX, titleBarY + 44, tabX + tabWidths[i], titleBarY + 44, glowPaint);
             }
 
-            tabX += tabSpacing;
+            tabX += tabWidths[i] + tabGap;
         }
 
         // Window controls - always drawn
@@ -3397,10 +3428,9 @@ public partial class MainForm : Form
             _hoveredWindowControl == 0, _hoveredWindowControl == 1, _hoveredWindowControl == 2);
     }
 
-    private void DrawProfileSelector(SKCanvas canvas, float x, float y)
+    private void DrawProfileSelector(SKCanvas canvas, float x, float y, float width)
     {
-        float width = 130f;  // Wider to accommodate longer names
-        float height = 26f;
+        float height = FUIRenderer.ScaleLineHeight(26f);
         _profileSelectorBounds = new SKRect(x, y, x + width, y + height);
 
         // Get profile name
@@ -3445,7 +3475,8 @@ public partial class MainForm : Form
 
         // Profile name (with dropdown arrow prefix)
         string displayText = $"▾ {profileName}";
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, y + 17),
+        float textY = y + (height + FUIRenderer.ScaleFont(11f)) / 2 - 2;
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, textY),
             _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 11f);
 
         // Note: Dropdown is drawn separately in DrawOpenDropdowns() to render on top of all panels

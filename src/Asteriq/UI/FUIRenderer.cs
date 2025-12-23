@@ -1,5 +1,6 @@
 using Asteriq.Models;
 using Asteriq.Services;
+using Microsoft.Win32;
 using SkiaSharp;
 
 namespace Asteriq.UI;
@@ -14,11 +15,49 @@ public static class FUIRenderer
     public enum CornerStyle { Rounded, Hard, Chamfered }
     public static CornerStyle CurrentCornerStyle = CornerStyle.Chamfered;
 
-    // Font size scaling for accessibility
+    // Font scaling - combines Windows system setting with user preference
     private static FontSizeOption _fontSizeOption = FontSizeOption.Medium;
+    private static float _windowsTextScaleFactor = 1.0f;
+    private static bool _windowsScaleDetected = false;
 
     /// <summary>
-    /// Current font size option (Small/Medium/Large)
+    /// Initialize font scaling by detecting Windows text scale setting.
+    /// Call this once at application startup.
+    /// </summary>
+    public static void InitializeFontScaling()
+    {
+        if (_windowsScaleDetected) return;
+
+        try
+        {
+            // Read Windows text scale factor from registry
+            // Location: HKEY_CURRENT_USER\SOFTWARE\Microsoft\Accessibility\TextScaleFactor
+            using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Accessibility");
+            if (key is not null)
+            {
+                var value = key.GetValue("TextScaleFactor");
+                if (value is int scaleFactor)
+                {
+                    _windowsTextScaleFactor = scaleFactor / 100f;
+                }
+            }
+        }
+        catch
+        {
+            // If we can't read the registry, use default scale of 1.0
+            _windowsTextScaleFactor = 1.0f;
+        }
+
+        _windowsScaleDetected = true;
+    }
+
+    /// <summary>
+    /// Windows text scale factor (1.0 = 100%, 1.5 = 150%, etc.)
+    /// </summary>
+    public static float WindowsTextScaleFactor => _windowsTextScaleFactor;
+
+    /// <summary>
+    /// Current font size option (Small/Medium/Large) for user fine-tuning
     /// </summary>
     public static FontSizeOption FontSizeOption
     {
@@ -27,32 +66,46 @@ public static class FUIRenderer
     }
 
     /// <summary>
-    /// Get the font size offset based on current setting
-    /// Small = 0, Medium = +2, Large = +4
+    /// User preference multiplier - allows fine-tuning on top of Windows setting
+    /// Small = 1.2x, Medium = 1.4x, Large = 1.6x
     /// </summary>
-    public static float FontSizeOffset => _fontSizeOption switch
+    public static float UserScaleMultiplier => _fontSizeOption switch
     {
-        FontSizeOption.Small => 0f,
-        FontSizeOption.Medium => 2f,
-        FontSizeOption.Large => 4f,
-        _ => 2f
+        FontSizeOption.Small => 1.0f,
+        FontSizeOption.Medium => 1.2f,
+        FontSizeOption.Large => 1.4f,
+        _ => 1.4f
     };
 
     /// <summary>
-    /// Scale a font size according to the current font size setting
+    /// Combined font scale factor (Windows setting × user preference)
     /// </summary>
-    public static float ScaleFont(float baseSize) => baseSize + FontSizeOffset;
+    public static float FontScaleFactor => _windowsTextScaleFactor * UserScaleMultiplier;
+
+    /// <summary>
+    /// Scale a font size according to Windows + user settings
+    /// </summary>
+    public static float ScaleFont(float baseSize) => baseSize * FontScaleFactor;
 
     /// <summary>
     /// Scale spacing/padding to account for larger fonts
-    /// Uses a smaller multiplier than fonts to avoid excessive spacing
+    /// Uses a dampened scale to avoid excessive spacing
     /// </summary>
-    public static float ScaleSpacing(float baseSpacing) => baseSpacing + FontSizeOffset * 0.5f;
+    public static float ScaleSpacing(float baseSpacing)
+    {
+        // Use square root for dampened scaling - if fonts are 1.5x, spacing is ~1.22x
+        float dampenedScale = 1f + (FontScaleFactor - 1f) * 0.5f;
+        return baseSpacing * dampenedScale;
+    }
 
     /// <summary>
     /// Scale line height for text rows
     /// </summary>
-    public static float ScaleLineHeight(float baseHeight) => baseHeight + FontSizeOffset;
+    public static float ScaleLineHeight(float baseHeight) => baseHeight * FontScaleFactor;
+
+    // Legacy property for compatibility - returns an additive offset approximation
+    [Obsolete("Use ScaleFont() instead for proper multiplicative scaling")]
+    public static float FontSizeOffset => (FontScaleFactor - 1f) * 10f;
 
     // Standard measurements
     public const float CornerRadius = 8f;
@@ -464,6 +517,98 @@ public static class FUIRenderer
         float scaledSize = scaleFont ? ScaleFont(size) : size;
         using var paint = CreateTextPaint(SKColors.White, scaledSize);
         return paint.MeasureText(text);
+    }
+
+    /// <summary>
+    /// Truncates text with ellipsis if it exceeds the maximum width
+    /// </summary>
+    public static string TruncateText(string text, float maxWidth, float size = 14f, bool scaleFont = true)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+
+        float textWidth = MeasureText(text, size, scaleFont);
+        if (textWidth <= maxWidth) return text;
+
+        // Binary search for the right length
+        string ellipsis = "...";
+        float ellipsisWidth = MeasureText(ellipsis, size, scaleFont);
+        float availableWidth = maxWidth - ellipsisWidth;
+
+        if (availableWidth <= 0) return ellipsis;
+
+        int low = 0;
+        int high = text.Length;
+        int bestFit = 0;
+
+        while (low <= high)
+        {
+            int mid = (low + high) / 2;
+            string testText = text.Substring(0, mid);
+            float testWidth = MeasureText(testText, size, scaleFont);
+
+            if (testWidth <= availableWidth)
+            {
+                bestFit = mid;
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+
+        return bestFit > 0 ? text.Substring(0, bestFit) + ellipsis : ellipsis;
+    }
+
+    /// <summary>
+    /// Draws text, truncating with ellipsis if it exceeds the maximum width
+    /// </summary>
+    public static void DrawTextTruncated(SKCanvas canvas, string text, SKPoint position, float maxWidth,
+        SKColor color, float size = 14f, bool withGlow = false, bool scaleFont = true)
+    {
+        string truncated = TruncateText(text, maxWidth, size, scaleFont);
+        DrawText(canvas, truncated, position, color, size, withGlow, null, scaleFont);
+    }
+
+    /// <summary>
+    /// Calculates the minimum width needed for a label-control row
+    /// </summary>
+    public static float CalculateLabelWidth(string label, float size = 11f, float minPadding = 10f)
+    {
+        return MeasureText(label, size) + minPadding;
+    }
+
+    /// <summary>
+    /// Draws a label-value pair row with proper spacing.
+    /// Returns the X position where the value ends.
+    /// </summary>
+    public static float DrawLabelValueRow(SKCanvas canvas, float x, float y, float rowWidth,
+        string label, string value, float fontSize = 11f,
+        SKColor? labelColor = null, SKColor? valueColor = null)
+    {
+        labelColor ??= FUIColors.TextPrimary;
+        valueColor ??= FUIColors.TextDim;
+
+        float labelWidth = MeasureText(label, fontSize);
+        float valueWidth = MeasureText(value, fontSize);
+        float minGap = ScaleSpacing(10f);
+
+        // If total width exceeds available space, truncate label
+        float availableForLabel = rowWidth - valueWidth - minGap;
+        if (labelWidth > availableForLabel && availableForLabel > 30)
+        {
+            DrawTextTruncated(canvas, label, new SKPoint(x, y), availableForLabel, labelColor.Value, fontSize);
+        }
+        else
+        {
+            DrawText(canvas, label, new SKPoint(x, y), labelColor.Value, fontSize);
+        }
+
+        // Draw value right-aligned
+        float valueX = x + rowWidth - valueWidth;
+        DrawText(canvas, value, new SKPoint(valueX, y), valueColor.Value, fontSize);
+
+        return valueX + valueWidth;
     }
 
     #endregion

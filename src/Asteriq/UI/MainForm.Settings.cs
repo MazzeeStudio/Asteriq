@@ -261,28 +261,41 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 15;
+        float contentWidth = rightMargin - leftMargin;
         float sectionSpacing = FUIRenderer.ScaleLineHeight(20f);
         float rowHeight = FUIRenderer.ScaleLineHeight(24f);
+        float minControlGap = FUIRenderer.ScaleSpacing(10f);
 
         // Title
         FUIRenderer.DrawText(canvas, "SYSTEM", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
 
-        // Auto-load setting
-        FUIRenderer.DrawText(canvas, "Auto-load last profile", new SKPoint(leftMargin, y + 4), FUIColors.TextPrimary, 11f);
-        _autoLoadToggleBounds = new SKRect(rightMargin - 45, y, rightMargin, y + rowHeight);
+        // Auto-load setting - toggle has fixed height for proper capsule shape
+        float toggleWidth = 45f;
+        float toggleHeight = 22f;  // Fixed height for consistent toggle appearance
+        float autoLoadLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float autoLoadLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Auto-load last profile", new SKPoint(leftMargin, autoLoadLabelY),
+            autoLoadLabelMaxWidth, FUIColors.TextPrimary, 11f);
+        float toggleY = y + (rowHeight - toggleHeight) / 2;  // Center toggle in row
+        _autoLoadToggleBounds = new SKRect(rightMargin - toggleWidth, toggleY, rightMargin, toggleY + toggleHeight);
         DrawToggleSwitch(canvas, _autoLoadToggleBounds, _profileService.AutoLoadLastProfile);
         y += rowHeight + sectionSpacing;
 
-        // Font size section
-        FUIRenderer.DrawText(canvas, "Font Size", new SKPoint(leftMargin, y + 6), FUIColors.TextPrimary, 11f);
-
+        // Font size section - show Windows scale factor and adjustment buttons
         FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
-        float[] fontSizePreviews = { 9f, 11f, 13f };
-        float fontBtnWidth = 36f;
+        string[] fontSizeLabels = { "-", "=", "+" };
+        float fontBtnWidth = 28f;
         float fontBtnHeight = 24f;
         float fontBtnGap = 3f;
-        float fontBtnsStartX = rightMargin - (fontBtnWidth * 3 + fontBtnGap * 2);
+        float fontBtnsWidth = fontBtnWidth * 3 + fontBtnGap * 2;
+        float fontLabelMaxWidth = contentWidth - fontBtnsWidth - minControlGap;
+
+        string fontLabel = $"Font Size (System: {FUIRenderer.WindowsTextScaleFactor:P0})";
+        FUIRenderer.DrawTextTruncated(canvas, fontLabel, new SKPoint(leftMargin, y + 6),
+            fontLabelMaxWidth, FUIColors.TextPrimary, 11f);
+
+        float fontBtnsStartX = rightMargin - fontBtnsWidth;
 
         for (int i = 0; i < fontSizeValues.Length; i++)
         {
@@ -303,7 +316,7 @@ public partial class MainForm
             using var fontFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
             canvas.DrawRect(fontBounds, fontFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, "aA", fontBounds, textColor, fontSizePreviews[i], scaleFont: false);
+            FUIRenderer.DrawTextCentered(canvas, fontSizeLabels[i], fontBounds, textColor, 14f, scaleFont: false);
         }
         y += fontBtnHeight + sectionSpacing;
 
@@ -318,18 +331,22 @@ public partial class MainForm
 
         // Measure text height for proper vertical centering of dot
         float statusTextSize = FUIRenderer.ScaleFont(11f);
-        float statusLineHeight = statusTextSize + 4; // Approximate line height
+        float statusLineHeight = statusTextSize + 4;
         float statusDotRadius = 4f;
-        float statusDotY = y + (statusLineHeight / 2); // Center dot vertically with text
+        float statusDotY = y + (statusLineHeight / 2);
+        float statusTextX = leftMargin + statusDotRadius * 2 + 8;
+        float statusMaxWidth = contentWidth - (statusTextX - leftMargin);
 
         using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
         canvas.DrawCircle(leftMargin + statusDotRadius + 1, statusDotY, statusDotRadius, statusDot);
-        FUIRenderer.DrawText(canvas, vjoyStatus, new SKPoint(leftMargin + statusDotRadius * 2 + 8, y), vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, vjoyStatus, new SKPoint(statusTextX, y), statusMaxWidth,
+            vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
         y += rowHeight;
 
         if (vjoyEnabled)
         {
-            FUIRenderer.DrawText(canvas, $"Available devices: {devices.Count}", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawTextTruncated(canvas, $"Available devices: {devices.Count}",
+                new SKPoint(leftMargin, y), contentWidth, FUIColors.TextDim, 10f);
         }
         y += rowHeight + sectionSpacing;
 
@@ -337,14 +354,21 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, "KEYBOARD OUTPUT", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += sectionSpacing;
 
+        float fieldWidth = 60f;
         float fieldHeight = FUIRenderer.ScaleLineHeight(26f);
+        float labelMaxWidth = contentWidth - fieldWidth - minControlGap;
         float textVerticalOffset = (fieldHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 2;
-        FUIRenderer.DrawText(canvas, "Key repeat delay (ms)", new SKPoint(leftMargin, y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4), FUIColors.TextPrimary, 11f);
-        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + fieldHeight), "50");
+        float labelY = y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4;
+
+        FUIRenderer.DrawTextTruncated(canvas, "Key repeat delay (ms)", new SKPoint(leftMargin, labelY),
+            labelMaxWidth, FUIColors.TextPrimary, 11f);
+        DrawSettingsValueField(canvas, new SKRect(rightMargin - fieldWidth, y, rightMargin, y + fieldHeight), "50");
         y += fieldHeight + 8;
 
-        FUIRenderer.DrawText(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4), FUIColors.TextPrimary, 11f);
-        DrawSettingsValueField(canvas, new SKRect(rightMargin - 70, y, rightMargin, y + fieldHeight), "30");
+        labelY = y + textVerticalOffset - FUIRenderer.ScaleFont(11f) + 4;
+        FUIRenderer.DrawTextTruncated(canvas, "Key repeat rate (ms)", new SKPoint(leftMargin, labelY),
+            labelMaxWidth, FUIColors.TextPrimary, 11f);
+        DrawSettingsValueField(canvas, new SKRect(rightMargin - fieldWidth, y, rightMargin, y + fieldHeight), "30");
     }
 
     private void DrawVisualSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -363,29 +387,32 @@ public partial class MainForm
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 15;
+        float contentWidth = rightMargin - leftMargin;
         float sectionSpacing = FUIRenderer.ScaleLineHeight(16f);
-        float rowHeight = FUIRenderer.ScaleLineHeight(24f);
 
         // Title
         FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
 
-        // Theme section - Core themes
-        FUIRenderer.DrawText(canvas, "Core", new SKPoint(leftMargin, y + 4), FUIColors.TextDim, 9f);
+        // Theme section - calculate button sizes based on available width
+        float themeLabelWidth = FUIRenderer.ScaleSpacing(35f);
+        float themeAreaWidth = contentWidth - themeLabelWidth;
+        float themeBtnGap = 3f;
+        float themeBtnWidth = Math.Min(38f, (themeAreaWidth - themeBtnGap * 3) / 4);
+        float themeBtnHeight = 20f;
+        float themeBtnsStartX = leftMargin + themeLabelWidth;
+
+        // Core themes
+        FUIRenderer.DrawTextTruncated(canvas, "Core", new SKPoint(leftMargin, y + 4), themeLabelWidth - 5, FUIColors.TextDim, 9f);
 
         FUITheme[] coreThemes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
         string[] coreNames = { "MID", "MTX", "AMB", "ICE" };
         SKColor[] coreColors = {
-            new SKColor(0x40, 0xA0, 0xFF),  // Midnight - blue
-            new SKColor(0x40, 0xFF, 0x40),  // Matrix - green
-            new SKColor(0xFF, 0xA0, 0x40),  // Amber - orange
-            new SKColor(0x40, 0xE0, 0xFF)   // Ice - cyan
+            new SKColor(0x40, 0xA0, 0xFF),
+            new SKColor(0x40, 0xFF, 0x40),
+            new SKColor(0xFF, 0xA0, 0x40),
+            new SKColor(0x40, 0xE0, 0xFF)
         };
-
-        float themeBtnWidth = 38f;
-        float themeBtnHeight = 20f;
-        float themeBtnGap = 3f;
-        float themeBtnsStartX = leftMargin + 35f;
 
         for (int i = 0; i < coreThemes.Length; i++)
         {
@@ -399,15 +426,15 @@ public partial class MainForm
         y += themeBtnHeight + 6;
 
         // Manufacturer themes - Row 1
-        FUIRenderer.DrawText(canvas, "Mfr", new SKPoint(leftMargin, y + 4), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawTextTruncated(canvas, "Mfr", new SKPoint(leftMargin, y + 4), themeLabelWidth - 5, FUIColors.TextDim, 9f);
 
         FUITheme[] mfrThemes1 = { FUITheme.Drake, FUITheme.Aegis, FUITheme.Anvil, FUITheme.Argo };
         string[] mfrNames1 = { "DRK", "AEG", "ANV", "ARG" };
         SKColor[] mfrColors1 = {
-            new SKColor(0xFF, 0x80, 0x20),  // Drake - orange
-            new SKColor(0x40, 0x90, 0xE0),  // Aegis - blue
-            new SKColor(0x90, 0xC0, 0x40),  // Anvil - olive
-            new SKColor(0xFF, 0xC0, 0x00)   // Argo - yellow
+            new SKColor(0xFF, 0x80, 0x20),
+            new SKColor(0x40, 0x90, 0xE0),
+            new SKColor(0x90, 0xC0, 0x40),
+            new SKColor(0xFF, 0xC0, 0x00)
         };
 
         for (int i = 0; i < mfrThemes1.Length; i++)
@@ -425,10 +452,10 @@ public partial class MainForm
         FUITheme[] mfrThemes2 = { FUITheme.Crusader, FUITheme.Origin, FUITheme.MISC, FUITheme.RSI };
         string[] mfrNames2 = { "CRU", "ORI", "MSC", "RSI" };
         SKColor[] mfrColors2 = {
-            new SKColor(0x40, 0x90, 0xE0),  // Crusader - blue
-            new SKColor(0xD4, 0xAF, 0x37),  // Origin - gold
-            new SKColor(0x40, 0xC0, 0x90),  // MISC - teal
-            new SKColor(0x50, 0xA0, 0xF0)   // RSI - blue
+            new SKColor(0x40, 0x90, 0xE0),
+            new SKColor(0xD4, 0xAF, 0x37),
+            new SKColor(0x40, 0xC0, 0x90),
+            new SKColor(0x50, 0xA0, 0xF0)
         };
 
         for (int i = 0; i < mfrThemes2.Length; i++)
@@ -446,47 +473,63 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += sectionSpacing;
 
-        // Slider layout with more space
-        float labelWidth = 70f;
-        float valueWidth = 28f;
-        float sliderLeft = leftMargin + labelWidth;
-        float sliderRight = rightMargin - valueWidth - 8;
-        float sliderRowHeight = 22f;
-        float sliderRowGap = 8f;
+        // Calculate slider layout dynamically
+        // Find the longest label to determine label column width
+        string[] sliderLabels = { "Grid", "Glow", "Noise", "Scanlines", "Vignette" };
+        float maxLabelWidth = 0;
+        foreach (var label in sliderLabels)
+        {
+            float w = FUIRenderer.MeasureText(label, 11f);
+            if (w > maxLabelWidth) maxLabelWidth = w;
+        }
+
+        float labelColumnWidth = maxLabelWidth + FUIRenderer.ScaleSpacing(10f);
+        float valueColumnWidth = FUIRenderer.MeasureText("100", 10f) + FUIRenderer.ScaleSpacing(8f);
+        float sliderLeft = leftMargin + labelColumnWidth;
+        float sliderRight = rightMargin - valueColumnWidth;
+        float sliderRowHeight = FUIRenderer.ScaleLineHeight(22f);
+        float sliderRowGap = FUIRenderer.ScaleSpacing(8f);
+
+        // Ensure slider has minimum width
+        if (sliderRight - sliderLeft < 50)
+        {
+            sliderLeft = leftMargin + 50;
+            sliderRight = rightMargin - 30;
+        }
 
         // Grid strength slider
-        FUIRenderer.DrawText(canvas, "Grid", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Grid", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
         _bgGridSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
         DrawSettingsSlider(canvas, _bgGridSliderBounds, _background.GridStrength, 100);
-        FUIRenderer.DrawText(canvas, _background.GridStrength.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.GridStrength.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Glow intensity slider
-        FUIRenderer.DrawText(canvas, "Glow", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Glow", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
         _bgGlowSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
         DrawSettingsSlider(canvas, _bgGlowSliderBounds, _background.GlowIntensity, 100);
-        FUIRenderer.DrawText(canvas, _background.GlowIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.GlowIntensity.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Noise intensity slider
-        FUIRenderer.DrawText(canvas, "Noise", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Noise", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
         _bgNoiseSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
         DrawSettingsSlider(canvas, _bgNoiseSliderBounds, _background.NoiseIntensity, 100);
-        FUIRenderer.DrawText(canvas, _background.NoiseIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.NoiseIntensity.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Scanline intensity slider
-        FUIRenderer.DrawText(canvas, "Scanlines", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Scanlines", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
         _bgScanlineSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
         DrawSettingsSlider(canvas, _bgScanlineSliderBounds, _background.ScanlineIntensity, 100);
-        FUIRenderer.DrawText(canvas, _background.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Vignette intensity slider
-        FUIRenderer.DrawText(canvas, "Vignette", new SKPoint(leftMargin, y + 5), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Vignette", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
         _bgVignetteSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
         DrawSettingsSlider(canvas, _bgVignetteSliderBounds, _background.VignetteStrength, 100);
-        FUIRenderer.DrawText(canvas, _background.VignetteStrength.ToString(), new SKPoint(sliderRight + 10, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
     }
 
     private void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)

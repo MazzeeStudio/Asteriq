@@ -38,4 +38,7 @@ public class AppSettings
     public int WindowHeight { get; set; } = 0; // 0 = use default
     public int WindowX { get; set; } = int.MinValue; // MinValue = center on screen
     public int WindowY { get; set; } = int.MinValue; // MinValue = center on screen
+
+    // System tray settings
+    public bool CloseToTray { get; set; } = false; // Default: clicking X exits the app
 }

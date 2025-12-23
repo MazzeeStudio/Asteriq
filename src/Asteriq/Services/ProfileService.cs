@@ -622,6 +622,24 @@ public class ProfileService
     }
 
     /// <summary>
+    /// Get or set whether clicking the close button minimizes to tray instead of exiting
+    /// </summary>
+    public bool CloseToTray
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.CloseToTray;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.CloseToTray = value;
+            SaveSettings(settings);
+        }
+    }
+
+    /// <summary>
     /// Activate a profile by ID, making it the current active profile
     /// </summary>
     public bool ActivateProfile(Guid profileId)

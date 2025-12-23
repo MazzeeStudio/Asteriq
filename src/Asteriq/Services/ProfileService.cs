@@ -499,6 +499,24 @@ public class ProfileService
     }
 
     /// <summary>
+    /// Font family setting (Carbon/Consolas)
+    /// </summary>
+    public UIFontFamily FontFamily
+    {
+        get
+        {
+            var settings = LoadSettings();
+            return settings.FontFamily;
+        }
+        set
+        {
+            var settings = LoadSettings();
+            settings.FontFamily = value;
+            SaveSettings(settings);
+        }
+    }
+
+    /// <summary>
     /// Event fired when font size setting changes
     /// </summary>
     public event EventHandler<FontSizeOption>? FontSizeChanged;

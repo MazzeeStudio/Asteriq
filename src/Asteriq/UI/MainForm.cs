@@ -321,6 +321,7 @@ public partial class MainForm : Form
 
     // Font size selector state
     private SKRect[] _fontSizeButtonBounds = new SKRect[3];
+    private SKRect[] _fontFamilyButtonBounds = new SKRect[2];
 
     // Background settings slider bounds
     private SKRect _bgGridSliderBounds;
@@ -508,6 +509,9 @@ public partial class MainForm : Form
 
         // Apply user's font size preference
         FUIRenderer.FontSizeOption = _profileService.FontSize;
+
+        // Apply user's font family preference
+        FUIRenderer.FontFamily = _profileService.FontFamily;
 
         // Apply theme setting
         FUIColors.SetTheme(_profileService.Theme);

@@ -21,6 +21,7 @@ public partial class MainForm : Form
     private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int WM_SYSCOMMAND = 0x0112;
     private const int WM_SIZE = 0x0005;
+    private const int WM_NCCALCSIZE = 0x0083;
     private const int SC_MAXIMIZE = 0xF030;
     private const int SC_RESTORE = 0xF120;
     private const int HTCLIENT = 1;
@@ -38,6 +39,12 @@ public partial class MainForm : Form
     private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
+
+    // DWM (Desktop Window Manager) for Windows 11 border color
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    private const int DWMWA_BORDER_COLOR = 34;  // Windows 11+ only
 
     // Window sizing
     private const int ResizeBorder = 6;
@@ -1085,7 +1092,7 @@ public partial class MainForm : Form
     {
         Text = "Asteriq";
         MinimumSize = new Size(1024, 1000);  // Increased to fit Settings panel content
-        FormBorderStyle = FormBorderStyle.None;
+        FormBorderStyle = FormBorderStyle.Sizable;  // Sizable for resize borders + colored borders
         BackColor = Color.Black;
         DoubleBuffered = true;
         KeyPreview = true;
@@ -1122,6 +1129,20 @@ public partial class MainForm : Form
         else
         {
             StartPosition = FormStartPosition.CenterScreen;
+        }
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+
+        // Set border color for Windows 11+ (dark theme color)
+        if (Environment.OSVersion.Version.Build >= 22000)  // Windows 11
+        {
+            // Convert RGB to COLORREF (BGR format): 0x00BBGGRR
+            // Using FUIColor.BorderDark (#1A1F24) = RGB(26, 31, 36) = BGR(36, 31, 26)
+            int borderColor = 0x00241F1A;  // BGR format
+            DwmSetWindowAttribute(Handle, DWMWA_BORDER_COLOR, ref borderColor, sizeof(int));
         }
     }
 
@@ -1908,6 +1929,15 @@ public partial class MainForm : Form
 
     protected override void WndProc(ref Message m)
     {
+        // Handle WM_NCCALCSIZE to remove title bar but keep resize borders
+        if (m.Msg == WM_NCCALCSIZE && m.WParam != IntPtr.Zero)
+        {
+            // Return 0 to use entire window rectangle as client area
+            // This removes the title bar but keeps resize borders
+            m.Result = IntPtr.Zero;
+            return;
+        }
+
         // Handle maximize/restore to prevent double-window flash
         if (m.Msg == WM_SYSCOMMAND)
         {

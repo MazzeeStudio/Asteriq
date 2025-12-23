@@ -287,7 +287,7 @@ public partial class MainForm
         float fontBtnsWidth = fontBtnWidth * 3 + fontBtnGap * 2;
         float fontLabelMaxWidth = contentWidth - fontBtnsWidth - minControlGap;
 
-        string fontLabel = $"Font Size (System: {FUIRenderer.WindowsTextScaleFactor:P0})";
+        string fontLabel = $"Font Size (Display: {FUIRenderer.DisplayScaleFactor:P0})";
         FUIRenderer.DrawTextTruncated(canvas, fontLabel, new SKPoint(leftMargin, y + 6),
             fontLabelMaxWidth, FUIColors.TextPrimary, 11f);
 

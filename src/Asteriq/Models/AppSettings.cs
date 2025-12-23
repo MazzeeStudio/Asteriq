@@ -13,6 +13,15 @@ public enum FontSizeOption
 }
 
 /// <summary>
+/// Font family options
+/// </summary>
+public enum UIFontFamily
+{
+    Carbon,    // Futuristic sci-fi font (default)
+    Consolas   // Clean monospace font for readability
+}
+
+/// <summary>
 /// Application settings
 /// </summary>
 public class AppSettings
@@ -20,6 +29,7 @@ public class AppSettings
     public Guid? LastProfileId { get; set; }
     public bool AutoLoadLastProfile { get; set; } = true;
     public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
+    public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
     public FUITheme Theme { get; set; } = FUITheme.Midnight;
 
     // Background effect settings (0-100 intensity scale)

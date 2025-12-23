@@ -17,6 +17,7 @@ public static class FUIRenderer
 
     // Font scaling - combines Windows system setting with user preference
     private static FontSizeOption _fontSizeOption = FontSizeOption.Medium;
+    private static UIFontFamily _fontFamily = UIFontFamily.Carbon;
     private static float _windowsTextScaleFactor = 1.0f;
     private static float _displayScaleFactor = 1.0f;  // DPI scale (150% = 1.5)
     private static bool _windowsScaleDetected = false;
@@ -79,6 +80,15 @@ public static class FUIRenderer
     {
         get => _fontSizeOption;
         set => _fontSizeOption = value;
+    }
+
+    /// <summary>
+    /// Current font family (Carbon/Consolas)
+    /// </summary>
+    public static UIFontFamily FontFamily
+    {
+        get => _fontFamily;
+        set => _fontFamily = value;
     }
 
     /// <summary>
@@ -625,12 +635,15 @@ public static class FUIRenderer
     public static SKPaint CreateTextPaint(SKColor color, float size = 14f,
         bool bold = false, bool withGlow = false, SKTypeface? typeface = null)
     {
+        // Select font family based on user preference
+        string fontName = _fontFamily == UIFontFamily.Carbon ? "Carbon" : "Consolas";
+
         var paint = new SKPaint
         {
             Color = color,
             TextSize = size,
             IsAntialias = true,
-            Typeface = typeface ?? SKTypeface.FromFamilyName("Consolas",
+            Typeface = typeface ?? SKTypeface.FromFamilyName(fontName,
                 bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
                 SKFontStyleWidth.Normal,
                 SKFontStyleSlant.Upright),

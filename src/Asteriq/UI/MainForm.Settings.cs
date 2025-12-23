@@ -370,6 +370,39 @@ public partial class MainForm
         }
         y += fontBtnHeight + sectionSpacing;
 
+        // Font family section - Carbon vs Consolas
+        UIFontFamily[] fontFamilyValues = { UIFontFamily.Carbon, UIFontFamily.Consolas };
+        string[] fontFamilyLabels = { "CARBON", "CONSOLAS" };
+        float fontFamilyBtnWidth = (contentWidth - fontBtnGap) / 2;  // Two buttons split evenly
+        float fontFamilyBtnHeight = 32f;
+
+        FUIRenderer.DrawText(canvas, "Font", new SKPoint(leftMargin, y + 6),
+            FUIColors.TextPrimary, 11f);
+        y += FUIRenderer.ScaleLineHeight(20f);
+
+        for (int i = 0; i < fontFamilyValues.Length; i++)
+        {
+            var fontFamilyBounds = new SKRect(
+                leftMargin + i * (fontFamilyBtnWidth + fontBtnGap), y,
+                leftMargin + i * (fontFamilyBtnWidth + fontBtnGap) + fontFamilyBtnWidth, y + fontFamilyBtnHeight);
+
+            _fontFamilyButtonBounds[i] = fontFamilyBounds;
+
+            bool isActive = _profileService.FontFamily == fontFamilyValues[i];
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
+            var frameColor = isActive ? FUIColors.Active : FUIColors.Frame;
+            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+
+            using var fontFamilyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(fontFamilyBounds, fontFamilyBgPaint);
+
+            using var fontFamilyFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
+            canvas.DrawRect(fontFamilyBounds, fontFamilyFramePaint);
+
+            FUIRenderer.DrawTextCentered(canvas, fontFamilyLabels[i], fontFamilyBounds, textColor, 10f, scaleFont: false);
+        }
+        y += fontFamilyBtnHeight + sectionSpacing;
+
         // vJoy section
         FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += sectionSpacing;
@@ -632,6 +665,19 @@ public partial class MainForm
             {
                 _profileService.FontSize = fontSizes[i];
                 FUIRenderer.FontSizeOption = fontSizes[i];
+                _canvas.Invalidate();
+                return;
+            }
+        }
+
+        // Check font family button clicks
+        UIFontFamily[] fontFamilies = { UIFontFamily.Carbon, UIFontFamily.Consolas };
+        for (int i = 0; i < _fontFamilyButtonBounds.Length; i++)
+        {
+            if (_fontFamilyButtonBounds[i].Contains(pt))
+            {
+                _profileService.FontFamily = fontFamilies[i];
+                FUIRenderer.FontFamily = fontFamilies[i];
                 _canvas.Invalidate();
                 return;
             }

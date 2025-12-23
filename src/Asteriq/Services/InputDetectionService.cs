@@ -6,13 +6,13 @@ namespace Asteriq.Services;
 // Simple file logger for input detection debugging
 internal static class InputDetectionLog
 {
-    private static readonly string LogPath = Path.Combine(
+    private static readonly string s_logPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Asteriq", "input_detection.log");
 
     static InputDetectionLog()
     {
-        var dir = Path.GetDirectoryName(LogPath);
+        var dir = Path.GetDirectoryName(s_logPath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
     }
@@ -23,7 +23,7 @@ internal static class InputDetectionLog
         {
             var line = $"[{DateTime.Now:HH:mm:ss.fff}] {message}";
             Console.WriteLine(line);
-            File.AppendAllText(LogPath, line + Environment.NewLine);
+            File.AppendAllText(s_logPath, line + Environment.NewLine);
         }
         catch (Exception)
         {
@@ -35,7 +35,7 @@ internal static class InputDetectionLog
     {
         try
         {
-            File.WriteAllText(LogPath, "");
+            File.WriteAllText(s_logPath, "");
         }
         catch (Exception)
         {
@@ -178,12 +178,14 @@ public class InputDetectionService : IDisposable
     /// </summary>
     /// <param name="filter">Filter which input types to detect</param>
     /// <param name="axisThreshold">How far axis must move from stable baseline to register (0-1)</param>
-    /// <param name="timeout">Optional timeout in milliseconds</param>
+    /// <param name="timeoutMs">Optional timeout in milliseconds</param>
+    /// <param name="ct">Cancellation token for external cancellation</param>
     /// <returns>The detected input, or null if cancelled/timed out</returns>
     public async Task<DetectedInput?> WaitForInputAsync(
         InputDetectionFilter filter = InputDetectionFilter.All,
         float axisThreshold = 0.5f,  // 50% threshold - intentional movement required
-        int? timeoutMs = null)
+        int? timeoutMs = null,
+        CancellationToken ct = default)
     {
         lock (_lock)
         {
@@ -224,8 +226,14 @@ public class InputDetectionService : IDisposable
                 _cancellationSource.CancelAfter(timeoutMs.Value);
             }
 
+            // Link external cancellation token to internal source
+            using var linkedCts = ct.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(ct, _cancellationSource.Token)
+                : null;
+            var effectiveToken = linkedCts?.Token ?? _cancellationSource.Token;
+
             // Wait for detection or cancellation
-            using var registration = _cancellationSource.Token.Register(() =>
+            using var registration = effectiveToken.Register(() =>
             {
                 _currentDetection?.TrySetResult(null);
             });

@@ -40,7 +40,7 @@ public partial class MainForm : Form
     private const int TitleBarHeight = 75;
 
     // Version from assembly (set at build time via MSBuild)
-    private static readonly string AppVersion = Assembly.GetExecutingAssembly()
+    private static readonly string s_appVersion = Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
     // Services
@@ -3714,7 +3714,7 @@ public partial class MainForm : Form
             new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 12f);
 
         // Right: version and time
-        string versionTime = $"v{AppVersion} | {DateTime.Now:HH:mm:ss}";
+        string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";
         float versionWidth = FUIRenderer.MeasureText(versionTime, 12f);
         FUIRenderer.DrawText(canvas, versionTime,
             new SKPoint(bounds.Right - versionWidth - 20, y + 22), FUIColors.TextDim, 12f);

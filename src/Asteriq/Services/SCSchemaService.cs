@@ -11,7 +11,7 @@ public class SCSchemaService
     /// <summary>
     /// Device attribute names in defaultProfile.xml
     /// </summary>
-    private static readonly string[] DeviceAttributes = { "keyboard", "mouse", "gamepad", "joystick" };
+    private static readonly string[] s_deviceAttributes = { "keyboard", "mouse", "gamepad", "joystick" };
 
     /// <summary>
     /// Parses defaultProfile.xml and extracts all action definitions
@@ -69,7 +69,7 @@ public class SCSchemaService
         var bindings = new List<SCDefaultBinding>();
 
         // Parse bindings from attributes (keyboard="w", joystick="button1", etc.)
-        foreach (var deviceAttr in DeviceAttributes)
+        foreach (var deviceAttr in s_deviceAttributes)
         {
             var inputValue = actionNode.GetAttribute(deviceAttr)?.Trim();
             if (string.IsNullOrWhiteSpace(inputValue))
@@ -93,7 +93,7 @@ public class SCSchemaService
         }
 
         // Parse child elements (<keyboard input="..."/>, <joystick input="..."/>, etc.)
-        foreach (var deviceAttr in DeviceAttributes)
+        foreach (var deviceAttr in s_deviceAttributes)
         {
             var deviceElements = actionNode.SelectNodes(deviceAttr);
             if (deviceElements is null)

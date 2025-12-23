@@ -317,14 +317,14 @@ public class InputService : IDisposable
         }
     }
 
-    private static readonly object _logLock = new();
+    private static readonly object s_logLock = new();
 
     [System.Diagnostics.Conditional("DEBUG")]
     private static void LogAxisTypes(string message)
     {
         try
         {
-            lock (_logLock)
+            lock (s_logLock)
             {
                 var logPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

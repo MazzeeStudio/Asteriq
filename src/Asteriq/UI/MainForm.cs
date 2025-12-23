@@ -1126,7 +1126,7 @@ public partial class MainForm : Form
     private void InitializeForm()
     {
         Text = "Asteriq";
-        MinimumSize = new Size(1024, 1000);  // Increased to fit Settings panel content
+        MinimumSize = new Size(1570, 1000);  // Increased to fit SC Bindings panel content
         FormBorderStyle = FormBorderStyle.Sizable;  // Sizable for resize borders + colored borders
         BackColor = Color.Black;
         DoubleBuffered = true;

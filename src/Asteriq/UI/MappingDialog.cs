@@ -643,7 +643,7 @@ public class MappingDialog : Form
 
         // Detected input info
         FUIRenderer.DrawText(canvas, "INPUT DETECTED", new SKPoint(pad, y), FUIColors.Active, 12f);
-        y += 25;
+        y += 24;
 
         var inputFrame = new SKRect(pad, y, bounds.Width - pad, y + 50);
         using (var inputBgPaint = new SKPaint
@@ -678,7 +678,7 @@ public class MappingDialog : Form
         bool canUseKeyboard = _detectedInput.Type == InputType.Button;
 
         FUIRenderer.DrawText(canvas, "OUTPUT TARGET", new SKPoint(pad, y), FUIColors.Primary, 12f);
-        y += 25;
+        y += 24;
 
         if (canUseKeyboard)
         {
@@ -737,7 +737,7 @@ public class MappingDialog : Form
             new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 12f);
         DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == buttonOffset + 1, _selectedVJoyDevice < _vjoyDevices.Count - 1);
 
-        y += 35;
+        y += 36;
 
         // Output index selector - handle Button, Axis, and Hat types
         string outputLabel = _detectedInput!.Type switch

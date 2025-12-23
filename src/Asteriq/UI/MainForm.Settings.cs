@@ -190,7 +190,7 @@ public partial class MainForm
         }
 
         // Add new layer button
-        if (y + 35 < bottom)
+        if (y + 36 < bottom)
         {
             var addBounds = new SKRect(leftMargin, y, rightMargin, y + 30);
             using var addBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Success.WithAlpha(20) };

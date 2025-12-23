@@ -501,8 +501,8 @@ public partial class MainForm : Form
         var label = new Label
         {
             Text = "Profile Name:",
-            Left = 15,
-            Top = 15,
+            Left = 16,
+            Top = 16,
             Width = 280,
             ForeColor = Color.FromArgb(180, 190, 210)
         };
@@ -510,7 +510,7 @@ public partial class MainForm : Form
         var textBox = new TextBox
         {
             Text = defaultName,
-            Left = 15,
+            Left = 16,
             Top = 40,
             Width = 275,
             BackColor = Color.FromArgb(35, 38, 50),
@@ -1939,7 +1939,7 @@ public partial class MainForm : Form
             }
             // Exclude tab area (tabs start at Width - 540 and span ~400px)
             float tabStartX = ClientSize.Width - 540;
-            if (clientPoint.X >= tabStartX && clientPoint.Y >= 35 && clientPoint.Y <= 65)
+            if (clientPoint.X >= tabStartX && clientPoint.Y >= 36 && clientPoint.Y <= 64)
             {
                 return HTCLIENT;
             }
@@ -2700,7 +2700,7 @@ public partial class MainForm : Form
             if (i < _tabNames.Length - 1) totalTabsWidth += tabGap;
         }
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
-        float tabY = 15;
+        float tabY = 16;
 
         if (e.Y >= tabY + 20 && e.Y <= tabY + 50)
         {

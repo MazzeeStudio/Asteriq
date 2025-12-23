@@ -2069,7 +2069,7 @@ public partial class MainForm
         // Draw dropdown arrow
         if (isEnabled)
         {
-            float arrowX = bounds.Right - 15;
+            float arrowX = bounds.Right - 16;
             float arrowY = bounds.MidY;
             using var arrowPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = textColor, StrokeWidth = 1.5f, IsAntialias = true };
             canvas.DrawLine(arrowX - 4, arrowY - 2, arrowX, arrowY + 2, arrowPaint);
@@ -2486,7 +2486,7 @@ public partial class MainForm
         if (_scSearchBoxBounds.Contains(point))
         {
             // Check if clicking the X to clear
-            if (!string.IsNullOrEmpty(_scSearchText) && point.X > _scSearchBoxBounds.Right - 25)
+            if (!string.IsNullOrEmpty(_scSearchText) && point.X > _scSearchBoxBounds.Right - 24)
             {
                 _scSearchText = "";
                 RefreshFilteredActions();
@@ -3666,8 +3666,8 @@ public partial class MainForm
         var label = new Label
         {
             Text = "Profile Name:",
-            Left = 15,
-            Top = 15,
+            Left = 16,
+            Top = 16,
             Width = 280,
             ForeColor = Color.FromArgb(180, 190, 210)
         };
@@ -3675,7 +3675,7 @@ public partial class MainForm
         var textBox = new TextBox
         {
             Text = _scExportProfile.ProfileName,
-            Left = 15,
+            Left = 16,
             Top = 40,
             Width = 280,
             BackColor = Color.FromArgb(30, 35, 45),
@@ -3745,16 +3745,16 @@ public partial class MainForm
         var vjoyLabel = new Label
         {
             Text = "vJoy Device:",
-            Left = 15,
-            Top = 15,
+            Left = 16,
+            Top = 16,
             Width = 100,
             ForeColor = Color.FromArgb(180, 190, 210)
         };
 
         var vjoyCombo = new ComboBox
         {
-            Left = 15,
-            Top = 35,
+            Left = 16,
+            Top = 36,
             Width = 300,
             DropDownStyle = ComboBoxStyle.DropDownList,
             BackColor = Color.FromArgb(30, 35, 45),
@@ -3769,15 +3769,15 @@ public partial class MainForm
         var inputLabel = new Label
         {
             Text = action.InputType == SCInputType.Axis ? "Axis:" : "Button:",
-            Left = 15,
-            Top = 70,
+            Left = 16,
+            Top = 72,
             Width = 100,
             ForeColor = Color.FromArgb(180, 190, 210)
         };
 
         var inputCombo = new ComboBox
         {
-            Left = 15,
+            Left = 16,
             Top = 90,
             Width = 300,
             DropDownStyle = ComboBoxStyle.DropDownList,
@@ -3806,8 +3806,8 @@ public partial class MainForm
         var invertCheck = new CheckBox
         {
             Text = "Inverted",
-            Left = 15,
-            Top = 125,
+            Left = 16,
+            Top = 124,
             Width = 100,
             ForeColor = Color.FromArgb(180, 190, 210),
             Visible = action.InputType == SCInputType.Axis
@@ -3945,7 +3945,7 @@ public partial class MainForm
         {
             Text = "Binding Conflict",
             Width = 420,
-            Height = 220 + Math.Min(conflicts.Count * 15, 60),
+            Height = 220 + Math.Min(conflicts.Count * 16, 64),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -3956,19 +3956,19 @@ public partial class MainForm
         var msgLabel = new Label
         {
             Text = message,
-            Left = 15,
-            Top = 15,
+            Left = 16,
+            Top = 16,
             Width = 380,
-            Height = 100 + Math.Min(conflicts.Count * 15, 60),
+            Height = 100 + Math.Min(conflicts.Count * 16, 64),
             ForeColor = Color.FromArgb(200, 180, 170)
         };
 
-        int buttonY = msgLabel.Bottom + 15;
+        int buttonY = msgLabel.Bottom + 16;
 
         var replaceButton = new Button
         {
             Text = "Replace Existing",
-            Left = 15,
+            Left = 16,
             Top = buttonY,
             Width = 120,
             Height = 30,
@@ -4454,8 +4454,8 @@ public partial class MainForm
         var label = new Label
         {
             Text = "Profile Name:",
-            Left = 15,
-            Top = 15,
+            Left = 16,
+            Top = 16,
             Width = 280,
             ForeColor = Color.FromArgb(180, 190, 210)
         };
@@ -4463,7 +4463,7 @@ public partial class MainForm
         var textBox = new TextBox
         {
             Text = "New Profile",
-            Left = 15,
+            Left = 16,
             Top = 40,
             Width = 280,
             BackColor = Color.FromArgb(30, 35, 45),

@@ -35,5 +35,11 @@ Thumbs.db
 src/Asteriq/asteriq.ico
 test.ico
 
+# Publish outputs
+src/Asteriq/publish/
+src/Asteriq/publish-single/
+src/Asteriq/publish-small/
+*.v*.zip
+
 # Mockups (design exploration, not part of main codebase)
 mockups/

@@ -69,9 +69,9 @@ public sealed class SystemTrayIcon : IDisposable
                 // Render SVG to SKBitmap
                 var bounds = svg.Picture.CullRect;
 
-                // Scale to fill more of the canvas - multiply by 1.5 to make icon bigger without clipping
+                // Scale to fill more of the canvas - multiply by 1.2 to make icon bigger without clipping
                 var baseScale = Math.Min(size / bounds.Width, size / bounds.Height);
-                var scale = baseScale * 1.5f;
+                var scale = baseScale * 1.2f;
 
                 using var surface = SKSurface.Create(new SKImageInfo(size, size));
                 var canvas = surface.Canvas;

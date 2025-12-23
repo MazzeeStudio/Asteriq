@@ -1,111 +1,114 @@
 using SkiaSharp;
-using Svg.Skia;
-using System.Runtime.InteropServices;
+using System.Drawing.Drawing2D;
 
 namespace Asteriq.UI;
 
 /// <summary>
 /// Manages the system tray icon with color-changing based on forwarding state.
-/// Loads joystick.svg and renders it in normal (dim) or active (glowing) state.
+/// Draws a simple joystick icon that changes color based on forwarding state and current theme.
 /// </summary>
 public sealed class SystemTrayIcon : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
-    private readonly string _svgPath;
-    private Icon? _normalIcon;
-    private Icon? _activeIcon;
     private bool _isActive;
+    private Icon? _currentIcon;
 
-    public SystemTrayIcon(string svgPath, string toolTipText = "Asteriq")
+    public SystemTrayIcon(string toolTipText = "Asteriq")
     {
-        _svgPath = svgPath;
         _notifyIcon = new NotifyIcon
         {
             Text = toolTipText,
-            Visible = true
+            Visible = false // Start hidden, will show after first icon generation
         };
 
-        GenerateIcons();
-        SetActive(false); // Start in normal state
+        // Generate initial icon
+        UpdateIcon();
+        _notifyIcon.Visible = true;
     }
 
     /// <summary>
-    /// Generate both normal and active state icons from the SVG.
+    /// Set the context menu for the tray icon.
     /// </summary>
-    private void GenerateIcons()
+    public ContextMenuStrip? ContextMenuStrip
     {
-        if (!File.Exists(_svgPath))
-        {
-            throw new FileNotFoundException($"SVG file not found: {_svgPath}");
-        }
-
-        // Load SVG
-        var svg = new SKSvg();
-        svg.Load(_svgPath);
-
-        if (svg.Picture is null)
-        {
-            throw new InvalidOperationException($"Failed to load SVG from {_svgPath}");
-        }
-
-        // Icon sizes for Windows (16x16 is standard tray icon size)
-        const int iconSize = 16;
-
-        // Generate normal icon (dim grayscale)
-        _normalIcon = GenerateIcon(svg.Picture, iconSize, FUIColors.TextDim);
-
-        // Generate active icon (theme active color with glow)
-        _activeIcon = GenerateIcon(svg.Picture, iconSize, FUIColors.Active);
+        get => _notifyIcon.ContextMenuStrip;
+        set => _notifyIcon.ContextMenuStrip = value;
     }
 
     /// <summary>
-    /// Generate an icon from the SVG picture with the specified color.
+    /// Generate icon with current theme colors.
+    /// Draws a simple joystick shape directly using GDI+.
     /// </summary>
-    private static Icon GenerateIcon(SKPicture picture, int size, SKColor color)
+    private Icon GenerateIcon()
     {
-        // Create a bitmap to render the SVG
-        using var surface = SKSurface.Create(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
-        var canvas = surface.Canvas;
-        canvas.Clear(SKColors.Transparent);
+        const int size = 16;
+        using var bitmap = new Bitmap(size, size);
+        using var g = Graphics.FromImage(bitmap);
 
-        // Calculate scale to fit SVG in icon size
-        var bounds = picture.CullRect;
-        var scale = Math.Min(size / bounds.Width, size / bounds.Height);
-        var offsetX = (size - bounds.Width * scale) / 2;
-        var offsetY = (size - bounds.Height * scale) / 2;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
 
-        canvas.Translate(offsetX, offsetY);
-        canvas.Scale(scale);
+        // Get color based on state and current theme
+        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextDim;
+        Color color = Color.FromArgb(skColor.Alpha, skColor.Red, skColor.Green, skColor.Blue);
 
-        // Apply color filter to colorize the SVG
-        using var paint = new SKPaint();
-        using var colorFilter = SKColorFilter.CreateBlendMode(color, SKBlendMode.SrcIn);
-        paint.ColorFilter = colorFilter;
+        // Draw simple joystick icon (stick + base)
+        using var pen = new Pen(color, 1.5f);
+        using var brush = new SolidBrush(color);
 
-        canvas.DrawPicture(picture, paint);
-        canvas.Flush();
+        // Base (circle at bottom)
+        float baseY = size * 0.75f;
+        float baseRadius = size * 0.35f;
+        g.FillEllipse(brush, size / 2f - baseRadius, baseY - baseRadius, baseRadius * 2, baseRadius * 2);
 
-        // Convert to Windows Icon
-        using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        using var memoryStream = new MemoryStream();
-        data.SaveTo(memoryStream);
-        memoryStream.Position = 0;
+        // Stick (vertical line)
+        float stickTop = size * 0.15f;
+        float stickBottom = baseY;
+        g.DrawLine(pen, size / 2f, stickTop, size / 2f, stickBottom);
 
-        // Convert PNG to Icon
-        using var bitmap = new Bitmap(memoryStream);
+        // Stick top (small circle)
+        float topRadius = size * 0.2f;
+        g.FillEllipse(brush, size / 2f - topRadius, stickTop - topRadius, topRadius * 2, topRadius * 2);
+
+        // Add glow effect when active
+        if (_isActive)
+        {
+            using var glowBrush = new SolidBrush(Color.FromArgb(60, color));
+            g.FillEllipse(glowBrush, size / 2f - baseRadius * 1.3f, baseY - baseRadius * 1.3f,
+                baseRadius * 2.6f, baseRadius * 2.6f);
+        }
+
         return Icon.FromHandle(bitmap.GetHicon());
     }
 
     /// <summary>
+    /// Update the icon with current state and theme colors.
+    /// </summary>
+    private void UpdateIcon()
+    {
+        _currentIcon?.Dispose();
+        _currentIcon = GenerateIcon();
+        _notifyIcon.Icon = _currentIcon;
+    }
+
+    /// <summary>
     /// Set the icon to active (glowing) or normal (dim) state.
+    /// Regenerates icon with current theme colors.
     /// </summary>
     public void SetActive(bool active)
     {
         if (_isActive == active) return;
 
         _isActive = active;
-        _notifyIcon.Icon = active ? _activeIcon : _normalIcon;
+        UpdateIcon();
+    }
+
+    /// <summary>
+    /// Refresh the icon with current theme colors (call when theme changes).
+    /// </summary>
+    public void RefreshThemeColors()
+    {
+        UpdateIcon();
     }
 
     /// <summary>
@@ -142,11 +145,19 @@ public sealed class SystemTrayIcon : IDisposable
         remove => _notifyIcon.DoubleClick -= value;
     }
 
+    /// <summary>
+    /// Subscribe to tray icon mouse click events (includes button info).
+    /// </summary>
+    public event MouseEventHandler? MouseClick
+    {
+        add => _notifyIcon.MouseClick += value;
+        remove => _notifyIcon.MouseClick -= value;
+    }
+
     public void Dispose()
     {
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
-        _normalIcon?.Dispose();
-        _activeIcon?.Dispose();
+        _currentIcon?.Dispose();
     }
 }

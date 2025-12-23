@@ -464,14 +464,8 @@ public partial class MainForm : Form
         _mappingEngine = new MappingEngine(_vjoyService);
 
         // Initialize system tray icon
-        var svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "joystick.svg");
-        _trayIcon = new SystemTrayIcon(svgPath, $"Asteriq v{s_appVersion}");
-        _trayIcon.DoubleClick += (s, e) =>
-        {
-            Show();
-            WindowState = FormWindowState.Normal;
-            Activate();
-        };
+        _trayIcon = new SystemTrayIcon($"Asteriq v{s_appVersion}");
+        InitializeTrayMenu();
 
         InitializeForm();
         InitializeCanvas();
@@ -4075,10 +4069,98 @@ public partial class MainForm : Form
 
     #endregion
 
+    #region System Tray
+
+    private void InitializeTrayMenu()
+    {
+        var menu = new ContextMenuStrip();
+
+        // Start/Stop Forwarding (will be updated dynamically)
+        var forwardingItem = new ToolStripMenuItem("Start Forwarding");
+        forwardingItem.Click += (s, e) =>
+        {
+            if (_isForwarding)
+                StopForwarding();
+            else
+                StartForwarding();
+            UpdateTrayMenu();
+        };
+        menu.Items.Add(forwardingItem);
+
+        menu.Items.Add(new ToolStripSeparator());
+
+        // Open
+        var openItem = new ToolStripMenuItem("Open");
+        openItem.Click += (s, e) =>
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+        };
+        menu.Items.Add(openItem);
+
+        // Close to Tray toggle
+        var closeToTrayItem = new ToolStripMenuItem("Close to Tray")
+        {
+            CheckOnClick = true,
+            Checked = _profileService.CloseToTray
+        };
+        closeToTrayItem.CheckedChanged += (s, e) =>
+        {
+            _profileService.CloseToTray = closeToTrayItem.Checked;
+        };
+        menu.Items.Add(closeToTrayItem);
+
+        menu.Items.Add(new ToolStripSeparator());
+
+        // Exit
+        var exitItem = new ToolStripMenuItem("Exit");
+        exitItem.Click += (s, e) =>
+        {
+            _forceClose = true;
+            Application.Exit();
+        };
+        menu.Items.Add(exitItem);
+
+        _trayIcon.ContextMenuStrip = menu;
+
+        // Double-click to open
+        _trayIcon.DoubleClick += (s, e) =>
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+        };
+    }
+
+    private void UpdateTrayMenu()
+    {
+        if (_trayIcon.ContextMenuStrip is null) return;
+
+        // Update the forwarding menu item text
+        var forwardingItem = _trayIcon.ContextMenuStrip.Items[0] as ToolStripMenuItem;
+        if (forwardingItem is not null)
+        {
+            forwardingItem.Text = _isForwarding ? "Stop Forwarding" : "Start Forwarding";
+        }
+    }
+
+    #endregion
+
     #region Cleanup
+
+    private bool _forceClose = false;
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        // If close to tray is enabled and this isn't a forced close, minimize to tray instead
+        if (_profileService.CloseToTray && !_forceClose && e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
         // Save window state before closing
         if (WindowState == FormWindowState.Normal)
         {

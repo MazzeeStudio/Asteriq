@@ -96,6 +96,10 @@ public partial class MainForm : Form
     private bool _enableAnimations = true;  // Can be toggled for performance
     private bool _isResizing = false;  // Suppress renders during resize
 
+    // Phase 2: Render caching
+    private SKBitmap? _cachedBackground;  // Cached background layer
+    private bool _backgroundDirty = true;  // Background needs redraw
+
     private int _hoveredDevice = -1;
     private int _selectedDevice = -1;  // Start with no selection, will be set in RefreshDevices
     private List<PhysicalDeviceInfo> _devices = new();
@@ -2017,11 +2021,13 @@ public partial class MainForm : Form
         {
             // Resize/move finished - mark dirty and resume rendering
             _isResizing = false;
+            _backgroundDirty = true;  // Background needs regeneration at new size
             MarkDirty();
         }
         else if (m.Msg == WM_SIZE)
         {
             // Window size changed - mark dirty for redraw
+            _backgroundDirty = true;  // Background needs regeneration at new size
             MarkDirty();
         }
 
@@ -3341,7 +3347,7 @@ public partial class MainForm : Form
         // Clear to void
         canvas.Clear(FUIColors.Void);
 
-        // Layer 0: Background grid
+        // Layer 0: Background grid (cached for performance)
         DrawBackgroundLayer(canvas, bounds);
 
         // Layer 1: Main structure panels
@@ -3353,8 +3359,41 @@ public partial class MainForm : Form
 
     private void DrawBackgroundLayer(SKCanvas canvas, SKRect bounds)
     {
-        // Render FUI background with all effects
-        _background.Render(canvas, bounds);
+        int width = (int)bounds.Width;
+        int height = (int)bounds.Height;
+
+        // Check if we need to regenerate the background cache
+        if (_backgroundDirty || _cachedBackground is null ||
+            _cachedBackground.Width != width || _cachedBackground.Height != height)
+        {
+            // Dispose old cache if size changed
+            if (_cachedBackground is not null && (_cachedBackground.Width != width || _cachedBackground.Height != height))
+            {
+                _cachedBackground.Dispose();
+                _cachedBackground = null;
+            }
+
+            // Create new bitmap if needed
+            _cachedBackground ??= new SKBitmap(width, height);
+
+            // Render background to cache
+            using var cacheSurface = SKSurface.Create(new SKImageInfo(width, height));
+            var cacheCanvas = cacheSurface.Canvas;
+            cacheCanvas.Clear(SKColors.Transparent);
+
+            // Render FUI background with all effects to cache
+            _background.Render(cacheCanvas, bounds);
+
+            // Copy to cached bitmap
+            using var image = cacheSurface.Snapshot();
+            using var pixmap = image.PeekPixels();
+            pixmap.ReadPixels(_cachedBackground.Info, _cachedBackground.GetPixels(), _cachedBackground.RowBytes);
+
+            _backgroundDirty = false;
+        }
+
+        // Draw cached background
+        canvas.DrawBitmap(_cachedBackground, 0, 0);
     }
 
     private void DrawStructureLayer(SKCanvas canvas, SKRect bounds)

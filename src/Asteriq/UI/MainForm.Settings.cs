@@ -651,6 +651,7 @@ public partial class MainForm
             {
                 FUIColors.SetTheme(themes[i]);
                 _profileService.Theme = themes[i];
+                _backgroundDirty = true;  // Theme changed, invalidate background cache
                 _trayIcon.RefreshThemeColors();  // Update tray icon with new theme color
                 _canvas.Invalidate();
                 return;
@@ -744,6 +745,7 @@ public partial class MainForm
             case "vignette": _background.VignetteStrength = value; break;
         }
 
+        _backgroundDirty = true;  // Background settings changed, invalidate cache
         _canvas.Invalidate();
     }
 

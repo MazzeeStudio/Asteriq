@@ -3523,16 +3523,29 @@ public partial class MainForm : Form
         using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
         canvas.DrawRect(bounds, borderPaint);
 
-        // Truncate text to leave room for arrow prefix and padding
-        float textPadding = 5f;
-        float arrowPrefixWidth = 16f;  // Space for "▾ "
-        float maxTextWidth = bounds.Width - textPadding - arrowPrefixWidth - 8f;
+        // Truncate text to leave room for arrow and padding
+        float textPadding = 8f;
+        float arrowSpaceRight = 20f;  // Space for dropdown arrow on right
+        float maxTextWidth = bounds.Width - textPadding - arrowSpaceRight;
         string truncatedText = TruncateTextToWidth(text, maxTextWidth, 11f);
 
-        // Display text with dropdown arrow prefix (FUI style like profile selector)
-        string displayText = isEnabled ? $"▾ {truncatedText}" : truncatedText;
+        // Display text
         var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + textPadding, bounds.MidY + 4), textColor, 11f);
+        FUIRenderer.DrawText(canvas, truncatedText, new SKPoint(bounds.Left + textPadding, bounds.MidY + 4), textColor, 11f);
+
+        // Draw custom dropdown arrow on the right
+        if (isEnabled)
+        {
+            float arrowX = bounds.Right - 12f;
+            float arrowY = bounds.MidY;
+            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
+            using var arrowPath = new SKPath();
+            arrowPath.MoveTo(arrowX - 4, arrowY - 2);
+            arrowPath.LineTo(arrowX + 4, arrowY - 2);
+            arrowPath.LineTo(arrowX, arrowY + 3);
+            arrowPath.Close();
+            canvas.DrawPath(arrowPath, arrowPaint);
+        }
     }
 
     private void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)

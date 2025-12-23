@@ -187,7 +187,12 @@ After Phase 2:
     - Broke visual appearance of background layers
     - Reverted in commit b64db51
     - **Lesson**: Composite caching approach incompatible with current rendering pipeline
-  - [ ] Phase 2.2: Alternative rendering optimizations (NOT STARTED)
+  - [x] Phase 2.2: Background layer caching - **COMPLETED**
+    - Implemented intelligent caching of background layer only
+    - Background cached to SKBitmap, reused until invalidated
+    - Cache invalidates on: window resize, theme change, background settings change
+    - Significantly reduces rendering workload without visual issues
+    - Successfully avoids the problems of full composite caching
 - [ ] Phase 3: Framework evaluation (AWAITING Phase 1 RESULTS)
 
 ## Phase 1 Results - To Be Tested

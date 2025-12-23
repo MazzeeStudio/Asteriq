@@ -1983,8 +1983,10 @@ public partial class MainForm : Form
                 MaximizeWindow();
                 return;  // Prevent Windows from handling it
             }
-            else if (command == SC_RESTORE)
+            else if (command == SC_RESTORE && _isManuallyMaximized)
             {
+                // Only intercept restore if we're in our manual maximized state
+                // Otherwise let Windows handle restore from minimize
                 RestoreWindow();
                 return;  // Prevent Windows from handling it
             }

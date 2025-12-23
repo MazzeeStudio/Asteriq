@@ -311,7 +311,7 @@ public partial class MainForm
 
             bool isSelected = _profileService.TrayIconType == trayIconValues[i];
             var bgColor = isSelected ? FUIColors.Active : FUIColors.Background2;
-            var textColor = isSelected ? FUIColors.TextPrimary : FUIColors.TextDim;
+            var textColor = isSelected ? FUIColors.Void : FUIColors.TextDim;
 
             using var iconBgPaint = new SKPaint { Color = bgColor, IsAntialias = true };
             canvas.DrawRoundRect(iconBounds, 4, 4, iconBgPaint);

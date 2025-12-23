@@ -4075,7 +4075,10 @@ public partial class MainForm : Form
 
     private void InitializeTrayMenu()
     {
-        var menu = new ContextMenuStrip();
+        var menu = new ContextMenuStrip
+        {
+            Renderer = new DarkContextMenuRenderer()
+        };
 
         // Start/Stop Forwarding (will be updated dynamically)
         var forwardingItem = new ToolStripMenuItem("Start Forwarding");

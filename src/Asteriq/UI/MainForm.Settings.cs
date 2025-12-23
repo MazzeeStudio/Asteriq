@@ -310,25 +310,22 @@ public partial class MainForm
             _trayIconTypeButtonBounds[i] = iconBounds;
 
             bool isSelected = _profileService.TrayIconType == trayIconValues[i];
-            var bgColor = isSelected ? FUIColors.Active : FUIColors.Background2;
-            var textColor = isSelected ? FUIColors.Void : FUIColors.TextDim;
+            var bgColor = isSelected ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2;
+            var frameColor = isSelected ? FUIColors.Active : FUIColors.Frame;
+            var textColor = isSelected ? FUIColors.TextBright : FUIColors.TextDim;
 
-            using var iconBgPaint = new SKPaint { Color = bgColor, IsAntialias = true };
-            canvas.DrawRoundRect(iconBounds, 4, 4, iconBgPaint);
+            using var iconBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            canvas.DrawRect(iconBounds, iconBgPaint);
 
             using var iconBorderPaint = new SKPaint
             {
-                Color = isSelected ? FUIColors.Active : FUIColors.FrameDim,
-                IsAntialias = true,
-                IsStroke = true,
-                StrokeWidth = 1
+                Style = SKPaintStyle.Stroke,
+                Color = frameColor,
+                StrokeWidth = isSelected ? 1.5f : 1f
             };
-            canvas.DrawRoundRect(iconBounds, 4, 4, iconBorderPaint);
+            canvas.DrawRect(iconBounds, iconBorderPaint);
 
-            FUIRenderer.DrawText(canvas, trayIconLabels[i],
-                new SKPoint(iconBounds.MidX - FUIRenderer.MeasureText(trayIconLabels[i], 10f) / 2,
-                    iconBounds.MidY + FUIRenderer.ScaleFont(10f) / 2 - 2),
-                textColor, 10f);
+            FUIRenderer.DrawTextCentered(canvas, trayIconLabels[i], iconBounds, textColor, 10f);
         }
         y += iconBtnHeight + sectionSpacing;
 

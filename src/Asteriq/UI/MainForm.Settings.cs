@@ -288,9 +288,9 @@ public partial class MainForm
         DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _profileService.CloseToTray);
         y += rowHeight + sectionSpacing;
 
-        // Tray icon type selection (Joystick / Throttle)
-        TrayIconType[] trayIconValues = { TrayIconType.Joystick, TrayIconType.Throttle };
-        string[] trayIconLabels = { "Joystick", "Throttle" };
+        // Tray icon type selection (Throttle / Joystick)
+        TrayIconType[] trayIconValues = { TrayIconType.Throttle, TrayIconType.Joystick };
+        string[] trayIconLabels = { "Throttle", "Joystick" };
         float iconBtnWidth = 72f;   // 4px aligned
         float iconBtnHeight = 32f;  // 4px aligned
         float iconBtnGap = 4f;      // 4px aligned

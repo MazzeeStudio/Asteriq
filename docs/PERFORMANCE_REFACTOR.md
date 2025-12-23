@@ -167,11 +167,20 @@ After Phase 2:
 ## Current Status
 
 - [x] Performance issues identified and documented
-- [ ] Phase 1.1: Conditional animation
-- [ ] Phase 1.2: Smart invalidation
-- [ ] Phase 1.3: Resize optimization
-- [ ] Phase 2: Rendering optimization
-- [ ] Phase 3: Framework evaluation
+- [x] Phase 1.1: Conditional animation (COMPLETED)
+  - Added `_enableAnimations` flag to toggle animations
+  - Animations only run when enabled
+  - Background/decorative animations conditional
+- [x] Phase 1.2: Smart invalidation (PARTIALLY COMPLETED)
+  - Added `_isDirty` flag for state tracking
+  - OnAnimationTick only invalidates when animations run or state is dirty
+  - ActiveInputTracker now returns bool indicating if redraw needed
+  - **TODO**: Replace remaining direct `_canvas.Invalidate()` calls with dirty flag pattern
+- [ ] Phase 1.3: Resize optimization (NOT STARTED)
+  - Need to add WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE detection
+  - Suppress rendering during active resize drag
+- [ ] Phase 2: Rendering optimization (NOT STARTED)
+- [ ] Phase 3: Framework evaluation (PENDING Phase 1 & 2 results)
 
 ## Notes
 

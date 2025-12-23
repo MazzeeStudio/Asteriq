@@ -3474,8 +3474,8 @@ public partial class MainForm : Form
         // Profile dropdown (rendered on top of all panels)
         if (_profileDropdownOpen)
         {
-            // Get position from profile selector bounds
-            DrawProfileDropdown(canvas, _profileSelectorBounds.Left, _profileSelectorBounds.Bottom);
+            // Get position from profile selector bounds with small gap
+            DrawProfileDropdown(canvas, _profileSelectorBounds.Left, _profileSelectorBounds.Bottom + 8);
         }
     }
 
@@ -3608,7 +3608,7 @@ public partial class MainForm : Form
         // Profile selector (on the left, after subtitle or title)
         if (showProfileSelector)
         {
-            DrawProfileSelector(canvas, profileSelectorX, titleBarY + 22, profileSelectorWidth);
+            DrawProfileSelector(canvas, profileSelectorX, titleBarY + 16, profileSelectorWidth);
         }
 
         // Draw navigation tabs
@@ -3694,7 +3694,7 @@ public partial class MainForm : Form
 
         // Profile name (with dropdown arrow prefix)
         string displayText = $"▾ {profileName}";
-        float textY = y + (height + FUIRenderer.ScaleFont(11f)) / 2 - 2;
+        float textY = y + height / 2 + 4;
         FUIRenderer.DrawText(canvas, displayText, new SKPoint(x + 5, textY),
             _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 11f);
 

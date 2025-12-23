@@ -325,6 +325,7 @@ public partial class MainForm : Form
     private SKRect _bgScanlineSliderBounds;
     private SKRect _bgVignetteSliderBounds;
     private SKRect _autoLoadToggleBounds;
+    private SKRect _closeToTrayToggleBounds;
     private string? _draggingBgSlider;  // Which slider is being dragged
 
     // Star Citizen bindings tab state
@@ -4098,18 +4099,6 @@ public partial class MainForm : Form
             Activate();
         };
         menu.Items.Add(openItem);
-
-        // Close to Tray toggle
-        var closeToTrayItem = new ToolStripMenuItem("Close to Tray")
-        {
-            CheckOnClick = true,
-            Checked = _profileService.CloseToTray
-        };
-        closeToTrayItem.CheckedChanged += (s, e) =>
-        {
-            _profileService.CloseToTray = closeToTrayItem.Checked;
-        };
-        menu.Items.Add(closeToTrayItem);
 
         menu.Items.Add(new ToolStripSeparator());
 

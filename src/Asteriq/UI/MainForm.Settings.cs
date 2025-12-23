@@ -278,6 +278,16 @@ public partial class MainForm
         DrawToggleSwitch(canvas, _autoLoadToggleBounds, _profileService.AutoLoadLastProfile);
         y += rowHeight + sectionSpacing;
 
+        // Close to Tray toggle
+        float closeToTrayLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float closeToTrayLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Close to tray", new SKPoint(leftMargin, closeToTrayLabelY),
+            closeToTrayLabelMaxWidth, FUIColors.TextPrimary, 11f);
+        float closeToTrayToggleY = y + (rowHeight - toggleHeight) / 2;
+        _closeToTrayToggleBounds = new SKRect(rightMargin - toggleWidth, closeToTrayToggleY, rightMargin, closeToTrayToggleY + toggleHeight);
+        DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _profileService.CloseToTray);
+        y += rowHeight + sectionSpacing;
+
         // Font size section - show Windows scale factor and adjustment buttons
         FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
         string[] fontSizeLabels = { "-", "=", "+" };
@@ -606,6 +616,14 @@ public partial class MainForm
         if (_autoLoadToggleBounds.Contains(pt))
         {
             _profileService.AutoLoadLastProfile = !_profileService.AutoLoadLastProfile;
+            _canvas.Invalidate();
+            return;
+        }
+
+        // Check close to tray toggle click
+        if (_closeToTrayToggleBounds.Contains(pt))
+        {
+            _profileService.CloseToTray = !_profileService.CloseToTray;
             _canvas.Invalidate();
             return;
         }

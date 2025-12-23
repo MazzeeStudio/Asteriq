@@ -1132,6 +1132,9 @@ public partial class MainForm : Form
         DoubleBuffered = true;
         KeyPreview = true;
 
+        // Load application icon for taskbar
+        LoadApplicationIcon();
+
         // Load saved window state or use defaults
         var (width, height, x, y) = _profileService.LoadWindowState();
         if (width > 0 && height > 0)
@@ -1164,6 +1167,26 @@ public partial class MainForm : Form
         else
         {
             StartPosition = FormStartPosition.CenterScreen;
+        }
+    }
+
+    private void LoadApplicationIcon()
+    {
+        try
+        {
+            // Load the application icon from the asteriq.ico file
+            // This is in the same directory as the exe
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "asteriq.ico");
+
+            if (File.Exists(iconPath))
+            {
+                Icon = new Icon(iconPath);
+            }
+        }
+        catch
+        {
+            // Icon loading failed, continue without icon
+            // The app will still work, just won't show icon in taskbar
         }
     }
 

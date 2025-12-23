@@ -1001,9 +1001,18 @@ public partial class MainForm
 
                 // Dim buttons if no handle selected
                 bool enabled = _selectedDeadzoneHandle >= 0;
-                using var btnBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+                bool isHovered = enabled && btnBounds.Contains(_mousePosition.X, _mousePosition.Y);
+
+                var bgColor = enabled
+                    ? (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2)
+                    : FUIColors.Background2;
+                var frameColor = enabled
+                    ? (isHovered ? FUIColors.FrameBright : FUIColors.Frame)
+                    : FUIColors.Frame.WithAlpha(100);
+
+                using var btnBg = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
                 canvas.DrawRect(btnBounds, btnBg);
-                using var btnFrame = new SKPaint { Style = SKPaintStyle.Stroke, Color = enabled ? FUIColors.Frame : FUIColors.Frame.WithAlpha(100), StrokeWidth = 1f };
+                using var btnFrame = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
                 canvas.DrawRect(btnBounds, btnFrame);
                 FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 9f);
             }

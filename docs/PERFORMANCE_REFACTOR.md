@@ -166,21 +166,33 @@ After Phase 2:
 
 ## Current Status
 
-- [x] Performance issues identified and documented
-- [x] Phase 1.1: Conditional animation (COMPLETED)
-  - Added `_enableAnimations` flag to toggle animations
-  - Animations only run when enabled
-  - Background/decorative animations conditional
-- [x] Phase 1.2: Smart invalidation (PARTIALLY COMPLETED)
-  - Added `_isDirty` flag for state tracking
-  - OnAnimationTick only invalidates when animations run or state is dirty
-  - ActiveInputTracker now returns bool indicating if redraw needed
-  - **TODO**: Replace remaining direct `_canvas.Invalidate()` calls with dirty flag pattern
-- [ ] Phase 1.3: Resize optimization (NOT STARTED)
-  - Need to add WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE detection
-  - Suppress rendering during active resize drag
-- [ ] Phase 2: Rendering optimization (NOT STARTED)
-- [ ] Phase 3: Framework evaluation (PENDING Phase 1 & 2 results)
+- [x] **Phase 1: COMPLETED** ✅
+  - [x] Phase 1.1: Conditional animation (COMPLETED)
+    - Added `_enableAnimations` flag to toggle animations
+    - Animations only run when enabled
+    - Background/decorative animations conditional
+  - [x] Phase 1.2: Smart invalidation (COMPLETED)
+    - Added `_isDirty` flag for state tracking
+    - OnAnimationTick only invalidates when animations run or state is dirty
+    - ActiveInputTracker now returns bool indicating if redraw needed
+    - All 23 direct `_canvas.Invalidate()` calls replaced with `MarkDirty()` pattern
+  - [x] Phase 1.3: Resize optimization (COMPLETED)
+    - Added WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE detection
+    - Rendering suppressed during active resize drag
+    - Added WM_SIZE handling to mark dirty on size changes
+    - Added `MarkDirty()` helper method for unified state tracking
+- [ ] Phase 2: Rendering optimization (AWAITING Phase 1 TESTING)
+- [ ] Phase 3: Framework evaluation (AWAITING Phase 1 & 2 RESULTS)
+
+## Phase 1 Results - To Be Tested
+
+All Phase 1 optimizations are now complete. User should test and report:
+1. **Idle performance**: CPU/GPU usage when window is idle (should be near 0%)
+2. **Resize smoothness**: Window resize should be smooth without stuttering or ghost windows
+3. **General responsiveness**: UI should feel snappy and solid during interaction
+4. **Animation performance**: Background animations should run smoothly when enabled
+
+Based on test results, we'll determine if Phase 2 (rendering optimization) is needed or if we should evaluate framework migration (Phase 3).
 
 ## Notes
 

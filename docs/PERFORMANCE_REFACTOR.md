@@ -181,8 +181,14 @@ After Phase 2:
     - Rendering suppressed during active resize drag
     - Added WM_SIZE handling to mark dirty on size changes
     - Added `MarkDirty()` helper method for unified state tracking
-- [ ] Phase 2: Rendering optimization (AWAITING Phase 1 TESTING)
-- [ ] Phase 3: Framework evaluation (AWAITING Phase 1 & 2 RESULTS)
+- [ ] Phase 2: Rendering optimization
+  - [x] Phase 2.1: Background composite caching - **ATTEMPTED & REVERTED**
+    - Cached full background to single bitmap for reuse
+    - Broke visual appearance of background layers
+    - Reverted in commit b64db51
+    - **Lesson**: Composite caching approach incompatible with current rendering pipeline
+  - [ ] Phase 2.2: Alternative rendering optimizations (NOT STARTED)
+- [ ] Phase 3: Framework evaluation (AWAITING Phase 1 RESULTS)
 
 ## Phase 1 Results - To Be Tested
 

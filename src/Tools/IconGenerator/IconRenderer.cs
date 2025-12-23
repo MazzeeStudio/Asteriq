@@ -67,19 +67,14 @@ public static class IconRenderer
         float offsetX = (size - bounds.Width * scale) / 2;
         float offsetY = (throttleSpace - bounds.Height * scale) / 2;
 
-        // Render SVG with white color tint
+        // Render SVG with gradients preserved
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
         canvas.Scale(scale);
 
-        // Apply white color filter (similar to SystemTrayIcon.cs)
-        using var paint = new SKPaint
-        {
-            ColorFilter = SKColorFilter.CreateBlendMode(
-                ForegroundColor,
-                SKBlendMode.SrcIn) // Replace colors while preserving alpha
-        };
-        canvas.DrawPicture(svg.Picture, paint);
+        // Draw the SVG as-is to preserve gradient detail
+        // The throttle.svg already has beautiful grayscale gradients
+        canvas.DrawPicture(svg.Picture);
         canvas.Restore();
 
         // Add text/symbol at bottom (only for larger sizes)

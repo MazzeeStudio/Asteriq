@@ -199,7 +199,7 @@ public class HidInputReader : IDisposable
                 BuildInputMappings(reportDescriptor);
 
                 _cts = new CancellationTokenSource();
-                _readTask = Task.Run(ReadLoop, _cts.Token);
+                _readTask = Task.Run(ReadLoopAsync, _cts.Token);
 
                 return true;
             }
@@ -287,7 +287,7 @@ public class HidInputReader : IDisposable
             _ => "Unknown"
         };
 
-        private async Task ReadLoop()
+        private async Task ReadLoopAsync()
         {
             if (_stream is null) return;
 

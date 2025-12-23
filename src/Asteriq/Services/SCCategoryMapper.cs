@@ -10,7 +10,7 @@ public static class SCCategoryMapper
     /// Action-level overrides for specific actions that should be in a different category
     /// than their actionmap would suggest (e.g., emergency actions)
     /// </summary>
-    private static readonly Dictionary<string, (string Category, int SortOrder)> ActionOverrides = new()
+    private static readonly Dictionary<string, (string Category, int SortOrder)> s_actionOverrides = new()
     {
         { "v_eject", ("Emergency", 100) },
         { "v_self_destruct", ("Emergency", 100) },
@@ -21,7 +21,7 @@ public static class SCCategoryMapper
     /// Mapping from raw actionmap names to user-friendly category names.
     /// Based on actual SC defaultProfile.xml actionmap names.
     /// </summary>
-    private static readonly Dictionary<string, (string Category, int SortOrder)> ActionMapCategories = new()
+    private static readonly Dictionary<string, (string Category, int SortOrder)> s_actionMapCategories = new()
     {
         // Flight Control
         { "spaceship_movement", ("Flight Control", 1) },
@@ -138,7 +138,7 @@ public static class SCCategoryMapper
 
         var lowerMap = actionMap.ToLowerInvariant();
 
-        if (ActionMapCategories.TryGetValue(lowerMap, out var info))
+        if (s_actionMapCategories.TryGetValue(lowerMap, out var info))
             return info.Category;
 
         // Infer from name patterns if not in mapping
@@ -153,7 +153,7 @@ public static class SCCategoryMapper
     public static string GetCategoryNameForAction(string actionMap, string actionName)
     {
         // Check action-level overrides first
-        if (!string.IsNullOrEmpty(actionName) && ActionOverrides.TryGetValue(actionName, out var actionInfo))
+        if (!string.IsNullOrEmpty(actionName) && s_actionOverrides.TryGetValue(actionName, out var actionInfo))
             return actionInfo.Category;
 
         // Fall back to actionmap category
@@ -167,7 +167,7 @@ public static class SCCategoryMapper
     public static int GetSortOrderForAction(string actionMap, string actionName)
     {
         // Check action-level overrides first
-        if (!string.IsNullOrEmpty(actionName) && ActionOverrides.TryGetValue(actionName, out var actionInfo))
+        if (!string.IsNullOrEmpty(actionName) && s_actionOverrides.TryGetValue(actionName, out var actionInfo))
             return actionInfo.SortOrder;
 
         // Fall back to category sort order
@@ -184,7 +184,7 @@ public static class SCCategoryMapper
 
         var lowerMap = actionMap.ToLowerInvariant();
 
-        if (ActionMapCategories.TryGetValue(lowerMap, out var info))
+        if (s_actionMapCategories.TryGetValue(lowerMap, out var info))
             return info.SortOrder;
 
         return 99; // Unknown categories at end
@@ -193,7 +193,7 @@ public static class SCCategoryMapper
     /// <summary>
     /// Category display name to sort order mapping (matches SCVirtStick order)
     /// </summary>
-    private static readonly Dictionary<string, int> CategorySortOrders = new()
+    private static readonly Dictionary<string, int> s_categorySortOrders = new()
     {
         { "Flight Control", 1 },
         { "Weapons", 2 },
@@ -227,7 +227,7 @@ public static class SCCategoryMapper
         if (string.IsNullOrEmpty(categoryName))
             return 99;
 
-        return CategorySortOrders.TryGetValue(categoryName, out var order) ? order : 99;
+        return s_categorySortOrders.TryGetValue(categoryName, out var order) ? order : 99;
     }
 
     /// <summary>

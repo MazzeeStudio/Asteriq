@@ -23,7 +23,7 @@ public class P4kExtractorService : IDisposable
     /// <summary>
     /// Alternative paths where default profile might be located
     /// </summary>
-    private static readonly string[] AlternativeProfilePaths =
+    private static readonly string[] s_alternativeProfilePaths =
     {
         "Data/Libs/Config/defaultProfile.xml",
         "data/libs/config/defaultprofile.xml",
@@ -90,7 +90,7 @@ public class P4kExtractorService : IDisposable
         System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Searching for defaultProfile.xml in {_zipFile.Count} entries...");
 
         // Try known paths first
-        foreach (var path in AlternativeProfilePaths)
+        foreach (var path in s_alternativeProfilePaths)
         {
             var entry = _zipFile.GetEntry(path);
             if (entry is not null)

@@ -3730,126 +3730,12 @@ public partial class MainForm
             return;
         }
 
-        using var dialog = new Form
-        {
-            Text = $"Assign: {action.ActionName}",
-            Width = 350,
-            Height = 240,
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(20, 22, 30)
-        };
-
-        var vjoyLabel = new Label
-        {
-            Text = "vJoy Device:",
-            Left = 16,
-            Top = 16,
-            Width = 100,
-            ForeColor = Color.FromArgb(180, 190, 210)
-        };
-
-        var vjoyCombo = new ComboBox
-        {
-            Left = 16,
-            Top = 36,
-            Width = 300,
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            BackColor = Color.FromArgb(30, 35, 45),
-            ForeColor = Color.White
-        };
-        foreach (var vjoy in availableVJoy)
-        {
-            vjoyCombo.Items.Add($"vJoy {vjoy.Id}");
-        }
-        vjoyCombo.SelectedIndex = 0;
-
-        var inputLabel = new Label
-        {
-            Text = action.InputType == SCInputType.Axis ? "Axis:" : "Button:",
-            Left = 16,
-            Top = 72,
-            Width = 100,
-            ForeColor = Color.FromArgb(180, 190, 210)
-        };
-
-        var inputCombo = new ComboBox
-        {
-            Left = 16,
-            Top = 90,
-            Width = 300,
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            BackColor = Color.FromArgb(30, 35, 45),
-            ForeColor = Color.White
-        };
-
-        // Always show both axes and buttons - user can assign any input type to any action
-        // Group axes first (more commonly needed for throttle/slider assignments)
-        inputCombo.Items.AddRange(new[] { "x", "y", "z", "rx", "ry", "rz", "slider1", "slider2" });
-        inputCombo.Items.Add("---"); // Separator
-        for (int i = 1; i <= 32; i++)
-        {
-            inputCombo.Items.Add($"button{i}");
-        }
-        // Default selection based on action's expected input type
-        if (action.InputType == SCInputType.Axis)
-        {
-            inputCombo.SelectedIndex = 0; // Default to "x" for axis actions
-        }
-        else
-        {
-            inputCombo.SelectedIndex = 9; // Default to "button1" (after 8 axes + separator)
-        }
-
-        var invertCheck = new CheckBox
-        {
-            Text = "Inverted",
-            Left = 16,
-            Top = 124,
-            Width = 100,
-            ForeColor = Color.FromArgb(180, 190, 210),
-            Visible = action.InputType == SCInputType.Axis
-        };
-
-        var okButton = new Button
-        {
-            Text = "Assign",
-            Left = 150,
-            Top = 160,
-            Width = 80,
-            DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(40, 100, 70),
-            ForeColor = Color.White
-        };
-
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            Left = 235,
-            Top = 160,
-            Width = 80,
-            DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(60, 50, 50),
-            ForeColor = Color.White
-        };
-
-        dialog.Controls.AddRange(new Control[] { vjoyLabel, vjoyCombo, inputLabel, inputCombo, invertCheck, okButton, cancelButton });
-        dialog.AcceptButton = okButton;
-        dialog.CancelButton = cancelButton;
+        using var dialog = new SCAssignmentDialog(action, availableVJoy);
 
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
-            var vjoyId = availableVJoy[vjoyCombo.SelectedIndex].Id;
-            var inputName = inputCombo.SelectedItem?.ToString() ?? "button1";
-
-            // Skip if separator was selected
-            if (inputName == "---")
-            {
-                _scAssigningInput = false;
-                return;
-            }
+            var vjoyId = dialog.SelectedVJoyId;
+            var inputName = dialog.SelectedInputName;
 
             // Check for conflicts - is this input already bound to another action?
             var conflicts = FindSCBindingConflicts(vjoyId, inputName, action.ActionMap, action.ActionName);
@@ -3885,7 +3771,7 @@ public partial class MainForm
                 VJoyDevice = vjoyId,
                 InputName = inputName,
                 InputType = inputType,
-                Inverted = invertCheck.Checked
+                Inverted = dialog.IsInverted
             };
 
             _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);

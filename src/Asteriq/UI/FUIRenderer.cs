@@ -18,6 +18,7 @@ public static class FUIRenderer
     // Font scaling - combines Windows system setting with user preference
     private static FontSizeOption _fontSizeOption = FontSizeOption.Medium;
     private static float _windowsTextScaleFactor = 1.0f;
+    private static float _displayScaleFactor = 1.0f;  // DPI scale (150% = 1.5)
     private static bool _windowsScaleDetected = false;
 
     /// <summary>
@@ -57,6 +58,21 @@ public static class FUIRenderer
     public static float WindowsTextScaleFactor => _windowsTextScaleFactor;
 
     /// <summary>
+    /// Display scale factor from DPI (1.0 = 100%/96dpi, 1.5 = 150%/144dpi, etc.)
+    /// </summary>
+    public static float DisplayScaleFactor => _displayScaleFactor;
+
+    /// <summary>
+    /// Set the display scale factor from a form's DPI.
+    /// Call this after the form is created: SetDisplayScale(DeviceDpi)
+    /// </summary>
+    /// <param name="deviceDpi">The form's DeviceDpi property (e.g., 96, 144, 192)</param>
+    public static void SetDisplayScale(int deviceDpi)
+    {
+        _displayScaleFactor = deviceDpi / 96f;
+    }
+
+    /// <summary>
     /// Current font size option (Small/Medium/Large) for user fine-tuning
     /// </summary>
     public static FontSizeOption FontSizeOption
@@ -78,9 +94,9 @@ public static class FUIRenderer
     };
 
     /// <summary>
-    /// Combined font scale factor (Windows setting × user preference)
+    /// Combined font scale factor (DPI × Windows text setting × user preference)
     /// </summary>
-    public static float FontScaleFactor => _windowsTextScaleFactor * UserScaleMultiplier;
+    public static float FontScaleFactor => _displayScaleFactor * _windowsTextScaleFactor * UserScaleMultiplier;
 
     /// <summary>
     /// Scale a font size according to Windows + user settings
@@ -97,6 +113,12 @@ public static class FUIRenderer
         float dampenedScale = 1f + (FontScaleFactor - 1f) * 0.5f;
         return baseSpacing * dampenedScale;
     }
+
+    /// <summary>
+    /// Scale layout values (margins, padding, sizes) by DPI only.
+    /// Use this for UI layout that should scale with display but not font preferences.
+    /// </summary>
+    public static float ScaleLayout(float baseValue) => baseValue * _displayScaleFactor;
 
     /// <summary>
     /// Scale line height for text rows

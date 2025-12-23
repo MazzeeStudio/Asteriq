@@ -460,6 +460,9 @@ public partial class MainForm : Form
         // Initialize font scaling (reads Windows text scale setting)
         FUIRenderer.InitializeFontScaling();
 
+        // Set display scale from form's DPI (e.g., 150% = 144 DPI)
+        FUIRenderer.SetDisplayScale(DeviceDpi);
+
         // Apply user's font size preference
         FUIRenderer.FontSizeOption = _profileService.FontSize;
 
@@ -3881,6 +3884,25 @@ public partial class MainForm : Form
 
         // Rebuild devices list with physical first, then virtual
         _devices = orderedPhysical.Concat(virtualDevices).ToList();
+    }
+
+    #endregion
+
+    #region DPI Handling
+
+    /// <summary>
+    /// Handle DPI changes when window moves between monitors with different DPI settings.
+    /// Per Microsoft best practices for Per-Monitor V2 DPI awareness.
+    /// </summary>
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+
+        // Update the renderer's display scale factor
+        FUIRenderer.SetDisplayScale(DeviceDpi);
+
+        // Force full redraw at new DPI
+        Invalidate();
     }
 
     #endregion

@@ -1,20 +1,24 @@
 using SkiaSharp;
+using Svg.Skia;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace Asteriq.UI;
 
 /// <summary>
 /// Manages the system tray icon with color-changing based on forwarding state.
-/// Draws a simple joystick icon that changes color based on forwarding state and current theme.
+/// Loads joystick.svg and colorizes it based on forwarding state and current theme.
 /// </summary>
 public sealed class SystemTrayIcon : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
+    private readonly string _svgPath;
     private bool _isActive;
     private Icon? _currentIcon;
 
     public SystemTrayIcon(string toolTipText = "Asteriq")
     {
+        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "joystick.svg");
         _notifyIcon = new NotifyIcon
         {
             Text = toolTipText,
@@ -36,27 +40,118 @@ public sealed class SystemTrayIcon : IDisposable
     }
 
     /// <summary>
-    /// Generate icon with current theme colors.
-    /// Draws a simple joystick shape directly using GDI+.
+    /// Generate icon from SVG with current theme colors.
+    /// Renders SVG to bitmap then applies color tint.
     /// </summary>
     private Icon GenerateIcon()
     {
-        const int size = 16;
+        const int size = 32;  // Use 32x32 for better visibility in system tray
+
+        // Get color based on state and current theme
+        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextDim;
+        Color targetColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+
+        try
+        {
+            // Load and render SVG using SkiaSharp
+            var svg = new SKSvg();
+            if (File.Exists(_svgPath))
+            {
+                using var stream = File.OpenRead(_svgPath);
+                svg.Load(stream);
+            }
+
+            if (svg.Picture is not null)
+            {
+                // Render SVG to SKBitmap
+                var bounds = svg.Picture.CullRect;
+                var scale = Math.Min(size / bounds.Width, size / bounds.Height);
+
+                using var surface = SKSurface.Create(new SKImageInfo(size, size));
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.Transparent);
+
+                // Center and scale
+                canvas.Translate((size - bounds.Width * scale) / 2, (size - bounds.Height * scale) / 2);
+                canvas.Scale(scale);
+
+                // Draw SVG in white (we'll colorize it later)
+                canvas.DrawPicture(svg.Picture);
+
+                // Convert to GDI+ bitmap
+                using var image = surface.Snapshot();
+                using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+                using var ms = new MemoryStream();
+                data.SaveTo(ms);
+                ms.Position = 0;
+
+                using var bitmap = new Bitmap(ms);
+
+                // Apply color tint to the bitmap
+                var tintedBitmap = ApplyColorTint(bitmap, targetColor);
+                return Icon.FromHandle(tintedBitmap.GetHicon());
+            }
+        }
+        catch
+        {
+            // SVG loading failed, fall back to simple shape
+        }
+
+        // Fallback: draw simple joystick icon if SVG fails
+        return GenerateFallbackIcon(targetColor, size);
+    }
+
+    /// <summary>
+    /// Apply a color tint to a bitmap while preserving transparency.
+    /// </summary>
+    private static Bitmap ApplyColorTint(Bitmap source, Color tintColor)
+    {
+        var result = new Bitmap(source.Width, source.Height);
+
+        using (var g = Graphics.FromImage(result))
+        {
+            // Create a color matrix to tint the image
+            float r = tintColor.R / 255f;
+            float gr = tintColor.G / 255f;
+            float b = tintColor.B / 255f;
+
+            var colorMatrix = new ColorMatrix(new float[][]
+            {
+                new float[] {r, 0, 0, 0, 0},
+                new float[] {0, gr, 0, 0, 0},
+                new float[] {0, 0, b, 0, 0},
+                new float[] {0, 0, 0, 1, 0},
+                new float[] {0, 0, 0, 0, 1}
+            });
+
+            using var attributes = new ImageAttributes();
+            attributes.SetColorMatrix(colorMatrix);
+
+            g.DrawImage(source,
+                new Rectangle(0, 0, source.Width, source.Height),
+                0, 0, source.Width, source.Height,
+                GraphicsUnit.Pixel,
+                attributes);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Generate a simple fallback icon if SVG loading fails.
+    /// </summary>
+    private Icon GenerateFallbackIcon(Color color, int size)
+    {
         using var bitmap = new Bitmap(size, size);
         using var g = Graphics.FromImage(bitmap);
 
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
 
-        // Get color based on state and current theme
-        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextDim;
-        Color color = Color.FromArgb(skColor.Alpha, skColor.Red, skColor.Green, skColor.Blue);
-
-        // Draw simple joystick icon (stick + base)
         using var pen = new Pen(color, 1.5f);
         using var brush = new SolidBrush(color);
 
-        // Base (circle at bottom)
+        // Draw simple joystick icon (stick + base)
         float baseY = size * 0.75f;
         float baseRadius = size * 0.35f;
         g.FillEllipse(brush, size / 2f - baseRadius, baseY - baseRadius, baseRadius * 2, baseRadius * 2);

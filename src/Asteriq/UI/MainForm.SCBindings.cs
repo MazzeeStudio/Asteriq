@@ -541,7 +541,7 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, "INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight;
 
-        float selectorHeight = 28f;
+        float selectorHeight = 36f;
         _scInstallationSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorHeight);
 
         string installationText = _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
@@ -848,7 +848,7 @@ public partial class MainForm
         y += 18f;
 
         // Installation selector
-        float selectorHeight = 24f;
+        float selectorHeight = 32f;
         _scInstallationSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorHeight);
 
         string installationText = _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
@@ -890,7 +890,7 @@ public partial class MainForm
         y += FUIRenderer.ScaleLineHeight(28f);
 
         // Filter row: [search...] [☐] Bound only    [All Categories ▼]
-        float filterRowHeight = 24f;
+        float filterRowHeight = 32f;
         float checkboxSize = 16f;
         float filterWidth = 196f;  // 40% wider than original
         float gap = 10f;
@@ -1841,7 +1841,7 @@ public partial class MainForm
         y += 18f;
 
         // Profile dropdown (full width)
-        float dropdownHeight = 24f;
+        float dropdownHeight = 32f;
         _scProfileDropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
         bool dropdownHovered = _scProfileDropdownBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, _scExportProfile.ProfileName, dropdownHovered, _scProfileDropdownOpen);

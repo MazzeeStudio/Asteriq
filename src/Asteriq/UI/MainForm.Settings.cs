@@ -13,16 +13,17 @@ public partial class MainForm
 
     private void DrawSettingsTabContent(SKCanvas canvas, SKRect bounds, float pad, float contentTop, float contentBottom)
     {
-        float frameInset = 5f;
+        float frameInset = FUIRenderer.FrameInset;  // 4px - 4px aligned
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
         // Two-panel layout: Left (profile management) | Right (application settings)
+        float panelGap = FUIRenderer.SpaceLG;  // 16px - 4px aligned
         float leftPanelWidth = 400f;
-        float rightPanelWidth = contentBounds.Width - leftPanelWidth - 15;
+        float rightPanelWidth = contentBounds.Width - leftPanelWidth - panelGap;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
             contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
-        var rightBounds = new SKRect(leftBounds.Right + 15, contentBounds.Top,
+        var rightBounds = new SKRect(leftBounds.Right + panelGap, contentBounds.Top,
             contentBounds.Right, contentBounds.Bottom);
 
         // LEFT PANEL - Profile Management
@@ -45,10 +46,10 @@ public partial class MainForm
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
         // Consistent padding from L-corner frame (same for left and top)
-        float cornerPadding = 20f;
+        float cornerPadding = FUIRenderer.SpaceXL;  // 24px - was 20f
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;  // 16px - was 15
         float width = rightMargin - leftMargin;
         float sectionSpacing = FUIRenderer.ScaleLineHeight(18f);
         float rowHeight = FUIRenderer.ScaleLineHeight(18f);
@@ -257,22 +258,22 @@ public partial class MainForm
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
-        float cornerPadding = 20f;
+        float cornerPadding = FUIRenderer.SpaceXL;  // 24px - was 20f
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;  // 16px - was 15
         float contentWidth = rightMargin - leftMargin;
         float sectionSpacing = FUIRenderer.ScaleLineHeight(20f);
         float rowHeight = FUIRenderer.ScaleLineHeight(24f);
-        float minControlGap = FUIRenderer.ScaleSpacing(10f);
+        float minControlGap = FUIRenderer.ScaleSpacing(12f);  // 12px - was 10f
 
         // Title
         FUIRenderer.DrawText(canvas, "SYSTEM", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
 
         // Auto-load setting - toggle has fixed height for proper capsule shape
-        float toggleWidth = 45f;
-        float toggleHeight = 22f;  // Fixed height for consistent toggle appearance
+        float toggleWidth = 48f;   // 4px aligned - was 45f
+        float toggleHeight = 24f;  // 4px aligned - was 22f, meets TouchTargetMinHeight
         float autoLoadLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float autoLoadLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Auto-load last profile", new SKPoint(leftMargin, autoLoadLabelY),
@@ -285,9 +286,9 @@ public partial class MainForm
         // Font size section - show Windows scale factor and adjustment buttons
         FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
         string[] fontSizeLabels = { "-", "=", "+" };
-        float fontBtnWidth = 28f;
-        float fontBtnHeight = 24f;
-        float fontBtnGap = 3f;
+        float fontBtnWidth = 32f;   // 4px aligned, meets TouchTargetCompact - was 28f
+        float fontBtnHeight = 32f;  // 4px aligned, meets TouchTargetCompact - was 24f
+        float fontBtnGap = 4f;      // 4px aligned - was 3f
         float fontBtnsWidth = fontBtnWidth * 3 + fontBtnGap * 2;
         float fontLabelMaxWidth = contentWidth - fontBtnsWidth - minControlGap;
 
@@ -383,23 +384,23 @@ public partial class MainForm
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
 
-        float cornerPadding = 20f;
+        float cornerPadding = FUIRenderer.SpaceXL;  // 24px - was 20f
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;  // 16px - was 15
         float contentWidth = rightMargin - leftMargin;
         float sectionSpacing = FUIRenderer.ScaleLineHeight(16f);
 
         // Title
         FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(30f);
+        y += FUIRenderer.ScaleLineHeight(32f);  // 32px - was 30f
 
         // Theme section - calculate button sizes based on available width
-        float themeLabelWidth = FUIRenderer.ScaleSpacing(35f);
+        float themeLabelWidth = FUIRenderer.ScaleSpacing(36f);  // 36px - was 35f
         float themeAreaWidth = contentWidth - themeLabelWidth;
-        float themeBtnGap = 3f;
-        float themeBtnWidth = Math.Min(38f, (themeAreaWidth - themeBtnGap * 3) / 4);
-        float themeBtnHeight = 20f;
+        float themeBtnGap = 4f;  // 4px - was 3f
+        float themeBtnWidth = Math.Min(40f, (themeAreaWidth - themeBtnGap * 3) / 4);  // 40px max - was 38f
+        float themeBtnHeight = 20f;  // OK - 4px multiple
         float themeBtnsStartX = leftMargin + themeLabelWidth;
 
         // Core themes

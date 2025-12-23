@@ -107,31 +107,97 @@ public static class FUIRenderer
     [Obsolete("Use ScaleFont() instead for proper multiplicative scaling")]
     public static float FontSizeOffset => (FontScaleFactor - 1f) * 10f;
 
-    // Standard measurements
+    // Standard measurements (all 4px aligned)
     public const float CornerRadius = 8f;
     public const float CornerRadiusSmall = 4f;
     public const float CornerRadiusLarge = 12f;
     public const float ChamferSize = 8f;
-    public const float ChamferSizeSmall = 5f;
+    public const float ChamferSizeSmall = 4f;   // Was 5f - aligned to 4px grid
     public const float ChamferSizeLarge = 12f;
     public const float BracketSize = 8f;
-    public const float BracketGap = 3f;
+    public const float BracketGap = 4f;         // Was 3f - aligned to 4px grid
     public const float LineWeight = 1.5f;
     public const float LineWeightThin = 1f;
     public const float LineWeightThick = 2f;
     public const float GlowRadius = 8f;
     public const float GlowRadiusLarge = 16f;
 
-    // Spacing system
-    public const float SpaceXS = 4f;
-    public const float SpaceSM = 8f;
-    public const float SpaceMD = 16f;
-    public const float SpaceLG = 24f;
-    public const float SpaceXL = 32f;
+    // Spacing system (4px grid aligned)
+    // Based on Windows UX Guidelines: all spacing in multiples of 4 epx
+    public const float SpaceXS = 4f;      // Tight spacing, minimum gaps
+    public const float SpaceSM = 8f;      // Small spacing, between related items
+    public const float SpaceMD = 12f;     // Medium spacing, small gutters
+    public const float SpaceLG = 16f;     // Standard spacing, panel padding
+    public const float SpaceXL = 24f;     // Large spacing, large gutters
+    public const float Space2XL = 32f;    // Extra large, section breaks
+    public const float Space3XL = 48f;    // Major sections
+
+    // Legacy spacing aliases for compatibility
     public const float PanelPadding = 16f;
     public const float ItemSpacing = 12f;
     public const float SectionSpacing = 24f;
-    public const float FrameInset = 5f;
+    public const float FrameInset = 4f;   // Was 5f - aligned to 4px grid
+
+    // Typography - Windows Type Ramp
+    // See: https://learn.microsoft.com/en-us/windows/apps/design/style/typography
+    public const float FontCaption = 12f;     // Labels, secondary text (min readable)
+    public const float FontBody = 14f;        // Primary content text
+    public const float FontBodyLarge = 18f;   // Emphasized body, intro text
+    public const float FontSubtitle = 20f;    // Section headers
+    public const float FontTitle = 28f;       // Page/panel titles
+    public const float FontTitleLarge = 40f;  // Hero titles
+
+    // Line heights for proper text spacing
+    public const float LineHeightCaption = 16f;
+    public const float LineHeightBody = 20f;
+    public const float LineHeightBodyLarge = 24f;
+    public const float LineHeightSubtitle = 28f;
+    public const float LineHeightTitle = 36f;
+
+    // Touch targets - Windows UX Guidelines
+    // Standard: 40x40 epx for touch+pointer, Compact: 32x32 for pointer-focused
+    public const float TouchTargetStandard = 40f;
+    public const float TouchTargetCompact = 32f;
+    public const float TouchTargetMinHeight = 24f;  // Absolute minimum for controls
+
+    // Responsive breakpoints - Windows size classes
+    public const float BreakpointSmall = 640f;    // 0-640: phones, small windows
+    public const float BreakpointLarge = 1008f;   // 1008+: PCs, large windows
+
+    // Gutters per breakpoint
+    public const float GutterSmall = 12f;   // For windows < 640px
+    public const float GutterLarge = 24f;   // For windows >= 640px
+
+    // Title bar constants - Windows standard
+    public const float TitleBarHeight = 32f;
+    public const float TitleBarHeightExpanded = 48f;  // With search/avatar
+    public const float TitleBarPadding = 16f;
+
+    /// <summary>
+    /// Gets the appropriate gutter size based on window width
+    /// </summary>
+    public static float GetGutter(float windowWidth)
+    {
+        return windowWidth < BreakpointSmall ? GutterSmall : GutterLarge;
+    }
+
+    /// <summary>
+    /// Gets content margin based on window width
+    /// </summary>
+    public static float GetContentMargin(float windowWidth)
+    {
+        return windowWidth < BreakpointSmall ? SpaceMD : SpaceXL;
+    }
+
+    /// <summary>
+    /// Determines if window is in small size class
+    /// </summary>
+    public static bool IsSmallWindow(float windowWidth) => windowWidth < BreakpointSmall;
+
+    /// <summary>
+    /// Determines if window is in large size class
+    /// </summary>
+    public static bool IsLargeWindow(float windowWidth) => windowWidth >= BreakpointLarge;
 
     #region Frame Drawing
 
@@ -618,8 +684,8 @@ public static class FUIRenderer
     public static void DrawWindowControls(SKCanvas canvas, float x, float y,
         bool minimizeHovered = false, bool maximizeHovered = false, bool closeHovered = false)
     {
-        float btnSize = 28f;
-        float btnGap = 8f;
+        float btnSize = TouchTargetCompact;  // 32px - was 28f, meets touch target minimum
+        float btnGap = SpaceSM;  // 8px
 
         var minBounds = new SKRect(x, y, x + btnSize, y + btnSize);
         DrawWindowControlButton(canvas, minBounds, WindowControlType.Minimize, minimizeHovered);

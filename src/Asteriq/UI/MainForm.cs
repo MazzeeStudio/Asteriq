@@ -3192,17 +3192,17 @@ public partial class MainForm : Form
         // Title bar
         DrawTitleBar(canvas, bounds);
 
-        // Main content area
-        float pad = FUIRenderer.SpaceLG;
-        float gap = FUIRenderer.SpaceMD;
-        float contentTop = 90;
-        float contentBottom = bounds.Bottom - 55;
+        // Main content area - all values 4px aligned
+        float pad = FUIRenderer.SpaceXL;  // 24px
+        float gap = FUIRenderer.SpaceLG;  // 16px
+        float contentTop = 88;  // 4px aligned - was 90
+        float contentBottom = bounds.Bottom - 56;  // 4px aligned - was 55
 
         // Calculate panel widths
         // Side-tabbed panels (Devices, Mappings) use reduced left padding to put tabs closer to edge
-        float sideTabPad = 8f;  // Reduced padding for panels with side tabs
+        float sideTabPad = FUIRenderer.SpaceSM;  // 8px
         float leftPanelWidth = 400f;  // Match Settings panel width
-        float rightPanelWidth = 330f;
+        float rightPanelWidth = 328f;  // 4px aligned - was 330f
         float centerStart = sideTabPad + leftPanelWidth + gap;
         float centerEnd = bounds.Right - pad - rightPanelWidth - gap;
 
@@ -3320,12 +3320,13 @@ public partial class MainForm : Form
         FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 26f, true);
 
         // Window controls - always at fixed position from right edge
-        float btnTotalWidth = 28f * 3 + 8f * 2; // 3 buttons at 28px + 2 gaps at 8px = 100px
+        // 3 buttons at 32px + 2 gaps at 8px = 112px
+        float btnTotalWidth = FUIRenderer.TouchTargetCompact * 3 + FUIRenderer.SpaceSM * 2;
         float windowControlsX = bounds.Right - pad - btnTotalWidth;
 
-        // Navigation tabs - positioned with 40px gap from window controls
-        float tabWindowGap = 40f;
-        float tabGap = FUIRenderer.ScaleSpacing(15f);  // Gap between tabs
+        // Navigation tabs - positioned with gap from window controls
+        float tabWindowGap = FUIRenderer.Space2XL;  // 32px - was 40f
+        float tabGap = FUIRenderer.ScaleSpacing(16f);  // 16px - was 15f
         using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
 
         // Calculate total tabs width by measuring each tab

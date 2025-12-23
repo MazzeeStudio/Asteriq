@@ -35,36 +35,21 @@ public partial class MainForm
 
     private void DrawProfileManagementPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+        // Draw panel chrome and get standard layout metrics
+        var metrics = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = metrics.Y;
+        float leftMargin = metrics.LeftMargin;
+        float rightMargin = metrics.RightMargin;
 
-        // Consistent padding from L-corner frame (same for left and top)
-        float cornerPadding = FUIRenderer.SpaceXL;  // 24px - was 20f
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;  // 16px - was 15
-        float width = rightMargin - leftMargin;
-        float sectionSpacing = FUIRenderer.ScaleLineHeight(18f);
-        float rowHeight = FUIRenderer.ScaleLineHeight(18f);
-
-        // Title
-        FUIRenderer.DrawText(canvas, "PROFILE MANAGEMENT", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(30f);
+        // Panel title
+        y = FUIRenderer.DrawPanelHeader(canvas, "PROFILE MANAGEMENT", leftMargin, y);
 
         // Current profile info
         var profile = _profileService.ActiveProfile;
         if (profile is not null)
         {
-            // Active profile header
-            FUIRenderer.DrawText(canvas, "ACTIVE PROFILE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += sectionSpacing;
+            // Active profile section
+            y = FUIRenderer.DrawSectionHeader(canvas, "ACTIVE PROFILE", leftMargin, y);
 
             // Profile name with highlight
             float nameBoxHeight = FUIRenderer.ScaleLineHeight(32f);
@@ -75,14 +60,13 @@ public partial class MainForm
             using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
             canvas.DrawRoundRect(nameBounds, 4, 4, nameFramePaint);
 
-            float nameTextY = y + (nameBoxHeight - FUIRenderer.ScaleFont(13f)) / 2 + FUIRenderer.ScaleFont(13f) - 3;
-            FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, 13f, true);
+            float nameTextY = y + (nameBoxHeight - FUIRenderer.ScaleFont(FUIRenderer.FontBody)) / 2 + FUIRenderer.ScaleFont(FUIRenderer.FontBody) - 3;
+            FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, FUIRenderer.FontBody, true);
             y += nameBoxHeight + FUIRenderer.ScaleLineHeight(12f);
 
-            // Profile stats
-            float lineHeight = FUIRenderer.ScaleLineHeight(18f);
-            FUIRenderer.DrawText(canvas, "STATISTICS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-            y += lineHeight;
+            // Profile stats section
+            float lineHeight = metrics.RowHeight;
+            y = FUIRenderer.DrawSectionHeader(canvas, "STATISTICS", leftMargin, y);
 
             DrawProfileStat(canvas, leftMargin, y, "Axis Mappings", profile.AxisMappings.Count.ToString());
             y += lineHeight;
@@ -107,23 +91,23 @@ public partial class MainForm
         }
 
         // Actions section
-        FUIRenderer.DrawText(canvas, "ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += sectionSpacing;
+        y = FUIRenderer.DrawSectionHeader(canvas, "ACTIONS", leftMargin, y);
 
         // Action buttons - scale height for larger fonts
         float buttonHeight = FUIRenderer.ScaleLineHeight(28f);
-        float buttonGap = FUIRenderer.ScaleSpacing(8f);
+        float buttonGap = FUIRenderer.SpaceSM;
+        float buttonWidth = (metrics.ContentWidth - buttonGap) / 2;
 
         // New Profile button
-        DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "New Profile", false);
+        DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight), "New Profile", false);
         // Duplicate button
-        DrawSettingsButton(canvas, new SKRect(rightMargin - (width - buttonGap) / 2, y, rightMargin, y + buttonHeight),
+        DrawSettingsButton(canvas, new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight),
             profile is not null ? "Duplicate" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
         // Import/Export buttons
-        DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + (width - buttonGap) / 2, y + buttonHeight), "Import", false);
-        DrawSettingsButton(canvas, new SKRect(rightMargin - (width - buttonGap) / 2, y, rightMargin, y + buttonHeight),
+        DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight), "Import", false);
+        DrawSettingsButton(canvas, new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight),
             profile is not null ? "Export" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
@@ -141,7 +125,7 @@ public partial class MainForm
             y += buttonHeight + FUIRenderer.ScaleLineHeight(20f);
 
             // Shift Layers section
-            DrawShiftLayersSection(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 15, profile);
+            DrawShiftLayersSection(canvas, leftMargin, rightMargin, y, bounds.Bottom - FUIRenderer.FrameInset - FUIRenderer.SpaceLG, profile);
         }
     }
 
@@ -267,9 +251,9 @@ public partial class MainForm
         float rowHeight = FUIRenderer.ScaleLineHeight(24f);
         float minControlGap = FUIRenderer.ScaleSpacing(12f);  // 12px - was 10f
 
-        // Title
-        FUIRenderer.DrawText(canvas, "SYSTEM", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(30f);
+        // Title - using FontBody (14f) with glow for panel titles
+        FUIRenderer.DrawText(canvas, "SYSTEM", new SKPoint(leftMargin, y), FUIColors.TextBright, FUIRenderer.FontBody, true);
+        y += FUIRenderer.ScaleLineHeight(32f);
 
         // Auto-load setting - toggle has fixed height for proper capsule shape
         float toggleWidth = 48f;   // 4px aligned - was 45f
@@ -391,9 +375,9 @@ public partial class MainForm
         float contentWidth = rightMargin - leftMargin;
         float sectionSpacing = FUIRenderer.ScaleLineHeight(16f);
 
-        // Title
-        FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(32f);  // 32px - was 30f
+        // Title - using FontBody (14f) with glow for panel titles
+        FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, FUIRenderer.FontBody, true);
+        y += FUIRenderer.ScaleLineHeight(32f);
 
         // Theme section - calculate button sizes based on available width
         float themeLabelWidth = FUIRenderer.ScaleSpacing(36f);  // 36px - was 35f

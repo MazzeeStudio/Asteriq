@@ -143,7 +143,7 @@ public partial class MainForm
         y += lineHeight + 4;
 
         // List existing shift layers
-        float layerRowHeight = 36f;
+        float layerRowHeight = FUIRenderer.TouchTargetStandard;  // 40px for standard touch targets
         foreach (var layer in profile.ShiftLayers)
         {
             if (y + layerRowHeight > bottom - 50) break;
@@ -384,7 +384,7 @@ public partial class MainForm
         float themeAreaWidth = contentWidth - themeLabelWidth;
         float themeBtnGap = 4f;  // 4px - was 3f
         float themeBtnWidth = Math.Min(40f, (themeAreaWidth - themeBtnGap * 3) / 4);  // 40px max - was 38f
-        float themeBtnHeight = 20f;  // OK - 4px multiple
+        float themeBtnHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum for touch
         float themeBtnsStartX = leftMargin + themeLabelWidth;
 
         // Core themes

@@ -530,7 +530,7 @@ public partial class MainForm
         float cornerPadding = 20f;
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
         float lineHeight = FUIRenderer.ScaleLineHeight(20f);
 
         // Title
@@ -589,27 +589,27 @@ public partial class MainForm
         }
 
         // Refresh button
-        y += 15f;
+        y += 16f;  // 4px aligned
         float buttonWidth = 120f;
-        float buttonHeight = 28f;
+        float buttonHeight = FUIRenderer.TouchTargetCompact;  // 32px
         _scRefreshButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
         _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scRefreshButtonBounds, "REFRESH",
             _scRefreshButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Export Profile Name section
-        y += buttonHeight + 30f;
+        y += buttonHeight + 32f;  // 4px aligned
         FUIRenderer.DrawText(canvas, "EXPORT PROFILE", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += FUIRenderer.ScaleLineHeight(30f);
 
         FUIRenderer.DrawText(canvas, "PROFILE NAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight;
 
-        float nameFieldHeight = 28f;
+        float nameFieldHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
         _scProfileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameFieldHeight);
         _scProfileNameHovered = _scProfileNameBounds.Contains(_mousePosition.X, _mousePosition.Y);
         DrawTextFieldReadOnly(canvas, _scProfileNameBounds, _scExportProfile.ProfileName, _scProfileNameHovered);
-        y += nameFieldHeight + 10f;
+        y += nameFieldHeight + 12f;  // 4px aligned
 
         // Export filename preview
         FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -632,7 +632,7 @@ public partial class MainForm
         float cornerPadding = 20f;
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
         float lineHeight = FUIRenderer.ScaleLineHeight(20f);
 
         // Title - Import Section
@@ -666,7 +666,7 @@ public partial class MainForm
         bool canImport = _scAvailableProfiles.Count > 0;
 
         DrawImportButton(canvas, _scImportButtonBounds, importText, _scImportButtonHovered || _scImportDropdownOpen, canImport);
-        y += buttonHeight + 5f;
+        y += buttonHeight + 4f;  // 4px aligned
 
         // Draw import dropdown if open
         if (_scImportDropdownOpen && _scAvailableProfiles.Count > 0)
@@ -684,7 +684,7 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight - 2f;
 
-        float filenameBoxHeight = 26f;
+        float filenameBoxHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
         _scExportFilenameBoxBounds = new SKRect(leftMargin, y, rightMargin, y + filenameBoxHeight);
 
         // Draw text input box
@@ -874,7 +874,7 @@ public partial class MainForm
         float cornerPadding = 15f;
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
         float lineHeight = FUIRenderer.ScaleLineHeight(18f);
 
         // Title row with action count
@@ -966,7 +966,7 @@ public partial class MainForm
         _scDeviceColsStart = deviceColsStart;
 
         // Table header row
-        float headerRowHeight = 22f;
+        float headerRowHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum
         float headerTextY = y + headerRowHeight / 2 + 4f;  // Vertically centered
 
         // Table header background
@@ -1848,8 +1848,8 @@ public partial class MainForm
         y += dropdownHeight + 6f;
 
         // Buttons row: + New, Save (aligned right)
-        float textBtnWidth = 50f;
-        float textBtnHeight = 20f;
+        float textBtnWidth = 52f;  // 4px aligned
+        float textBtnHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum
 
         // Save button (rightmost)
         _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y, rightMargin, y + textBtnHeight);

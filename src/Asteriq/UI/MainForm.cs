@@ -3485,7 +3485,7 @@ public partial class MainForm : Form
 
     private void DrawProfileDropdown(SKCanvas canvas, float x, float y)
     {
-        float itemHeight = 26f;
+        float itemHeight = 28f;  // 4px aligned
         float width = 150f;
         float padding = 8f;
         int itemCount = Math.Max(_profiles.Count + 3, 4); // +3 for "New Profile", "Import", "Export", minimum 4

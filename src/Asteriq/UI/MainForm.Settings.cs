@@ -487,7 +487,8 @@ public partial class MainForm
         float themeBtnsStartX = leftMargin + themeLabelWidth;
 
         // Core themes
-        FUIRenderer.DrawTextTruncated(canvas, "Core", new SKPoint(leftMargin, y + 4), themeLabelWidth - 5, FUIColors.TextDim, 9f);
+        float themeLabelY = themeBtnHeight / 2 + 3; // Vertically center label with button row
+        FUIRenderer.DrawTextTruncated(canvas, "Core", new SKPoint(leftMargin, y + themeLabelY), themeLabelWidth - 5, FUIColors.TextDim, 9f);
 
         FUITheme[] coreThemes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
         string[] coreNames = { "MID", "MTX", "AMB", "ICE" };
@@ -510,7 +511,7 @@ public partial class MainForm
         y += themeBtnHeight + 8;
 
         // Manufacturer themes - Row 1
-        FUIRenderer.DrawTextTruncated(canvas, "Mfr", new SKPoint(leftMargin, y + 4), themeLabelWidth - 5, FUIColors.TextDim, 9f);
+        FUIRenderer.DrawTextTruncated(canvas, "Mfr", new SKPoint(leftMargin, y + themeLabelY), themeLabelWidth - 5, FUIColors.TextDim, 9f);
 
         FUITheme[] mfrThemes1 = { FUITheme.Drake, FUITheme.Aegis, FUITheme.Anvil, FUITheme.Argo };
         string[] mfrNames1 = { "DRK", "AEG", "ANV", "ARG" };

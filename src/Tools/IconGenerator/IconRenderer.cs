@@ -11,7 +11,7 @@ namespace Asteriq.Tools.IconGenerator;
 /// </summary>
 public static class IconRenderer
 {
-    private static readonly SKColor BackgroundColor = new SKColor(0x0A, 0x0E, 0x14); // FUIColors.Background1
+    // No background color - use transparent
     private static readonly SKColor ForegroundColor = SKColors.White;
 
     /// <summary>
@@ -44,8 +44,8 @@ public static class IconRenderer
         using var surface = SKSurface.Create(new SKImageInfo(size, size));
         var canvas = surface.Canvas;
 
-        // Clear to dark background
-        canvas.Clear(BackgroundColor);
+        // Clear to transparent background
+        canvas.Clear(SKColors.Transparent);
 
         // Load SVG
         var svg = new SKSvg();
@@ -57,15 +57,11 @@ public static class IconRenderer
         if (svg.Picture is null)
             throw new InvalidOperationException($"Failed to load SVG: {svgPath}");
 
-        // Calculate layout - reserve space for text at bottom
-        float textSpace = size >= 48 ? size * 0.25f : 0;
-        float throttleSpace = size - textSpace;
-
-        // Calculate SVG scaling and positioning to fit in available space
+        // Calculate SVG scaling - use 90% of canvas for maximum size
         var bounds = svg.Picture.CullRect;
-        float scale = Math.Min(throttleSpace / bounds.Width, throttleSpace / bounds.Height) * 0.85f; // 85% to add some padding
+        float scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.90f; // 90% to add small padding
         float offsetX = (size - bounds.Width * scale) / 2;
-        float offsetY = (throttleSpace - bounds.Height * scale) / 2;
+        float offsetY = (size - bounds.Height * scale) / 2;
 
         // Render SVG with gradients preserved
         canvas.Save();
@@ -77,13 +73,8 @@ public static class IconRenderer
         canvas.DrawPicture(svg.Picture);
         canvas.Restore();
 
-        // Add text/symbol at bottom (only for larger sizes)
-        if (size >= 48)
-        {
-            // Use star symbol for smaller sizes, full text for 256x256
-            string label = size >= 128 ? "ASTERIQ" : "★";
-            DrawLabel(canvas, label, size, throttleSpace);
-        }
+        // Add 6-pointed asterisk star in top-left corner
+        DrawAsteriskStar(canvas, size);
 
         // Encode to PNG
         using var image = surface.Snapshot();
@@ -92,40 +83,77 @@ public static class IconRenderer
     }
 
     /// <summary>
-    /// Draws the label (text or symbol) at the bottom of the icon.
+    /// Draws a 6-pointed asterisk star in the top-left corner.
     /// </summary>
-    private static void DrawLabel(SKCanvas canvas, string label, int iconSize, float yOffset)
+    private static void DrawAsteriskStar(SKCanvas canvas, int iconSize)
     {
-        // Calculate font size based on icon size
-        float fontSize = label == "★"
-            ? iconSize * 0.15f    // Star symbol: 15% of icon size
-            : iconSize switch
-            {
-                256 => 22f,
-                128 => 12f,
-                _ => 7f
-            };
-
-        // Try Carbon font first, fallback to Consolas
-        var typeface = SKTypeface.FromFamilyName("Carbon",
-            SKFontStyleWeight.Normal,
-            SKFontStyleWidth.Normal,
-            SKFontStyleSlant.Upright)
-            ?? SKTypeface.FromFamilyName("Consolas");
-
-        using var paint = new SKPaint
+        // Star size relative to icon size (smaller for tiny icons)
+        float starSize = iconSize switch
         {
-            Color = ForegroundColor,
-            TextSize = fontSize,
-            IsAntialias = true,
-            Typeface = typeface,
-            TextAlign = SKTextAlign.Center
+            >= 256 => iconSize * 0.18f,  // 18% of icon size for large icons
+            >= 48 => iconSize * 0.22f,   // 22% for medium (more visible)
+            _ => iconSize * 0.25f        // 25% for small (maximum visibility)
         };
 
-        // Position text at bottom with padding
-        float x = iconSize / 2f; // Center horizontally
-        float y = yOffset + (iconSize - yOffset) / 2 + fontSize / 3; // Center in text area
+        // Position in top-left with padding
+        float padding = iconSize * 0.08f; // 8% padding from edges
+        float centerX = padding + starSize / 2;
+        float centerY = padding + starSize / 2;
 
-        canvas.DrawText(label, x, y, paint);
+        // Draw 6-pointed asterisk (3 lines crossing at center)
+        using var paint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = ForegroundColor,
+            StrokeWidth = iconSize >= 48 ? 2.5f : 1.5f,
+            StrokeCap = SKStrokeCap.Round,
+            IsAntialias = true
+        };
+
+        float radius = starSize / 2;
+
+        // Draw 3 lines at 60° intervals (creating 6 points)
+        for (int i = 0; i < 3; i++)
+        {
+            float angle = (float)(i * Math.PI / 3); // 60° in radians
+            float cos = (float)Math.Cos(angle);
+            float sin = (float)Math.Sin(angle);
+
+            // Draw line from one point through center to opposite point
+            canvas.DrawLine(
+                centerX - radius * cos,
+                centerY - radius * sin,
+                centerX + radius * cos,
+                centerY + radius * sin,
+                paint);
+        }
+
+        // For larger icons, add a subtle glow effect
+        if (iconSize >= 128)
+        {
+            using var glowPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = ForegroundColor.WithAlpha(60),
+                StrokeWidth = paint.StrokeWidth + 2,
+                StrokeCap = SKStrokeCap.Round,
+                IsAntialias = true,
+                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 2f)
+            };
+
+            for (int i = 0; i < 3; i++)
+            {
+                float angle = (float)(i * Math.PI / 3);
+                float cos = (float)Math.Cos(angle);
+                float sin = (float)Math.Sin(angle);
+
+                canvas.DrawLine(
+                    centerX - radius * cos,
+                    centerY - radius * sin,
+                    centerX + radius * cos,
+                    centerY + radius * sin,
+                    glowPaint);
+            }
+        }
     }
 }

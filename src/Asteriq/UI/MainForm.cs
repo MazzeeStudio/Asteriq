@@ -39,6 +39,14 @@ public partial class MainForm : Form
     private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    // SetWindowPos flags
+    private const uint SWP_NOCOPYBITS = 0x0100;  // Discards entire window content (prevents ghost window)
+    private const uint SWP_FRAMECHANGED = 0x0020;  // Recalculates frame
+    private const uint SWP_NOZORDER = 0x0004;     // Retains current Z order
+    private const uint SWP_NOACTIVATE = 0x0010;   // Does not activate window
 
     // DWM (Desktop Window Manager) for Windows 11 border color
     [DllImport("dwmapi.dll")]
@@ -49,7 +57,10 @@ public partial class MainForm : Form
     // Window sizing
     private const int ResizeBorder = 6;
     private const int TitleBarHeight = 75;
-    private bool _isWindowTransitioning = false;  // Suppress rendering during maximize/restore
+
+    // Manual maximize state (we handle maximize ourselves for better control)
+    private bool _isManuallyMaximized = false;
+    private Rectangle _restoreBounds;  // Bounds to restore to when unmaximizing
 
     // Version from assembly (set at build time via MSBuild)
     private static readonly string s_appVersion = Assembly.GetExecutingAssembly()
@@ -1938,19 +1949,20 @@ public partial class MainForm : Form
             return;
         }
 
-        // Handle maximize/restore to prevent double-window flash
+        // Intercept maximize/restore commands and handle manually
         if (m.Msg == WM_SYSCOMMAND)
         {
             int command = (int)m.WParam & 0xFFF0;
-            if (command == SC_MAXIMIZE || command == SC_RESTORE)
+            if (command == SC_MAXIMIZE)
             {
-                _isWindowTransitioning = true;
+                MaximizeWindow();
+                return;  // Prevent Windows from handling it
             }
-        }
-        else if (m.Msg == WM_SIZE)
-        {
-            // Window size has finished changing
-            _isWindowTransitioning = false;
+            else if (command == SC_RESTORE)
+            {
+                RestoreWindow();
+                return;  // Prevent Windows from handling it
+            }
         }
         else if (m.Msg == WM_NCHITTEST)
         {
@@ -1963,6 +1975,48 @@ public partial class MainForm : Form
         }
 
         base.WndProc(ref m);
+    }
+
+    private void MaximizeWindow()
+    {
+        if (_isManuallyMaximized) return;
+
+        // Store current bounds for restore
+        _restoreBounds = new Rectangle(Location, Size);
+
+        // Get the working area of the screen the window is currently on
+        var screen = Screen.FromHandle(Handle);
+        var workingArea = screen.WorkingArea;
+
+        // Use SetWindowPos with SWP_NOCOPYBITS to prevent ghost window
+        // This moves and resizes in one atomic operation without copying old pixels
+        _isManuallyMaximized = true;
+        SetWindowPos(
+            Handle,
+            IntPtr.Zero,
+            workingArea.X,
+            workingArea.Y,
+            workingArea.Width,
+            workingArea.Height,
+            SWP_NOCOPYBITS | SWP_NOZORDER | SWP_FRAMECHANGED
+        );
+    }
+
+    private void RestoreWindow()
+    {
+        if (!_isManuallyMaximized) return;
+
+        // Restore to previous bounds using SetWindowPos to prevent ghost window
+        _isManuallyMaximized = false;
+        SetWindowPos(
+            Handle,
+            IntPtr.Zero,
+            _restoreBounds.X,
+            _restoreBounds.Y,
+            _restoreBounds.Width,
+            _restoreBounds.Height,
+            SWP_NOCOPYBITS | SWP_NOZORDER | SWP_FRAMECHANGED
+        );
     }
 
     private int HitTest(Point clientPoint)
@@ -2639,9 +2693,11 @@ public partial class MainForm : Form
                     WindowState = FormWindowState.Minimized;
                     break;
                 case 1:
-                    WindowState = WindowState == FormWindowState.Maximized
-                        ? FormWindowState.Normal
-                        : FormWindowState.Maximized;
+                    // Toggle manual maximize/restore
+                    if (_isManuallyMaximized)
+                        RestoreWindow();
+                    else
+                        MaximizeWindow();
                     break;
                 case 2:
                     Close();
@@ -3220,13 +3276,6 @@ public partial class MainForm : Form
 
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
-        // Skip rendering during maximize/restore transitions to prevent double-window flash
-        if (_isWindowTransitioning)
-        {
-            e.Surface.Canvas.Clear(FUIColors.Void);
-            return;
-        }
-
         var canvas = e.Surface.Canvas;
         var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
 

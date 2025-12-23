@@ -13,7 +13,9 @@ public class FUIBackground : IDisposable
     private SKBitmap? _gridBitmap;
     private SKBitmap? _vignetteBitmap;
     private SKBitmap? _noiseBitmap;
+    private SKBitmap? _compositeCache;  // Full background composite cache
     private SKSize _cachedSize;
+    private bool _cacheInvalidated = true;
 
     private readonly Random _random = new();
 
@@ -54,19 +56,48 @@ public class FUIBackground : IDisposable
         {
             RegenerateCaches(size);
             _cachedSize = size;
+            _cacheInvalidated = true;
         }
+
+        // Use composite cache if available and valid
+        if (_compositeCache is not null && !_cacheInvalidated)
+        {
+            canvas.DrawBitmap(_compositeCache, bounds.Left, bounds.Top);
+            return;
+        }
+
+        // Regenerate composite cache
+        RegenerateCompositeCache(bounds);
+
+        // Draw the cached composite
+        if (_compositeCache is not null)
+        {
+            canvas.DrawBitmap(_compositeCache, bounds.Left, bounds.Top);
+        }
+    }
+
+    private void RegenerateCompositeCache(SKRect bounds)
+    {
+        int width = (int)bounds.Width;
+        int height = (int)bounds.Height;
+        if (width <= 0 || height <= 0) return;
+
+        _compositeCache?.Dispose();
+        _compositeCache = new SKBitmap(width, height);
+        using var compositeCanvas = new SKCanvas(_compositeCache);
+        compositeCanvas.Clear(SKColors.Transparent);
 
         // Layer 1: Grid (intensity-based)
         if (GridStrength > 0 && _gridBitmap is not null)
         {
             using var gridPaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(255 * GridOpacity)) };
-            canvas.DrawBitmap(_gridBitmap, bounds.Left, bounds.Top, gridPaint);
+            compositeCanvas.DrawBitmap(_gridBitmap, 0, 0, gridPaint);
         }
 
         // Layer 2: Ambient glows (intensity-based)
         if (GlowIntensity > 0)
         {
-            DrawAmbientGlows(canvas, bounds);
+            DrawAmbientGlows(compositeCanvas, new SKRect(0, 0, width, height));
         }
 
         // Layer 3: Noise/grain (intensity-based)
@@ -79,21 +110,23 @@ public class FUIBackground : IDisposable
                 Color = SKColors.White.WithAlpha(alpha),
                 BlendMode = SKBlendMode.Overlay
             };
-            canvas.DrawBitmap(_noiseBitmap, bounds.Left, bounds.Top, noisePaint);
+            compositeCanvas.DrawBitmap(_noiseBitmap, 0, 0, noisePaint);
         }
 
         // Layer 4: Scanlines (intensity-based)
         if (ScanlineIntensity > 0)
         {
-            DrawScanlines(canvas, bounds);
+            DrawScanlines(compositeCanvas, new SKRect(0, 0, width, height));
         }
 
         // Layer 5: Vignette (intensity-based)
         if (VignetteStrength > 0 && _vignetteBitmap is not null)
         {
             using var vignettePaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(255 * VignetteOpacity)) };
-            canvas.DrawBitmap(_vignetteBitmap, bounds.Left, bounds.Top, vignettePaint);
+            compositeCanvas.DrawBitmap(_vignetteBitmap, 0, 0, vignettePaint);
         }
+
+        _cacheInvalidated = false;
     }
 
     private void RegenerateCaches(SKSize size)
@@ -272,12 +305,22 @@ public class FUIBackground : IDisposable
             BlendMode = SKBlendMode.Overlay
         };
 
-        // Horizontal scanlines every 2-3 pixels based on intensity
-        int spacing = ScanlineIntensity > 50 ? 2 : 3;
+        // Optimized: Use larger spacing, fewer lines for better performance
+        // Horizontal scanlines every 3-4 pixels based on intensity
+        int spacing = ScanlineIntensity > 60 ? 3 : 4;
         for (float y = bounds.Top; y < bounds.Bottom; y += spacing)
         {
             canvas.DrawLine(bounds.Left, y, bounds.Right, y, paint);
         }
+    }
+
+    /// <summary>
+    /// Invalidate the composite cache (forces redraw on next Render call)
+    /// Call this when background settings change
+    /// </summary>
+    public void InvalidateCache()
+    {
+        _cacheInvalidated = true;
     }
 
     public void Dispose()
@@ -285,5 +328,6 @@ public class FUIBackground : IDisposable
         _gridBitmap?.Dispose();
         _vignetteBitmap?.Dispose();
         _noiseBitmap?.Dispose();
+        _compositeCache?.Dispose();
     }
 }

@@ -385,7 +385,7 @@ public class FUICurveEditor : UserControl
                 if (labelY < _graphBounds.Top + 10)
                     labelY = pt.Y + radius + 16;
 
-                FUIRenderer.DrawText(canvas, label, new SKPoint(pt.X - 25, labelY), FUIColors.TextBright, 9f);
+                FUIRenderer.DrawText(canvas, label, new SKPoint(pt.X - 24, labelY), FUIColors.TextBright, 9f);
             }
         }
     }

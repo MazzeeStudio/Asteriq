@@ -157,17 +157,17 @@ public class BindingConflictDialog : Form
         {
             var conflict = _conflicts[i];
             string displayName = FormatActionName(conflict.ActionMap, conflict.ActionName);
-            FUIRenderer.DrawText(canvas, $"  {displayName}", new SKPoint(25, itemY + 14), FUIColors.TextPrimary, 10f);
+            FUIRenderer.DrawText(canvas, $"  {displayName}", new SKPoint(24, itemY + 14), FUIColors.TextPrimary, 10f);
             itemY += 22;
         }
 
         if (_conflicts.Count > 5)
         {
             FUIRenderer.DrawText(canvas, $"  ... and {_conflicts.Count - 5} more",
-                new SKPoint(25, itemY + 14), FUIColors.TextDim, 10f);
+                new SKPoint(24, itemY + 14), FUIColors.TextDim, 10f);
         }
 
-        y += listHeight + 15;
+        y += listHeight + 16;
 
         // New binding info
         string newBindingText = $"You are trying to bind: {_newActionName}";
@@ -190,7 +190,7 @@ public class BindingConflictDialog : Form
         float buttonHeight = 32;  // 4px aligned, TouchTargetCompact
 
         // Cancel button (left)
-        _cancelButtonBounds = new SKRect(15, buttonY, 105, buttonY + buttonHeight);
+        _cancelButtonBounds = new SKRect(16, buttonY, 104, buttonY + buttonHeight);
         FUIRenderer.DrawButton(canvas, _cancelButtonBounds, "CANCEL",
             _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 

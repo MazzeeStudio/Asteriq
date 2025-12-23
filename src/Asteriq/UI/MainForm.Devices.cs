@@ -207,11 +207,11 @@ public partial class MainForm
         var nameColor = isDisconnected
             ? FUIColors.TextDim
             : (isSelected ? FUIColors.TextBright : FUIColors.TextPrimary);
-        FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 35, y + 26), nameColor, 13f, isSelected && !isDisconnected);
+        FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 36, y + 24), nameColor, 13f, isSelected && !isDisconnected);
 
         // Status text
         var statusTextColor = isDisconnected ? FUIColors.Danger : FUIColors.Active;
-        FUIRenderer.DrawText(canvas, status, new SKPoint(x + 35, y + 45), statusTextColor, 11f);
+        FUIRenderer.DrawText(canvas, status, new SKPoint(x + 36, y + 44), statusTextColor, 11f);
 
         // vJoy assignment indicator (positioned to avoid chevron overlap)
         if (!isDisconnected && !string.IsNullOrEmpty(vjoyAssignment))
@@ -230,8 +230,8 @@ public partial class MainForm
                 StrokeWidth = 2f,
                 IsAntialias = true
             };
-            canvas.DrawLine(x + width - 18, y + 25, x + width - 10, y + 30, chevronPaint);
-            canvas.DrawLine(x + width - 10, y + 30, x + width - 18, y + 35, chevronPaint);
+            canvas.DrawLine(x + width - 18, y + 24, x + width - 10, y + 28, chevronPaint);
+            canvas.DrawLine(x + width - 10, y + 28, x + width - 18, y + 32, chevronPaint);
         }
     }
 
@@ -667,11 +667,11 @@ public partial class MainForm
         float baseWidth = 70f;
 
         // Stick shaft
-        canvas.DrawLine(centerX, bounds.Top + 35, centerX, bounds.Bottom - 55, outlinePaint);
+        canvas.DrawLine(centerX, bounds.Top + 36, centerX, bounds.Bottom - 56, outlinePaint);
 
         // Stick top (grip area)
-        var gripRect = new SKRect(centerX - stickWidth / 2, bounds.Top + 25,
-                                   centerX + stickWidth / 2, bounds.Top + 85);
+        var gripRect = new SKRect(centerX - stickWidth / 2, bounds.Top + 24,
+                                   centerX + stickWidth / 2, bounds.Top + 84);
         canvas.DrawRoundRect(gripRect, 8, 8, outlinePaint);
 
         // Base

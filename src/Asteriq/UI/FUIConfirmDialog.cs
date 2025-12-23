@@ -87,7 +87,7 @@ public class FUIConfirmDialog : Form
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 20f, 6f);
 
         // Title
-        float titleY = 25;
+        float titleY = 24;
         var titleBounds = new SKRect(0, titleY, bounds.Width, titleY + 20);
         FUIRenderer.DrawTextCentered(canvas, _title.ToUpperInvariant(), titleBounds, FUIColors.Active, 14f, true);
 

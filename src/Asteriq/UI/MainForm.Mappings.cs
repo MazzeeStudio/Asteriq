@@ -96,7 +96,7 @@ public partial class MainForm
 
         _vjoyNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
         DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1);
-        y += arrowButtonSize + 15;
+        y += arrowButtonSize + 16;
 
         // Scrollable binding rows (filtered by category)
         float listBottom = contentBounds.Bottom - 10;
@@ -534,18 +534,18 @@ public partial class MainForm
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
 
         float y = bounds.Top + frameInset + 10;
-        float leftMargin = bounds.Left + frameInset + 15;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float leftMargin = bounds.Left + frameInset + 16;
+        float rightMargin = bounds.Right - frameInset - 16;
 
         // Title
         FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
-        y += 35;
+        y += 36;
 
         // Show settings for selected row
         if (_selectedMappingRow < 0)
         {
             FUIRenderer.DrawText(canvas, "Select an output to configure",
-                new SKPoint(leftMargin, y + 30), FUIColors.TextDim, 12f);
+                new SKPoint(leftMargin, y + 32), FUIColors.TextDim, 12f);
             return;
         }
 
@@ -554,8 +554,8 @@ public partial class MainForm
         bool isAxis = _mappingCategory == 1;
         string outputName = GetSelectedOutputName();
 
-        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 15), FUIColors.Active, 13f, true);
-        y += 35;
+        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 16), FUIColors.Active, 13f, true);
+        y += 36;
 
         // INPUT SOURCES section - shows mapped inputs with add/remove
         y = DrawInputSourcesSection(canvas, leftMargin, rightMargin, y);
@@ -1029,7 +1029,7 @@ public partial class MainForm
                 // Min at left edge, CtrMin at right edge of left track
                 // CtrMax at left edge of right track, Max at right edge
                 FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMin:F2}", new SKPoint(leftTrackRight - 25, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMin:F2}", new SKPoint(leftTrackRight - 24, y), FUIColors.TextDim, 9f);
                 FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMax:F2}", new SKPoint(rightTrackLeft, y), FUIColors.TextDim, 9f);
                 FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 9f);
             }
@@ -1313,7 +1313,7 @@ public partial class MainForm
 
             FUIRenderer.DrawTextCentered(canvas, outputTypes[i], typeBounds, textColor, 11f);
         }
-        y += typeButtonHeight + 15;
+        y += typeButtonHeight + 16;
 
         // KEY COMBO section (only when Keyboard is selected)
         if (_outputTypeIsKeyboard)
@@ -1394,7 +1394,7 @@ public partial class MainForm
             {
                 FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyCaptureBounds, FUIColors.TextDim, 11f);
             }
-            y += keyFieldHeight + 15;
+            y += keyFieldHeight + 16;
         }
 
         // Button Mode section
@@ -2528,9 +2528,9 @@ public partial class MainForm
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Active, 30f, 8f);
 
-        float y = bounds.Top + frameInset + 15;
-        float leftMargin = bounds.Left + frameInset + 15;
-        float rightMargin = bounds.Right - frameInset - 15;
+        float y = bounds.Top + frameInset + 16;
+        float leftMargin = bounds.Left + frameInset + 16;
+        float rightMargin = bounds.Right - frameInset - 16;
 
         // Title
         string outputName = GetEditingOutputName();
@@ -2591,7 +2591,7 @@ public partial class MainForm
         // Action buttons at bottom
         float buttonWidth = 80f;
         float buttonHeight = 32f;
-        float buttonY = bounds.Bottom - frameInset - buttonHeight - 15;
+        float buttonY = bounds.Bottom - frameInset - buttonHeight - 16;
 
         _cancelButtonBounds = new SKRect(rightMargin - buttonWidth * 2 - 10, buttonY,
             rightMargin - buttonWidth - 10, buttonY + buttonHeight);
@@ -2868,7 +2868,7 @@ public partial class MainForm
     {
         ButtonMode[] modes = { ButtonMode.Normal, ButtonMode.Toggle, ButtonMode.Pulse, ButtonMode.HoldToActivate };
         string[] labels = { "Normal", "Toggle", "Pulse", "Hold" };
-        float buttonWidth = (width - 15) / 4;
+        float buttonWidth = (width - 16) / 4;
         float buttonHeight = 28f;
 
         for (int i = 0; i < modes.Length; i++)
@@ -3202,7 +3202,7 @@ public partial class MainForm
         // [+] button (Edit/Add)
         float buttonSize = 24f;
         float buttonY = bounds.MidY - buttonSize / 2;
-        float addButtonX = bounds.Right - (hasBind ? 60 : 35);
+        float addButtonX = bounds.Right - (hasBind ? 60 : 36);
         var addBounds = new SKRect(addButtonX, buttonY, addButtonX + buttonSize, buttonY + buttonSize);
         _mappingAddButtonBounds.Add(addBounds);
 
@@ -4928,7 +4928,7 @@ public partial class MainForm
         canvas.DrawRect(bounds, framePaint);
 
         // Plus icon
-        float iconX = bounds.Left + 15;
+        float iconX = bounds.Left + 16;
         float iconY = bounds.MidY;
         using var iconPaint = new SKPaint
         {

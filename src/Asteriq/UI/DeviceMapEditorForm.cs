@@ -382,7 +382,7 @@ public class DeviceMapEditorForm : Form
 
         // SVG dropdown
         FUIRenderer.DrawText(canvas, "SVG:", new SKPoint(x, y + 12), FUIColors.TextDim, 10f);
-        x += 35;
+        x += 36;
 
         _svgDropdownBounds = new SKRect(x, y, x + 180, y + 30);
         DrawDropdown(canvas, _svgDropdownBounds, _deviceMap.SvgFile ?? "Select SVG...", _svgDropdownOpen);
@@ -763,25 +763,25 @@ public class DeviceMapEditorForm : Form
         canvas.DrawRect(_propertiesPanelBounds, framePaint);
 
         // Header
-        float y = _propertiesPanelBounds.Top + 15;
-        FUIRenderer.DrawText(canvas, "CONTROL PROPERTIES", new SKPoint(_propertiesPanelBounds.Left + 15, y),
+        float y = _propertiesPanelBounds.Top + 16;
+        FUIRenderer.DrawText(canvas, "CONTROL PROPERTIES", new SKPoint(_propertiesPanelBounds.Left + 16, y),
             FUIColors.Active, 11f, true);
-        y += 25;
+        y += 24;
 
         if (_selectedControlKey is null)
         {
             FUIRenderer.DrawText(canvas, "Select a control or click on SVG",
-                new SKPoint(_propertiesPanelBounds.Left + 15, y), FUIColors.TextDisabled, 10f);
+                new SKPoint(_propertiesPanelBounds.Left + 16, y), FUIColors.TextDisabled, 10f);
             FUIRenderer.DrawText(canvas, "to add a new control anchor.",
-                new SKPoint(_propertiesPanelBounds.Left + 15, y + 15), FUIColors.TextDisabled, 10f);
+                new SKPoint(_propertiesPanelBounds.Left + 16, y + 16), FUIColors.TextDisabled, 10f);
             return;
         }
 
         if (!_deviceMap.Controls.TryGetValue(_selectedControlKey, out var control))
             return;
 
-        float leftMargin = _propertiesPanelBounds.Left + 15;
-        float rightMargin = _propertiesPanelBounds.Right - 15;
+        float leftMargin = _propertiesPanelBounds.Left + 16;
+        float rightMargin = _propertiesPanelBounds.Right - 16;
         float labelWidth = 70;
 
         // Control Key (read-only for now)
@@ -819,17 +819,17 @@ public class DeviceMapEditorForm : Form
         FUIRenderer.DrawText(canvas, "Side:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         _shelfSideButtonBounds = new SKRect(leftMargin + labelWidth, y - 12, leftMargin + labelWidth + 60, y + 8);
         DrawSmallButton(canvas, _shelfSideButtonBounds, ll?.ShelfSide ?? "right");
-        y += 25;
+        y += 24;
 
         // Shelf Length with +/- buttons
         FUIRenderer.DrawText(canvas, "Shelf:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         float btnX = leftMargin + labelWidth;
         _shelfLengthMinusBounds = new SKRect(btnX, y - 12, btnX + 24, y + 8);
         DrawSmallButton(canvas, _shelfLengthMinusBounds, "-");
-        FUIRenderer.DrawText(canvas, (ll?.ShelfLength ?? 80).ToString("F0"), new SKPoint(btnX + 30, y), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, (ll?.ShelfLength ?? 80).ToString("F0"), new SKPoint(btnX + 32, y), FUIColors.TextPrimary, 10f);
         _shelfLengthPlusBounds = new SKRect(btnX + 60, y - 12, btnX + 84, y + 8);
         DrawSmallButton(canvas, _shelfLengthPlusBounds, "+");
-        y += 25;
+        y += 24;
 
         // Segments section
         FUIRenderer.DrawText(canvas, "Segments:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -850,7 +850,7 @@ public class DeviceMapEditorForm : Form
                 // Angle controls
                 float angX = leftMargin + 30;
                 FUIRenderer.DrawText(canvas, "A:", new SKPoint(angX, y), FUIColors.TextDim, 9f);
-                var angMinus = new SKRect(angX + 15, y - 10, angX + 35, y + 6);
+                var angMinus = new SKRect(angX + 16, y - 10, angX + 36, y + 6);
                 DrawSmallButton(canvas, angMinus, "-");
                 FUIRenderer.DrawText(canvas, seg.Angle.ToString("F0"), new SKPoint(angX + 40, y), FUIColors.TextPrimary, 9f);
                 var angPlus = new SKRect(angX + 65, y - 10, angX + 85, y + 6);
@@ -859,7 +859,7 @@ public class DeviceMapEditorForm : Form
                 // Length controls
                 float lenX = angX + 95;
                 FUIRenderer.DrawText(canvas, "L:", new SKPoint(lenX, y), FUIColors.TextDim, 9f);
-                var lenMinus = new SKRect(lenX + 15, y - 10, lenX + 35, y + 6);
+                var lenMinus = new SKRect(lenX + 16, y - 10, lenX + 36, y + 6);
                 DrawSmallButton(canvas, lenMinus, "-");
                 FUIRenderer.DrawText(canvas, seg.Length.ToString("F0"), new SKPoint(lenX + 40, y), FUIColors.TextPrimary, 9f);
                 var lenPlus = new SKRect(lenX + 65, y - 10, lenX + 85, y + 6);
@@ -920,10 +920,10 @@ public class DeviceMapEditorForm : Form
             canvas.DrawRoundRect(valueBounds, 3, 3, framePaint);
         }
 
-        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + labelWidth + 5, y),
+        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + labelWidth + 4, y),
             readOnly ? FUIColors.TextPrimary : FUIColors.TextPrimary, 10f);
 
-        y += 25;
+        y += 24;
     }
 
     private void DrawControlsList(SKCanvas canvas)
@@ -942,8 +942,8 @@ public class DeviceMapEditorForm : Form
         canvas.DrawRect(_controlsListBounds, framePaint);
 
         // Header
-        float headerY = _controlsListBounds.Top + 15;
-        FUIRenderer.DrawText(canvas, "CONTROLS", new SKPoint(_controlsListBounds.Left + 15, headerY),
+        float headerY = _controlsListBounds.Top + 16;
+        FUIRenderer.DrawText(canvas, "CONTROLS", new SKPoint(_controlsListBounds.Left + 16, headerY),
             FUIColors.Active, 11f, true);
 
         // Content area (between header and buttons)
@@ -1017,8 +1017,8 @@ public class DeviceMapEditorForm : Form
         // Add/Delete buttons
         float btnY = _controlsListBounds.Bottom - 40;
         float btnWidth = 80;
-        float btnGap = 10;
-        float btnX = _controlsListBounds.Left + 15;
+        float btnGap = 12;
+        float btnX = _controlsListBounds.Left + 16;
 
         _addControlButtonBounds = new SKRect(btnX, btnY, btnX + btnWidth, btnY + 26);
         DrawButton(canvas, _addControlButtonBounds, "+ ADD", _addControlHovered);

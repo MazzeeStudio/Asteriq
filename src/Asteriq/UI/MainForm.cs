@@ -22,6 +22,8 @@ public partial class MainForm : Form
     private const int WM_SYSCOMMAND = 0x0112;
     private const int WM_SIZE = 0x0005;
     private const int WM_NCCALCSIZE = 0x0083;
+    private const int WM_ENTERSIZEMOVE = 0x0231;
+    private const int WM_EXITSIZEMOVE = 0x0232;
     private const int SC_MAXIMIZE = 0xF030;
     private const int SC_RESTORE = 0xF120;
     private const int HTCLIENT = 1;
@@ -91,6 +93,7 @@ public partial class MainForm : Form
     // Performance optimization
     private bool _isDirty = true;  // Force initial render
     private bool _enableAnimations = true;  // Can be toggled for performance
+    private bool _isResizing = false;  // Suppress renders during resize
 
     private int _hoveredDevice = -1;
     private int _selectedDevice = -1;  // Start with no selection, will be set in RefreshDevices
@@ -1601,8 +1604,8 @@ public partial class MainForm : Form
             CheckSCBindingInput();
         }
 
-        // Only invalidate if animations ran or something is dirty
-        if (needsUpdate || _isDirty)
+        // Only invalidate if animations ran or something is dirty, and we're not resizing
+        if ((needsUpdate || _isDirty) && !_isResizing)
         {
             _canvas.Invalidate();
             _isDirty = false;
@@ -1686,7 +1689,7 @@ public partial class MainForm : Form
             // Invalidate canvas if highlight changed to show the shimmer effect
             if (_highlightedMappingRow != prevHighlightRow || _highlightedVJoyDevice != prevHighlightDevice)
             {
-                _canvas.Invalidate();
+                MarkDirty();
             }
         }
     }
@@ -1809,7 +1812,7 @@ public partial class MainForm : Form
             // Restore selection by identity
             RestoreDeviceSelection(selectedGuid, selectedName);
 
-            _canvas.Invalidate();
+            MarkDirty();
         });
     }
 
@@ -1849,7 +1852,7 @@ public partial class MainForm : Form
             // Restore selection by identity
             RestoreDeviceSelection(selectedGuid, selectedName);
 
-            _canvas.Invalidate();
+            MarkDirty();
         });
     }
 
@@ -1995,8 +1998,32 @@ public partial class MainForm : Form
                 return;
             }
         }
+        else if (m.Msg == WM_ENTERSIZEMOVE)
+        {
+            // User started resizing or moving - suppress renders during drag
+            _isResizing = true;
+        }
+        else if (m.Msg == WM_EXITSIZEMOVE)
+        {
+            // Resize/move finished - mark dirty and resume rendering
+            _isResizing = false;
+            MarkDirty();
+        }
+        else if (m.Msg == WM_SIZE)
+        {
+            // Window size changed - mark dirty for redraw
+            MarkDirty();
+        }
 
         base.WndProc(ref m);
+    }
+
+    /// <summary>
+    /// Mark the canvas as dirty, requiring a redraw on next animation tick
+    /// </summary>
+    private void MarkDirty()
+    {
+        _isDirty = true;
     }
 
     private void MaximizeWindow()
@@ -2097,7 +2124,7 @@ public partial class MainForm : Form
                 float scrollDelta = (deltaY / trackHeight) * maxScroll;
                 _scBindingsScrollOffset = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxScroll);
             }
-            _canvas.Invalidate();
+            MarkDirty();
             return;
         }
 
@@ -2111,7 +2138,7 @@ public partial class MainForm : Form
                 float scrollDelta = (deltaX / trackWidth) * maxHScroll;
                 _scGridHorizontalScroll = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxHScroll);
             }
-            _canvas.Invalidate();
+            MarkDirty();
             return;
         }
 
@@ -2153,7 +2180,7 @@ public partial class MainForm : Form
                 targetIndex = Math.Clamp(targetIndex, 0, physicalDevices.Count);
 
                 _dragDropTargetIndex = targetIndex;
-                _canvas.Invalidate();
+                MarkDirty();
                 return;
             }
         }
@@ -2216,13 +2243,13 @@ public partial class MainForm : Form
                 if (_draggingPulseDuration)
                 {
                     UpdatePulseDurationFromMouse(e.X);
-                    _canvas.Invalidate();
+                    MarkDirty();
                     return;
                 }
                 if (_draggingHoldDuration)
                 {
                     UpdateHoldDurationFromMouse(e.X);
-                    _canvas.Invalidate();
+                    MarkDirty();
                     return;
                 }
 
@@ -2284,13 +2311,13 @@ public partial class MainForm : Form
                 if (_draggingCurvePoint >= 0)
                 {
                     UpdateDraggedCurvePoint(pt);
-                    _canvas.Invalidate();
+                    MarkDirty();
                     return;
                 }
                 if (_draggingDeadzoneHandle >= 0)
                 {
                     UpdateDraggedDeadzoneHandle(pt);
-                    _canvas.Invalidate();
+                    MarkDirty();
                     return;
                 }
                 // Check curve point hover
@@ -2301,14 +2328,14 @@ public partial class MainForm : Form
                     {
                         _hoveredCurvePoint = newHovered;
                         Cursor = newHovered >= 0 ? Cursors.Hand : Cursors.Cross;
-                        _canvas.Invalidate();
+                        MarkDirty();
                     }
                     return;
                 }
                 else if (_hoveredCurvePoint >= 0)
                 {
                     _hoveredCurvePoint = -1;
-                    _canvas.Invalidate();
+                    MarkDirty();
                 }
             }
 
@@ -3005,7 +3032,7 @@ public partial class MainForm : Form
                 {
                     _selectedDeadzoneHandle = dzHandle;
                     _draggingDeadzoneHandle = dzHandle;
-                    _canvas.Invalidate();
+                    MarkDirty();
                     return;
                 }
 
@@ -3013,7 +3040,7 @@ public partial class MainForm : Form
                 if (_deadzoneSliderBounds.Contains(pt))
                 {
                     _selectedDeadzoneHandle = -1;
-                    _canvas.Invalidate();
+                    MarkDirty();
                     return;
                 }
             }
@@ -3159,7 +3186,7 @@ public partial class MainForm : Form
             _dragDeviceIndex = -1;
             _dragDropTargetIndex = -1;
             Cursor = Cursors.Default;
-            _canvas.Invalidate();
+            MarkDirty();
             return;
         }
 
@@ -3175,7 +3202,7 @@ public partial class MainForm : Form
         {
             _scIsDraggingVScroll = false;
             _scIsDraggingHScroll = false;
-            _canvas.Invalidate();
+            MarkDirty();
         }
 
         if (_draggingCurvePoint >= 0 || _draggingDeadzoneHandle >= 0)
@@ -3183,7 +3210,7 @@ public partial class MainForm : Form
             _draggingCurvePoint = -1;
             _draggingDeadzoneHandle = -1;
             SaveAxisSettingsForRow();  // Persist curve/deadzone changes
-            _canvas.Invalidate();
+            MarkDirty();
         }
 
         // Release duration slider dragging
@@ -3192,7 +3219,7 @@ public partial class MainForm : Form
             _draggingPulseDuration = false;
             _draggingHoldDuration = false;
             UpdateDurationForSelectedMapping();
-            _canvas.Invalidate();
+            MarkDirty();
         }
 
         // Release background slider dragging
@@ -3200,7 +3227,7 @@ public partial class MainForm : Form
         {
             _draggingBgSlider = null;
             SaveBackgroundSettings();
-            _canvas.Invalidate();
+            MarkDirty();
         }
     }
 
@@ -3211,7 +3238,7 @@ public partial class MainForm : Form
         {
             float scrollAmount = -e.Delta / 4f;
             _scActionMapFilterScrollOffset = Math.Clamp(_scActionMapFilterScrollOffset + scrollAmount, 0, _scActionMapFilterMaxScroll);
-            _canvas.Invalidate();
+            MarkDirty();
             return;
         }
 
@@ -3222,7 +3249,7 @@ public partial class MainForm : Form
             float maxScroll = Math.Max(0, _bindingsContentHeight - _bindingsListBounds.Height);
 
             _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset + scrollAmount, 0, maxScroll);
-            _canvas.Invalidate();
+            MarkDirty();
         }
 
         // Handle scroll on BINDINGS (SC) tab when mouse is over the SC bindings list
@@ -3245,7 +3272,7 @@ public partial class MainForm : Form
                 float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
                 _scBindingsScrollOffset = Math.Clamp(_scBindingsScrollOffset + scrollAmount, 0, maxScroll);
             }
-            _canvas.Invalidate();
+            MarkDirty();
         }
     }
 

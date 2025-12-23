@@ -19,6 +19,10 @@ public partial class MainForm : Form
     // Win32 constants for borderless window support
     private const int WM_NCHITTEST = 0x0084;
     private const int WM_NCLBUTTONDOWN = 0x00A1;
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int WM_SIZE = 0x0005;
+    private const int SC_MAXIMIZE = 0xF030;
+    private const int SC_RESTORE = 0xF120;
     private const int HTCLIENT = 1;
     private const int HTCAPTION = 2;
     private const int HTLEFT = 10;
@@ -38,6 +42,7 @@ public partial class MainForm : Form
     // Window sizing
     private const int ResizeBorder = 6;
     private const int TitleBarHeight = 75;
+    private bool _isWindowTransitioning = false;  // Suppress rendering during maximize/restore
 
     // Version from assembly (set at build time via MSBuild)
     private static readonly string s_appVersion = Assembly.GetExecutingAssembly()
@@ -1903,7 +1908,21 @@ public partial class MainForm : Form
 
     protected override void WndProc(ref Message m)
     {
-        if (m.Msg == WM_NCHITTEST)
+        // Handle maximize/restore to prevent double-window flash
+        if (m.Msg == WM_SYSCOMMAND)
+        {
+            int command = (int)m.WParam & 0xFFF0;
+            if (command == SC_MAXIMIZE || command == SC_RESTORE)
+            {
+                _isWindowTransitioning = true;
+            }
+        }
+        else if (m.Msg == WM_SIZE)
+        {
+            // Window size has finished changing
+            _isWindowTransitioning = false;
+        }
+        else if (m.Msg == WM_NCHITTEST)
         {
             var result = HitTest(PointToClient(Cursor.Position));
             if (result != HTCLIENT)
@@ -3171,6 +3190,13 @@ public partial class MainForm : Form
 
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
+        // Skip rendering during maximize/restore transitions to prevent double-window flash
+        if (_isWindowTransitioning)
+        {
+            e.Surface.Canvas.Clear(FUIColors.Void);
+            return;
+        }
+
         var canvas = e.Surface.Canvas;
         var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
 

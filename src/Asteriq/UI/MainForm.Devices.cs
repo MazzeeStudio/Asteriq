@@ -976,22 +976,18 @@ public partial class MainForm
         if (profile is null)
         {
             // No profile - show error to user
-            MessageBox.Show(
+            FUIMessageBox.ShowWarning(this,
                 "No active profile found.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
-                "Cannot Start Forwarding",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
+                "Cannot Start Forwarding");
             return;
         }
 
         // Check if profile has any mappings
         if (profile.AxisMappings.Count == 0 && profile.ButtonMappings.Count == 0 && profile.HatMappings.Count == 0)
         {
-            MessageBox.Show(
+            FUIMessageBox.ShowWarning(this,
                 $"Profile '{profile.Name}' has no mappings.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
-                "Cannot Start Forwarding",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
+                "Cannot Start Forwarding");
             return;
         }
 
@@ -1000,11 +996,9 @@ public partial class MainForm
         // Check vJoy is initialized
         if (!_vjoyService.IsInitialized)
         {
-            MessageBox.Show(
+            FUIMessageBox.ShowError(this,
                 "vJoy driver is not initialized.\n\nPlease ensure vJoy is installed correctly.",
-                "Cannot Start Forwarding",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+                "Cannot Start Forwarding");
             return;
         }
 
@@ -1023,11 +1017,9 @@ public partial class MainForm
             var info = _vjoyService.GetDeviceInfo(deviceId);
             if (!info.Exists)
             {
-                MessageBox.Show(
+                FUIMessageBox.ShowError(this,
                     $"vJoy device {deviceId} does not exist.\n\nPlease configure vJoy device {deviceId} using 'Configure vJoy'.",
-                    "Cannot Start Forwarding",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                    "Cannot Start Forwarding");
                 return;
             }
         }
@@ -1044,11 +1036,9 @@ public partial class MainForm
                 })
                 .ToList();
 
-            MessageBox.Show(
+            FUIMessageBox.ShowError(this,
                 $"Failed to acquire vJoy device(s).\n\nDevice status:\n{string.Join("\n", statusMessages)}\n\nIf Owner PID matches Our PID, try restarting the app.\nIf different, another app owns the device.",
-                "Cannot Start Forwarding",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+                "Cannot Start Forwarding");
             return;
         }
 

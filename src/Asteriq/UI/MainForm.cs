@@ -73,6 +73,7 @@ public partial class MainForm : Form
     private readonly ProfileService _profileService;
     private readonly VJoyService _vjoyService;
     private readonly MappingEngine _mappingEngine;
+    private readonly SystemTrayIcon _trayIcon;
 
     // Profile UI state
     private List<ProfileInfo> _profiles = new();
@@ -461,6 +462,17 @@ public partial class MainForm : Form
         _profileService = new ProfileService();
         _vjoyService = new VJoyService();
         _mappingEngine = new MappingEngine(_vjoyService);
+
+        // Initialize system tray icon
+        var svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "joystick.svg");
+        _trayIcon = new SystemTrayIcon(svgPath, $"Asteriq v{s_appVersion}");
+        _trayIcon.DoubleClick += (s, e) =>
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+        };
+
         InitializeForm();
         InitializeCanvas();
         InitializeInput();
@@ -4079,6 +4091,7 @@ public partial class MainForm : Form
         _inputService?.Dispose();
         _joystickSvg?.Dispose();
         _throttleSvg?.Dispose();
+        _trayIcon?.Dispose();
         base.OnFormClosing(e);
     }
 

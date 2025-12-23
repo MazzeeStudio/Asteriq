@@ -1053,6 +1053,7 @@ public partial class MainForm
         }
 
         _isForwarding = true;
+        _trayIcon.SetActive(true);
         System.Diagnostics.Debug.WriteLine($"Started forwarding with profile: {profile.Name}");
     }
 
@@ -1065,6 +1066,7 @@ public partial class MainForm
 
         _mappingEngine.Stop();
         _isForwarding = false;
+        _trayIcon.SetActive(false);
         System.Diagnostics.Debug.WriteLine("Stopped forwarding");
     }
 

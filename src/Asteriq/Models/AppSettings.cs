@@ -59,6 +59,6 @@ public class AppSettings
 /// </summary>
 public enum TrayIconType
 {
-    Joystick,
-    Throttle
+    Throttle,
+    Joystick
 }

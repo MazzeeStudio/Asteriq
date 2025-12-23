@@ -3379,7 +3379,7 @@ public partial class MainForm : Form
             // Render background to cache
             using var cacheSurface = SKSurface.Create(new SKImageInfo(width, height));
             var cacheCanvas = cacheSurface.Canvas;
-            cacheCanvas.Clear(SKColors.Transparent);
+            cacheCanvas.Clear(FUIColors.Void);
 
             // Render FUI background with all effects to cache
             _background.Render(cacheCanvas, bounds);

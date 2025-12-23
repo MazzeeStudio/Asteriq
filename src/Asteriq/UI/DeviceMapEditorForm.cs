@@ -202,7 +202,7 @@ public class DeviceMapEditorForm : Form
         }
         else
         {
-            MessageBox.Show($"Failed to load file:\n{path}", "Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            FUIMessageBox.ShowError(this, $"Failed to load file:\n{path}", "Load Error");
         }
     }
 
@@ -252,8 +252,7 @@ public class DeviceMapEditorForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to save: {ex.Message}",
-                "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            FUIMessageBox.ShowError(this, $"Failed to save: {ex.Message}", "Save Error");
         }
     }
 
@@ -280,9 +279,8 @@ public class DeviceMapEditorForm : Form
         {
             if (_hasUnsavedChanges)
             {
-                var result = MessageBox.Show("You have unsaved changes. Discard and close?",
-                    "Unsaved Changes", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-                if (result != System.Windows.Forms.DialogResult.Yes)
+                var result = FUIMessageBox.ShowQuestion(this, "You have unsaved changes. Discard and close?", "Unsaved Changes");
+                if (!result)
                     return true;
             }
             Close();

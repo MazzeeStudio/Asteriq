@@ -4593,14 +4593,12 @@ public partial class MainForm
         // Warn if there are existing bindings that would be replaced
         if (_scExportProfile.Bindings.Count > 0)
         {
-            var result = MessageBox.Show(
+            var result = FUIMessageBox.ShowQuestion(this,
                 $"Profile '{_scExportProfile.ProfileName}' has {_scExportProfile.Bindings.Count} existing binding(s).\n\n" +
                 "Import will replace all current bindings. Continue?",
-                "Replace Bindings",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
+                "Replace Bindings");
 
-            if (result != DialogResult.Yes)
+            if (!result)
                 return;
         }
 

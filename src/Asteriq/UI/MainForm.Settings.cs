@@ -507,7 +507,7 @@ public partial class MainForm
             StoreThemeButtonBounds(i, themeBounds);
             DrawThemeButton(canvas, themeBounds, coreNames[i], coreColors[i], FUIColors.CurrentTheme == coreThemes[i]);
         }
-        y += themeBtnHeight + 6;
+        y += themeBtnHeight + 8;
 
         // Manufacturer themes - Row 1
         FUIRenderer.DrawTextTruncated(canvas, "Mfr", new SKPoint(leftMargin, y + 4), themeLabelWidth - 5, FUIColors.TextDim, 9f);
@@ -551,7 +551,7 @@ public partial class MainForm
             StoreThemeButtonBounds(8 + i, themeBounds);
             DrawThemeButton(canvas, themeBounds, mfrNames2[i], mfrColors2[i], FUIColors.CurrentTheme == mfrThemes2[i]);
         }
-        y += themeBtnHeight + sectionSpacing;
+        y += themeBtnHeight + sectionSpacing + 8;
 
         // Background effects section
         FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -581,39 +581,44 @@ public partial class MainForm
             sliderRight = rightMargin - 30;
         }
 
+        // Slider visual height and centering
+        float sliderHeight = 12f;
+        float sliderY = (sliderRowHeight - sliderHeight) / 2;
+        float textY = sliderRowHeight / 2 + 4;
+
         // Grid strength slider
-        FUIRenderer.DrawTextTruncated(canvas, "Grid", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
-        _bgGridSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        FUIRenderer.DrawTextTruncated(canvas, "Grid", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        _bgGridSliderBounds = new SKRect(sliderLeft, y + sliderY, sliderRight, y + sliderY + sliderHeight);
         DrawSettingsSlider(canvas, _bgGridSliderBounds, _background.GridStrength, 100);
-        FUIRenderer.DrawText(canvas, _background.GridStrength.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.GridStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Glow intensity slider
-        FUIRenderer.DrawTextTruncated(canvas, "Glow", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
-        _bgGlowSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        FUIRenderer.DrawTextTruncated(canvas, "Glow", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        _bgGlowSliderBounds = new SKRect(sliderLeft, y + sliderY, sliderRight, y + sliderY + sliderHeight);
         DrawSettingsSlider(canvas, _bgGlowSliderBounds, _background.GlowIntensity, 100);
-        FUIRenderer.DrawText(canvas, _background.GlowIntensity.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.GlowIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Noise intensity slider
-        FUIRenderer.DrawTextTruncated(canvas, "Noise", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
-        _bgNoiseSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        FUIRenderer.DrawTextTruncated(canvas, "Noise", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        _bgNoiseSliderBounds = new SKRect(sliderLeft, y + sliderY, sliderRight, y + sliderY + sliderHeight);
         DrawSettingsSlider(canvas, _bgNoiseSliderBounds, _background.NoiseIntensity, 100);
-        FUIRenderer.DrawText(canvas, _background.NoiseIntensity.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.NoiseIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Scanline intensity slider
-        FUIRenderer.DrawTextTruncated(canvas, "Scanlines", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
-        _bgScanlineSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        FUIRenderer.DrawTextTruncated(canvas, "Scanlines", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        _bgScanlineSliderBounds = new SKRect(sliderLeft, y + sliderY, sliderRight, y + sliderY + sliderHeight);
         DrawSettingsSlider(canvas, _bgScanlineSliderBounds, _background.ScanlineIntensity, 100);
-        FUIRenderer.DrawText(canvas, _background.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
         y += sliderRowHeight + sliderRowGap;
 
         // Vignette intensity slider
-        FUIRenderer.DrawTextTruncated(canvas, "Vignette", new SKPoint(leftMargin, y + 5), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
-        _bgVignetteSliderBounds = new SKRect(sliderLeft, y + 3, sliderRight, y + sliderRowHeight - 3);
+        FUIRenderer.DrawTextTruncated(canvas, "Vignette", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        _bgVignetteSliderBounds = new SKRect(sliderLeft, y + sliderY, sliderRight, y + sliderY + sliderHeight);
         DrawSettingsSlider(canvas, _bgVignetteSliderBounds, _background.VignetteStrength, 100);
-        FUIRenderer.DrawText(canvas, _background.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + 5), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, _background.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
     }
 
     private void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)

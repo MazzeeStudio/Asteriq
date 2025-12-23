@@ -1105,7 +1105,7 @@ public class DeviceMapEditorForm : Form
 
     private void DrawSvgDropdownMenu(SKCanvas canvas)
     {
-        float itemHeight = 26;
+        float itemHeight = 28;  // 4px aligned
         float menuHeight = _availableSvgFiles.Count * itemHeight + 10;
         var menuBounds = new SKRect(_svgDropdownBounds.Left, _svgDropdownBounds.Bottom + 2,
             _svgDropdownBounds.Right, _svgDropdownBounds.Bottom + 2 + menuHeight);

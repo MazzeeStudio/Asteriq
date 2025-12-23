@@ -769,14 +769,14 @@ public partial class MainForm
         MergeOperation[] ops = { MergeOperation.Average, MergeOperation.Maximum, MergeOperation.Minimum, MergeOperation.Sum };
 
         float width = rightMargin - leftMargin;
-        float buttonWidth = (width - 9) / 4; // 3 gaps of 3px each
-        float buttonHeight = 24f;
+        float buttonWidth = (width - 12) / 4; // 3 gaps of 4px each
+        float buttonHeight = 28f;  // 4px aligned, meets minimum touch target
 
         for (int i = 0; i < 4; i++)
         {
             var btnBounds = new SKRect(
-                leftMargin + i * (buttonWidth + 3), y,
-                leftMargin + i * (buttonWidth + 3) + buttonWidth, y + buttonHeight);
+                leftMargin + i * (buttonWidth + 4), y,
+                leftMargin + i * (buttonWidth + 4) + buttonWidth, y + buttonHeight);
             _mergeOpButtonBounds[i] = btnBounds;
 
             bool isActive = axisMapping.MergeOp == ops[i];
@@ -795,7 +795,7 @@ public partial class MainForm
             FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 10f);
         }
 
-        y += buttonHeight + 14;  // Move well below buttons
+        y += buttonHeight + 16;  // Move well below buttons (4px aligned)
 
         // Description of current merge mode
         string description = axisMapping.MergeOp switch
@@ -934,14 +934,14 @@ public partial class MainForm
 
         // Curve preset buttons - store bounds for click handling
         string[] presets = { "LINEAR", "S-CURVE", "EXPO", "CUSTOM" };
-        float buttonWidth = (width - 9) / presets.Length;
-        float buttonHeight = FUIRenderer.ScaleLineHeight(22f);
+        float buttonWidth = (width - 12) / presets.Length; // 3 gaps of 4px each
+        float buttonHeight = FUIRenderer.ScaleLineHeight(24f);  // 4px aligned minimum
 
         for (int i = 0; i < presets.Length; i++)
         {
             var presetBounds = new SKRect(
-                leftMargin + i * (buttonWidth + 3), y,
-                leftMargin + i * (buttonWidth + 3) + buttonWidth, y + buttonHeight);
+                leftMargin + i * (buttonWidth + 4), y,
+                leftMargin + i * (buttonWidth + 4) + buttonWidth, y + buttonHeight);
 
             // Store bounds for click detection
             _curvePresetBounds[i] = presetBounds;
@@ -1403,7 +1403,7 @@ public partial class MainForm
 
         // Mode buttons - all on one row
         string[] modes = { "Normal", "Toggle", "Pulse", "Hold" };
-        float buttonHeight = 26f;
+        float buttonHeight = 28f;  // 4px aligned, meets minimum touch target
         float buttonGap = 4f;
         float totalGap = buttonGap * (modes.Length - 1);
         float buttonWidth = (width - totalGap) / modes.Length;
@@ -2768,7 +2768,7 @@ public partial class MainForm
 
     private void DrawDeviceDropdownList(SKCanvas canvas, SKRect anchorBounds)
     {
-        float itemHeight = 26f;
+        float itemHeight = 28f;  // 4px aligned
         float listHeight = Math.Min(_devices.Count * itemHeight, 200);
         var listBounds = new SKRect(anchorBounds.Left, anchorBounds.Bottom + 2,
             anchorBounds.Right, anchorBounds.Bottom + 2 + listHeight);

@@ -187,7 +187,7 @@ public class BindingConflictDialog : Form
 
         // Draw buttons
         float buttonY = buttonPanelTop + 12;
-        float buttonHeight = 30;
+        float buttonHeight = 32;  // 4px aligned, TouchTargetCompact
 
         // Cancel button (left)
         _cancelButtonBounds = new SKRect(15, buttonY, 105, buttonY + buttonHeight);

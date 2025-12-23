@@ -145,10 +145,6 @@ public partial class MainForm : Form
     private float _bindingsContentHeight = 0;
     private SKRect _bindingsListBounds;
 
-    // Mappings tab UI state - Device visualization
-    private SKRect _mirrorToggleBounds;
-    private bool _mirrorToggleHovered;
-
     // Mappings tab UI state - Right panel (mapping editor)
     private bool _mappingEditorOpen = false;
     private int _editingRowIndex = -1;
@@ -2048,16 +2044,6 @@ public partial class MainForm : Form
             _clearAllButtonHovered = false;
             _hoveredInputSourceRemove = -1;
             _hoveredMergeOpButton = -1;
-            _mirrorToggleHovered = false;
-
-            // Center panel: Mirror toggle button
-            if (!_mirrorToggleBounds.IsEmpty && _mirrorToggleBounds.Contains(e.X, e.Y))
-            {
-                _mirrorToggleHovered = true;
-                Cursor = Cursors.Hand;
-                _canvas.Invalidate();
-                return;
-            }
 
             // Right panel: Add input button
             if (_addInputButtonBounds.Contains(e.X, e.Y))
@@ -2746,15 +2732,6 @@ public partial class MainForm : Form
         // Mappings tab click handling
         if (_activeTab == 1)
         {
-            // Center panel: Mirror toggle button
-            if (_mirrorToggleHovered && _mappingsPrimaryDeviceMap is not null)
-            {
-                _mappingsPrimaryDeviceMap.Mirror = !_mappingsPrimaryDeviceMap.Mirror;
-                _mappingsPrimaryDeviceMap.Save();
-                _canvas.Invalidate();
-                return;
-            }
-
             // Right panel: Add input button - toggles listening
             if (_addInputButtonHovered && _selectedMappingRow >= 0)
             {

@@ -518,51 +518,6 @@ public partial class MainForm
                 new SKRect(bounds.Left, centerY - 20, bounds.Right, centerY + 20),
                 FUIColors.TextDim, 14f);
         }
-
-        // Draw Left/Right toggle button in top-right corner
-        DrawMirrorToggleButton(canvas, bounds, frameInset, shouldMirror);
-    }
-
-    private void DrawMirrorToggleButton(SKCanvas canvas, SKRect bounds, float frameInset, bool isMirrored)
-    {
-        // Position in top-right corner of the panel
-        float buttonWidth = 60f;
-        float buttonHeight = 24f;
-        float margin = 10f;
-
-        _mirrorToggleBounds = new SKRect(
-            bounds.Right - frameInset - buttonWidth - margin,
-            bounds.Top + frameInset + margin,
-            bounds.Right - frameInset - margin,
-            bounds.Top + frameInset + margin + buttonHeight
-        );
-
-        // Draw button background
-        var bgColor = _mirrorToggleHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(_mirrorToggleBounds, bgPaint);
-
-        // Draw frame
-        var frameColor = _mirrorToggleHovered ? FUIColors.Primary : FUIColors.Frame;
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
-        canvas.DrawRect(_mirrorToggleBounds, framePaint);
-
-        // Draw L/R text with indicator
-        string leftText = "L";
-        string rightText = "R";
-        float midX = _mirrorToggleBounds.MidX;
-        float textY = _mirrorToggleBounds.MidY + 4;
-
-        // Left side
-        var leftColor = isMirrored ? FUIColors.Active : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, leftText, new SKPoint(_mirrorToggleBounds.Left + 12, textY), leftColor, 11f, isMirrored);
-
-        // Separator
-        FUIRenderer.DrawText(canvas, "/", new SKPoint(midX - 3, textY), FUIColors.TextDim, 11f);
-
-        // Right side
-        var rightColor = !isMirrored ? FUIColors.Active : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, rightText, new SKPoint(_mirrorToggleBounds.Right - 18, textY), rightColor, 11f, !isMirrored);
     }
 
     private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)

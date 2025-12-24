@@ -979,7 +979,16 @@ public partial class MainForm
         float curveHeight = 140f;
         _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
         DrawCurveVisualization(canvas, _curveEditorBounds);
-        y += curveHeight + FUIRenderer.ScaleLineHeight(16f);
+        y += curveHeight + FUIRenderer.ScaleSpacing(6f);
+
+        // Live axis movement indicator
+        var axisMapping = GetCurrentAxisMapping();
+        if (axisMapping is not null)
+        {
+            float indicatorHeight = DrawAxisMovementIndicator(canvas, leftMargin, rightMargin, y, axisMapping);
+            y += indicatorHeight + FUIRenderer.ScaleSpacing(6f);
+        }
+        y += FUIRenderer.ScaleSpacing(4f);
 
         // Deadzone section
         if (y + 100 < bottom)
@@ -1727,6 +1736,177 @@ public partial class MainForm
         canvas.RotateDegrees(-90);
         FUIRenderer.DrawText(canvas, "OUT", new SKPoint(0, 0), FUIColors.TextDim, 8f);
         canvas.Restore();
+    }
+
+    private float DrawAxisMovementIndicator(SKCanvas canvas, float leftMargin, float rightMargin, float y, AxisMapping axisMapping)
+    {
+        float width = rightMargin - leftMargin;
+        float startY = y;
+
+        // Get current raw input values for all input sources
+        float rawInput = 0f;
+        bool hasInput = false;
+
+        if (axisMapping.Inputs.Count > 0)
+        {
+            var inputValues = new List<float>();
+
+            foreach (var input in axisMapping.Inputs)
+            {
+                // Find the physical device
+                var device = _devices.FirstOrDefault(d => d.InstanceGuid.ToString() == input.DeviceId);
+                if (device is null) continue;
+
+                // Get the device state from InputService
+                var state = _inputService.GetDeviceState(device.DeviceIndex);
+                if (state is null || input.Index >= state.Axes.Length) continue;
+
+                inputValues.Add(state.Axes[input.Index]);
+                hasInput = true;
+            }
+
+            // Merge multiple inputs according to merge operation
+            if (inputValues.Count > 0)
+            {
+                rawInput = axisMapping.MergeOp switch
+                {
+                    MergeOperation.Average => inputValues.Average(),
+                    MergeOperation.Maximum => inputValues.Max(),
+                    MergeOperation.Minimum => inputValues.Min(),
+                    MergeOperation.Sum => Math.Clamp(inputValues.Sum(), -1f, 1f),
+                    _ => inputValues[0]
+                };
+            }
+        }
+
+        // Apply the curve to get processed output
+        float processedOutput = hasInput ? axisMapping.Curve.Apply(rawInput) : 0f;
+
+        // Check if this is a centered axis (joystick) or end-only (throttle/slider)
+        // Auto-detect based on output axis type if mode is set to default Centered
+        bool isCentered;
+        if (axisMapping.Curve.DeadzoneMode == DeadzoneMode.Centered)
+        {
+            // Auto-detect: Z axis and sliders are typically end-only (throttles)
+            // X, Y, RX, RY, RZ are typically centered (joysticks)
+            int outputIndex = axisMapping.Output.Index;
+            isCentered = outputIndex switch
+            {
+                2 => false,  // Z axis - throttle
+                6 => false,  // Slider1
+                7 => false,  // Slider2
+                _ => true    // X, Y, RX, RY, RZ - joystick axes
+            };
+        }
+        else
+        {
+            isCentered = axisMapping.Curve.DeadzoneMode == DeadzoneMode.Centered;
+        }
+
+        // Convert to percentages for display
+        float rawPercent, outPercent;
+        if (isCentered)
+        {
+            // Centered: -100% to +100%
+            rawPercent = rawInput * 100f;
+            outPercent = processedOutput * 100f;
+        }
+        else
+        {
+            // End-only: 0% to 100% (convert from -1..1 to 0..100)
+            rawPercent = (rawInput + 1f) * 50f;
+            outPercent = (processedOutput + 1f) * 50f;
+        }
+
+        // Draw section header with live values
+        string headerText = hasInput
+            ? (isCentered
+                ? $"LIVE INPUT: {rawPercent:+0;-0;0}%  →  OUTPUT: {outPercent:+0;-0;0}%"
+                : $"LIVE INPUT: {rawPercent:0}%  →  OUTPUT: {outPercent:0}%")
+            : "LIVE INPUT: (no signal)";
+
+        var headerColor = hasInput ? FUIColors.Active : FUIColors.TextDim.WithAlpha(150);
+        FUIRenderer.DrawText(canvas, headerText, new SKPoint(leftMargin, y), headerColor, 9f);
+        y += FUIRenderer.ScaleLineHeight(16f);
+
+        if (hasInput)
+        {
+            // Draw a visual bar indicator for the processed output
+            float barHeight = FUIRenderer.ScaleLineHeight(8f);
+            var barBounds = new SKRect(leftMargin, y, rightMargin, y + barHeight);
+
+            // Background
+            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0 };
+            canvas.DrawRect(barBounds, bgPaint);
+
+            // Convert output value to bar position (0..1)
+            float normalizedValue = (processedOutput + 1f) / 2f;
+            float barX = barBounds.Left + normalizedValue * barBounds.Width;
+
+            if (isCentered)
+            {
+                // Center line for centered axes
+                using var centerPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = FUIColors.Frame,
+                    StrokeWidth = 1f
+                };
+                canvas.DrawLine(barBounds.MidX, barBounds.Top, barBounds.MidX, barBounds.Bottom, centerPaint);
+
+                // Fill from center to current position
+                var fillBounds = processedOutput >= 0
+                    ? new SKRect(barBounds.MidX, barBounds.Top, barX, barBounds.Bottom)
+                    : new SKRect(barX, barBounds.Top, barBounds.MidX, barBounds.Bottom);
+
+                using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
+                canvas.DrawRect(fillBounds, fillPaint);
+            }
+            else
+            {
+                // Fill from left edge to current position (for sliders/throttles)
+                var fillBounds = new SKRect(barBounds.Left, barBounds.Top, barX, barBounds.Bottom);
+                using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
+                canvas.DrawRect(fillBounds, fillPaint);
+            }
+
+            // Position indicator (vertical line)
+            using var indicatorPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active,
+                StrokeWidth = 2f
+            };
+            canvas.DrawLine(barX, barBounds.Top, barX, barBounds.Bottom, indicatorPaint);
+
+            // Frame
+            using var framePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Frame,
+                StrokeWidth = 1f
+            };
+            canvas.DrawRect(barBounds, framePaint);
+
+            y += barHeight + FUIRenderer.ScaleSpacing(2f);
+
+            // Labels below bar - different for centered vs end-only
+            if (isCentered)
+            {
+                FUIRenderer.DrawText(canvas, "-100%", new SKPoint(leftMargin, y), FUIColors.TextDim, 7f);
+                FUIRenderer.DrawText(canvas, "0%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 7f);
+                FUIRenderer.DrawText(canvas, "+100%", new SKPoint(rightMargin - 28, y), FUIColors.TextDim, 7f);
+            }
+            else
+            {
+                FUIRenderer.DrawText(canvas, "0%", new SKPoint(leftMargin, y), FUIColors.TextDim, 7f);
+                FUIRenderer.DrawText(canvas, "50%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 7f);
+                FUIRenderer.DrawText(canvas, "100%", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 7f);
+            }
+            y += FUIRenderer.ScaleLineHeight(12f);
+        }
+
+        return y - startY;
     }
 
     private void DrawCurvePath(SKCanvas canvas, SKRect bounds)

@@ -184,6 +184,15 @@ static class Program
             return;
         }
 
+        // Single-instance check - only allow one GUI instance
+        using var singleInstance = new SingleInstanceManager();
+        if (!singleInstance.IsFirstInstance)
+        {
+            // Another instance is running - activate it and exit
+            singleInstance.ActivateExistingInstance();
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         Application.Run(new UI.MainForm());
     }

@@ -2004,6 +2004,13 @@ public partial class MainForm : Form
 
     protected override void WndProc(ref Message m)
     {
+        // Handle single-instance activation request
+        if (m.Msg == SingleInstanceManager.ActivationMessage)
+        {
+            ShowAndActivateWindow();
+            return;
+        }
+
         // Handle WM_NCCALCSIZE to remove title bar but keep resize borders
         if (m.Msg == WM_NCCALCSIZE && m.WParam != IntPtr.Zero)
         {
@@ -2059,6 +2066,20 @@ public partial class MainForm : Form
         }
 
         base.WndProc(ref m);
+    }
+
+    /// <summary>
+    /// Show and activate the window, restoring from minimized or tray state if needed.
+    /// </summary>
+    private void ShowAndActivateWindow()
+    {
+        Show();
+        if (WindowState == FormWindowState.Minimized)
+        {
+            WindowState = FormWindowState.Normal;
+        }
+        Activate();
+        BringToFront();
     }
 
     /// <summary>
@@ -4195,12 +4216,7 @@ public partial class MainForm : Form
 
         // Open
         var openItem = new ToolStripMenuItem("Open");
-        openItem.Click += (s, e) =>
-        {
-            Show();
-            WindowState = FormWindowState.Normal;
-            Activate();
-        };
+        openItem.Click += (s, e) => ShowAndActivateWindow();
         menu.Items.Add(openItem);
 
         menu.Items.Add(new ToolStripSeparator());
@@ -4217,12 +4233,7 @@ public partial class MainForm : Form
         _trayIcon.ContextMenuStrip = menu;
 
         // Double-click to open
-        _trayIcon.DoubleClick += (s, e) =>
-        {
-            Show();
-            WindowState = FormWindowState.Normal;
-            Activate();
-        };
+        _trayIcon.DoubleClick += (s, e) => ShowAndActivateWindow();
     }
 
     private void UpdateTrayMenu()

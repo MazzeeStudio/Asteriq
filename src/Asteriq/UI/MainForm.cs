@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Xml.Linq;
 using Asteriq.Models;
 using Asteriq.Services;
+using Asteriq.Services.Abstractions;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using Svg.Skia;
@@ -69,10 +70,10 @@ public partial class MainForm : Form
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
     // Services
-    private readonly InputService _inputService;
-    private readonly ProfileService _profileService;
-    private readonly VJoyService _vjoyService;
-    private readonly MappingEngine _mappingEngine;
+    private readonly IInputService _inputService;
+    private readonly IProfileService _profileService;
+    private readonly IVJoyService _vjoyService;
+    private readonly IMappingEngine _mappingEngine;
     private readonly SystemTrayIcon _trayIcon;
 
     // Profile UI state
@@ -334,11 +335,11 @@ public partial class MainForm : Form
     private SKRect[] _trayIconTypeButtonBounds = new SKRect[2];  // Joystick, Throttle
     private string? _draggingBgSlider;  // Which slider is being dragged
 
-    // Star Citizen bindings tab state
-    private SCInstallationService? _scInstallationService;
-    private SCProfileCacheService? _scProfileCacheService;
-    private SCSchemaService? _scSchemaService;
-    private SCXmlExportService? _scExportService;
+    // Star Citizen bindings tab state (all injected via constructor, never null)
+    private ISCInstallationService _scInstallationService = null!;
+    private SCProfileCacheService _scProfileCacheService = null!;
+    private SCSchemaService _scSchemaService = null!;
+    private SCXmlExportService _scExportService = null!;
     private List<SCInstallation> _scInstallations = new();
     private int _selectedSCInstallation = 0;
     private SCExportProfile _scExportProfile = new();
@@ -442,8 +443,8 @@ public partial class MainForm : Form
     private SKRect _scClearBindingButtonBounds;
     private bool _scClearBindingButtonHovered;
 
-    // SC Export profile management
-    private SCExportProfileService? _scExportProfileService;
+    // SC Export profile management (injected via constructor, never null)
+    private SCExportProfileService _scExportProfileService = null!;
     private List<SCExportProfileInfo> _scExportProfiles = new();
     private SKRect _scProfileDropdownBounds;
     private bool _scProfileDropdownOpen;
@@ -463,17 +464,37 @@ public partial class MainForm : Form
     private bool _startForwardingButtonHovered;
     private bool _stopForwardingButtonHovered;
 
-    public MainForm()
+    /// <summary>
+    /// Constructor with dependency injection
+    /// </summary>
+    public MainForm(
+        IInputService inputService,
+        IProfileService profileService,
+        IVJoyService vjoyService,
+        IMappingEngine mappingEngine,
+        SystemTrayIcon trayIcon,
+        ISCInstallationService scInstallationService,
+        SCProfileCacheService scProfileCacheService,
+        SCSchemaService scSchemaService,
+        SCXmlExportService scExportService,
+        SCExportProfileService scExportProfileService)
     {
-        _inputService = new InputService();
-        _profileService = new ProfileService();
-        _vjoyService = new VJoyService();
-        _mappingEngine = new MappingEngine(_vjoyService);
+        // Assign injected services
+        _inputService = inputService ?? throw new ArgumentNullException(nameof(inputService));
+        _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
+        _vjoyService = vjoyService ?? throw new ArgumentNullException(nameof(vjoyService));
+        _mappingEngine = mappingEngine ?? throw new ArgumentNullException(nameof(mappingEngine));
+        _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
+        _scInstallationService = scInstallationService ?? throw new ArgumentNullException(nameof(scInstallationService));
+        _scProfileCacheService = scProfileCacheService ?? throw new ArgumentNullException(nameof(scProfileCacheService));
+        _scSchemaService = scSchemaService ?? throw new ArgumentNullException(nameof(scSchemaService));
+        _scExportService = scExportService ?? throw new ArgumentNullException(nameof(scExportService));
+        _scExportProfileService = scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService));
 
-        // Initialize system tray icon
-        _trayIcon = new SystemTrayIcon($"Asteriq v{s_appVersion}", _profileService.TrayIconType);
+        // Update tray icon tooltip
+        _trayIcon.SetToolTip($"Asteriq v{s_appVersion}");
+
         InitializeTrayMenu();
-
         InitializeForm();
         InitializeCanvas();
         InitializeInput();

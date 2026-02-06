@@ -1,4 +1,5 @@
 using Asteriq.Models;
+using Asteriq.Services.Abstractions;
 using Asteriq.VJoy;
 
 namespace Asteriq.Services;
@@ -6,9 +7,9 @@ namespace Asteriq.Services;
 /// <summary>
 /// Processes input mappings and outputs to vJoy/keyboard
 /// </summary>
-public class MappingEngine : IDisposable
+public class MappingEngine : IMappingEngine
 {
-    private readonly VJoyService _vjoy;
+    private readonly IVJoyService _vjoy;
     private readonly KeyboardService _keyboard;
     private readonly bool _ownsKeyboard;
     private readonly Dictionary<string, float[]> _deviceAxisValues = new();
@@ -20,12 +21,12 @@ public class MappingEngine : IDisposable
     private MappingProfile? _activeProfile;
     private bool _isRunning;
 
-    public MappingEngine(VJoyService vjoy) : this(vjoy, new KeyboardService())
+    public MappingEngine(IVJoyService vjoy) : this(vjoy, new KeyboardService())
     {
         _ownsKeyboard = true;
     }
 
-    public MappingEngine(VJoyService vjoy, KeyboardService keyboard)
+    public MappingEngine(IVJoyService vjoy, KeyboardService keyboard)
     {
         _vjoy = vjoy;
         _keyboard = keyboard;

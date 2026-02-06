@@ -15,11 +15,9 @@ public partial class MainForm
     {
         try
         {
-            _scInstallationService = new SCInstallationService();
-            _scProfileCacheService = new SCProfileCacheService();
-            _scSchemaService = new SCSchemaService();
-            _scExportService = new SCXmlExportService();
-            _scExportProfileService = new SCExportProfileService();
+            // SC services are now injected via constructor
+            // _scInstallationService, _scProfileCacheService, _scSchemaService,
+            // _scExportService, and _scExportProfileService are already assigned
 
             // Ensure vJoy devices are enumerated for SC Bindings columns
             if (_vjoyDevices.Count == 0 && _vjoyService is not null)

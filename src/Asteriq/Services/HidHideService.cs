@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Asteriq.Models;
+using Asteriq.Services.Abstractions;
 
 namespace Asteriq.Services;
 
@@ -38,7 +39,7 @@ public class HidHideDeviceGroup
 /// <summary>
 /// Service for managing HidHide device hiding
 /// </summary>
-public class HidHideService
+public class HidHideService : IHidHideService
 {
     private readonly string _cliPath;
 

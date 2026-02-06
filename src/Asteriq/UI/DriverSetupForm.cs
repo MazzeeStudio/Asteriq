@@ -30,9 +30,9 @@ public class DriverSetupForm : Form
 
     public bool SetupComplete { get; private set; }
 
-    public DriverSetupForm()
+    public DriverSetupForm(DriverSetupManager driverSetupManager)
     {
-        _driverSetup = new DriverSetupManager();
+        _driverSetup = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
         InitializeComponents();
         RefreshDriverStatus();
     }

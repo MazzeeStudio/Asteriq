@@ -54,6 +54,9 @@ public class DarkContextMenuRenderer : ToolStripProfessionalRenderer
 
     protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
     {
+        if (e.Item is null)
+            return;
+
         var skColor = e.Item.Enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
         e.ArrowColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
         base.OnRenderArrow(e);

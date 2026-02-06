@@ -1,7 +1,12 @@
 using Asteriq.Diagnostics;
 using Asteriq.Models;
 using Asteriq.Services;
+using Asteriq.Services.Abstractions;
 using Asteriq.VJoy;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Serilog;
 using System.Runtime.InteropServices;
 
 namespace Asteriq;
@@ -195,22 +200,94 @@ static class Program
 
         ApplicationConfiguration.Initialize();
 
+        // Build service provider with dependency injection
+        var serviceProvider = BuildServiceProvider();
+
+        // Migrate settings from old unified settings.json to new split files
+        var migrationService = serviceProvider.GetRequiredService<Services.SettingsMigrationService>();
+        migrationService.MigrateIfNeeded();
+
         // Check required drivers before creating MainForm
-        if (!CheckRequiredDrivers())
+        if (!CheckRequiredDrivers(serviceProvider))
         {
             // User cancelled driver setup - exit
+            serviceProvider.Dispose();
             return;
         }
 
-        Application.Run(new UI.MainForm());
+        // Create and run MainForm with injected services
+        var mainForm = ActivatorUtilities.CreateInstance<UI.MainForm>(serviceProvider);
+        Application.Run(mainForm);
+
+        // Cleanup
+        serviceProvider.Dispose();
+    }
+
+    /// <summary>
+    /// Build the dependency injection service provider
+    /// </summary>
+    private static ServiceProvider BuildServiceProvider()
+    {
+        // Configure Serilog before building the service provider
+        ConfigureSerilog();
+
+        var services = new ServiceCollection();
+
+        // Add logging with Serilog
+        services.AddLogging(builder =>
+        {
+            builder.ClearProviders();
+            builder.AddSerilog(dispose: true);
+        });
+
+        // Register all application services
+        services.AddAsteriqServices();
+
+        // UI components (Transient - created per request)
+        services.AddTransient<UI.MainForm>();
+
+        // SystemTrayIcon factory - needs IProfileService to determine icon type
+        services.AddTransient<UI.SystemTrayIcon>(sp =>
+        {
+            var profileService = sp.GetRequiredService<IProfileService>();
+            return new UI.SystemTrayIcon("Asteriq", profileService.TrayIconType);
+        });
+
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Configure Serilog logging with console and file sinks
+    /// </summary>
+    private static void ConfigureSerilog()
+    {
+        var logsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Asteriq",
+            "Logs");
+
+        Directory.CreateDirectory(logsPath);
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Console(
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+            .WriteTo.File(
+                Path.Combine(logsPath, "asteriq-.log"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7,
+                outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
+
+        Log.Information("Serilog configured - logging to console and {LogPath}", logsPath);
     }
 
     /// <summary>
     /// Check if required drivers are installed. Returns false if user cancels setup.
     /// </summary>
-    private static bool CheckRequiredDrivers()
+    private static bool CheckRequiredDrivers(IServiceProvider serviceProvider)
     {
-        var driverSetup = new Services.DriverSetupManager();
+        var driverSetup = serviceProvider.GetRequiredService<Services.DriverSetupManager>();
         var status = driverSetup.GetSetupStatus();
 
         if (status.IsComplete)
@@ -219,7 +296,7 @@ static class Program
         }
 
         // Show driver setup form
-        using var setupForm = new UI.DriverSetupForm();
+        using var setupForm = ActivatorUtilities.CreateInstance<UI.DriverSetupForm>(serviceProvider);
         var result = setupForm.ShowDialog();
 
         if (result == DialogResult.OK && setupForm.SetupComplete)
@@ -501,7 +578,7 @@ Examples:
         }
 
         // Initialize vJoy
-        var vjoyService = new VJoyService();
+        var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
         if (!vjoyService.Initialize())
         {
             Console.WriteLine("Failed to initialize vJoy!");
@@ -800,7 +877,7 @@ Examples:
             return;
         }
 
-        var vjoyService = new VJoyService();
+        var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
         if (!vjoyService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize vJoy");
@@ -1348,7 +1425,7 @@ Examples:
             return;
         }
 
-        var vjoyService = new VJoyService();
+        var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
         if (!vjoyService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize vJoy");

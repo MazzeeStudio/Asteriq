@@ -1,6 +1,7 @@
 using SDL2;
 using Asteriq.Models;
 using Asteriq.DirectInput;
+using Asteriq.Services.Abstractions;
 using System.Collections.Concurrent;
 
 namespace Asteriq.Services;
@@ -19,7 +20,7 @@ public enum InputPollingBackend
 /// <summary>
 /// Handles physical device input using SDL2 or DirectInput
 /// </summary>
-public class InputService : IDisposable
+public class InputService : IInputService
 {
     // Keyed by SDL instance ID (stable) rather than device index (can shift)
     private readonly ConcurrentDictionary<int, IntPtr> _openJoysticks = new();

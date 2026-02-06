@@ -1,4 +1,5 @@
 using Asteriq.Models;
+using Asteriq.Services.Abstractions;
 using System.IO;
 
 namespace Asteriq.Services;
@@ -114,7 +115,7 @@ public enum InputDetectionFilter
 /// </summary>
 public class InputDetectionService : IDisposable
 {
-    private readonly InputService _inputService;
+    private readonly IInputService _inputService;
     private readonly object _lock = new();
 
     private TaskCompletionSource<DetectedInput?>? _currentDetection;
@@ -163,7 +164,7 @@ public class InputDetectionService : IDisposable
     /// </summary>
     public event EventHandler<DetectedInput>? InputDetected;
 
-    public InputDetectionService(InputService inputService)
+    public InputDetectionService(IInputService inputService)
     {
         _inputService = inputService;
     }

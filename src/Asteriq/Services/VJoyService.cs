@@ -1,18 +1,26 @@
 using System.Collections.Concurrent;
 using Asteriq.Models;
+using Asteriq.Services.Abstractions;
 using Asteriq.VJoy;
+using Microsoft.Extensions.Logging;
 
 namespace Asteriq.Services;
 
 /// <summary>
 /// Service for managing vJoy virtual devices
 /// </summary>
-public class VJoyService : IDisposable
+public class VJoyService : IVJoyService
 {
+    private readonly ILogger<VJoyService> _logger;
     private readonly ConcurrentDictionary<uint, bool> _acquiredDevices = new();
     private bool _isInitialized;
     private System.Threading.Timer? _keepAliveTimer;
     private readonly object _lock = new();
+
+    public VJoyService(ILogger<VJoyService> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
     
     /// <summary>
     /// Whether vJoy has been successfully initialized
@@ -38,17 +46,17 @@ public class VJoyService : IDisposable
         {
             if (!VJoyInterop.vJoyEnabled())
             {
-                Console.WriteLine("vJoy driver not enabled");
+                _logger.LogError("vJoy driver not enabled");
                 return false;
             }
 
             short version = VJoyInterop.GetvJoyVersion();
-            Console.WriteLine($"vJoy version: {version}");
+            _logger.LogInformation("vJoy version: {Version}", version);
 
             uint dllVer = 0, drvVer = 0;
             if (!VJoyInterop.DriverMatch(ref dllVer, ref drvVer))
             {
-                Console.WriteLine($"vJoy version mismatch: DLL={dllVer}, Driver={drvVer}");
+                _logger.LogWarning("vJoy version mismatch: DLL={DllVersion}, Driver={DriverVersion}", dllVer, drvVer);
                 // Continue anyway, might still work
             }
 
@@ -59,16 +67,14 @@ public class VJoyService : IDisposable
 
             return true;
         }
-        catch (DllNotFoundException dnf)
+        catch (DllNotFoundException ex)
         {
-            Console.WriteLine($"vJoy initialization failed: vJoyInterface.dll not found. " +
-                              $"Ensure vJoy is installed and the DLL is accessible. Details: {dnf.Message}");
+            _logger.LogError(ex, "vJoy initialization failed: vJoyInterface.dll not found. Ensure vJoy is installed and the DLL is accessible");
             return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"vJoy initialization failed during version check/driver validation. " +
-                              $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
+            _logger.LogError(ex, "vJoy initialization failed during version check/driver validation");
             return false;
         }
     }
@@ -90,21 +96,21 @@ public class VJoyService : IDisposable
                 if (status == VjdStat.Free)
                 {
                     // Lost ownership, try to re-acquire
-                    Console.WriteLine($"vJoy device {deviceId} ownership lost, re-acquiring...");
+                    _logger.LogWarning("vJoy device {DeviceId} ownership lost, re-acquiring...", deviceId);
                     if (VJoyInterop.AcquireVJD(deviceId))
                     {
-                        Console.WriteLine($"vJoy device {deviceId} re-acquired successfully");
+                        _logger.LogInformation("vJoy device {DeviceId} re-acquired successfully", deviceId);
                     }
                     else
                     {
-                        Console.WriteLine($"Failed to re-acquire vJoy device {deviceId}");
+                        _logger.LogError("Failed to re-acquire vJoy device {DeviceId}", deviceId);
                         _acquiredDevices.TryRemove(deviceId, out _);
                     }
                 }
                 else
                 {
                     // Device busy or missing
-                    Console.WriteLine($"vJoy device {deviceId} status changed to {status}");
+                    _logger.LogWarning("vJoy device {DeviceId} status changed to {Status}", deviceId, status);
                     _acquiredDevices.TryRemove(deviceId, out _);
                 }
             }

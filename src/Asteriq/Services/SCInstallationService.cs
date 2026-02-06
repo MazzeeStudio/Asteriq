@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Asteriq.Models;
+using Asteriq.Services.Abstractions;
 
 namespace Asteriq.Services;
 
@@ -7,7 +8,7 @@ namespace Asteriq.Services;
 /// Detects and manages Star Citizen installations.
 /// Scans for SC installations (LIVE, PTU, EPTU) and provides paths to key files.
 /// </summary>
-public class SCInstallationService
+public class SCInstallationService : ISCInstallationService
 {
     private readonly List<SCInstallation> _installations = new();
     private string? _customInstallPath;

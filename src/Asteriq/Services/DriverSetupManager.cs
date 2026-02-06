@@ -1,9 +1,12 @@
+using Asteriq.Services.Abstractions;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Asteriq.Services;
 
 /// <summary>
-/// Manages detection and installation of required drivers (vJoy)
+/// Manages detection and installation of required drivers (vJoy and HidHide)
 /// </summary>
 public class DriverSetupManager
 {
@@ -12,20 +15,30 @@ public class DriverSetupManager
     private const string HIDHIDE_RELEASES_URL = "https://github.com/nefarius/HidHide/releases";
     private const string HIDHIDE_DOWNLOAD_URL = "https://github.com/nefarius/HidHide/releases/download/v1.5.230/HidHide_1.5.230_x64.exe";
 
+    private readonly ILogger<DriverSetupManager> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHidHideService _hidHideService;
     private readonly string _downloadPath;
-    private readonly HttpClient _httpClient;
 
-    public DriverSetupManager()
+    /// <summary>
+    /// Constructor with dependency injection
+    /// </summary>
+    public DriverSetupManager(
+        ILogger<DriverSetupManager> logger,
+        IHttpClientFactory httpClientFactory,
+        IHidHideService hidHideService)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _hidHideService = hidHideService ?? throw new ArgumentNullException(nameof(hidHideService));
+
         _downloadPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Asteriq",
             "Downloads");
 
         Directory.CreateDirectory(_downloadPath);
-
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Asteriq/1.0");
+        _logger.LogDebug("DriverSetupManager initialized. Download path: {DownloadPath}", _downloadPath);
     }
 
     #region vJoy Detection
@@ -41,6 +54,7 @@ public class DriverSetupManager
             using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\vjoy");
             if (key is not null)
             {
+                _logger.LogDebug("vJoy service found in registry");
                 return true;
             }
 
@@ -52,15 +66,18 @@ public class DriverSetupManager
                 {
                     if (subKeyName.Contains("VID_1234&PID_BEAD", StringComparison.OrdinalIgnoreCase))
                     {
+                        _logger.LogDebug("vJoy device found in registry: {DeviceKey}", subKeyName);
                         return true;
                     }
                 }
             }
 
+            _logger.LogInformation("vJoy not detected in registry");
             return false;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Failed to check vJoy installation status");
             return false;
         }
     }
@@ -139,8 +156,9 @@ public class DriverSetupManager
     /// </summary>
     public bool IsHidHideInstalled()
     {
-        var hidHide = new HidHideService();
-        return hidHide.IsAvailable();
+        var isAvailable = _hidHideService.IsAvailable();
+        _logger.LogDebug("HidHide availability: {IsAvailable}", isAvailable);
+        return isAvailable;
     }
 
     #endregion
@@ -157,7 +175,8 @@ public class DriverSetupManager
 
         try
         {
-            using var response = await _httpClient.GetAsync(VJOY_DOWNLOAD_URL, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var httpClient = _httpClientFactory.CreateClient("Asteriq");
+            using var response = await httpClient.GetAsync(VJOY_DOWNLOAD_URL, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
@@ -181,10 +200,12 @@ public class DriverSetupManager
                 }
             }
 
+            _logger.LogInformation("vJoy installer downloaded successfully to {FilePath}", filePath);
             return filePath;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to download vJoy installer from {Url}", VJOY_DOWNLOAD_URL);
             return null;
         }
     }
@@ -199,10 +220,14 @@ public class DriverSetupManager
 
         try
         {
-            using var response = await _httpClient.GetAsync(HIDHIDE_DOWNLOAD_URL, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            _logger.LogInformation("Downloading HidHide installer from {Url}", HIDHIDE_DOWNLOAD_URL);
+
+            using var httpClient = _httpClientFactory.CreateClient("Asteriq");
+            using var response = await httpClient.GetAsync(HIDHIDE_DOWNLOAD_URL, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
+            _logger.LogDebug("HidHide installer size: {TotalBytes} bytes", totalBytes);
 
             using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
@@ -223,10 +248,12 @@ public class DriverSetupManager
                 }
             }
 
+            _logger.LogInformation("HidHide installer downloaded successfully to {FilePath}", filePath);
             return filePath;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to download HidHide installer from {Url}", HIDHIDE_DOWNLOAD_URL);
             return null;
         }
     }
@@ -236,12 +263,14 @@ public class DriverSetupManager
     #region Driver Installation
 
     /// <summary>
-    /// Launch vJoy installer (requires user interaction)
+    /// Launch vJoy installer (requires user interaction and elevation)
     /// </summary>
     public bool LaunchVJoyInstaller(string installerPath)
     {
         try
         {
+            _logger.LogInformation("Launching vJoy installer: {InstallerPath}", installerPath);
+
             var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = installerPath,
@@ -249,21 +278,26 @@ public class DriverSetupManager
                 Verb = "runas" // Request elevation
             });
 
-            return process is not null;
+            var success = process is not null;
+            _logger.LogInformation("vJoy installer launch {Result}", success ? "succeeded" : "failed");
+            return success;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to launch vJoy installer at {InstallerPath}", installerPath);
             return false;
         }
     }
 
     /// <summary>
-    /// Launch HidHide installer (requires user interaction)
+    /// Launch HidHide installer (requires user interaction and elevation)
     /// </summary>
     public bool LaunchHidHideInstaller(string installerPath)
     {
         try
         {
+            _logger.LogInformation("Launching HidHide installer: {InstallerPath}", installerPath);
+
             var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = installerPath,
@@ -271,10 +305,13 @@ public class DriverSetupManager
                 Verb = "runas" // Request elevation
             });
 
-            return process is not null;
+            var success = process is not null;
+            _logger.LogInformation("HidHide installer launch {Result}", success ? "succeeded" : "failed");
+            return success;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to launch HidHide installer at {InstallerPath}", installerPath);
             return false;
         }
     }

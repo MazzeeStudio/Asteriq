@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Asteriq.Models;
 using Asteriq.Services;
+using Asteriq.Services.Abstractions;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 
@@ -36,9 +37,9 @@ public class MappingDialogResult
 /// </summary>
 public class MappingDialog : Form
 {
-    private readonly InputService _inputService;
+    private readonly IInputService _inputService;
     private readonly InputDetectionService _detectionService;
-    private readonly VJoyService _vjoyService;
+    private readonly IVJoyService _vjoyService;
     private readonly List<VJoyDeviceInfo> _vjoyDevices;
 
     private SKControl _canvas = null!;
@@ -81,12 +82,12 @@ public class MappingDialog : Form
 
     public MappingDialogResult Result { get; private set; } = new();
 
-    public MappingDialog(InputService inputService, VJoyService vjoyService)
+    public MappingDialog(IInputService inputService, IVJoyService vjoyService)
         : this(inputService, vjoyService, null)
     {
     }
 
-    public MappingDialog(InputService inputService, VJoyService vjoyService, DetectedInput? preSelectedInput)
+    public MappingDialog(IInputService inputService, IVJoyService vjoyService, DetectedInput? preSelectedInput)
     {
         _inputService = inputService;
         _vjoyService = vjoyService;

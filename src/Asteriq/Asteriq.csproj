@@ -42,15 +42,18 @@
     </PropertyGroup>
 
     <!-- Run icon generator if ico doesn't exist -->
-    <Exec Command="dotnet run --project &quot;$(IconGeneratorProject)&quot; -- &quot;$(IconOutputPath)&quot; &quot;$(IconSvgPath)&quot;"
-          ConsoleToMSBuild="true"
-          StandardOutputImportance="low"
-          Condition="!Exists('$(IconOutputPath)')" />
+    <Exec Command="dotnet run --project &quot;$(IconGeneratorProject)&quot; -- &quot;$(IconOutputPath)&quot; &quot;$(IconSvgPath)&quot;" ConsoleToMSBuild="true" StandardOutputImportance="low" Condition="!Exists('$(IconOutputPath)')" />
   </Target>
 
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.2" />
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="SkiaSharp" Version="2.88.7" />
     <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.7" />

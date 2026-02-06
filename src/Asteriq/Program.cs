@@ -194,7 +194,43 @@ static class Program
         }
 
         ApplicationConfiguration.Initialize();
+
+        // Check required drivers before creating MainForm
+        if (!CheckRequiredDrivers())
+        {
+            // User cancelled driver setup - exit
+            return;
+        }
+
         Application.Run(new UI.MainForm());
+    }
+
+    /// <summary>
+    /// Check if required drivers are installed. Returns false if user cancels setup.
+    /// </summary>
+    private static bool CheckRequiredDrivers()
+    {
+        var driverSetup = new Services.DriverSetupManager();
+        var status = driverSetup.GetSetupStatus();
+
+        if (status.IsComplete)
+        {
+            return true; // All required drivers are installed
+        }
+
+        // Show driver setup form
+        using var setupForm = new UI.DriverSetupForm();
+        var result = setupForm.ShowDialog();
+
+        if (result == DialogResult.OK && setupForm.SetupComplete)
+        {
+            // Re-check status after setup
+            status = driverSetup.GetSetupStatus();
+            return status.IsComplete;
+        }
+
+        // User cancelled or setup incomplete
+        return false;
     }
 
     private static void ShowHelp()

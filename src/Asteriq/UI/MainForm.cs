@@ -4257,7 +4257,7 @@ public partial class MainForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         // If close to tray is enabled and this isn't a forced close, minimize to tray instead
-        if (_profileService.CloseToTray && !_forceClose && e.CloseReason == CloseReason.UserClosing)
+        if (_profileService is not null && _profileService.CloseToTray && !_forceClose && e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
             Hide();

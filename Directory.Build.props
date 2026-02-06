@@ -1,0 +1,51 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable nullable reference types -->
+    <Nullable>enable</Nullable>
+
+    <!-- Enable implicit usings (can use GlobalUsings.cs) -->
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- DO NOT treat warnings as errors during refactoring -->
+    <!-- TODO: Re-enable after code cleanup: <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors> -->
+
+    <!-- Use moderate analysis level (not latest-all which is too strict) -->
+    <AnalysisLevel>8.0</AnalysisLevel>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+
+    <!-- Assembly attributes -->
+    <Company>Asteriq</Company>
+    <Product>Asteriq HOTAS Manager</Product>
+    <Copyright>Copyright © 2024-2026</Copyright>
+
+    <!-- Deterministic builds -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- Code analysis packages - DISABLED during refactoring to avoid breaking build -->
+  <!-- TODO: Re-enable after code cleanup
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.*" PrivateAssets="all" />
+  </ItemGroup>
+  -->
+
+  <!-- Disable specific warnings that are too noisy -->
+  <PropertyGroup>
+    <!-- CA1303: Do not pass literals as localized parameters (we're not localizing) -->
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
+
+    <!-- CA1848: Use LoggerMessage delegates (performance optimization we can defer) -->
+    <NoWarn>$(NoWarn);CA1848</NoWarn>
+
+    <!-- IDE0290: Use primary constructor (we'll adopt selectively) -->
+    <NoWarn>$(NoWarn);IDE0290</NoWarn>
+
+    <!-- NU1701: Package restored using .NETFramework instead of target framework -->
+    <!-- OpenTK packages are legacy but functional in .NET 8 -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+
+    <!-- Suppress warning about newer analyzers in SDK than in package -->
+    <_SkipUpgradeNetAnalyzersNuGetWarning>true</_SkipUpgradeNetAnalyzersNuGetWarning>
+  </PropertyGroup>
+</Project>

@@ -50,7 +50,7 @@ public class SCProfileCacheService
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Loaded cached profile for {installation.Environment} (key: {cacheKey})");
             return doc;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is XmlException or IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to load cached profile for {installation.Environment}: {ex.Message}");
 
@@ -59,7 +59,7 @@ public class SCProfileCacheService
             {
                 File.Delete(cachePath);
             }
-            catch (Exception deleteEx)
+            catch (Exception deleteEx) when (deleteEx is IOException or UnauthorizedAccessException)
             {
                 System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to delete corrupted cache file: {deleteEx.Message}");
             }
@@ -91,7 +91,7 @@ public class SCProfileCacheService
 
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Cached profile for {installation.Environment} (key: {cacheKey})");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is XmlException or IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to cache profile for {installation.Environment}: {ex.Message}");
         }
@@ -169,7 +169,7 @@ public class SCProfileCacheService
                 System.Diagnostics.Debug.WriteLine("[SCProfileCache] Cleared profile cache");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to clear profile cache: {ex.Message}");
         }
@@ -191,7 +191,7 @@ public class SCProfileCacheService
                 System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Cleared cached profile for {installation.Environment}");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to clear cached profile: {ex.Message}");
         }
@@ -218,7 +218,7 @@ public class SCProfileCacheService
                     .ToList();
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Failed to get cache info: {ex.Message}");
         }

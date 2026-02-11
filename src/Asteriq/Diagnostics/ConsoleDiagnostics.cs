@@ -150,7 +150,7 @@ public class ConsoleDiagnostics : IDisposable
             Console.WriteLine("╟──────────────────────────────────────────────────────────────────────────────╢");
             Console.ResetColor();
         }
-        catch
+        catch (Exception ex) when (ex is ArgumentOutOfRangeException or IOException)
         {
             // Ignore console errors during resize
         }

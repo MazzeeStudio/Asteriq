@@ -55,7 +55,7 @@ public class P4kExtractorService : IDisposable
             System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Opened p4k archive: {_p4kPath} ({_zipFile.Count} entries)");
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to open p4k archive: {ex.Message}");
             return false;
@@ -178,7 +178,7 @@ public class P4kExtractorService : IDisposable
 
                     return ms.ToArray();
                 }
-                catch
+                catch (Exception ex) when (ex is IOException or InvalidOperationException or NotSupportedException)
                 {
                     System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Entry {entry.Name} encryption prevents reading");
                     return null;
@@ -198,7 +198,7 @@ public class P4kExtractorService : IDisposable
 
             return outputMs.ToArray();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or NotSupportedException)
         {
             System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to extract entry '{entry.Name}' " +
                                                $"(Size: {entry.Size}, Compressed: {entry.CompressedSize}, Encrypted: {entry.IsCrypted}). " +
@@ -265,7 +265,7 @@ public class P4kExtractorService : IDisposable
             System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Decompressed {compressedData.Length} -> {decompressedData.Length} bytes for {entry.Name}");
             return decompressedData.ToArray();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or NotSupportedException)
         {
             System.Diagnostics.Debug.WriteLine($"[P4kExtractor] Failed to extract Zstandard-compressed entry '{entry.Name}' " +
                                                $"(Size: {entry.Size}, Compressed: {entry.CompressedSize}). " +

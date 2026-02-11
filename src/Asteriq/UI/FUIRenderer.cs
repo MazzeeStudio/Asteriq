@@ -44,7 +44,7 @@ public static class FUIRenderer
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or System.Security.SecurityException)
         {
             // If we can't read the registry, use default scale of 1.0
             _windowsTextScaleFactor = 1.0f;

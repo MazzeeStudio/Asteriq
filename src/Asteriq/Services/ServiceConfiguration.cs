@@ -32,7 +32,9 @@ public static class ServiceConfiguration
         services.AddSingleton<SettingsMigrationService>();
 
         // Backward compatibility adapter for IProfileService
+#pragma warning disable CS0618 // Intentional use of obsolete ProfileServiceAdapter for backward compatibility
         services.AddSingleton<IProfileService, ProfileServiceAdapter>();
+#pragma warning restore CS0618
 
         // HTTP client factory for driver downloads
         services.AddHttpClient("Asteriq", client =>

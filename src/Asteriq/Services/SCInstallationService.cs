@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Xml;
 using Asteriq.Models;
 using Asteriq.Services.Abstractions;
 
@@ -61,7 +62,7 @@ public class SCInstallationService : ISCInstallationService
             var processes = Process.GetProcessesByName("StarCitizen");
             return processes.Length > 0;
         }
-        catch
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
             return false;
         }
@@ -246,7 +247,7 @@ public class SCInstallationService : ISCInstallationService
 
             return null;
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
         }
@@ -323,7 +324,7 @@ public class SCInstallationService : ISCInstallationService
             }
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCInstallationService] Failed to create mappings directory at " +
                                                $"'{installation.MappingsPath}'. Error type: {ex.GetType().Name}, Details: {ex.Message}");
@@ -380,7 +381,7 @@ public class SCInstallationService : ISCInstallationService
                         }
                     }
                 }
-                catch
+                catch (Exception ex) when (ex is IOException or XmlException)
                 {
                     // Ignore errors reading profile name - will fall back to filename
                 }
@@ -391,7 +392,7 @@ public class SCInstallationService : ISCInstallationService
             // Sort by last modified (newest first)
             profiles.Sort((a, b) => b.LastModified.CompareTo(a.LastModified));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCInstallationService] Error listing profiles: {ex.Message}");
         }

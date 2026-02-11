@@ -52,7 +52,7 @@ public class DirectInputService : IDisposable
                     _deviceCache[deviceInstance.guidInstance] = deviceInfo;
                 }
             }
-            catch
+            catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or EntryPointNotFoundException)
             {
                 // Skip devices that fail to enumerate
             }

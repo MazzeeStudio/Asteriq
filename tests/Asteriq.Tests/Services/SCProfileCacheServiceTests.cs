@@ -23,7 +23,7 @@ public class SCProfileCacheServiceTests : IDisposable
     {
         if (Directory.Exists(_testCacheDir))
         {
-            try { Directory.Delete(_testCacheDir, true); } catch { }
+            try { Directory.Delete(_testCacheDir, true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
 

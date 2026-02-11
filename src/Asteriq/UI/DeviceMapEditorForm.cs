@@ -250,7 +250,7 @@ public class DeviceMapEditorForm : Form
             _lastSaveMessage = $"Saved to {Path.GetFileName(savePath)}";
             _lastSaveTime = DateTime.Now;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             FUIMessageBox.ShowError(this, $"Failed to save: {ex.Message}", "Save Error");
         }

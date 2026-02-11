@@ -72,7 +72,7 @@ public class DeviceMap
             }
             return map;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load device map from '{jsonPath}'. " +
                                                $"Error type: {ex.GetType().Name}, Details: {ex.Message}");
@@ -97,7 +97,7 @@ public class DeviceMap
             File.WriteAllText(LoadedFromPath, json);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to save device map to '{LoadedFromPath}'. " +
                                                $"Error: {ex.Message}");

@@ -75,7 +75,7 @@ public class DriverSetupManager
             _logger.LogInformation("vJoy not detected in registry");
             return false;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             _logger.LogWarning(ex, "Failed to check vJoy installation status");
             return false;
@@ -114,7 +114,7 @@ public class DriverSetupManager
 
             return null;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             return null;
         }
@@ -203,7 +203,7 @@ public class DriverSetupManager
             _logger.LogInformation("vJoy installer downloaded successfully to {FilePath}", filePath);
             return filePath;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
         {
             _logger.LogError(ex, "Failed to download vJoy installer from {Url}", VJOY_DOWNLOAD_URL);
             return null;
@@ -251,7 +251,7 @@ public class DriverSetupManager
             _logger.LogInformation("HidHide installer downloaded successfully to {FilePath}", filePath);
             return filePath;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
         {
             _logger.LogError(ex, "Failed to download HidHide installer from {Url}", HIDHIDE_DOWNLOAD_URL);
             return null;
@@ -282,7 +282,7 @@ public class DriverSetupManager
             _logger.LogInformation("vJoy installer launch {Result}", success ? "succeeded" : "failed");
             return success;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
             _logger.LogError(ex, "Failed to launch vJoy installer at {InstallerPath}", installerPath);
             return false;
@@ -309,7 +309,7 @@ public class DriverSetupManager
             _logger.LogInformation("HidHide installer launch {Result}", success ? "succeeded" : "failed");
             return success;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
             _logger.LogError(ex, "Failed to launch HidHide installer at {InstallerPath}", installerPath);
             return false;

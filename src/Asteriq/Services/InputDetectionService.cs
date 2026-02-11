@@ -26,7 +26,7 @@ internal static class InputDetectionLog
             Console.WriteLine(line);
             File.AppendAllText(s_logPath, line + Environment.NewLine);
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Debug logging should never crash the app - silently ignore file write failures
         }
@@ -38,7 +38,7 @@ internal static class InputDetectionLog
         {
             File.WriteAllText(s_logPath, "");
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Debug log clear failure is non-critical - silently ignore
         }

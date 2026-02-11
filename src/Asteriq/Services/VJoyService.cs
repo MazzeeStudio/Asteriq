@@ -72,7 +72,7 @@ public class VJoyService : IVJoyService
             _logger.LogError(ex, "vJoy initialization failed: vJoyInterface.dll not found. Ensure vJoy is installed and the DLL is accessible");
             return false;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or EntryPointNotFoundException)
         {
             _logger.LogError(ex, "vJoy initialization failed during version check/driver validation");
             return false;
@@ -120,7 +120,9 @@ public class VJoyService : IVJoyService
     /// <summary>
     /// Event fired when a device is lost and could not be re-acquired
     /// </summary>
+#pragma warning disable CS0067 // Event required by IVJoyService interface but not yet raised
     public event EventHandler<uint>? DeviceLost;
+#pragma warning restore CS0067
 
     /// <summary>
     /// Get information about all vJoy device slots (1-16)

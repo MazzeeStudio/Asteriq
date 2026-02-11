@@ -62,7 +62,7 @@ public class WindowStateManager : IWindowStateManager
             var json = File.ReadAllText(_settingsFile);
             return JsonSerializer.Deserialize<WindowState>(json, _jsonOptions) ?? new WindowState();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             _logger.LogError(ex, "Failed to load window state from {SettingsFile}, using defaults", _settingsFile);
             return new WindowState();

@@ -519,7 +519,7 @@ Examples:
             Log("Done.");
             Environment.Exit(0);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is ArgumentOutOfRangeException or IOException)
         {
             Log($"EXCEPTION: {ex.GetType().Name}: {ex.Message}");
             Log(ex.StackTrace ?? "No stack trace");

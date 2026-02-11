@@ -57,7 +57,7 @@ public class DriverSetupForm : Form
                 Icon = new Icon(iconPath);
             }
         }
-        catch
+        catch (Exception ex) when (ex is IOException or ArgumentException)
         {
             // Icon loading is not critical
         }

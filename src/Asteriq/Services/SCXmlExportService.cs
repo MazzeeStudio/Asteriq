@@ -380,7 +380,7 @@ public class SCXmlExportService
             result.Success = true;
             System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Imported {result.Bindings.Count} bindings from {filePath}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
         {
             result.Error = $"Failed to parse profile: {ex.Message}";
             System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Import error: {ex.Message}");

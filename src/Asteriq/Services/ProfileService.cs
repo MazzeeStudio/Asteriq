@@ -764,7 +764,7 @@ public class ProfileService : IProfileService
             var json = File.ReadAllText(_settingsFile);
             return JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
         }
-        catch
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             return new AppSettings();
         }

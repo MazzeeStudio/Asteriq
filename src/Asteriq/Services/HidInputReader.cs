@@ -87,7 +87,7 @@ public class HidInputReader : IDisposable
                 System.Diagnostics.Debug.WriteLine($"[HidInputReader] Opened device: {displayName}");
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
             {
                 System.Diagnostics.Debug.WriteLine($"[HidInputReader] Failed to open device: {ex.Message}");
                 return false;
@@ -203,7 +203,7 @@ public class HidInputReader : IDisposable
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
             {
                 System.Diagnostics.Debug.WriteLine($"[HidInputReader] Failed to start: {ex.Message}");
                 return false;
@@ -217,7 +217,7 @@ public class HidInputReader : IDisposable
             {
                 _readTask?.Wait(500);
             }
-            catch { /* ignore */ }
+            catch (Exception ex) when (ex is AggregateException or ObjectDisposedException) { /* ignore */ }
         }
 
         private void BuildInputMappings(ReportDescriptor reportDescriptor)
@@ -308,7 +308,7 @@ public class HidInputReader : IDisposable
                 {
                     break;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
                 {
                     if (_cts?.Token.IsCancellationRequested != true && !_disposed)
                     {
@@ -340,7 +340,7 @@ public class HidInputReader : IDisposable
                     }
                 }
             }
-            catch { /* ignore parse errors */ }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { /* ignore parse errors */ }
         }
 
         private void ProcessDataValue(DataValue dataValue, ref int currentButtonInDataItem, ref DataItem? lastButtonDataItem,

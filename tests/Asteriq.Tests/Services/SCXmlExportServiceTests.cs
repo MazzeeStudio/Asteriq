@@ -83,8 +83,8 @@ public class SCXmlExportServiceTests
 
         var options = doc.Root?.Elements("options").ToList();
         Assert.Equal(2, options?.Count);
-        Assert.Contains(options, o => o.Attribute("instance")?.Value == "1");
-        Assert.Contains(options, o => o.Attribute("instance")?.Value == "2");
+        Assert.Contains(options!, o => o.Attribute("instance")?.Value == "1");
+        Assert.Contains(options!, o => o.Attribute("instance")?.Value == "2");
     }
 
     [Fact]
@@ -112,8 +112,8 @@ public class SCXmlExportServiceTests
 
         var actionMaps = doc.Root?.Elements("actionmap").ToList();
         Assert.Equal(2, actionMaps?.Count);
-        Assert.Contains(actionMaps, m => m.Attribute("name")?.Value == "spaceship_movement");
-        Assert.Contains(actionMaps, m => m.Attribute("name")?.Value == "spaceship_weapons");
+        Assert.Contains(actionMaps!, m => m.Attribute("name")?.Value == "spaceship_movement");
+        Assert.Contains(actionMaps!, m => m.Attribute("name")?.Value == "spaceship_weapons");
     }
 
     [Fact]

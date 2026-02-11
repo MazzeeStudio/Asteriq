@@ -59,7 +59,7 @@ public static class CryXmlService
                 System.Diagnostics.Debug.WriteLine("[CryXmlService] Parsed as regular XML");
                 return doc;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
             {
                 System.Diagnostics.Debug.WriteLine($"[CryXmlService] Failed to parse as regular XML: {ex.Message}");
                 return null;
@@ -78,7 +78,7 @@ public static class CryXmlService
             System.Diagnostics.Debug.WriteLine("[CryXmlService] Parsing as CryXmlB binary format");
             return ParseCryXmlB(data);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
         {
             System.Diagnostics.Debug.WriteLine($"[CryXmlService] Failed to parse CryXmlB: {ex.Message}");
             return null;

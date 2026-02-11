@@ -480,16 +480,20 @@ Update this section as tasks complete:
 - All Console.WriteLine replaced with ILogger<T>
 
 **Build Status:**
-- ✅ 0 errors, 88 warnings (pre-existing)
-- ✅ All 485 tests passing
+- ✅ 0 errors, 0 warnings (CA1031 + all build warnings fixed 2026-02-11)
+- ✅ All 489 tests passing
 - ✅ Clean git history with 3 commits
+
+**Completed (2026-02-11):**
+- CA1031 fix: All 72 broad exception catches narrowed to specific types (0 warnings)
+- All non-CA1031 build warnings fixed (CS0169, CS0219, CS0414, CS0649, CS8618, CS0618, CS0067)
+- Code review document updated (asteriq_code_review.md)
 
 **Deferred to Next Session:**
 - Task #7 (partial): Business logic extraction from MainForm (16,260 lines) - still needs work
 - Task #8: CLI command pattern extraction from Program.cs (2,182 lines)
 - Task #9: UI rendering logic extraction
 - Task #10: UI constants extraction
-- Task #11: Code review document update
 
 **Lessons Learned:**
 - Settings services benefit significantly from in-memory caching

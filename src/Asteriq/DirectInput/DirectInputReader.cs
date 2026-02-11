@@ -225,7 +225,7 @@ public class DirectInputReader : IDisposable
                 _openDevices[instanceGuid] = handle;
                 return true;
             }
-            catch
+            catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or EntryPointNotFoundException)
             {
                 if (device != IntPtr.Zero)
                     ReleaseDevice(device);
@@ -497,7 +497,7 @@ public class DirectInputReader : IDisposable
                         handle.Unacquire?.Invoke(handle.Device);
                         ReleaseDevice(handle.Device);
                     }
-                    catch
+                    catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or EntryPointNotFoundException)
                     {
                         // Ignore errors during cleanup
                     }

@@ -363,7 +363,7 @@ public class HidHideService : IHidHideService
 
             return output + error;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
             Console.WriteLine($"HidHide CLI command failed. Command: '{arguments}', " +
                               $"CLI path: '{_cliPath}', Error type: {ex.GetType().Name}, Details: {ex.Message}");

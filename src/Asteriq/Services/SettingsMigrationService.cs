@@ -106,7 +106,7 @@ public class SettingsMigrationService
 
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             _logger.LogError(ex, "Settings migration failed");
             return false;

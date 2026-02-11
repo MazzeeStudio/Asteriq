@@ -135,7 +135,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
             var json = File.ReadAllText(_settingsFile);
             return JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             _logger.LogError(ex, "Failed to load settings from {SettingsFile}, using defaults", _settingsFile);
             return new AppSettings();

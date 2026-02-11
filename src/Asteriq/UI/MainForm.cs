@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Xml.Linq;
 using Asteriq.Models;
 using Asteriq.Services;
@@ -191,15 +192,14 @@ public partial class MainForm : Form
     // Mapping editor - input detection
     private bool _isListeningForInput = false;
     private SKRect _inputFieldBounds;
-    private bool _inputFieldHovered;
+    private bool _inputFieldHovered = false;
     private DetectedInput? _pendingInput;
-    private DateTime _lastInputFieldClick;
     private const int DoubleClickThresholdMs = 400;
 
     // Mapping editor - manual entry
     private bool _manualEntryMode = false;
     private SKRect _manualEntryButtonBounds;
-    private bool _manualEntryButtonHovered;
+    private bool _manualEntryButtonHovered = false;
     private int _selectedSourceDevice = 0;
     private int _selectedSourceControl = 0;
     private SKRect _deviceDropdownBounds;
@@ -249,7 +249,6 @@ public partial class MainForm : Form
 
     // Double-click detection for binding rows
     private DateTime _lastRowClickTime = DateTime.MinValue;
-    private int _lastClickedRow = -1;
     private const int DoubleClickMs = 400;
 
     // Right panel - input sources and actions
@@ -267,8 +266,8 @@ public partial class MainForm : Form
     // Mapping editor - action buttons
     private SKRect _saveButtonBounds;
     private SKRect _cancelButtonBounds;
-    private bool _saveButtonHovered;
-    private bool _cancelButtonHovered;
+    private bool _saveButtonHovered = false;
+    private bool _cancelButtonHovered = false;
 
     // Input-to-mapping highlight (attention effect when physical input is pressed)
     private int _highlightedMappingRow = -1;  // Which row to highlight (-1 = none)
@@ -454,8 +453,7 @@ public partial class MainForm : Form
     private bool _scNewProfileButtonHovered;
     private SKRect _scSaveProfileButtonBounds;
     private bool _scSaveProfileButtonHovered;
-    private SKRect _scDeleteProfileButtonBounds;
-    private bool _scDeleteProfileButtonHovered;
+    private SKRect _scDeleteProfileButtonBounds = default;
 
     // Input forwarding state (physical → vJoy)
     private bool _isForwarding = false;
@@ -1031,7 +1029,7 @@ public partial class MainForm : Form
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or System.Xml.XmlException)
         {
             System.Diagnostics.Debug.WriteLine($"Error parsing SVG control bounds: {ex.Message}");
         }
@@ -1204,7 +1202,7 @@ public partial class MainForm : Form
                 Icon = new Icon(iconPath);
             }
         }
-        catch
+        catch (Exception ex) when (ex is IOException or ArgumentException)
         {
             // Icon loading failed, continue without icon
             // The app will still work, just won't show icon in taskbar
@@ -1977,7 +1975,7 @@ public partial class MainForm : Form
                     }).ToList();
                 }
             }
-            catch
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
             {
                 // Ignore errors loading disconnected devices
             }
@@ -2006,7 +2004,7 @@ public partial class MainForm : Form
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(path, json);
         }
-        catch
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             // Ignore errors saving disconnected devices
         }

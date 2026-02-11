@@ -43,9 +43,6 @@ public partial class MainForm
 
     private void DrawBindingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        float pad = FUIRenderer.PanelPadding;
-        float itemGap = FUIRenderer.ItemSpacing;
-
         // Vertical side tabs width
         float sideTabWidth = 28f;
 
@@ -3617,7 +3614,7 @@ public partial class MainForm
                 // Type-aware mapping is only used in 1:1 auto-mapping feature.
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Input listening cancelled or failed: {ex.Message}");
         }
@@ -4002,7 +3999,7 @@ public partial class MainForm
                     UseShellExecute = true
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
             {
                 FUIMessageBox.ShowError(this,
                     $"Failed to launch vJoy Configurator:\n{ex.Message}",
@@ -4487,7 +4484,7 @@ public partial class MainForm
                 SaveMappingForRow(targetRowIndex, detected, isAxis);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Input listening for row {rowIndex} cancelled or failed: {ex.Message}");
         }
@@ -4565,7 +4562,7 @@ public partial class MainForm
                 _pendingInput = detected;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Pending keyboard input listening cancelled or failed: {ex.Message}");
         }

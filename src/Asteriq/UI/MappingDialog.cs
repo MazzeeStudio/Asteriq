@@ -199,7 +199,7 @@ public class MappingDialog : Form
                 Cancel();
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"[MappingDialog] Input detection failed: {ex.Message}");
             Cancel();

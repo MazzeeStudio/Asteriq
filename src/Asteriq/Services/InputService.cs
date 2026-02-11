@@ -88,7 +88,7 @@ public class InputService : IInputService
         {
             _hidDeviceService = new HidDeviceService();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
         {
             System.Diagnostics.Debug.WriteLine($"HidSharp initialization failed (axis types will be unknown): {ex.Message}");
             // Continue without HidSharp - we'll just not have axis type info
@@ -101,7 +101,7 @@ public class InputService : IInputService
             _directInputReader = new DirectInputReader();
             System.Diagnostics.Debug.WriteLine("DirectInput initialized successfully");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or DllNotFoundException or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"DirectInput initialization failed (will use SDL2): {ex.Message}");
             InputBackend = InputPollingBackend.SDL2; // Fall back to SDL2
@@ -245,7 +245,7 @@ public class InputService : IInputService
 
             LogAxisTypes($"No DirectInput match found for SDL device '{info.Name}'");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
         {
             LogAxisTypes($"Failed to map SDL device to DirectInput: {ex.Message}");
         }
@@ -311,7 +311,7 @@ public class InputService : IInputService
                 LogAxisTypes($"No match found for '{info.Name}'");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
         {
             LogAxisTypes($"Failed to get axis types for device '{info.Name}' (InstanceGuid: {info.InstanceGuid}, " +
                          $"AxisCount: {info.AxisCount}). Error type: {ex.GetType().Name}, Details: {ex.Message}");
@@ -334,7 +334,7 @@ public class InputService : IInputService
                 File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
             }
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Ignore logging errors - debug logging should never crash the app
             // This is intentionally swallowed as it's non-critical diagnostic code

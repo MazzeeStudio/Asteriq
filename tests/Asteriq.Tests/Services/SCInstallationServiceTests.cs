@@ -21,12 +21,12 @@ public class SCInstallationServiceTests : IDisposable
         {
             if (Directory.Exists(dir))
             {
-                try { Directory.Delete(dir, true); } catch { }
+                try { Directory.Delete(dir, true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             }
         }
         if (Directory.Exists(_testDir))
         {
-            try { Directory.Delete(_testDir, true); } catch { }
+            try { Directory.Delete(_testDir, true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
 

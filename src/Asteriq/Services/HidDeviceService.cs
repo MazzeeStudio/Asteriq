@@ -78,7 +78,7 @@ public class HidDeviceService
 
                 result.Add(deviceInfo);
             }
-            catch
+            catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException or NotSupportedException)
             {
                 // Skip devices that fail to enumerate
             }
@@ -123,7 +123,7 @@ public class HidDeviceService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException or NotSupportedException)
         {
             // Fallback: check by name
             return IsJoystickByName(device);
@@ -154,7 +154,7 @@ public class HidDeviceService
             if (!string.IsNullOrWhiteSpace(name))
                 return name;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException or NotSupportedException)
         {
             // Some HID devices don't support GetProductName - fall through to try GetFriendlyName
         }
@@ -165,7 +165,7 @@ public class HidDeviceService
             if (!string.IsNullOrWhiteSpace(name))
                 return name;
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException or NotSupportedException)
         {
             // Some HID devices don't support GetFriendlyName - fall through to default name
         }
@@ -179,7 +179,7 @@ public class HidDeviceService
         {
             return device.GetSerialNumber() ?? "";
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException or NotSupportedException)
         {
             // Some HID devices don't support serial number retrieval
             return "";
@@ -247,7 +247,7 @@ public class HidDeviceService
             deviceInfo.ButtonCount = Math.Min(Math.Max(buttonCount, 0), 128);
             deviceInfo.HatCount = Math.Min(hatCount, 4);
         }
-        catch
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException or NotSupportedException)
         {
             // Leave defaults if parsing fails
         }

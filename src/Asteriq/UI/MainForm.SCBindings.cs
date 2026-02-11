@@ -1,3 +1,4 @@
+using System.Xml;
 using Asteriq.Models;
 using Asteriq.Services;
 using SkiaSharp;
@@ -62,7 +63,7 @@ public partial class MainForm
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstallations.Count} installations found");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings init failed: {ex.Message}");
         }
@@ -214,7 +215,7 @@ public partial class MainForm
                 System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded {_scActions.Count} SC actions from {installation.Environment}");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] Failed to load SC schema: {ex.Message}");
             _scActions = null;
@@ -3588,7 +3589,7 @@ public partial class MainForm
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] Exported SC profile to: {exportPath}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             _scExportStatus = $"Export failed: {ex.Message}";
             _scExportStatusTime = DateTime.Now;

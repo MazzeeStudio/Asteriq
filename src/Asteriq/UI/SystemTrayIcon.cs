@@ -13,7 +13,7 @@ namespace Asteriq.UI;
 public sealed class SystemTrayIcon : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
-    private string _svgPath;
+    private string _svgPath = string.Empty;
     private bool _isActive;
     private Icon? _currentIcon;
     private TrayIconType _iconType;
@@ -98,7 +98,7 @@ public sealed class SystemTrayIcon : IDisposable
                 return Icon.FromHandle(tintedBitmap.GetHicon());
             }
         }
-        catch
+        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
         {
             // SVG loading failed, fall back to simple shape
         }

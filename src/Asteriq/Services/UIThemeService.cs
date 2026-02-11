@@ -79,7 +79,7 @@ public class UIThemeService : IUIThemeService
             var json = File.ReadAllText(_settingsFile);
             return JsonSerializer.Deserialize<ThemeSettings>(json, _jsonOptions) ?? new ThemeSettings();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             _logger.LogError(ex, "Failed to load theme settings from {SettingsFile}, using defaults", _settingsFile);
             return new ThemeSettings();

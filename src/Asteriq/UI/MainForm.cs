@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
+using Asteriq.UI.Controllers;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using Svg.Skia;
@@ -72,10 +73,18 @@ public partial class MainForm : Form
 
     // Services
     private readonly IInputService _inputService;
-    private readonly IProfileService _profileService;
+    private readonly IProfileManager _profileManager;
+    private readonly IProfileRepository _profileRepository;
+    private readonly IApplicationSettingsService _appSettings;
+    private readonly IUIThemeService _themeService;
+    private readonly IWindowStateManager _windowState;
     private readonly IVJoyService _vjoyService;
     private readonly IMappingEngine _mappingEngine;
     private readonly SystemTrayIcon _trayIcon;
+
+    // Tab controllers
+    private SettingsTabController _settingsController = null!;
+    private TabContext _tabContext = null!;
 
     // Profile UI state
     private List<ProfileInfo> _profiles = new();
@@ -316,23 +325,7 @@ public partial class MainForm : Form
     private SKRect _invertToggleBounds;
     private bool _axisInverted = false;
 
-    // Theme selector state
-    private SKRect[] _themeButtonBounds = new SKRect[12];
-
-    // Font size selector state
-    private SKRect[] _fontSizeButtonBounds = new SKRect[3];
-    private SKRect[] _fontFamilyButtonBounds = new SKRect[2];
-
-    // Background settings slider bounds
-    private SKRect _bgGridSliderBounds;
-    private SKRect _bgGlowSliderBounds;
-    private SKRect _bgNoiseSliderBounds;
-    private SKRect _bgScanlineSliderBounds;
-    private SKRect _bgVignetteSliderBounds;
-    private SKRect _autoLoadToggleBounds;
-    private SKRect _closeToTrayToggleBounds;
-    private SKRect[] _trayIconTypeButtonBounds = new SKRect[2];  // Joystick, Throttle
-    private string? _draggingBgSlider;  // Which slider is being dragged
+    // (Settings tab fields moved to SettingsTabController)
 
     // Star Citizen bindings tab state (all injected via constructor, never null)
     private ISCInstallationService _scInstallationService = null!;
@@ -467,7 +460,11 @@ public partial class MainForm : Form
     /// </summary>
     public MainForm(
         IInputService inputService,
-        IProfileService profileService,
+        IProfileManager profileManager,
+        IProfileRepository profileRepository,
+        IApplicationSettingsService appSettings,
+        IUIThemeService themeService,
+        IWindowStateManager windowState,
         IVJoyService vjoyService,
         IMappingEngine mappingEngine,
         SystemTrayIcon trayIcon,
@@ -479,7 +476,11 @@ public partial class MainForm : Form
     {
         // Assign injected services
         _inputService = inputService ?? throw new ArgumentNullException(nameof(inputService));
-        _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+        _profileRepository = profileRepository ?? throw new ArgumentNullException(nameof(profileRepository));
+        _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+        _themeService = themeService ?? throw new ArgumentNullException(nameof(themeService));
+        _windowState = windowState ?? throw new ArgumentNullException(nameof(windowState));
         _vjoyService = vjoyService ?? throw new ArgumentNullException(nameof(vjoyService));
         _mappingEngine = mappingEngine ?? throw new ArgumentNullException(nameof(mappingEngine));
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
@@ -501,6 +502,81 @@ public partial class MainForm : Form
         LoadSvgAssets();
         InitializeProfiles();
         InitializeSCBindings();
+        InitializeTabControllers();
+    }
+
+    private void InitializeTabControllers()
+    {
+        _tabContext = new TabContext(
+            _inputService, _profileManager, _profileRepository, _appSettings,
+            _themeService, _vjoyService, _mappingEngine, _trayIcon,
+            _activeInputTracker, _background, this,
+            markDirty: MarkDirty,
+            invalidateCanvas: () => _canvas.Invalidate(),
+            refreshDevices: RefreshDevices,
+            refreshProfileList: RefreshProfileList,
+            loadDeviceMapForDevice: LoadDeviceMapForDevice,
+            updateMappingsPrimaryDeviceMap: UpdateMappingsPrimaryDeviceMap,
+            hitTestSvg: HitTestSvg,
+            onMappingsChanged: OnMappingsChanged);
+
+        // Sync initial state
+        _tabContext.Devices = _devices;
+        _tabContext.DisconnectedDevices = _disconnectedDevices;
+        _tabContext.SelectedDevice = _selectedDevice;
+        _tabContext.VJoyDevices = _vjoyDevices;
+        _tabContext.DeviceMap = _deviceMap;
+        _tabContext.JoystickSvg = _joystickSvg;
+        _tabContext.ThrottleSvg = _throttleSvg;
+        _tabContext.ControlBounds = _controlBounds;
+        _tabContext.IsForwarding = _isForwarding;
+
+        _settingsController = new SettingsTabController(_tabContext);
+    }
+
+    private void SyncTabContext()
+    {
+        _tabContext.Devices = _devices;
+        _tabContext.DisconnectedDevices = _disconnectedDevices;
+        _tabContext.SelectedDevice = _selectedDevice;
+        _tabContext.CurrentInputState = _currentInputState;
+        _tabContext.VJoyDevices = _vjoyDevices;
+        _tabContext.SelectedVJoyDeviceIndex = _selectedVJoyDeviceIndex;
+        _tabContext.DeviceMap = _deviceMap;
+        _tabContext.MappingsPrimaryDeviceMap = _mappingsPrimaryDeviceMap;
+        _tabContext.IsForwarding = _isForwarding;
+        _tabContext.BackgroundDirty = _backgroundDirty;
+        _tabContext.MousePosition = _mousePosition;
+        _tabContext.LeadLineProgress = _leadLineProgress;
+        _tabContext.PulsePhase = _pulsePhase;
+        _tabContext.DashPhase = _dashPhase;
+        _tabContext.JoystickSvg = _joystickSvg;
+        _tabContext.ThrottleSvg = _throttleSvg;
+        _tabContext.HoveredControlId = _hoveredControlId;
+        _tabContext.SelectedControlId = _selectedControlId;
+        _tabContext.SilhouetteBounds = _silhouetteBounds;
+        _tabContext.SvgScale = _svgScale;
+        _tabContext.SvgOffset = _svgOffset;
+        _tabContext.SvgMirrored = _svgMirrored;
+        _tabContext.ControlBounds = _controlBounds;
+        _tabContext.Profiles = _profiles;
+    }
+
+    private void SyncFromTabContext()
+    {
+        _backgroundDirty = _tabContext.BackgroundDirty;
+        _isForwarding = _tabContext.IsForwarding;
+        _selectedDevice = _tabContext.SelectedDevice;
+        _currentInputState = _tabContext.CurrentInputState;
+        _selectedVJoyDeviceIndex = _tabContext.SelectedVJoyDeviceIndex;
+        _deviceMap = _tabContext.DeviceMap;
+        _mappingsPrimaryDeviceMap = _tabContext.MappingsPrimaryDeviceMap;
+        _hoveredControlId = _tabContext.HoveredControlId;
+        _selectedControlId = _tabContext.SelectedControlId;
+        _silhouetteBounds = _tabContext.SilhouetteBounds;
+        _svgScale = _tabContext.SvgScale;
+        _svgOffset = _tabContext.SvgOffset;
+        _svgMirrored = _tabContext.SvgMirrored;
     }
 
     private void InitializeVJoy()
@@ -513,11 +589,11 @@ public partial class MainForm : Form
 
     private void InitializeProfiles()
     {
-        _profileService.Initialize();
+        _profileManager.Initialize();
         RefreshProfileList();
 
         // Initialize primary devices for loaded profile
-        _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
+        _profileManager.ActiveProfile?.UpdateAllPrimaryDevices();
         UpdateMappingsPrimaryDeviceMap();
 
         // Initialize font scaling (reads Windows text scale setting)
@@ -527,16 +603,16 @@ public partial class MainForm : Form
         FUIRenderer.SetDisplayScale(DeviceDpi);
 
         // Apply user's font size preference
-        FUIRenderer.FontSizeOption = _profileService.FontSize;
+        FUIRenderer.FontSizeOption = _appSettings.FontSize;
 
         // Apply user's font family preference
-        FUIRenderer.FontFamily = _profileService.FontFamily;
+        FUIRenderer.FontFamily = _appSettings.FontFamily;
 
         // Apply theme setting
-        FUIColors.SetTheme(_profileService.Theme);
+        FUIColors.SetTheme(_themeService.Theme);
 
         // Apply background settings
-        var bgSettings = _profileService.LoadBackgroundSettings();
+        var bgSettings = _themeService.LoadBackgroundSettings();
         _background.GridStrength = bgSettings.gridStrength;
         _background.GlowIntensity = bgSettings.glowIntensity;
         _background.NoiseIntensity = bgSettings.noiseIntensity;
@@ -546,7 +622,7 @@ public partial class MainForm : Form
 
     private void RefreshProfileList()
     {
-        _profiles = _profileService.ListProfiles();
+        _profiles = _profileRepository.ListProfiles();
     }
 
     private void CreateNewProfilePrompt()
@@ -617,7 +693,7 @@ public partial class MainForm : Form
 
         if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
         {
-            _profileService.CreateAndActivateProfile(textBox.Text.Trim());
+            _profileManager.CreateAndActivateProfile(textBox.Text.Trim());
             // New profile has no mappings yet, but initialize primary device tracking
             UpdateMappingsPrimaryDeviceMap();
             RefreshProfileList();
@@ -636,12 +712,12 @@ public partial class MainForm : Form
 
         if (openDialog.ShowDialog(this) == DialogResult.OK)
         {
-            var imported = _profileService.ImportProfile(openDialog.FileName, generateNewId: true);
+            var imported = _profileRepository.ImportProfile(openDialog.FileName);
             if (imported is not null)
             {
-                _profileService.ActivateProfile(imported.Id);
+                _profileManager.ActivateProfile(imported.Id);
                 // Initialize primary devices for imported profile
-                _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
+                _profileManager.ActiveProfile?.UpdateAllPrimaryDevices();
                 UpdateMappingsPrimaryDeviceMap();
                 RefreshProfileList();
             }
@@ -656,7 +732,7 @@ public partial class MainForm : Form
 
     private void ExportActiveProfile()
     {
-        if (_profileService.ActiveProfile is null)
+        if (_profileManager.ActiveProfile is null)
         {
             FUIMessageBox.ShowInfo(this,
                 "No profile is currently active. Please select a profile first.",
@@ -664,7 +740,7 @@ public partial class MainForm : Form
             return;
         }
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         string suggestedName = $"{profile.Name.Replace(" ", "_")}.json";
 
         using var saveDialog = new SaveFileDialog
@@ -678,7 +754,7 @@ public partial class MainForm : Form
 
         if (saveDialog.ShowDialog(this) == DialogResult.OK)
         {
-            bool success = _profileService.ExportProfile(profile.Id, saveDialog.FileName);
+            bool success = _profileRepository.ExportProfile(profile.Id, saveDialog.FileName);
             if (success)
             {
                 FUIMessageBox.ShowInfo(this,
@@ -923,7 +999,7 @@ public partial class MainForm : Form
             return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null)
             return;
 
@@ -946,7 +1022,7 @@ public partial class MainForm : Form
     /// </summary>
     private void OnMappingsChanged()
     {
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null)
             return;
 
@@ -1155,7 +1231,7 @@ public partial class MainForm : Form
         LoadApplicationIcon();
 
         // Load saved window state or use defaults
-        var (width, height, x, y) = _profileService.LoadWindowState();
+        var (width, height, x, y) = _windowState.LoadWindowState();
         if (width > 0 && height > 0)
         {
             Size = new Size(width, height);
@@ -1737,7 +1813,7 @@ public partial class MainForm : Form
         }
 
         // Check for button presses to highlight corresponding mapping in Mappings tab
-        if (_activeTab == 1 && _profileService.ActiveProfile is not null)
+        if (_activeTab == 1 && _profileManager.ActiveProfile is not null)
         {
             int prevHighlightRow = _highlightedMappingRow;
             uint prevHighlightDevice = _highlightedVJoyDevice;
@@ -1757,7 +1833,7 @@ public partial class MainForm : Form
     /// </summary>
     private void CheckForMappingHighlight(DeviceInputState state)
     {
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         // Get previous button state for this device (for rising-edge detection)
@@ -2225,10 +2301,12 @@ public partial class MainForm : Form
             return;
         }
 
-        // Handle background slider dragging (works across all tabs since it's global)
-        if (_draggingBgSlider is not null)
+        // Handle background slider dragging (delegated to Settings controller)
+        if (_settingsController.IsDraggingSlider)
         {
-            UpdateBgSliderFromPoint(e.X);
+            SyncTabContext();
+            _settingsController.OnMouseMove(e);
+            SyncFromTabContext();
             return;
         }
 
@@ -2768,9 +2846,9 @@ public partial class MainForm : Form
                 if (_hoveredProfileIndex >= 0 && _hoveredProfileIndex < _profiles.Count)
                 {
                     // Select existing profile
-                    _profileService.ActivateProfile(_profiles[_hoveredProfileIndex].Id);
+                    _profileManager.ActivateProfile(_profiles[_hoveredProfileIndex].Id);
                     // Initialize primary devices for migration of old profiles
-                    _profileService.ActiveProfile?.UpdateAllPrimaryDevices();
+                    _profileManager.ActiveProfile?.UpdateAllPrimaryDevices();
                     UpdateMappingsPrimaryDeviceMap();
                     _profileDropdownOpen = false;
                     return;
@@ -2953,7 +3031,6 @@ public partial class MainForm : Form
                     if (_activeTab != i)
                     {
                         // Clear any dragging state when switching tabs
-                        _draggingBgSlider = null;
                         _draggingPulseDuration = false;
                         _draggingHoldDuration = false;
 
@@ -2976,7 +3053,9 @@ public partial class MainForm : Form
         // Settings tab click handling
         if (_activeTab == 3)
         {
-            HandleSettingsTabClick(new SKPoint(e.X, e.Y));
+            SyncTabContext();
+            _settingsController.OnMouseDown(e);
+            SyncFromTabContext();
         }
 
         // Bindings (SC) tab click handling
@@ -3305,12 +3384,12 @@ public partial class MainForm : Form
             MarkDirty();
         }
 
-        // Release background slider dragging
-        if (_draggingBgSlider is not null)
+        // Release background slider dragging (delegated to Settings controller)
+        if (_settingsController.IsDraggingSlider)
         {
-            _draggingBgSlider = null;
-            SaveBackgroundSettings();
-            MarkDirty();
+            SyncTabContext();
+            _settingsController.OnMouseUp(e);
+            SyncFromTabContext();
         }
     }
 
@@ -3498,7 +3577,9 @@ public partial class MainForm : Form
         }
         else if (_activeTab == 3) // SETTINGS tab
         {
-            DrawSettingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
+            SyncTabContext();
+            _settingsController.Draw(canvas, bounds, pad, contentTop, contentBottom);
+            SyncFromTabContext();
         }
         else
         {
@@ -3547,58 +3628,10 @@ public partial class MainForm : Form
     }
 
     private void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-    {
-        // FUI style matching profile selector dropdown
-        var bgColor = isEnabled
-            ? (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150))
-            : FUIColors.Background1.WithAlpha(100);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRect(bounds, bgPaint);
-
-        // Border - highlight when hovered (FUI style)
-        var borderColor = isEnabled
-            ? (isHovered ? FUIColors.FrameBright : FUIColors.Frame)
-            : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRect(bounds, borderPaint);
-
-        // Truncate text to leave room for arrow and padding
-        float textPadding = 8f;
-        float arrowSpaceRight = 20f;  // Space for dropdown arrow on right
-        float maxTextWidth = bounds.Width - textPadding - arrowSpaceRight;
-        string truncatedText = TruncateTextToWidth(text, maxTextWidth, 11f);
-
-        // Display text
-        var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, truncatedText, new SKPoint(bounds.Left + textPadding, bounds.MidY + 4), textColor, 11f);
-
-        // Draw custom dropdown arrow on the right
-        if (isEnabled)
-        {
-            float arrowX = bounds.Right - 12f;
-            float arrowY = bounds.MidY;
-            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
-            using var arrowPath = new SKPath();
-            arrowPath.MoveTo(arrowX - 4, arrowY - 2);
-            arrowPath.LineTo(arrowX + 4, arrowY - 2);
-            arrowPath.LineTo(arrowX, arrowY + 3);
-            arrowPath.Close();
-            canvas.DrawPath(arrowPath, arrowPaint);
-        }
-    }
+        => FUIWidgets.DrawSelector(canvas, bounds, text, isHovered, isEnabled);
 
     private void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
-    {
-        var bgColor = isHovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background1.WithAlpha(140);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRect(bounds, borderPaint);
-
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), FUIColors.TextPrimary, 11f);
-    }
+        => FUIWidgets.DrawTextFieldReadOnly(canvas, bounds, text, isHovered);
 
 
 
@@ -3733,8 +3766,8 @@ public partial class MainForm : Form
         _profileSelectorBounds = new SKRect(x, y, x + width, y + height);
 
         // Get profile name
-        string profileName = _profileService.HasActiveProfile
-            ? _profileService.ActiveProfile!.Name
+        string profileName = _profileManager.HasActiveProfile
+            ? _profileManager.ActiveProfile!.Name
             : "No Profile";
 
         // Measure text to determine truncation (reserve space for arrow on right)
@@ -3853,7 +3886,7 @@ public partial class MainForm : Form
             var profile = _profiles[i];
             var itemBounds = new SKRect(x + 4, itemY, x + width - 4, itemY + itemHeight);
             bool isHovered = _hoveredProfileIndex == i;
-            bool isActive = _profileService.ActiveProfile?.Id == profile.Id;
+            bool isActive = _profileManager.ActiveProfile?.Id == profile.Id;
 
             // Hover background with FUI glow
             if (isHovered)
@@ -3934,89 +3967,17 @@ public partial class MainForm : Form
         itemY += itemHeight;
 
         // "Export" option
-        bool canExport = _profileService.ActiveProfile is not null;
+        bool canExport = _profileManager.ActiveProfile is not null;
         DrawDropdownItem(canvas, x, itemY, width, itemHeight, "↑ Export...",
             _hoveredProfileIndex == _profiles.Count + 2, false, canExport);
     }
 
     private void DrawDropdownItem(SKCanvas canvas, float x, float itemY, float width, float itemHeight,
         string text, bool isHovered, bool isActive, bool isEnabled)
-    {
-        var itemBounds = new SKRect(x + 4, itemY, x + width - 4, itemY + itemHeight);
-
-        if (isHovered && isEnabled)
-        {
-            // Hover background
-            using var hoverPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Active.WithAlpha(40),
-                IsAntialias = true
-            };
-            canvas.DrawRect(itemBounds, hoverPaint);
-
-            // Left accent bar
-            using var accentPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Active,
-                IsAntialias = true
-            };
-            canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), accentPaint);
-        }
-
-        var color = !isEnabled ? FUIColors.TextDisabled
-            : isHovered ? FUIColors.TextBright
-            : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, text, new SKPoint(x + 12, itemY + 17), color, 11f);
-    }
+        => FUIWidgets.DrawDropdownItem(canvas, x, itemY, width, itemHeight, text, isHovered, isActive, isEnabled);
 
     private void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
-    {
-        // No background box - minimalist style like reference image
-        // Just text and accent bar for selected state
-
-        // Accent bar on right edge for selected tab (facing the content)
-        if (isSelected)
-        {
-            using var accentPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active,
-                StrokeWidth = 3f,
-                IsAntialias = true
-            };
-            canvas.DrawLine(bounds.Right - 1, bounds.Top + 5, bounds.Right - 1, bounds.Bottom - 5, accentPaint);
-
-            // Add glow effect for selected
-            using var glowPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active.WithAlpha(60),
-                StrokeWidth = 8f,
-                IsAntialias = true,
-                MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 4f)
-            };
-            canvas.DrawLine(bounds.Right - 1, bounds.Top + 5, bounds.Right - 1, bounds.Bottom - 5, glowPaint);
-        }
-
-        // Vertical text (rotated 90 degrees, reading bottom-to-top)
-        canvas.Save();
-        canvas.Translate(bounds.MidX - 2, bounds.MidY);
-        canvas.RotateDegrees(-90);
-
-        var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextDim.WithAlpha(150));
-        using var textPaint = new SKPaint
-        {
-            Color = textColor,
-            TextSize = 10f,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright),
-            TextAlign = SKTextAlign.Center
-        };
-        canvas.DrawText(label, 0, 4f, textPaint);
-        canvas.Restore();
-    }
+        => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
 
 
     private void DrawStatusBar(SKCanvas canvas, SKRect bounds)
@@ -4066,10 +4027,10 @@ public partial class MainForm : Form
     /// </summary>
     private void SaveDeviceOrder()
     {
-        if (_profileService.ActiveProfile is null)
+        if (_profileManager.ActiveProfile is null)
             return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
 
         // Get physical devices only (that's what we reorder)
         var physicalDevices = _devices.Where(d => !d.IsVirtual).ToList();
@@ -4142,7 +4103,7 @@ public partial class MainForm : Form
             }
         }
 
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
 
         Console.WriteLine($"Device order saved. vJoy assignments updated:");
         for (int i = 0; i < physicalDevices.Count; i++)
@@ -4156,10 +4117,10 @@ public partial class MainForm : Form
     /// </summary>
     private void ApplyDeviceOrder()
     {
-        if (_profileService.ActiveProfile is null)
+        if (_profileManager.ActiveProfile is null)
             return;
 
-        var savedOrder = _profileService.ActiveProfile.DeviceOrder;
+        var savedOrder = _profileManager.ActiveProfile.DeviceOrder;
         if (savedOrder is null || savedOrder.Count == 0)
             return;
 
@@ -4276,7 +4237,7 @@ public partial class MainForm : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         // If close to tray is enabled and this isn't a forced close, minimize to tray instead
-        if (_profileService is not null && _profileService.CloseToTray && !_forceClose && e.CloseReason == CloseReason.UserClosing)
+        if (_appSettings.CloseToTray && !_forceClose && e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
             Hide();
@@ -4286,7 +4247,7 @@ public partial class MainForm : Form
         // Save window state before closing
         if (WindowState == FormWindowState.Normal)
         {
-            _profileService?.SaveWindowState(Width, Height, Left, Top);
+            _windowState.SaveWindowState(Width, Height, Left, Top);
         }
 
         _renderTimer?.Stop();

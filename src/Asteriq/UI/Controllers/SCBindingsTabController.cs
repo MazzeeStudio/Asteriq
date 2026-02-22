@@ -421,10 +421,16 @@ public class SCBindingsTabController : ITabController
             RefreshSCInstallations();
             RefreshSCExportProfiles();
 
-            // Try to load the last used SC export profile
+            // Try to load the last used SC export profile.
+            // Skip "asteriq" - that was the old auto-generated default name, never user-chosen.
             var lastProfileName = _ctx.AppSettings.LastSCExportProfile;
-            SCExportProfile? loadedProfile = null;
+            if (lastProfileName == "asteriq")
+            {
+                _ctx.AppSettings.LastSCExportProfile = null;
+                lastProfileName = null;
+            }
 
+            SCExportProfile? loadedProfile = null;
             if (!string.IsNullOrEmpty(lastProfileName) && _ctx.AppSettings.AutoLoadLastSCExportProfile)
             {
                 loadedProfile = _scExportProfileService.LoadProfile(lastProfileName);
@@ -433,26 +439,29 @@ public class SCBindingsTabController : ITabController
             if (loadedProfile is not null)
             {
                 _scExportProfile = loadedProfile;
-                System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded last SC export profile: {loadedProfile.ProfileName}");
-            }
-            else if (_scExportProfiles.Count > 0)
-            {
-                // No last profile setting - load the first available one
-                var first = _scExportProfileService?.LoadProfile(_scExportProfiles[0].ProfileName);
-                if (first is not null)
-                {
-                    _scExportProfile = first;
-                    _ctx.AppSettings.LastSCExportProfile = first.ProfileName;
-                }
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded last SC export: {loadedProfile.ProfileName}");
             }
             else
             {
-                // No profiles exist yet - start with a blank unnamed export
-                // (user must click "+ New" to name and save it)
-                _scExportProfile = new SCExportProfile();
-                foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
+                // No last profile (or it was the old "asteriq" default) - load first non-legacy profile
+                var firstNamed = _scExportProfiles.FirstOrDefault(p => p.ProfileName != "asteriq");
+                if (firstNamed is not null)
                 {
-                    _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
+                    var first = _scExportProfileService?.LoadProfile(firstNamed.ProfileName);
+                    if (first is not null)
+                    {
+                        _scExportProfile = first;
+                        _ctx.AppSettings.LastSCExportProfile = first.ProfileName;
+                    }
+                }
+                else
+                {
+                    // Only "asteriq" or no profiles exist - start blank so user names their own
+                    _scExportProfile = new SCExportProfile();
+                    foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
+                    {
+                        _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
+                    }
                 }
             }
 
@@ -602,6 +611,7 @@ public class SCBindingsTabController : ITabController
             List<SCAction>? actions = null;
             List<string> actionMaps = new();
             List<SCMappingFile> availableProfiles = new();
+            string? loadError = null;
 
             try
             {
@@ -640,7 +650,15 @@ public class SCBindingsTabController : ITabController
             }
             catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
             {
+                loadError = ex.Message;
                 System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to load SC schema: {ex.Message}");
+            }
+#pragma warning disable CA1031 // Must catch all to prevent _scLoading stuck at true in fire-and-forget Task.Run
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                loadError = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Unexpected error loading SC schema: {ex}");
             }
 
             _ctx.OwnerForm.BeginInvoke(() =>
@@ -648,6 +666,7 @@ public class SCBindingsTabController : ITabController
                 if (version != _schemaLoadVersion) return; // A newer load was started; discard this result
 
                 _scLoading = false;
+                _scLoadingMessage = loadError is not null ? $"Load failed: {loadError}" : "";
                 _scActions = actions;
                 _scActionMaps = actionMaps;
                 _scAvailableProfiles = availableProfiles;

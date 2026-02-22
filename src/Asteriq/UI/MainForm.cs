@@ -993,10 +993,10 @@ public partial class MainForm : Form
 
     private void ApplyFontScaleToWindowSize()
     {
-        // The design baseline is Medium (1.2x): 1570×1000 logical pixels.
+        // The design baseline is Medium (1.3x): 1570×1000 logical pixels.
         // Scale MinimumSize proportionally with the user's font size preference.
-        const float baseMinW = 1570f / 1.2f;  // ~1308 - base at Small (1.0x)
-        const float baseMinH = 1000f / 1.2f;  // ~833
+        const float baseMinW = 1570f / 1.3f;  // ~1208 - base at VSmall (1.0x)
+        const float baseMinH = 1000f / 1.3f;  // ~769
         float userScale = FUIRenderer.UserScaleMultiplier;
         MinimumSize = new Size((int)(baseMinW * userScale), (int)(baseMinH * userScale));
         // Windows enforces MinimumSize automatically; if the current size is smaller it will be grown.

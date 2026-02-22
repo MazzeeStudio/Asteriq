@@ -8,6 +8,13 @@ public class SettingsTabController : ITabController
 {
     private readonly TabContext _ctx;
 
+    // Profile action button bounds
+    private SKRect _newProfileButtonBounds;
+    private SKRect _duplicateProfileButtonBounds;
+    private SKRect _importProfileButtonBounds;
+    private SKRect _exportProfileButtonBounds;
+    private SKRect _deleteProfileButtonBounds;
+
     // Theme selector state
     private SKRect[] _themeButtonBounds = new SKRect[12];
 
@@ -143,26 +150,30 @@ public class SettingsTabController : ITabController
         float buttonGap = FUIRenderer.SpaceSM;
         float buttonWidth = (metrics.ContentWidth - buttonGap) / 2;
 
-        FUIWidgets.DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight), "New Profile", false);
-        FUIWidgets.DrawSettingsButton(canvas, new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight),
+        _newProfileButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
+        _duplicateProfileButtonBounds = new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight);
+        FUIWidgets.DrawSettingsButton(canvas, _newProfileButtonBounds, "New Profile", false);
+        FUIWidgets.DrawSettingsButton(canvas, _duplicateProfileButtonBounds,
             profile is not null ? "Duplicate" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
-        FUIWidgets.DrawSettingsButton(canvas, new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight), "Import", false);
-        FUIWidgets.DrawSettingsButton(canvas, new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight),
+        _importProfileButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
+        _exportProfileButtonBounds = new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight);
+        FUIWidgets.DrawSettingsButton(canvas, _importProfileButtonBounds, "Import", false);
+        FUIWidgets.DrawSettingsButton(canvas, _exportProfileButtonBounds,
             profile is not null ? "Export" : "---", profile is null);
         y += buttonHeight + buttonGap;
 
         if (profile is not null && y + buttonHeight <= bottom)
         {
-            var deleteBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
+            _deleteProfileButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
             using var delBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(30) };
-            canvas.DrawRoundRect(deleteBounds, 4, 4, delBgPaint);
+            canvas.DrawRoundRect(_deleteProfileButtonBounds, 4, 4, delBgPaint);
 
             using var delFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Danger.WithAlpha(150), StrokeWidth = 1f };
-            canvas.DrawRoundRect(deleteBounds, 4, 4, delFramePaint);
+            canvas.DrawRoundRect(_deleteProfileButtonBounds, 4, 4, delFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, "Delete Profile", deleteBounds, FUIColors.Danger, 11f);
+            FUIRenderer.DrawTextCentered(canvas, "Delete Profile", _deleteProfileButtonBounds, FUIColors.Danger, 11f);
             y += buttonHeight + FUIRenderer.ScaleLineHeight(20f);
 
             if (y < bottom - 60)
@@ -573,6 +584,34 @@ public class SettingsTabController : ITabController
 
     private void HandleSettingsTabClick(SKPoint pt)
     {
+        // Profile action buttons
+        if (_newProfileButtonBounds.Contains(pt))
+        {
+            _ctx.CreateNewProfilePrompt?.Invoke();
+            return;
+        }
+        if (_duplicateProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null)
+        {
+            _ctx.DuplicateActiveProfile?.Invoke();
+            return;
+        }
+        if (_importProfileButtonBounds.Contains(pt))
+        {
+            _ctx.ImportProfile?.Invoke();
+            return;
+        }
+        if (_exportProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null)
+        {
+            _ctx.ExportActiveProfile?.Invoke();
+            return;
+        }
+        if (_deleteProfileButtonBounds != default && _deleteProfileButtonBounds.Contains(pt) &&
+            _ctx.ProfileManager.ActiveProfile is not null)
+        {
+            _ctx.DeleteActiveProfile?.Invoke();
+            return;
+        }
+
         // Font size button clicks
         FontSizeOption[] fontSizes = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
         for (int i = 0; i < _fontSizeButtonBounds.Length; i++)

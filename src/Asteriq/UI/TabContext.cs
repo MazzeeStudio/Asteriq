@@ -70,6 +70,10 @@ public class TabContext
     public Action? RemoveDisconnectedDevice { get; set; }
     public Action<string>? OpenMappingDialogForControl { get; set; }
     public Action? CreateNewProfilePrompt { get; set; }
+    public Action? DuplicateActiveProfile { get; set; }
+    public Action? ImportProfile { get; set; }
+    public Action? ExportActiveProfile { get; set; }
+    public Action? DeleteActiveProfile { get; set; }
     public Action? SaveDisconnectedDevices { get; set; }
     public Action? SaveDeviceOrder { get; set; }
     public Action? SelectFirstDeviceInCategory { get; set; }

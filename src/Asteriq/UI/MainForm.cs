@@ -239,6 +239,10 @@ public partial class MainForm : Form
 
         // Wire up extended callbacks for cross-tab operations (non-mapping callbacks)
         _tabContext.CreateNewProfilePrompt = CreateNewProfilePrompt;
+        _tabContext.DuplicateActiveProfile = DuplicateActiveProfile;
+        _tabContext.ImportProfile = ImportProfilePrompt;
+        _tabContext.ExportActiveProfile = ExportActiveProfile;
+        _tabContext.DeleteActiveProfile = DeleteActiveProfile;
         _tabContext.SaveDisconnectedDevices = SaveDisconnectedDevices;
         _tabContext.SaveDeviceOrder = SaveDeviceOrder;
         _tabContext.SelectFirstDeviceInCategory = SelectFirstDeviceInCategory;
@@ -495,6 +499,44 @@ public partial class MainForm : Form
                     "Export Failed");
             }
         }
+    }
+
+    private void DuplicateActiveProfile()
+    {
+        var profile = _profileManager.ActiveProfile;
+        if (profile is null) return;
+
+        string newName = $"{profile.Name} (copy)";
+        var duplicated = _profileRepository.DuplicateProfile(profile.Id, newName);
+        if (duplicated is not null)
+        {
+            _profileManager.ActivateProfile(duplicated.Id);
+            _profileManager.ActiveProfile?.UpdateAllPrimaryDevices();
+            UpdateMappingsPrimaryDeviceMap();
+            RefreshProfileList();
+        }
+    }
+
+    private void DeleteActiveProfile()
+    {
+        var profile = _profileManager.ActiveProfile;
+        if (profile is null) return;
+
+        bool confirmed = FUIMessageBox.ShowQuestion(this,
+            $"Delete profile '{profile.Name}'?\n\nThis cannot be undone.",
+            "Delete Profile");
+        if (!confirmed) return;
+
+        var profileId = profile.Id;
+        _profileManager.DeactivateProfile();
+        _profileRepository.DeleteProfile(profileId);
+        RefreshProfileList();
+
+        // Activate first remaining profile if any
+        if (_profiles.Count > 0)
+            _profileManager.ActivateProfile(_profiles[0].Id);
+
+        UpdateMappingsPrimaryDeviceMap();
     }
 
     private void LoadSvgAssets()

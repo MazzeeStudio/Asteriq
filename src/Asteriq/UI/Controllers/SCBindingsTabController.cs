@@ -4167,22 +4167,21 @@ public class SCBindingsTabController : ITabController
     {
         if (_scExportService is null) return;
 
-        // If current profile has no name, adopt the SC file's name so the user sees it selected
-        if (string.IsNullOrEmpty(_scExportProfile.ProfileName))
+        // Warn before overwriting an existing named profile's bindings
+        string oldProfileName = _scExportProfile.ProfileName;
+        if (!string.IsNullOrEmpty(oldProfileName) && _scExportProfile.Bindings.Count > 0)
         {
-            _scExportProfile.ProfileName = mappingFile.DisplayName;
-        }
-        else if (_scExportProfile.Bindings.Count > 0)
-        {
-            // Warn before overwriting an existing named profile's bindings
             var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
-                $"Profile '{_scExportProfile.ProfileName}' has {_scExportProfile.Bindings.Count} existing binding(s).\n\n" +
+                $"Profile '{oldProfileName}' has {_scExportProfile.Bindings.Count} existing binding(s).\n\n" +
                 "Import will replace all current bindings. Continue?",
                 "Replace Bindings");
 
             if (!result)
                 return;
         }
+
+        // Always adopt the SC file's name so the dropdown reflects what was imported
+        _scExportProfile.ProfileName = mappingFile.DisplayName;
 
         // Import the profile
         var importResult = _scExportService.ImportFromFile(mappingFile.FilePath);
@@ -4218,8 +4217,10 @@ public class SCBindingsTabController : ITabController
             _scExportProfile.SetSCInstance(instance, (int)instance);
         }
 
-        // Save the profile
+        // Save the profile under the new name; delete old file if the name changed
         _scExportProfileService?.SaveProfile(_scExportProfile);
+        if (!string.IsNullOrEmpty(oldProfileName) && oldProfileName != _scExportProfile.ProfileName)
+            _scExportProfileService?.DeleteProfile(oldProfileName);
         _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
         RefreshSCExportProfiles();
 

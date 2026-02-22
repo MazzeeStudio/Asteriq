@@ -78,6 +78,7 @@ public class TabContext
     public Action? SaveDeviceOrder { get; set; }
     public Action? SelectFirstDeviceInCategory { get; set; }
     public Action? UpdateTrayMenu { get; set; }
+    public Action? ApplyFontScale { get; set; }
     public Func<SKSvg?>? GetActiveSvg { get; set; }
     public Func<DeviceMap?, SKSvg?>? GetSvgForDeviceMap { get; set; }
 

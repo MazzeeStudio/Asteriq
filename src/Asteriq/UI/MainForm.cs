@@ -205,6 +205,9 @@ public partial class MainForm : Form
             scSchemaService ?? throw new ArgumentNullException(nameof(scSchemaService)),
             scExportService ?? throw new ArgumentNullException(nameof(scExportService)),
             scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService)));
+
+        // Apply correct MinimumSize now that font settings are loaded
+        ApplyFontScaleToWindowSize();
     }
 
     private void InitializeTabControllers(
@@ -248,6 +251,7 @@ public partial class MainForm : Form
         _tabContext.SaveDeviceOrder = SaveDeviceOrder;
         _tabContext.SelectFirstDeviceInCategory = SelectFirstDeviceInCategory;
         _tabContext.UpdateTrayMenu = UpdateTrayMenu;
+        _tabContext.ApplyFontScale = ApplyFontScaleToWindowSize;
         _tabContext.GetActiveSvg = GetActiveSvg;
         _tabContext.GetSvgForDeviceMap = GetSvgForDeviceMap;
 
@@ -943,7 +947,7 @@ public partial class MainForm : Form
     private void InitializeForm()
     {
         Text = "Asteriq";
-        MinimumSize = new Size(1570, 1000);  // Increased to fit SC Bindings panel content
+        MinimumSize = new Size(1570, 1000);  // Overridden by ApplyFontScaleToWindowSize once font settings load
         FormBorderStyle = FormBorderStyle.Sizable;  // Sizable for resize borders + colored borders
         BackColor = Color.Black;
         DoubleBuffered = true;
@@ -985,6 +989,17 @@ public partial class MainForm : Form
         {
             StartPosition = FormStartPosition.CenterScreen;
         }
+    }
+
+    private void ApplyFontScaleToWindowSize()
+    {
+        // The design baseline is Medium (1.2x): 1570×1000 logical pixels.
+        // Scale MinimumSize proportionally with the user's font size preference.
+        const float baseMinW = 1570f / 1.2f;  // ~1308 - base at Small (1.0x)
+        const float baseMinH = 1000f / 1.2f;  // ~833
+        float userScale = FUIRenderer.UserScaleMultiplier;
+        MinimumSize = new Size((int)(baseMinW * userScale), (int)(baseMinH * userScale));
+        // Windows enforces MinimumSize automatically; if the current size is smaller it will be grown.
     }
 
     private void LoadApplicationIcon()

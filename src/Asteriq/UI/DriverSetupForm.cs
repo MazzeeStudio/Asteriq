@@ -1,303 +1,379 @@
 using Asteriq.Services;
 using SkiaSharp;
+using SkiaSharp.Views.Desktop;
 
 namespace Asteriq.UI;
 
 /// <summary>
-/// Form for checking and installing required drivers (vJoy)
+/// FUI-styled form for checking and installing required drivers (vJoy, HidHide).
 /// </summary>
 public class DriverSetupForm : Form
 {
     private readonly DriverSetupManager _driverSetup;
+    private readonly SKControl _canvas;
 
-    private Label _titleLabel = null!;
-    private Label _statusLabel = null!;
-    private ProgressBar _progressBar = null!;
-    private ListBox _logListBox = null!;
+    // Native controls overlaid on canvas
+    private readonly Button _vJoyInstallButton;
+    private readonly Button _hidHideInstallButton;
+    private readonly ProgressBar _progressBar;
+    private readonly ListBox _logListBox;
 
-    private Panel _vJoyPanel = null!;
-    private Label _vJoyStatusLabel = null!;
-    private Button _vJoyInstallButton = null!;
+    // State drawn on canvas (invalidate on change)
+    private string _statusText = "Checking installed drivers...";
+    private SKColor _statusColor;
+    private string _vJoyStatusText = "Checking...";
+    private SKColor _vJoyStatusColor;
+    private string _hidHideStatusText = "Checking...";
+    private SKColor _hidHideStatusColor;
+    private bool _continueEnabled;
 
-    private Panel _hidHidePanel = null!;
-    private Label _hidHideStatusLabel = null!;
-    private Button _hidHideInstallButton = null!;
+    // Canvas-drawn interactive regions
+    private SKRect _continueButtonBounds;
+    private SKRect _exitButtonBounds;
+    private SKRect _vJoyLinkBounds;
+    private SKRect _hidHideLinkBounds;
+    private int _hoveredRegion = -1; // 0=continue, 1=exit, 2=vjoy-link, 3=hidhide-link
 
-    private LinkLabel _manualDownloadLink = null!;
+    // Dragging
+    private bool _isDragging;
+    private Point _dragStart;
 
-    private Button _continueButton = null!;
-    private Button _exitButton = null!;
+    // Layout constants
+    private const float TitleBarH = 36f;
+    private const float FormW = 720f;
+    private const float FormH = 600f;
+    private const float Pad = 20f;
+    private const float ContentW = FormW - Pad * 2;   // 680
+    private const float Panel1Y = 76f;                // vJoy panel top
+    private const float PanelH = 122f;                // panel height
+    private const float Panel2Y = Panel1Y + PanelH + 10f;  // HidHide panel top = 208
+    private const float InstallBtnOffsetY = 82f;      // install button y relative to panel top
 
     public bool SetupComplete { get; private set; }
 
     public DriverSetupForm(DriverSetupManager driverSetupManager)
     {
         _driverSetup = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
-        InitializeComponents();
-        RefreshDriverStatus();
-    }
+        _statusColor = FUIColors.TextDim;
+        _vJoyStatusColor = FUIColors.TextDim;
+        _hidHideStatusColor = FUIColors.TextDim;
 
-    private void InitializeComponents()
-    {
-        Text = "Asteriq - Driver Setup";
-        Size = new Size(720, 680);
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
+        FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = ToColor(FUIColors.Background1);
-        ForeColor = ToColor(FUIColors.TextPrimary);
+        BackColor = Color.FromArgb(6, 8, 10);
+        ShowInTaskbar = true;
+        KeyPreview = true;
+        ClientSize = new Size((int)FormW, (int)FormH);
 
-        // Set icon
         try
         {
             var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "asteriq.ico");
-            if (File.Exists(iconPath))
-            {
-                Icon = new Icon(iconPath);
-            }
+            if (File.Exists(iconPath)) Icon = new Icon(iconPath);
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException)
-        {
-            // Icon loading is not critical
-        }
+        catch (Exception ex) when (ex is IOException or ArgumentException) { }
 
-        // Title
-        _titleLabel = new Label
-        {
-            Text = "DRIVER SETUP",
-            Font = new Font("Segoe UI", 16, FontStyle.Bold),
-            ForeColor = ToColor(FUIColors.Primary),
-            Location = new Point(20, 20),
-            AutoSize = true
-        };
-        Controls.Add(_titleLabel);
+        _canvas = new SKControl { Dock = DockStyle.Fill };
+        _canvas.PaintSurface += OnPaintSurface;
+        _canvas.MouseMove += OnCanvasMouseMove;
+        _canvas.MouseDown += OnCanvasMouseDown;
+        _canvas.MouseUp += OnCanvasMouseUp;
+        _canvas.MouseLeave += OnCanvasMouseLeave;
+        Controls.Add(_canvas);
 
-        // Status
-        _statusLabel = new Label
-        {
-            Text = "Checking installed drivers...",
-            Font = new Font("Segoe UI", 10),
-            ForeColor = ToColor(FUIColors.TextDim),
-            Location = new Point(20, 55),
-            Size = new Size(670, 30)
-        };
-        Controls.Add(_statusLabel);
+        // vJoy install button (overlaid on vJoy panel)
+        int installBtnX = (int)(Pad + ContentW - 92);
+        _vJoyInstallButton = MakeInstallButton(installBtnX, (int)(Panel1Y + InstallBtnOffsetY));
+        _vJoyInstallButton.Click += VJoyInstall_Click;
 
-        // vJoy Panel
-        _vJoyPanel = CreateDriverPanel(
-            "vJoy Virtual Joystick Driver",
-            "Required for creating virtual joystick devices that Star Citizen can see",
-            95,
-            out _vJoyStatusLabel,
-            out _vJoyInstallButton,
-            false);
-        Controls.Add(_vJoyPanel);
+        // HidHide install button (overlaid on HidHide panel)
+        _hidHideInstallButton = MakeInstallButton(installBtnX, (int)(Panel2Y + InstallBtnOffsetY));
+        _hidHideInstallButton.Click += HidHideInstall_Click;
 
-        // HidHide Panel
-        _hidHidePanel = CreateDriverPanel(
-            "HidHide Device Hiding Driver (Recommended)",
-            "Hides physical devices so only vJoy devices are seen by Star Citizen",
-            245,
-            out _hidHideStatusLabel,
-            out _hidHideInstallButton,
-            true);
-        Controls.Add(_hidHidePanel);
-
-        // Manual download link
-        _manualDownloadLink = new LinkLabel
-        {
-            Text = "Download manually from GitHub",
-            Location = new Point(20, 395),
-            AutoSize = true,
-            LinkColor = ToColor(FUIColors.Active),
-            ActiveLinkColor = ToColor(FUIColors.Primary),
-            VisitedLinkColor = ToColor(FUIColors.Active),
-            Font = new Font("Segoe UI", 9)
-        };
-        _manualDownloadLink.Click += ManualDownload_Click;
-        Controls.Add(_manualDownloadLink);
-
-        // Progress bar (styled to match theme)
+        // Progress bar (shown only during download)
         _progressBar = new ProgressBar
         {
-            Location = new Point(20, 425),
-            Size = new Size(670, 23),
+            Location = new Point((int)Pad, 362),
+            Size = new Size((int)ContentW, 14),
             Style = ProgressBarStyle.Continuous,
             Visible = false,
-            ForeColor = ToColor(FUIColors.Active)
         };
-        Controls.Add(_progressBar);
 
-        // Log list
+        // Install log
         _logListBox = new ListBox
         {
-            Location = new Point(20, 460),
-            Size = new Size(670, 130),
+            Location = new Point((int)Pad, 398),
+            Size = new Size((int)ContentW, 122),
             Font = new Font("Consolas", 8),
             BackColor = ToColor(FUIColors.Background2),
             ForeColor = ToColor(FUIColors.TextPrimary),
-            BorderStyle = BorderStyle.FixedSingle
+            BorderStyle = BorderStyle.None,
         };
-        Controls.Add(_logListBox);
 
-        // Buttons at bottom (16px from bottom)
-        _continueButton = new Button
+        foreach (Control ctl in new Control[] { _vJoyInstallButton, _hidHideInstallButton, _progressBar, _logListBox })
         {
-            Text = "Continue",
-            Location = new Point(470, 610),
-            Size = new Size(110, 35),
-            BackColor = ToColor(FUIColors.Active),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Enabled = false,
-            Font = new Font("Segoe UI", 10, FontStyle.Bold)
-        };
-        _continueButton.FlatAppearance.BorderSize = 0;
-        _continueButton.Click += Continue_Click;
-        Controls.Add(_continueButton);
+            Controls.Add(ctl);
+            ctl.BringToFront();
+        }
 
-        _exitButton = new Button
+        KeyDown += (_, e) =>
         {
-            Text = "Exit",
-            Location = new Point(590, 610),
-            Size = new Size(100, 35),
-            BackColor = ToColor(FUIColors.Background2),
-            ForeColor = ToColor(FUIColors.TextPrimary),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 10)
+            if (e.KeyCode == Keys.Escape) { DialogResult = DialogResult.Cancel; Close(); }
+            else if (e.KeyCode == Keys.Enter && _continueEnabled) { SetupComplete = true; DialogResult = DialogResult.OK; Close(); }
         };
-        _exitButton.FlatAppearance.BorderSize = 0;
-        _exitButton.Click += Exit_Click;
-        Controls.Add(_exitButton);
 
-        AcceptButton = _continueButton;
-        CancelButton = _exitButton;
+        RefreshDriverStatus();
     }
 
-    private Panel CreateDriverPanel(
-        string title,
-        string description,
-        int top,
-        out Label statusLabel,
-        out Button installButton,
-        bool isRecommended)
+    private static Button MakeInstallButton(int x, int y)
     {
-        var panel = new Panel
+        var btn = new Button
         {
-            Location = new Point(20, top),
-            Size = new Size(670, 135),
-            BackColor = ToColor(FUIColors.Background2),
-            BorderStyle = BorderStyle.FixedSingle
-        };
-
-        var titleLbl = new Label
-        {
-            Text = title,
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = ToColor(FUIColors.TextPrimary),
-            Location = new Point(15, 15),
-            AutoSize = true
-        };
-        panel.Controls.Add(titleLbl);
-
-        var descLbl = new Label
-        {
-            Text = description,
-            Font = new Font("Segoe UI", 9),
-            ForeColor = ToColor(FUIColors.TextDim),
-            Location = new Point(15, 42),
-            Size = new Size(635, 40)
-        };
-        panel.Controls.Add(descLbl);
-
-        statusLabel = new Label
-        {
-            Text = "Checking...",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = ToColor(FUIColors.TextDim),
-            Location = new Point(15, 90),
-            Size = new Size(500, 35)
-        };
-        panel.Controls.Add(statusLabel);
-
-        installButton = new Button
-        {
-            Text = "Install",
-            Location = new Point(560, 90),
-            Size = new Size(95, 30),
+            Text = "INSTALL",
+            Location = new Point(x, y),
+            Size = new Size(88, 28),
             BackColor = ToColor(FUIColors.Active),
-            ForeColor = Color.White,
+            ForeColor = Color.FromArgb(240, 244, 248),
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9, FontStyle.Bold),
-            Enabled = false
+            Font = new Font("Consolas", 8, FontStyle.Bold),
+            Enabled = false,
         };
-        installButton.FlatAppearance.BorderSize = 0;
-        panel.Controls.Add(installButton);
+        btn.FlatAppearance.BorderSize = 1;
+        btn.FlatAppearance.BorderColor = ToColor(FUIColors.FrameBright);
+        return btn;
+    }
 
-        return panel;
+    private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+    {
+        var canvas = e.Surface.Canvas;
+        var b = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+
+        canvas.Clear(FUIColors.Background0);
+
+        // Outer chamfered frame
+        FUIRenderer.DrawFrame(canvas, b.Inset(-1, -1), FUIColors.Frame, FUIRenderer.ChamferSize);
+
+        // Title bar
+        var titleBar = new SKRect(b.Left + 2, b.Top + 2, b.Right - 2, b.Top + TitleBarH);
+        using var titleBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRect(titleBar, titleBgPaint);
+        using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        canvas.DrawLine(titleBar.Left, titleBar.Bottom, titleBar.Right, titleBar.Bottom, sepPaint);
+        FUIRenderer.DrawText(canvas, "DRIVER SETUP", new SKPoint(16, titleBar.MidY + 5), FUIColors.TextBright, 13f, false);
+
+        // Overall status
+        FUIRenderer.DrawText(canvas, _statusText, new SKPoint(Pad, TitleBarH + 24), _statusColor, 11f);
+
+        // Driver panels
+        DrawDriverPanel(canvas,
+            new SKRect(Pad, Panel1Y, Pad + ContentW, Panel1Y + PanelH),
+            "vJOY VIRTUAL JOYSTICK", "REQUIRED",
+            "Creates virtual joystick devices visible to Star Citizen",
+            _vJoyStatusText, _vJoyStatusColor, required: true);
+
+        DrawDriverPanel(canvas,
+            new SKRect(Pad, Panel2Y, Pad + ContentW, Panel2Y + PanelH),
+            "HIDHIDE DEVICE HIDING", "RECOMMENDED",
+            "Hides physical devices so only virtual devices are visible",
+            _hidHideStatusText, _hidHideStatusColor, required: false);
+
+        // Manual download links
+        float linkY = Panel2Y + PanelH + 18;
+        FUIRenderer.DrawText(canvas, "MANUAL DOWNLOAD:", new SKPoint(Pad, linkY), FUIColors.TextDim, 9f, false);
+
+        using var linkPaint = FUIRenderer.CreateTextPaint(FUIColors.Active, FUIRenderer.ScaleFont(9f));
+
+        float vJoyLinkX = Pad + 142;
+        float vJoyLinkW = linkPaint.MeasureText("vJoy from GitHub");
+        _vJoyLinkBounds = new SKRect(vJoyLinkX, linkY - 12, vJoyLinkX + vJoyLinkW, linkY + 4);
+        FUIRenderer.DrawText(canvas, "vJoy from GitHub", new SKPoint(vJoyLinkX, linkY),
+            _hoveredRegion == 2 ? FUIColors.Primary : FUIColors.Active, 9f);
+
+        float hidHideLinkX = vJoyLinkX + vJoyLinkW + 24;
+        float hidHideLinkW = linkPaint.MeasureText("HidHide from GitHub");
+        _hidHideLinkBounds = new SKRect(hidHideLinkX, linkY - 12, hidHideLinkX + hidHideLinkW, linkY + 4);
+        FUIRenderer.DrawText(canvas, "HidHide from GitHub", new SKPoint(hidHideLinkX, linkY),
+            _hoveredRegion == 3 ? FUIColors.Primary : FUIColors.Active, 9f);
+
+        // Install log header
+        FUIRenderer.DrawText(canvas, "INSTALL LOG", new SKPoint(Pad, 388), FUIColors.TextDim, 9f, false);
+
+        // Log frame
+        var logFrame = new SKRect(Pad - 1, 394, Pad + ContentW + 1, 394 + 124);
+        using var logFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.FrameDim, StrokeWidth = 1f };
+        canvas.DrawRect(logFrame, logFramePaint);
+
+        // Bottom buttons
+        float btnW = 110f, btnH = 34f, btnSpacing = 12f;
+        float btnY = b.Bottom - 50;
+
+        _exitButtonBounds = new SKRect(b.Right - Pad - btnW, btnY, b.Right - Pad, btnY + btnH);
+        _continueButtonBounds = new SKRect(b.Right - Pad - btnW * 2 - btnSpacing, btnY,
+            b.Right - Pad - btnW - btnSpacing, btnY + btnH);
+
+        FUIRenderer.DrawButton(canvas, _exitButtonBounds, "EXIT",
+            _hoveredRegion == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+
+        if (_continueEnabled)
+        {
+            FUIRenderer.DrawButton(canvas, _continueButtonBounds, "CONTINUE",
+                _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                FUIColors.Active);
+        }
+        else
+        {
+            FUIRenderer.DrawButton(canvas, _continueButtonBounds, "CONTINUE", FUIRenderer.ButtonState.Normal);
+            using var dimPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(0, 0, 0, 140) };
+            canvas.DrawRect(_continueButtonBounds, dimPaint);
+        }
+
+        // L-corner decorations
+        FUIRenderer.DrawLCornerFrame(canvas, b.Inset(-4, -4), FUIColors.Frame.WithAlpha(100), 20f, 6f, 1f);
+    }
+
+    private static void DrawDriverPanel(SKCanvas canvas, SKRect bounds, string title, string badge,
+        string description, string statusText, SKColor statusColor, bool required)
+    {
+        // Background
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        canvas.DrawRect(bounds, bgPaint);
+
+        // Frame
+        FUIRenderer.DrawFrame(canvas, bounds, FUIColors.Frame, FUIRenderer.ChamferSize);
+
+        // Left accent bar
+        var accentColor = required ? FUIColors.Active : FUIColors.Warning.WithAlpha(200);
+        using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = accentColor };
+        canvas.DrawRect(new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Left + 5, bounds.Bottom - 2), accentPaint);
+
+        // Title
+        FUIRenderer.DrawText(canvas, title, new SKPoint(bounds.Left + 14, bounds.Top + 22),
+            FUIColors.TextBright, 12f, false);
+
+        // Badge (REQUIRED / RECOMMENDED)
+        var badgeColor = required ? FUIColors.Active : FUIColors.Warning;
+        FUIRenderer.DrawText(canvas, badge, new SKPoint(bounds.Left + 14, bounds.Top + 38), badgeColor, 9f, false);
+
+        // Description
+        FUIRenderer.DrawText(canvas, description, new SKPoint(bounds.Left + 14, bounds.Top + 60),
+            FUIColors.TextDim, 10f);
+
+        // Status
+        FUIRenderer.DrawText(canvas, statusText, new SKPoint(bounds.Left + 14, bounds.Top + 95),
+            statusColor, 10f);
+    }
+
+    private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
+    {
+        var pt = new SKPoint(e.X, e.Y);
+        int newHovered = -1;
+
+        if (_continueEnabled && _continueButtonBounds.Contains(pt)) newHovered = 0;
+        else if (_exitButtonBounds.Contains(pt)) newHovered = 1;
+        else if (_vJoyLinkBounds.Contains(pt)) newHovered = 2;
+        else if (_hidHideLinkBounds.Contains(pt)) newHovered = 3;
+
+        if (newHovered != _hoveredRegion)
+        {
+            _hoveredRegion = newHovered;
+            Cursor = newHovered >= 0 ? Cursors.Hand : Cursors.Default;
+            _canvas.Invalidate();
+        }
+
+        if (_isDragging)
+        {
+            var screen = PointToScreen(e.Location);
+            Location = new Point(screen.X - _dragStart.X, screen.Y - _dragStart.Y);
+        }
+    }
+
+    private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left) return;
+        if (e.Y < TitleBarH)
+        {
+            _isDragging = true;
+            _dragStart = e.Location;
+        }
+    }
+
+    private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
+    {
+        _isDragging = false;
+        if (e.Button != MouseButtons.Left) return;
+
+        if (_hoveredRegion == 0 && _continueEnabled) { SetupComplete = true; DialogResult = DialogResult.OK; Close(); }
+        else if (_hoveredRegion == 1) { DialogResult = DialogResult.Cancel; Close(); }
+        else if (_hoveredRegion == 2) OpenUrl(_driverSetup.GetVJoyReleasesUrl());
+        else if (_hoveredRegion == 3) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
+    }
+
+    private void OnCanvasMouseLeave(object? sender, EventArgs e)
+    {
+        if (_hoveredRegion >= 0)
+        {
+            _hoveredRegion = -1;
+            _canvas.Invalidate();
+        }
     }
 
     private void RefreshDriverStatus()
     {
         var status = _driverSetup.GetSetupStatus();
 
-        // vJoy status
         if (status.VJoyInstalled)
         {
-            _vJoyStatusLabel.Text = $"Installed at: {status.VJoyInstallPath ?? "Unknown"}";
-            _vJoyStatusLabel.ForeColor = ToColor(FUIColors.Success);
+            _vJoyStatusText = $"Installed at: {status.VJoyInstallPath ?? "Unknown"}";
+            _vJoyStatusColor = FUIColors.Success;
             _vJoyInstallButton.Enabled = false;
-            _vJoyInstallButton.Text = "Installed";
+            _vJoyInstallButton.Text = "INSTALLED";
             _vJoyInstallButton.BackColor = ToColor(FUIColors.Background2);
         }
         else
         {
-            _vJoyStatusLabel.Text = "Not installed";
-            _vJoyStatusLabel.ForeColor = ToColor(FUIColors.Danger);
+            _vJoyStatusText = "Not installed";
+            _vJoyStatusColor = FUIColors.Danger;
             _vJoyInstallButton.Enabled = true;
+            _vJoyInstallButton.Text = "INSTALL";
+            _vJoyInstallButton.BackColor = ToColor(FUIColors.Active);
             _vJoyInstallButton.Click -= VJoyInstall_Click;
             _vJoyInstallButton.Click += VJoyInstall_Click;
         }
 
-        // HidHide status
         if (status.HidHideInstalled)
         {
-            _hidHideStatusLabel.Text = "Installed";
-            _hidHideStatusLabel.ForeColor = ToColor(FUIColors.Success);
+            _hidHideStatusText = "Installed";
+            _hidHideStatusColor = FUIColors.Success;
             _hidHideInstallButton.Enabled = false;
-            _hidHideInstallButton.Text = "Installed";
+            _hidHideInstallButton.Text = "INSTALLED";
             _hidHideInstallButton.BackColor = ToColor(FUIColors.Background2);
         }
         else
         {
-            _hidHideStatusLabel.Text = "Not installed (Recommended for best experience)";
-            _hidHideStatusLabel.ForeColor = ToColor(FUIColors.Warning);
+            _hidHideStatusText = "Not installed (optional but recommended)";
+            _hidHideStatusColor = FUIColors.Warning;
             _hidHideInstallButton.Enabled = true;
+            _hidHideInstallButton.Text = "INSTALL";
+            _hidHideInstallButton.BackColor = ToColor(FUIColors.Active);
             _hidHideInstallButton.Click -= HidHideInstall_Click;
             _hidHideInstallButton.Click += HidHideInstall_Click;
         }
 
-        // Update overall status
         if (status.IsComplete)
         {
-            if (status.HidHideInstalled)
-            {
-                _statusLabel.Text = "All drivers installed and ready!";
-            }
-            else
-            {
-                _statusLabel.Text = "vJoy driver is installed. HidHide is recommended but optional.";
-            }
-            _statusLabel.ForeColor = ToColor(FUIColors.Success);
-            _continueButton.Enabled = true;
+            _statusText = status.HidHideInstalled
+                ? "All drivers installed and ready."
+                : "vJoy installed. HidHide is recommended but optional.";
+            _statusColor = FUIColors.Success;
+            _continueEnabled = true;
         }
         else
         {
-            _statusLabel.Text = "vJoy driver is required to run Asteriq";
-            _statusLabel.ForeColor = ToColor(FUIColors.Danger);
-            _continueButton.Enabled = false;
+            _statusText = "vJoy driver is required to run Asteriq.";
+            _statusColor = FUIColors.Danger;
+            _continueEnabled = false;
         }
+
+        _canvas.Invalidate();
 
         Log($"vJoy: {(status.VJoyInstalled ? "Installed" : "Not installed")}");
         Log($"HidHide: {(status.HidHideInstalled ? "Installed" : "Not installed")}");
@@ -311,32 +387,16 @@ public class DriverSetupForm : Form
 
         Log("Downloading vJoy installer...");
 
-        var progress = new Progress<int>(p =>
-        {
-            _progressBar.Value = p;
-        });
-
+        var progress = new Progress<int>(p => _progressBar.Value = p);
         var installerPath = await _driverSetup.DownloadVJoyInstallerAsync(progress);
 
         if (string.IsNullOrEmpty(installerPath))
         {
             Log("Failed to download vJoy installer");
-
-            var result = MessageBox.Show(
-                "Failed to download vJoy installer.\n\n" +
-                "Would you like to download it manually from GitHub?",
-                "Download Failed",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Error);
-
-            if (result == DialogResult.Yes)
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = _driverSetup.GetVJoyReleasesUrl(),
-                    UseShellExecute = true
-                });
-            }
+            int choice = FUIMessageBox.Show(this,
+                "Failed to download the vJoy installer.\n\nOpen the GitHub releases page to download manually?",
+                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open GitHub", "Cancel");
+            if (choice == 0) OpenUrl(_driverSetup.GetVJoyReleasesUrl());
 
             _vJoyInstallButton.Enabled = true;
             _progressBar.Visible = false;
@@ -349,30 +409,17 @@ public class DriverSetupForm : Form
         if (_driverSetup.LaunchVJoyInstaller(installerPath))
         {
             Log("Installer launched - please complete the installation");
-
-            var result = MessageBox.Show(
-                "The vJoy installer has been launched.\n\n" +
-                "Please complete the installation wizard, then click 'Refresh' to check the driver status.\n\n" +
-                "Note: A system restart may be required after installation.",
-                "vJoy Installation",
-                MessageBoxButtons.OKCancel,
-                MessageBoxIcon.Information);
-
-            if (result == DialogResult.OK)
-            {
-                RefreshDriverStatus();
-            }
+            int choice = FUIMessageBox.Show(this,
+                "The vJoy installer has been launched.\n\nComplete the installation wizard, then click Refresh.\nA system restart may be required.",
+                "vJoy Installation", FUIMessageBox.MessageBoxType.Information, "Refresh", "Later");
+            if (choice == 0) RefreshDriverStatus();
         }
         else
         {
             Log("Failed to launch installer");
-            MessageBox.Show(
-                "Failed to launch the vJoy installer.\n\n" +
-                "The installer was downloaded to:\n" + installerPath + "\n\n" +
-                "Please run it manually with administrator privileges.",
-                "Installation Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+            FUIMessageBox.ShowError(this,
+                $"Failed to launch the vJoy installer.\n\nInstaller downloaded to:\n{installerPath}\n\nRun it manually with administrator privileges.",
+                "Installation Error");
             _vJoyInstallButton.Enabled = true;
         }
 
@@ -387,32 +434,16 @@ public class DriverSetupForm : Form
 
         Log("Downloading HidHide installer...");
 
-        var progress = new Progress<int>(p =>
-        {
-            _progressBar.Value = p;
-        });
-
+        var progress = new Progress<int>(p => _progressBar.Value = p);
         var installerPath = await _driverSetup.DownloadHidHideInstallerAsync(progress);
 
         if (string.IsNullOrEmpty(installerPath))
         {
             Log("Failed to download HidHide installer");
-
-            var result = MessageBox.Show(
-                "Failed to download HidHide installer.\n\n" +
-                "Would you like to download it manually from GitHub?",
-                "Download Failed",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Error);
-
-            if (result == DialogResult.Yes)
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = _driverSetup.GetHidHideReleasesUrl(),
-                    UseShellExecute = true
-                });
-            }
+            int choice = FUIMessageBox.Show(this,
+                "Failed to download the HidHide installer.\n\nOpen the GitHub releases page to download manually?",
+                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open GitHub", "Cancel");
+            if (choice == 0) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
 
             _hidHideInstallButton.Enabled = true;
             _progressBar.Visible = false;
@@ -425,70 +456,30 @@ public class DriverSetupForm : Form
         if (_driverSetup.LaunchHidHideInstaller(installerPath))
         {
             Log("Installer launched - please complete the installation");
-
-            var result = MessageBox.Show(
-                "The HidHide installer has been launched.\n\n" +
-                "Please complete the installation wizard, then click 'Refresh' to check the driver status.\n\n" +
-                "Note: A system restart may be required after installation.",
-                "HidHide Installation",
-                MessageBoxButtons.OKCancel,
-                MessageBoxIcon.Information);
-
-            if (result == DialogResult.OK)
-            {
-                RefreshDriverStatus();
-            }
+            int choice = FUIMessageBox.Show(this,
+                "The HidHide installer has been launched.\n\nComplete the installation wizard, then click Refresh.\nA system restart may be required.",
+                "HidHide Installation", FUIMessageBox.MessageBoxType.Information, "Refresh", "Later");
+            if (choice == 0) RefreshDriverStatus();
         }
         else
         {
             Log("Failed to launch installer");
-            MessageBox.Show(
-                "Failed to launch the HidHide installer.\n\n" +
-                "The installer was downloaded to:\n" + installerPath + "\n\n" +
-                "Please run it manually with administrator privileges.",
-                "Installation Error",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+            FUIMessageBox.ShowError(this,
+                $"Failed to launch the HidHide installer.\n\nInstaller downloaded to:\n{installerPath}\n\nRun it manually with administrator privileges.",
+                "Installation Error");
             _hidHideInstallButton.Enabled = true;
         }
 
         _progressBar.Visible = false;
     }
 
-    private void ManualDownload_Click(object? sender, EventArgs e)
+    private static void OpenUrl(string url)
     {
-        // Show context menu with manual download links
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("vJoy from GitHub", null, (s, ev) =>
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = _driverSetup.GetVJoyReleasesUrl(),
-                UseShellExecute = true
-            });
+            FileName = url,
+            UseShellExecute = true
         });
-        menu.Items.Add("HidHide from GitHub", null, (s, ev) =>
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = _driverSetup.GetHidHideReleasesUrl(),
-                UseShellExecute = true
-            });
-        });
-        menu.Show(_manualDownloadLink, new Point(0, _manualDownloadLink.Height));
-    }
-
-    private void Continue_Click(object? sender, EventArgs e)
-    {
-        SetupComplete = true;
-        DialogResult = DialogResult.OK;
-        Close();
-    }
-
-    private void Exit_Click(object? sender, EventArgs e)
-    {
-        DialogResult = DialogResult.Cancel;
-        Close();
     }
 
     private void Log(string message)
@@ -504,11 +495,6 @@ public class DriverSetupForm : Form
         _logListBox.TopIndex = Math.Max(0, _logListBox.Items.Count - 1);
     }
 
-    /// <summary>
-    /// Convert SKColor to System.Drawing.Color
-    /// </summary>
-    private static Color ToColor(SKColor skColor)
-    {
-        return Color.FromArgb(skColor.Alpha, skColor.Red, skColor.Green, skColor.Blue);
-    }
+    private static Color ToColor(SKColor skColor) =>
+        Color.FromArgb(skColor.Alpha, skColor.Red, skColor.Green, skColor.Blue);
 }

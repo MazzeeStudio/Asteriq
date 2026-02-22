@@ -1604,8 +1604,11 @@ public partial class MainForm : Form
             {
                 return HTCLIENT;
             }
-            // Exclude tab area - use cached value from last draw pass
-            if (_tabsStartX > 0 && clientPoint.X >= _tabsStartX && clientPoint.Y >= 36 && clientPoint.Y <= 66)
+            // Exclude tab area - _tabsStartX is in scaled canvas space, convert to logical pixels
+            float userScale = FUIRenderer.UserScaleMultiplier;
+            if (_tabsStartX > 0 &&
+                clientPoint.X >= _tabsStartX * userScale &&
+                clientPoint.Y >= 36 * userScale && clientPoint.Y <= 66 * userScale)
             {
                 return HTCLIENT;
             }
@@ -1619,16 +1622,29 @@ public partial class MainForm : Form
 
     #region Mouse Handling
 
+    /// <summary>
+    /// Convert a WinForms mouse event from logical-pixel coordinates to the
+    /// scaled canvas coordinate system (canvas.Scale(UserScaleMultiplier) is active
+    /// during drawing, so all hit-test bounds are in logical/userScale space).
+    /// </summary>
+    private static MouseEventArgs ScaleMouseEvent(MouseEventArgs e)
+    {
+        float s = FUIRenderer.UserScaleMultiplier;
+        if (s == 1.0f) return e;
+        return new MouseEventArgs(e.Button, e.Clicks, (int)(e.X / s), (int)(e.Y / s), e.Delta);
+    }
+
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
     {
-        // Store mouse position for debug display
-        _mousePosition = e.Location;
+        var se = ScaleMouseEvent(e);
+        // Store mouse position in scaled canvas coordinates for hit-testing in draw pass
+        _mousePosition = se.Location;
 
         // Handle SC Bindings scrollbar dragging (delegated to SC Bindings controller)
         if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll)
         {
             SyncTabContext();
-            _scBindingsController.OnMouseMove(e);
+            _scBindingsController.OnMouseMove(se);
             SyncFromTabContext();
             return;
         }
@@ -1637,7 +1653,7 @@ public partial class MainForm : Form
         if (_settingsController.IsDraggingSlider)
         {
             SyncTabContext();
-            _settingsController.OnMouseMove(e);
+            _settingsController.OnMouseMove(se);
             SyncFromTabContext();
             return;
         }
@@ -1646,7 +1662,7 @@ public partial class MainForm : Form
         if (_activeTab == 0 && _devicesController.HasPendingDrag)
         {
             SyncTabContext();
-            _devicesController.OnMouseMove(e);
+            _devicesController.OnMouseMove(se);
             SyncFromTabContext();
             if (_devicesController.IsDraggingDevice)
                 return;
@@ -1660,21 +1676,21 @@ public partial class MainForm : Form
                 _mappingsController.IsDraggingDuration)
             {
                 SyncTabContext();
-                _mappingsController.OnMouseMove(e);
+                _mappingsController.OnMouseMove(se);
                 SyncFromTabContext();
                 return;
             }
 
             SyncTabContext();
-            _mappingsController.OnMouseMove(e);
+            _mappingsController.OnMouseMove(se);
             SyncFromTabContext();
         }
 
         // Profile dropdown hover detection
-        if (_profileDropdownOpen && _profileDropdownBounds.Contains(e.X, e.Y))
+        if (_profileDropdownOpen && _profileDropdownBounds.Contains(se.X, se.Y))
         {
             float itemHeight = 24f;
-            int itemIndex = (int)((e.Y - _profileDropdownBounds.Top - 2) / itemHeight);
+            int itemIndex = (int)((se.Y - _profileDropdownBounds.Top - 2) / itemHeight);
             _hoveredProfileIndex = itemIndex;
             Cursor = Cursors.Hand;
             return;
@@ -1688,11 +1704,11 @@ public partial class MainForm : Form
         if (_activeTab == 2)
         {
             SyncTabContext();
-            _scBindingsController.OnMouseMove(e);
+            _scBindingsController.OnMouseMove(se);
             SyncFromTabContext();
         }
 
-        // Update cursor based on hit test (for resize feedback)
+        // Update cursor based on hit test (for resize feedback) - uses unscaled logical coords
         int hitResult = HitTest(e.Location);
         switch (hitResult)
         {
@@ -1721,22 +1737,22 @@ public partial class MainForm : Form
         if (_activeTab == 0)
         {
             SyncTabContext();
-            _devicesController.OnMouseMove(e);
+            _devicesController.OnMouseMove(se);
             SyncFromTabContext();
         }
 
         // (Mapping category tab hover detection moved to MappingsTabController.OnMouseMove)
 
-        // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
-        float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
-        float btnSize = FUIRenderer.TouchTargetCompact;  // 32px - matches DrawWindowControls
-        float btnGap = FUIRenderer.SpaceSM;  // 8px
-        float btnTotalWidth = btnSize * 3 + btnGap * 2; // 112px with 32px buttons
-        float windowControlsX = ClientSize.Width - pad - btnTotalWidth; // Align with page padding
-        float titleBarY = FUIRenderer.TitleBarPadding;  // 16px
-        if (e.Y >= titleBarY + 12 && e.Y <= titleBarY + FUIRenderer.TitleBarHeightExpanded)
+        // Window controls hover - all coords in scaled canvas space
+        float pad = FUIRenderer.SpaceLG;
+        float btnSize = FUIRenderer.TouchTargetCompact;
+        float btnGap = FUIRenderer.SpaceSM;
+        float btnTotalWidth = btnSize * 3 + btnGap * 2;
+        float windowControlsX = ClientSize.Width / FUIRenderer.UserScaleMultiplier - pad - btnTotalWidth;
+        float titleBarY = FUIRenderer.TitleBarPadding;
+        if (se.Y >= titleBarY + 12 && se.Y <= titleBarY + FUIRenderer.TitleBarHeightExpanded)
         {
-            float relX = e.X - windowControlsX;
+            float relX = se.X - windowControlsX;
 
             if (relX >= 0 && relX < btnSize) _hoveredWindowControl = 0;
             else if (relX >= btnSize + btnGap && relX < btnSize * 2 + btnGap) _hoveredWindowControl = 1;
@@ -1752,6 +1768,8 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
     {
+        var se = ScaleMouseEvent(e);
+
         // Handle right-click
         if (e.Button == MouseButtons.Right)
         {
@@ -1759,7 +1777,7 @@ public partial class MainForm : Form
             if (_activeTab == 2)
             {
                 SyncTabContext();
-                _scBindingsController.OnMouseDown(e);
+                _scBindingsController.OnMouseDown(se);
                 SyncFromTabContext();
                 return;
             }
@@ -1768,7 +1786,7 @@ public partial class MainForm : Form
             if (_activeTab == 1)
             {
                 SyncTabContext();
-                _mappingsController.OnMouseDown(e);
+                _mappingsController.OnMouseDown(se);
                 SyncFromTabContext();
             }
             return;
@@ -1779,7 +1797,7 @@ public partial class MainForm : Form
         // Profile dropdown clicks (must be handled first when dropdown is open)
         if (_profileDropdownOpen)
         {
-            if (_profileDropdownBounds.Contains(e.X, e.Y))
+            if (_profileDropdownBounds.Contains(se.X, se.Y))
             {
                 // Click on dropdown item
                 if (_hoveredProfileIndex >= 0 && _hoveredProfileIndex < _profiles.Count)
@@ -1823,7 +1841,7 @@ public partial class MainForm : Form
         }
 
         // Profile selector click (toggle dropdown)
-        if (_profileSelectorBounds.Contains(e.X, e.Y))
+        if (_profileSelectorBounds.Contains(se.X, se.Y))
         {
             _profileDropdownOpen = !_profileDropdownOpen;
             if (_profileDropdownOpen)
@@ -1868,19 +1886,20 @@ public partial class MainForm : Form
         if (_activeTab == 0)
         {
             SyncTabContext();
-            _devicesController.OnMouseDown(e);
+            _devicesController.OnMouseDown(se);
             SyncFromTabContext();
         }
 
         // Mapping category tab clicks (delegated to controller)
         // (handled within MappingsTabController.OnMouseDown)
 
-        // Tab clicks - must match positions calculated in DrawTitleBar exactly
+        // Tab clicks - must match positions calculated in DrawTitleBar exactly.
+        // All coords in scaled canvas space (se already divided by userScale).
         float pad = FUIRenderer.SpaceLG;
-        float btnTotalWidth = 28f * 3 + 8f * 2; // Window control buttons
-        float windowControlsX = ClientSize.Width - pad - btnTotalWidth;
-        float tabWindowGap = FUIRenderer.Space2XL;          // matches draw code
-        float tabGap = FUIRenderer.ScaleSpacing(16f);       // matches draw code
+        float btnTotalWidth = FUIRenderer.TouchTargetCompact * 3 + FUIRenderer.SpaceSM * 2;
+        float windowControlsX = ClientSize.Width / FUIRenderer.UserScaleMultiplier - pad - btnTotalWidth;
+        float tabWindowGap = FUIRenderer.Space2XL;
+        float tabGap = FUIRenderer.ScaleSpacing(16f);
 
         using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
         var visibleTabs = GetVisibleTabIndices();
@@ -1896,14 +1915,14 @@ public partial class MainForm : Form
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
         float tabY = 16;
 
-        if (e.Y >= tabY + 20 && e.Y <= tabY + 50)
+        if (se.Y >= tabY + 20 && se.Y <= tabY + 50)
         {
             float tabX = tabStartX;
             for (int vi = 0; vi < visibleTabs.Length; vi++)
             {
                 int i = visibleTabs[vi];
                 float tabHitWidth = tabWidths[i] + (vi < visibleTabs.Length - 1 ? tabGap / 2 : 0);
-                if (e.X >= tabX && e.X < tabX + tabHitWidth)
+                if (se.X >= tabX && se.X < tabX + tabHitWidth)
                 {
                     if (_activeTab != i)
                     {
@@ -1921,7 +1940,7 @@ public partial class MainForm : Form
         if (_activeTab == 3)
         {
             SyncTabContext();
-            _settingsController.OnMouseDown(e);
+            _settingsController.OnMouseDown(se);
             SyncFromTabContext();
         }
 
@@ -1929,7 +1948,7 @@ public partial class MainForm : Form
         if (_activeTab == 2)
         {
             SyncTabContext();
-            _scBindingsController.OnMouseDown(e);
+            _scBindingsController.OnMouseDown(se);
             SyncFromTabContext();
             return;
         }
@@ -1938,7 +1957,7 @@ public partial class MainForm : Form
         if (_activeTab == 1)
         {
             SyncTabContext();
-            _mappingsController.OnMouseDown(e);
+            _mappingsController.OnMouseDown(se);
             SyncFromTabContext();
         }
 
@@ -1956,11 +1975,13 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
     {
+        var se = ScaleMouseEvent(e);
+
         // Device drag-to-reorder release (delegated to Devices controller)
         if (_devicesController.HasPendingDrag || _devicesController.IsDraggingDevice)
         {
             SyncTabContext();
-            _devicesController.OnMouseUp(e);
+            _devicesController.OnMouseUp(se);
             SyncFromTabContext();
             if (_devicesController.IsDraggingDevice)
                 return; // Was still dragging, now released
@@ -1970,7 +1991,7 @@ public partial class MainForm : Form
         if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll)
         {
             SyncTabContext();
-            _scBindingsController.OnMouseUp(e);
+            _scBindingsController.OnMouseUp(se);
             SyncFromTabContext();
         }
 
@@ -1979,7 +2000,7 @@ public partial class MainForm : Form
             _mappingsController.IsDraggingDuration)
         {
             SyncTabContext();
-            _mappingsController.OnMouseUp(e);
+            _mappingsController.OnMouseUp(se);
             SyncFromTabContext();
         }
 
@@ -1987,18 +2008,20 @@ public partial class MainForm : Form
         if (_settingsController.IsDraggingSlider)
         {
             SyncTabContext();
-            _settingsController.OnMouseUp(e);
+            _settingsController.OnMouseUp(se);
             SyncFromTabContext();
         }
     }
 
     private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
     {
+        var se = ScaleMouseEvent(e);
+
         // Handle scroll on SC Bindings tab (delegated to SC Bindings controller)
         if (_activeTab == 2)
         {
             SyncTabContext();
-            _scBindingsController.OnMouseWheel(e);
+            _scBindingsController.OnMouseWheel(se);
             SyncFromTabContext();
             return;
         }
@@ -2007,7 +2030,7 @@ public partial class MainForm : Form
         if (_activeTab == 1)
         {
             SyncTabContext();
-            _mappingsController.OnMouseWheel(e);
+            _mappingsController.OnMouseWheel(se);
             SyncFromTabContext();
         }
     }
@@ -2051,17 +2074,19 @@ public partial class MainForm : Form
         var canvas = e.Surface.Canvas;
         var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
 
-        // Clear to void
         canvas.Clear(FUIColors.Void);
 
-        // Layer 0: Background grid (cached for performance)
-        DrawBackgroundLayer(canvas, bounds);
+        // Apply user font scale as a canvas transform so that ALL drawn elements
+        // (text, boxes, spacing, SVG labels) scale uniformly without overflow.
+        // ScaleFont/ScaleSpacing/ScaleLineHeight exclude UserScaleMultiplier so
+        // this transform is the single source of that scaling.
+        float userScale = FUIRenderer.UserScaleMultiplier;
+        canvas.Scale(userScale);
+        var scaledBounds = new SKRect(0, 0, bounds.Width / userScale, bounds.Height / userScale);
 
-        // Layer 1: Main structure panels
-        DrawStructureLayer(canvas, bounds);
-
-        // Layer 2: Overlay effects
-        DrawOverlayLayer(canvas, bounds);
+        DrawBackgroundLayer(canvas, scaledBounds);
+        DrawStructureLayer(canvas, scaledBounds);
+        DrawOverlayLayer(canvas, scaledBounds);
     }
 
     private void DrawBackgroundLayer(SKCanvas canvas, SKRect bounds)

@@ -485,7 +485,10 @@ public class SCBindingsTabController : ITabController
     private void RefreshSCExportProfiles()
     {
         if (_scExportProfileService is null) return;
-        _scExportProfiles = _scExportProfileService.ListProfiles();
+        // Exclude profiles with empty names - these are save artifacts from unnamed profiles
+        _scExportProfiles = _scExportProfileService.ListProfiles()
+            .Where(p => !string.IsNullOrEmpty(p.ProfileName))
+            .ToList();
     }
 
     /// <summary>
@@ -2067,7 +2070,7 @@ public class SCBindingsTabController : ITabController
             int asteriqCount = _scExportProfiles.Count;
             int scFileCount = _scAvailableProfiles.Count;
             int totalItems = asteriqCount + (scFileCount > 0 ? scFileCount + 1 : 0); // +1 for separator
-            float listHeight = Math.Min(totalItems * 24f + 8f, 200f);
+            float listHeight = Math.Min(totalItems * 24f + (scFileCount > 0 ? 16f : 0f) + 8f, 240f); // +16 for "IMPORT FROM SC" label
             _scProfileDropdownListBounds = new SKRect(leftMargin, _scProfileDropdownBounds.Bottom + 2, rightMargin, _scProfileDropdownBounds.Bottom + 2 + listHeight);
             DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         }
@@ -4007,6 +4010,10 @@ public class SCBindingsTabController : ITabController
 
             y += 6f;
 
+            // Section label: make it clear these are SC files to import from, not Asteriq profiles
+            FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 8f, true);
+            y += 16f;
+
             // SC mapping files
             int scFileIndexOffset = _scExportProfiles.Count + 1000; // Use offset to distinguish from Asteriq profiles
             for (int i = 0; i < _scAvailableProfiles.Count && y + rowHeight <= bounds.Bottom; i++)
@@ -4152,6 +4159,7 @@ public class SCBindingsTabController : ITabController
             _scProfileDropdownOpen = false;
             _scExportStatus = $"Loaded profile '{profileName}'";
             _scExportStatusTime = DateTime.Now;
+            _ctx.InvalidateCanvas();
         }
     }
 
@@ -4159,9 +4167,14 @@ public class SCBindingsTabController : ITabController
     {
         if (_scExportService is null) return;
 
-        // Warn if there are existing bindings that would be replaced
-        if (_scExportProfile.Bindings.Count > 0)
+        // If current profile has no name, adopt the SC file's name so the user sees it selected
+        if (string.IsNullOrEmpty(_scExportProfile.ProfileName))
         {
+            _scExportProfile.ProfileName = mappingFile.DisplayName;
+        }
+        else if (_scExportProfile.Bindings.Count > 0)
+        {
+            // Warn before overwriting an existing named profile's bindings
             var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
                 $"Profile '{_scExportProfile.ProfileName}' has {_scExportProfile.Bindings.Count} existing binding(s).\n\n" +
                 "Import will replace all current bindings. Continue?",
@@ -4207,6 +4220,8 @@ public class SCBindingsTabController : ITabController
 
         // Save the profile
         _scExportProfileService?.SaveProfile(_scExportProfile);
+        _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
+        RefreshSCExportProfiles();
 
         // Update conflicts
         UpdateConflictingBindings();
@@ -4219,6 +4234,7 @@ public class SCBindingsTabController : ITabController
 
         _scExportStatus = $"Imported {importResult.Bindings.Count} bindings ({jsCount} JS, {kbCount} KB, {moCount} Mouse)";
         _scExportStatusTime = DateTime.Now;
+        _ctx.InvalidateCanvas();
 
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Imported {importResult.Bindings.Count} bindings from {mappingFile.FilePath}");
     }

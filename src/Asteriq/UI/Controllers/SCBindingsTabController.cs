@@ -653,39 +653,37 @@ public class SCBindingsTabController : ITabController
                 loadError = ex.Message;
                 System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to load SC schema: {ex.Message}");
             }
-#pragma warning disable CA1031 // Must catch all to prevent _scLoading stuck at true in fire-and-forget Task.Run
-            catch (Exception ex)
-#pragma warning restore CA1031
+            finally
             {
-                loadError = ex.Message;
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Unexpected error loading SC schema: {ex}");
-            }
-
-            _ctx.OwnerForm.BeginInvoke(() =>
-            {
-                if (version != _schemaLoadVersion) return; // A newer load was started; discard this result
-
-                _scLoading = false;
-                _scLoadingMessage = loadError is not null ? $"Load failed: {loadError}" : "";
-                _scActions = actions;
-                _scActionMaps = actionMaps;
-                _scAvailableProfiles = availableProfiles;
-
-                if (actions is not null)
+                // Guarantee _scLoading is cleared even if an unexpected exception escapes the catch above.
+                // BeginInvoke queues onto the UI thread; if an uncaught exception later faults the task
+                // it becomes an unobserved task exception rather than leaving the UI stuck at "Loading...".
+                _ctx.OwnerForm.BeginInvoke(() =>
                 {
-                    _scExportProfile.TargetEnvironment = installation.Environment;
-                    _scExportProfile.TargetBuildId = installation.BuildId;
+                    if (version != _schemaLoadVersion) return; // A newer load was started; discard this result
 
-                    // NOTE: We intentionally do NOT auto-apply defaults here.
-                    // Defaults are only applied when user explicitly clicks "Reset Defaults".
-                    RefreshFilteredActions();
-                    CalculateDeviceColumnWidths();
+                    _scLoading = false;
+                    _scLoadingMessage = loadError is not null ? $"Load failed: {loadError}" : "";
+                    _scActions = actions;
+                    _scActionMaps = actionMaps;
+                    _scAvailableProfiles = availableProfiles;
 
-                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded {actions.Count} SC actions from {installation.Environment}");
-                }
+                    if (actions is not null)
+                    {
+                        _scExportProfile.TargetEnvironment = installation.Environment;
+                        _scExportProfile.TargetBuildId = installation.BuildId;
 
-                _ctx.InvalidateCanvas();
-            });
+                        // NOTE: We intentionally do NOT auto-apply defaults here.
+                        // Defaults are only applied when user explicitly clicks "Reset Defaults".
+                        RefreshFilteredActions();
+                        CalculateDeviceColumnWidths();
+
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded {actions.Count} SC actions from {installation.Environment}");
+                    }
+
+                    _ctx.InvalidateCanvas();
+                });
+            } // end finally
         });
     }
 

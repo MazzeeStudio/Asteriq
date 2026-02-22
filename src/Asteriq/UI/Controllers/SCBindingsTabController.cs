@@ -3676,65 +3676,10 @@ public class SCBindingsTabController : ITabController
 
     private void EditSCProfileName()
     {
-        using var dialog = new Form
-        {
-            Text = "Export Profile Name",
-            Width = 320,
-            Height = 140,
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(20, 22, 30)
-        };
-
-        var label = new Label
-        {
-            Text = "Profile Name:",
-            Left = 16,
-            Top = 16,
-            Width = 280,
-            ForeColor = Color.FromArgb(180, 190, 210)
-        };
-
-        var textBox = new TextBox
-        {
-            Text = _scExportProfile.ProfileName,
-            Left = 16,
-            Top = 40,
-            Width = 280,
-            BackColor = Color.FromArgb(30, 35, 45),
-            ForeColor = Color.White
-        };
-
-        var okButton = new Button
-        {
-            Text = "OK",
-            Left = 130,
-            Top = 70,
-            Width = 75,
-            DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(40, 50, 70)
-        };
-
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            Left = 210,
-            Top = 70,
-            Width = 75,
-            DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(40, 50, 70)
-        };
-
-        dialog.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
-        dialog.AcceptButton = okButton;
-        dialog.CancelButton = cancelButton;
-
-        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
-        {
-            _scExportProfile.ProfileName = textBox.Text.Trim();
-        }
+        var name = FUIInputDialog.Show(_ctx.OwnerForm, "Export Profile Name", "Profile Name:",
+            _scExportProfile.ProfileName);
+        if (name is not null)
+            _scExportProfile.ProfileName = name;
     }
 
     private void AssignSCBinding()
@@ -3767,14 +3712,18 @@ public class SCBindingsTabController : ITabController
 
             if (conflicts.Count > 0)
             {
-                var conflictResult = ShowSCBindingConflictDialog(conflicts, vjoyId, inputName);
+                string actionDisplayName = SCCategoryMapper.FormatActionName(action.ActionName);
+                string inputDisplayName = FormatInputName(inputName);
+                string deviceName = $"JS{_scExportProfile.GetSCInstance(vjoyId)}";
+                using var conflictDialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
+                conflictDialog.ShowDialog(_ctx.OwnerForm);
 
-                if (conflictResult == SCConflictResolution.Cancel)
+                if (conflictDialog.Result == BindingConflictResult.Cancel)
                 {
                     _scAssigningInput = false;
                     return;
                 }
-                else if (conflictResult == SCConflictResolution.ReplaceAll)
+                else if (conflictDialog.Result == BindingConflictResult.ReplaceAll)
                 {
                     // Remove all conflicting bindings
                     foreach (var conflict in conflicts)
@@ -3818,8 +3767,6 @@ public class SCBindingsTabController : ITabController
         _scAssigningInput = false;
     }
 
-    private enum SCConflictResolution { Cancel, ApplyAnyway, ReplaceAll }
-
     private List<SCActionBinding> FindSCBindingConflicts(uint vjoyId, string inputName, string excludeActionMap, string excludeActionName)
     {
         var conflicts = new List<SCActionBinding>();
@@ -3839,86 +3786,6 @@ public class SCBindingsTabController : ITabController
         }
 
         return conflicts;
-    }
-
-    private SCConflictResolution ShowSCBindingConflictDialog(List<SCActionBinding> conflicts, uint vjoyId, string inputName)
-    {
-        string scInput = $"js{_scExportProfile.GetSCInstance(vjoyId)}_{inputName}";
-
-        // Build conflict list message
-        var conflictList = string.Join("\n",
-            conflicts.Select(c => $"  • {FormatActionMapName(c.ActionMap)}: {c.ActionName}"));
-
-        string message = $"The input '{scInput}' is already bound to:\n\n{conflictList}\n\n" +
-                         "What would you like to do?";
-
-        using var dialog = new Form
-        {
-            Text = "Binding Conflict",
-            Width = 420,
-            Height = 220 + Math.Min(conflicts.Count * 16, 64),
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(30, 25, 25)
-        };
-
-        var msgLabel = new Label
-        {
-            Text = message,
-            Left = 16,
-            Top = 16,
-            Width = 380,
-            Height = 100 + Math.Min(conflicts.Count * 16, 64),
-            ForeColor = Color.FromArgb(200, 180, 170)
-        };
-
-        int buttonY = msgLabel.Bottom + 16;
-
-        var replaceButton = new Button
-        {
-            Text = "Replace Existing",
-            Left = 16,
-            Top = buttonY,
-            Width = 120,
-            Height = 30,
-            BackColor = Color.FromArgb(100, 60, 40),
-            ForeColor = Color.White
-        };
-        replaceButton.Click += (_, _) => { dialog.Tag = SCConflictResolution.ReplaceAll; dialog.Close(); };
-
-        var allowButton = new Button
-        {
-            Text = "Allow Duplicate",
-            Left = 145,
-            Top = buttonY,
-            Width = 120,
-            Height = 30,
-            BackColor = Color.FromArgb(60, 80, 60),
-            ForeColor = Color.White
-        };
-        allowButton.Click += (_, _) => { dialog.Tag = SCConflictResolution.ApplyAnyway; dialog.Close(); };
-
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            Left = 275,
-            Top = buttonY,
-            Width = 100,
-            Height = 30,
-            DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(50, 50, 55),
-            ForeColor = Color.White
-        };
-
-        dialog.Controls.AddRange(new Control[] { msgLabel, replaceButton, allowButton, cancelButton });
-        dialog.CancelButton = cancelButton;
-
-        dialog.Tag = SCConflictResolution.Cancel;
-        dialog.ShowDialog(_ctx.OwnerForm);
-
-        return (SCConflictResolution)(dialog.Tag ?? SCConflictResolution.Cancel);
     }
 
     #endregion
@@ -4094,66 +3961,10 @@ public class SCBindingsTabController : ITabController
 
     private void CreateNewSCExportProfile()
     {
-        using var dialog = new Form
+        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "New SC Export Profile", "Profile Name:",
+            "New Profile", "Create");
+        if (newName is not null)
         {
-            Text = "New SC Export Profile",
-            Width = 320,
-            Height = 140,
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(20, 22, 30)
-        };
-
-        var label = new Label
-        {
-            Text = "Profile Name:",
-            Left = 16,
-            Top = 16,
-            Width = 280,
-            ForeColor = Color.FromArgb(180, 190, 210)
-        };
-
-        var textBox = new TextBox
-        {
-            Text = "New Profile",
-            Left = 16,
-            Top = 40,
-            Width = 280,
-            BackColor = Color.FromArgb(30, 35, 45),
-            ForeColor = Color.White
-        };
-
-        var okButton = new Button
-        {
-            Text = "Create",
-            Left = 130,
-            Top = 70,
-            Width = 75,
-            DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(40, 50, 70),
-            ForeColor = Color.White
-        };
-
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            Left = 210,
-            Top = 70,
-            Width = 75,
-            DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(40, 50, 70),
-            ForeColor = Color.White
-        };
-
-        dialog.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
-        dialog.AcceptButton = okButton;
-        dialog.CancelButton = cancelButton;
-
-        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
-        {
-            var newName = textBox.Text.Trim();
 
             // Check for duplicate name
             if (_scExportProfileService is not null && _scExportProfileService.ProfileExists(newName))

@@ -7,9 +7,11 @@ namespace Asteriq.Models;
 /// </summary>
 public enum FontSizeOption
 {
-    Small,   // Original sizes
-    Medium,  // +2pt (default)
-    Large    // +4pt
+    VSmall,  // 1.0x
+    Small,   // 1.2x
+    Medium,  // 1.3x (default)
+    Large,   // 1.4x
+    XLarge   // 1.6x
 }
 
 /// <summary>

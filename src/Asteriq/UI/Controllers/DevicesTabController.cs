@@ -822,7 +822,9 @@ public class DevicesTabController : ITabController
             _ctx.IsForwarding ? "RUNNING" : "STOPPED", _ctx.IsForwarding ? FUIColors.Active : FUIColors.TextDim);
         itemY += statusItemHeight + itemGap;
 
-        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "INPUT RATE", "100 HZ", FUIColors.TextPrimary);
+        int pollHz = _ctx.InputService.PollRateHz;
+        string pollRateText = pollHz > 0 ? $"{pollHz} HZ" : "—";
+        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "POLL RATE", pollRateText, FUIColors.TextPrimary);
         itemY += statusItemHeight + itemGap;
 
         string profileName = _ctx.MappingEngine.ActiveProfile?.Name ?? "NONE";

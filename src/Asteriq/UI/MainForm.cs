@@ -124,6 +124,7 @@ public partial class MainForm : Form
     // Tab state
     private int _activeTab = 0;
     private readonly string[] _tabNames = { "DEVICES", "MAPPINGS", "BINDINGS", "SETTINGS" };
+    private float _tabsStartX; // cached each draw pass, used by HitTest
 
     // Window control hover state
     private int _hoveredWindowControl = -1;
@@ -1588,9 +1589,8 @@ public partial class MainForm : Form
             {
                 return HTCLIENT;
             }
-            // Exclude tab area (tabs start at Width - 540 and span ~400px)
-            float tabStartX = ClientSize.Width - 540;
-            if (clientPoint.X >= tabStartX && clientPoint.Y >= 36 && clientPoint.Y <= 64)
+            // Exclude tab area - use cached value from last draw pass
+            if (_tabsStartX > 0 && clientPoint.X >= _tabsStartX && clientPoint.Y >= 36 && clientPoint.Y <= 66)
             {
                 return HTCLIENT;
             }
@@ -1860,22 +1860,23 @@ public partial class MainForm : Form
         // Mapping category tab clicks (delegated to controller)
         // (handled within MappingsTabController.OnMouseDown)
 
-        // Tab clicks - match positions calculated in DrawTitleBar
+        // Tab clicks - must match positions calculated in DrawTitleBar exactly
         float pad = FUIRenderer.SpaceLG;
         float btnTotalWidth = 28f * 3 + 8f * 2; // Window control buttons
         float windowControlsX = ClientSize.Width - pad - btnTotalWidth;
-        float tabWindowGap = 40f;
-        float tabGap = FUIRenderer.ScaleSpacing(15f);
+        float tabWindowGap = FUIRenderer.Space2XL;          // matches draw code
+        float tabGap = FUIRenderer.ScaleSpacing(16f);       // matches draw code
 
-        // Measure tab widths to match drawing
         using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
-        float[] tabWidths = new float[_tabNames.Length];
+        var visibleTabs = GetVisibleTabIndices();
+        float[] tabWidths = new float[_tabNames.Length];    // keyed by semantic index
         float totalTabsWidth = 0;
-        for (int i = 0; i < _tabNames.Length; i++)
+        for (int vi = 0; vi < visibleTabs.Length; vi++)
         {
+            int i = visibleTabs[vi];
             tabWidths[i] = tabMeasurePaint.MeasureText(_tabNames[i]);
             totalTabsWidth += tabWidths[i];
-            if (i < _tabNames.Length - 1) totalTabsWidth += tabGap;
+            if (vi < visibleTabs.Length - 1) totalTabsWidth += tabGap;
         }
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
         float tabY = 16;
@@ -1883,17 +1884,15 @@ public partial class MainForm : Form
         if (e.Y >= tabY + 20 && e.Y <= tabY + 50)
         {
             float tabX = tabStartX;
-            for (int i = 0; i < _tabNames.Length; i++)
+            for (int vi = 0; vi < visibleTabs.Length; vi++)
             {
-                float tabHitWidth = tabWidths[i] + (i < _tabNames.Length - 1 ? tabGap / 2 : 0);
+                int i = visibleTabs[vi];
+                float tabHitWidth = tabWidths[i] + (vi < visibleTabs.Length - 1 ? tabGap / 2 : 0);
                 if (e.X >= tabX && e.X < tabX + tabHitWidth)
                 {
                     if (_activeTab != i)
                     {
-                        // Notify previous tab's controller of deactivation
                         if (_activeTab == 1) _mappingsController.OnDeactivated();
-
-                        // Notify new tab's controller of activation
                         if (i == 1) _mappingsController.OnActivated();
                     }
                     _activeTab = i;
@@ -1997,6 +1996,13 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
     }
+
+    // Returns semantic tab indices (0=DEVICES,1=MAPPINGS,2=BINDINGS,3=SETTINGS) that are
+    // currently visible. MAPPINGS is hidden when vJoy is not available.
+    private int[] GetVisibleTabIndices() =>
+        _vjoyService.IsInitialized
+            ? new[] { 0, 1, 2, 3 }
+            : new[] { 0, 2, 3 };
 
     private string? HitTestSvg(SKPoint screenPoint)
     {
@@ -2183,16 +2189,19 @@ public partial class MainForm : Form
         float tabGap = FUIRenderer.ScaleSpacing(16f);  // 16px - was 15f
         using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
 
-        // Calculate total tabs width by measuring each tab
-        float[] tabWidths = new float[_tabNames.Length];
+        // Calculate total tabs width by measuring each visible tab
+        var visibleTabs = GetVisibleTabIndices();
+        float[] tabWidths = new float[_tabNames.Length]; // keyed by semantic index
         float totalTabsWidth = 0;
-        for (int i = 0; i < _tabNames.Length; i++)
+        for (int vi = 0; vi < visibleTabs.Length; vi++)
         {
+            int i = visibleTabs[vi];
             tabWidths[i] = tabMeasurePaint.MeasureText(_tabNames[i]);
             totalTabsWidth += tabWidths[i];
-            if (i < _tabNames.Length - 1) totalTabsWidth += tabGap;
+            if (vi < visibleTabs.Length - 1) totalTabsWidth += tabGap;
         }
         float tabStartX = windowControlsX - tabWindowGap - totalTabsWidth;
+        _tabsStartX = tabStartX; // cache for HitTest
 
         // Left side elements positioning - measure actual widths
         float elementGap = 20f;  // Gap between title/subtitle/profile selector
@@ -2247,10 +2256,11 @@ public partial class MainForm : Form
             DrawProfileSelector(canvas, profileSelectorX, titleBarY + 16, profileSelectorWidth);
         }
 
-        // Draw navigation tabs
+        // Draw navigation tabs (only visible ones)
         float tabX = tabStartX;
-        for (int i = 0; i < _tabNames.Length; i++)
+        for (int vi = 0; vi < visibleTabs.Length; vi++)
         {
+            int i = visibleTabs[vi];
             bool isActive = i == _activeTab;
             var tabColor = isActive ? FUIColors.Active : FUIColors.TextDim;
 

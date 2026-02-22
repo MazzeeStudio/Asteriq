@@ -86,6 +86,7 @@ public partial class MainForm : Form
     private SettingsTabController _settingsController = null!;
     private DevicesTabController _devicesController = null!;
     private SCBindingsTabController _scBindingsController = null!;
+    private MappingsTabController _mappingsController = null!;
     private TabContext _tabContext = null!;
 
     // Profile UI state
@@ -118,11 +119,7 @@ public partial class MainForm : Form
     private List<PhysicalDeviceInfo> _disconnectedDevices = new(); // Devices that were seen but are now disconnected
     private DeviceInputState? _currentInputState;
 
-    // Mapping category tabs (M1 = Buttons, M2 = Axes)
-    private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
-    private int _hoveredMappingCategory = -1;
-    private SKRect _mappingCategoryButtonsBounds;
-    private SKRect _mappingCategoryAxesBounds;
+    // (Mapping tab fields moved to MappingsTabController)
 
     // Tab state
     private int _activeTab = 0;
@@ -150,157 +147,11 @@ public partial class MainForm : Form
     private DeviceMap? _mappingsPrimaryDeviceMap; // Device map for Mappings tab based on vJoy primary device
     private readonly ActiveInputTracker _activeInputTracker = new();
 
-    // Mappings tab UI state - Left panel (output list)
+    // Shared vJoy state (used by SyncTabContext, UpdateMappingsPrimaryDeviceMap)
     private int _selectedVJoyDeviceIndex = 0;
     private List<VJoyDeviceInfo> _vjoyDevices = new();
-    private int _selectedMappingRow = -1;
-    private int _hoveredMappingRow = -1;
-    private SKRect _vjoyPrevButtonBounds;
-    private SKRect _vjoyNextButtonBounds;
-    private bool _vjoyPrevHovered;
-    private bool _vjoyNextHovered;
-    private List<SKRect> _mappingRowBounds = new();
-    private List<SKRect> _mappingAddButtonBounds = new();
-    private List<SKRect> _mappingRemoveButtonBounds = new();
-    private int _hoveredAddButton = -1;
-    private int _hoveredRemoveButton = -1;
-    private float _bindingsScrollOffset = 0;
-    private float _bindingsContentHeight = 0;
-    private SKRect _bindingsListBounds;
 
-    // Mappings tab UI state - Right panel (mapping editor)
-    private bool _mappingEditorOpen = false;
-    private int _editingRowIndex = -1;
-    private bool _isEditingAxis = false;
-    private InputDetectionService? _inputDetectionService;
-
-    // Mapping editor - input detection
-    private bool _isListeningForInput = false;
-    private SKRect _inputFieldBounds;
-    private bool _inputFieldHovered = false;
-    private DetectedInput? _pendingInput;
-    private const int DoubleClickThresholdMs = 400;
-
-    // Mapping editor - manual entry
-    private bool _manualEntryMode = false;
-    private SKRect _manualEntryButtonBounds;
-    private bool _manualEntryButtonHovered = false;
-    private int _selectedSourceDevice = 0;
-    private int _selectedSourceControl = 0;
-    private SKRect _deviceDropdownBounds;
-    private SKRect _controlDropdownBounds;
-    private bool _deviceDropdownOpen = false;
-    private bool _controlDropdownOpen = false;
-    private int _hoveredDeviceIndex = -1;
-    private int _hoveredControlIndex = -1;
-
-    // Mapping editor - button modes
-    private ButtonMode _selectedButtonMode = ButtonMode.Normal;
-    private SKRect[] _buttonModeBounds = new SKRect[4];
-    private int _hoveredButtonMode = -1;
-
-    // Button mode duration settings
-    private int _pulseDurationMs = 100;      // Duration for Pulse mode (100-1000ms)
-    private int _holdDurationMs = 500;       // Duration for HoldToActivate mode (200-2000ms)
-    private SKRect _pulseDurationSliderBounds;
-    private SKRect _holdDurationSliderBounds;
-    private bool _draggingPulseDuration = false;
-    private bool _draggingHoldDuration = false;
-
-    // Mapping editor - output type (Button vs Keyboard)
-    private bool _outputTypeIsKeyboard = false;
-    private SKRect _outputTypeBtnBounds;
-    private SKRect _outputTypeKeyBounds;
-    private int _hoveredOutputType = -1; // 0=Button, 1=Keyboard
-    private string _selectedKeyName = "";
-    private List<string>? _selectedModifiers = null;
-    private SKRect _keyCaptureBounds;
-    private bool _keyCaptureBoundsHovered;
-    private SKRect _keyClearButtonBounds;
-    private bool _keyClearButtonHovered;
-    private bool _isCapturingKey = false;
-    private DateTime _keyCaptureStartTime = DateTime.MinValue;
-    private const int KeyCaptureTimeoutMs = 10000; // 10 second timeout for key capture
-
-    // Input listening timeout
-    private DateTime _inputListeningStartTime = DateTime.MinValue;
-    private const int InputListeningTimeoutMs = 15000; // 15 second timeout for input listening
-
-    // Pending keyboard binding - when user assigns keyboard key to empty slot
-    private string? _pendingKeyboardKey;
-    private List<string>? _pendingKeyboardModifiers;
-    private int _pendingKeyboardOutputIndex = -1;
-    private uint _pendingKeyboardVJoyDevice = 0;
-
-    // Double-click detection for binding rows
-    private DateTime _lastRowClickTime = DateTime.MinValue;
-    private const int DoubleClickMs = 400;
-
-    // Right panel - input sources and actions
-    private SKRect _addInputButtonBounds;
-    private SKRect _clearAllButtonBounds;
-    private List<SKRect> _inputSourceRemoveBounds = new();
-    private bool _addInputButtonHovered;
-    private bool _clearAllButtonHovered;
-    private int _hoveredInputSourceRemove = -1;
-
-    // Merge operation selector (for axes with multiple inputs)
-    private SKRect[] _mergeOpButtonBounds = new SKRect[4]; // Average, Maximum, Minimum, Sum
-    private int _hoveredMergeOpButton = -1;
-
-    // Mapping editor - action buttons
-    private SKRect _saveButtonBounds;
-    private SKRect _cancelButtonBounds;
-    private bool _saveButtonHovered = false;
-    private bool _cancelButtonHovered = false;
-
-    // Input-to-mapping highlight (attention effect when physical input is pressed)
-    private int _highlightedMappingRow = -1;  // Which row to highlight (-1 = none)
-    private uint _highlightedVJoyDevice = 0;  // Which vJoy device the highlighted row belongs to
-    private DateTime _highlightStartTime = DateTime.MinValue;
-    private const int HighlightDurationMs = 1500; // How long the attention highlight lasts (1.5 seconds)
-    private Dictionary<string, bool[]> _highlightPrevButtonState = new(); // Previous frame button states (for rising-edge detection)
-    private Dictionary<string, DateTime> _highlightDebounce = new(); // Debounce: last highlight time per button
-    private const int HighlightDebounceCooldownMs = 500; // Minimum time between highlights for same button
-
-    // Curve editor state
-    private SKRect _curveEditorBounds;
-    private List<SKPoint> _curveControlPoints = new() { new(0, 0), new(1, 1) };
-    private int _hoveredCurvePoint = -1;
-    private int _draggingCurvePoint = -1;
-    private CurveType _selectedCurveType = CurveType.Linear;
-    private bool _curveSymmetrical = false;  // When true, curve points mirror around center
-    private SKRect _curveSymmetricalCheckboxBounds;
-
-    // Deadzone state (4-parameter model like JoystickGremlinEx)
-    private float _deadzoneMin = -1.0f;        // Left edge (start)
-    private float _deadzoneCenterMin = 0.0f;   // Center left (start of center deadzone)
-    private float _deadzoneCenterMax = 0.0f;   // Center right (end of center deadzone)
-    private float _deadzoneMax = 1.0f;         // Right edge (end)
-    private bool _deadzoneCenterEnabled = false; // Whether center deadzone handles are shown
-
-    // Deadzone UI bounds
-    private SKRect _deadzoneSliderBounds;
-    private SKRect _deadzoneCenterCheckboxBounds; // "Centre" toggle checkbox
-    private SKRect[] _deadzonePresetBounds = new SKRect[4]; // Presets: 0%, 2%, 5%, 10%
-    private int _draggingDeadzoneHandle = -1; // 0=min, 1=centerMin, 2=centerMax, 3=max
-    private int _selectedDeadzoneHandle = -1; // Currently selected handle for preset application
-
-    // Legacy compatibility
-    private float _axisDeadzone
-    {
-        get => Math.Max(Math.Abs(_deadzoneCenterMin), Math.Abs(_deadzoneCenterMax));
-        set
-        {
-            _deadzoneCenterMin = -Math.Abs(value);
-            _deadzoneCenterMax = Math.Abs(value);
-        }
-    }
-
-    private SKRect[] _curvePresetBounds = new SKRect[4]; // Bounds for Linear, S-Curve, Expo, Custom buttons
-    private SKRect _invertToggleBounds;
-    private bool _axisInverted = false;
-
+    // (Mappings tab UI fields moved to MappingsTabController)
     // (Settings tab fields moved to SettingsTabController)
     // (SC Bindings tab fields moved to SCBindingsTabController)
 
@@ -386,11 +237,9 @@ public partial class MainForm : Form
         _tabContext.ControlBounds = _controlBounds;
         _tabContext.IsForwarding = _isForwarding;
 
-        // Wire up extended callbacks for cross-tab operations
-        _tabContext.CreateOneToOneMappings = CreateOneToOneMappings;
-        _tabContext.ClearDeviceMappings = ClearDeviceMappings;
-        _tabContext.RemoveDisconnectedDevice = RemoveDisconnectedDevice;
-        _tabContext.OpenMappingDialogForControl = OpenMappingDialogForControl;
+        // Wire up extended callbacks for cross-tab operations (non-mapping callbacks)
+        _tabContext.CreateNewProfilePrompt = CreateNewProfilePrompt;
+        _tabContext.SaveDisconnectedDevices = SaveDisconnectedDevices;
         _tabContext.SaveDeviceOrder = SaveDeviceOrder;
         _tabContext.SelectFirstDeviceInCategory = SelectFirstDeviceInCategory;
         _tabContext.UpdateTrayMenu = UpdateTrayMenu;
@@ -399,10 +248,17 @@ public partial class MainForm : Form
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
+        _mappingsController = new MappingsTabController(_tabContext);
         _scBindingsController = new SCBindingsTabController(
             _tabContext, scInstallationService, scProfileCacheService,
             scSchemaService, scExportService, scExportProfileService);
         _scBindingsController.Initialize();
+
+        // Wire up mapping-related callbacks (now delegated to MappingsTabController)
+        _tabContext.CreateOneToOneMappings = _mappingsController.CreateOneToOneMappingsPublic;
+        _tabContext.ClearDeviceMappings = _mappingsController.ClearDeviceMappingsPublic;
+        _tabContext.RemoveDisconnectedDevice = _mappingsController.RemoveDisconnectedDevicePublic;
+        _tabContext.OpenMappingDialogForControl = _mappingsController.OpenMappingDialogForControlPublic;
     }
 
     private void SyncTabContext()
@@ -1187,42 +1043,13 @@ public partial class MainForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        // Handle key capture for keyboard output mapping
-        if (_isCapturingKey)
+        // Handle Mappings tab key capture (delegated to controller)
+        if (_activeTab == 1)
         {
-            // Get the base key without modifiers
-            var baseKey = keyData & Keys.KeyCode;
-
-            // Check if this is a modifier-only key press (e.g., just RCtrl)
-            bool isModifierOnly = baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
-                baseKey == Keys.Menu || baseKey == Keys.Control ||
-                baseKey == Keys.Shift || baseKey == Keys.Alt ||
-                baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
-                baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
-                baseKey == Keys.LMenu || baseKey == Keys.RMenu;
-
-            if (isModifierOnly)
-            {
-                // Capture just the modifier key itself (e.g., just RCtrl or just LShift)
-                _selectedKeyName = GetModifierKeyName(baseKey);
-                _selectedModifiers = null; // No additional modifiers when capturing a modifier itself
-                _outputTypeIsKeyboard = true; // Capturing a key means keyboard output mode
-                _isCapturingKey = false;
-                UpdateKeyNameForSelected();
-                return true;
-            }
-
-            // Extract modifiers and key name for regular keys
-            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
-            if (!string.IsNullOrEmpty(keyName))
-            {
-                _selectedKeyName = keyName;
-                _selectedModifiers = modifiers.Count > 0 ? modifiers : null;
-                _outputTypeIsKeyboard = true; // Capturing a key means keyboard output mode
-                _isCapturingKey = false;
-                UpdateKeyNameForSelected();
-            }
-            return true; // Consume the key
+            SyncTabContext();
+            bool handled = _mappingsController.ProcessCmdKey(ref msg, keyData);
+            SyncFromTabContext();
+            if (handled) return true;
         }
 
         // Handle SC Bindings keyboard input (search box, filename box)
@@ -1234,173 +1061,10 @@ public partial class MainForm : Form
             if (handled) return true;
         }
 
-        // Cancel key capture with Escape
-        if (keyData == Keys.Escape)
-        {
-            if (_isCapturingKey)
-            {
-                _isCapturingKey = false;
-                return true;
-            }
-            if (_isListeningForInput)
-            {
-                CancelInputListening();
-                return true;
-            }
-        }
-
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    private static string? GetKeyNameFromKeys(Keys keys)
-    {
-        var (keyName, _) = GetKeyNameAndModifiersFromKeys(keys);
-        return keyName;
-    }
-
-    private static (string? keyName, List<string> modifiers) GetKeyNameAndModifiersFromKeys(Keys keys)
-    {
-        var modifiers = new List<string>();
-
-        // Check for AltGr first - Windows sends LCtrl+RAlt for AltGr
-        // We detect this by checking if both LCtrl and RAlt are held simultaneously
-        bool isAltGr = IsKeyHeld(VK_RMENU) && IsKeyHeld(VK_LCONTROL) && !IsKeyHeld(VK_RCONTROL);
-
-        if (isAltGr)
-        {
-            // AltGr pressed - just add AltGr, skip the phantom LCtrl
-            modifiers.Add("AltGr");
-        }
-        else
-        {
-            // Extract modifiers using GetAsyncKeyState for left/right detection
-            if ((keys & Keys.Control) == Keys.Control)
-            {
-                // Try to detect left vs right using GetAsyncKeyState
-                if (IsKeyHeld(VK_RCONTROL))
-                    modifiers.Add("RCtrl");
-                else if (IsKeyHeld(VK_LCONTROL))
-                    modifiers.Add("LCtrl");
-            }
-            if ((keys & Keys.Alt) == Keys.Alt)
-            {
-                if (IsKeyHeld(VK_RMENU))
-                    modifiers.Add("RAlt");
-                else if (IsKeyHeld(VK_LMENU))
-                    modifiers.Add("LAlt");
-            }
-        }
-
-        // Shift is independent of AltGr
-        if ((keys & Keys.Shift) == Keys.Shift)
-        {
-            if (IsKeyHeld(VK_RSHIFT))
-                modifiers.Add("RShift");
-            else
-                modifiers.Add("LShift");
-        }
-
-        // Remove modifiers to get the base key
-        var baseKey = keys & ~Keys.Modifiers;
-
-        // Skip modifier-only presses
-        if (baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
-            baseKey == Keys.Menu || baseKey == Keys.LWin || baseKey == Keys.RWin ||
-            baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
-            baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
-            baseKey == Keys.LMenu || baseKey == Keys.RMenu)
-            return (null, modifiers);
-
-        var keyName = baseKey switch
-        {
-            Keys.A => "A", Keys.B => "B", Keys.C => "C", Keys.D => "D",
-            Keys.E => "E", Keys.F => "F", Keys.G => "G", Keys.H => "H",
-            Keys.I => "I", Keys.J => "J", Keys.K => "K", Keys.L => "L",
-            Keys.M => "M", Keys.N => "N", Keys.O => "O", Keys.P => "P",
-            Keys.Q => "Q", Keys.R => "R", Keys.S => "S", Keys.T => "T",
-            Keys.U => "U", Keys.V => "V", Keys.W => "W", Keys.X => "X",
-            Keys.Y => "Y", Keys.Z => "Z",
-            Keys.D0 => "0", Keys.D1 => "1", Keys.D2 => "2", Keys.D3 => "3",
-            Keys.D4 => "4", Keys.D5 => "5", Keys.D6 => "6", Keys.D7 => "7",
-            Keys.D8 => "8", Keys.D9 => "9",
-            Keys.F1 => "F1", Keys.F2 => "F2", Keys.F3 => "F3", Keys.F4 => "F4",
-            Keys.F5 => "F5", Keys.F6 => "F6", Keys.F7 => "F7", Keys.F8 => "F8",
-            Keys.F9 => "F9", Keys.F10 => "F10", Keys.F11 => "F11", Keys.F12 => "F12",
-            Keys.Space => "Space",
-            Keys.Enter => "Enter",
-            Keys.Tab => "Tab",
-            Keys.Back => "Backspace",
-            Keys.Delete => "Delete",
-            Keys.Insert => "Insert",
-            Keys.Home => "Home",
-            Keys.End => "End",
-            Keys.PageUp => "PageUp",
-            Keys.PageDown => "PageDown",
-            Keys.Up => "Up",
-            Keys.Down => "Down",
-            Keys.Left => "Left",
-            Keys.Right => "Right",
-            Keys.NumPad0 => "Num0", Keys.NumPad1 => "Num1", Keys.NumPad2 => "Num2",
-            Keys.NumPad3 => "Num3", Keys.NumPad4 => "Num4", Keys.NumPad5 => "Num5",
-            Keys.NumPad6 => "Num6", Keys.NumPad7 => "Num7", Keys.NumPad8 => "Num8",
-            Keys.NumPad9 => "Num9",
-            Keys.Multiply => "Num*",
-            Keys.Add => "Num+",
-            Keys.Subtract => "Num-",
-            Keys.Decimal => "Num.",
-            Keys.Divide => "Num/",
-            _ => null
-        };
-
-        return (keyName, modifiers);
-    }
-
-    // Windows API for detecting held keys
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern short GetAsyncKeyState(int vKey);
-
-    // Virtual key codes for left/right modifiers
-    private const int VK_LSHIFT = 0xA0;
-    private const int VK_RSHIFT = 0xA1;
-    private const int VK_LCONTROL = 0xA2;
-    private const int VK_RCONTROL = 0xA3;
-    private const int VK_LMENU = 0xA4;  // Left Alt
-    private const int VK_RMENU = 0xA5;  // Right Alt
-
-    private static bool IsKeyHeld(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
-
-    /// <summary>
-    /// Get the specific modifier key name (left/right variant) for modifier-only key presses
-    /// </summary>
-    private static string GetModifierKeyName(Keys key)
-    {
-        // Use GetAsyncKeyState to determine if it's left or right variant
-        if (key == Keys.ControlKey || key == Keys.Control)
-        {
-            if (IsKeyHeld(VK_RCONTROL)) return "RCtrl";
-            return "LCtrl";
-        }
-        if (key == Keys.LControlKey) return "LCtrl";
-        if (key == Keys.RControlKey) return "RCtrl";
-
-        if (key == Keys.ShiftKey || key == Keys.Shift)
-        {
-            if (IsKeyHeld(VK_RSHIFT)) return "RShift";
-            return "LShift";
-        }
-        if (key == Keys.LShiftKey) return "LShift";
-        if (key == Keys.RShiftKey) return "RShift";
-
-        if (key == Keys.Menu || key == Keys.Alt)
-        {
-            if (IsKeyHeld(VK_RMENU)) return "RAlt";
-            return "LAlt";
-        }
-        if (key == Keys.LMenu) return "LAlt";
-        if (key == Keys.RMenu) return "RAlt";
-
-        return key.ToString();
-    }
+    // (Key helper methods moved to MappingsTabController / SCBindingsTabController)
 
     private void InitializeCanvas()
     {
@@ -1559,68 +1223,18 @@ public partial class MainForm : Form
         // Check for button presses to highlight corresponding mapping in Mappings tab
         if (_activeTab == 1 && _profileManager.ActiveProfile is not null)
         {
-            int prevHighlightRow = _highlightedMappingRow;
-            uint prevHighlightDevice = _highlightedVJoyDevice;
+            int prevHighlightRow = _mappingsController.HighlightedMappingRow;
+            uint prevHighlightDevice = _mappingsController.HighlightedVJoyDevice;
 
-            CheckForMappingHighlight(state);
+            _mappingsController.CheckForMappingHighlight(state);
 
             // Invalidate canvas if highlight changed to show the shimmer effect
-            if (_highlightedMappingRow != prevHighlightRow || _highlightedVJoyDevice != prevHighlightDevice)
+            if (_mappingsController.HighlightedMappingRow != prevHighlightRow ||
+                _mappingsController.HighlightedVJoyDevice != prevHighlightDevice)
             {
                 MarkDirty();
             }
         }
-    }
-
-    /// <summary>
-    /// Check if any pressed input maps to a vJoy output and highlight it
-    /// </summary>
-    private void CheckForMappingHighlight(DeviceInputState state)
-    {
-        var profile = _profileManager.ActiveProfile;
-        if (profile is null) return;
-
-        // Get previous button state for this device (for rising-edge detection)
-        _highlightPrevButtonState.TryGetValue(state.DeviceName, out var prevButtons);
-
-        // Check button presses - only trigger on rising edge (was NOT pressed, now IS pressed)
-        for (int i = 0; i < state.Buttons.Length; i++)
-        {
-            bool isPressed = state.Buttons[i];
-            bool wasPressed = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
-
-            // Only trigger on rising edge (transition from not-pressed to pressed)
-            if (!isPressed || wasPressed) continue;
-
-            // Check debounce - don't re-highlight the same button too quickly
-            string debounceKey = $"{state.DeviceName}:{i}";
-            if (_highlightDebounce.TryGetValue(debounceKey, out var lastTime))
-            {
-                var elapsed = (DateTime.Now - lastTime).TotalMilliseconds;
-                if (elapsed < HighlightDebounceCooldownMs)
-                    continue; // Skip - too soon since last highlight for this button
-            }
-
-            // Look for button mapping from this device/button (match by device name and input)
-            var mapping = profile.ButtonMappings.FirstOrDefault(m =>
-                m.Inputs.Any(input =>
-                    input.DeviceName == state.DeviceName &&
-                    input.Type == InputType.Button &&
-                    input.Index == i));
-
-            if (mapping is not null)
-            {
-                // Found a mapping - highlight this row
-                _highlightedMappingRow = mapping.Output.Index;
-                _highlightedVJoyDevice = mapping.Output.VJoyDevice;
-                _highlightStartTime = DateTime.Now;
-                _highlightDebounce[debounceKey] = DateTime.Now; // Record highlight time for debounce
-                break;
-            }
-        }
-
-        // Store current button state for next frame comparison
-        _highlightPrevButtonState[state.DeviceName] = (bool[])state.Buttons.Clone();
     }
 
     private void TrackInputActivity(DeviceInputState state)
@@ -2044,190 +1658,22 @@ public partial class MainForm : Form
                 return;
         }
 
-        // Mappings tab hover handling
+        // Mappings tab hover handling (delegated to controller)
         if (_activeTab == 1)
         {
-            // Reset hover states
-            _vjoyPrevHovered = false;
-            _vjoyNextHovered = false;
-            _hoveredMappingRow = -1;
-            _hoveredAddButton = -1;
-            _hoveredRemoveButton = -1;
-            _hoveredButtonMode = -1;
-            _hoveredOutputType = -1;
-            _keyCaptureBoundsHovered = false;
-            _keyClearButtonHovered = false;
-            _addInputButtonHovered = false;
-            _clearAllButtonHovered = false;
-            _hoveredInputSourceRemove = -1;
-            _hoveredMergeOpButton = -1;
-
-            // Right panel: Add input button
-            if (_addInputButtonBounds.Contains(e.X, e.Y))
+            // Handle dragging that needs priority dispatch
+            if (_mappingsController.IsDraggingCurve || _mappingsController.IsDraggingDeadzone ||
+                _mappingsController.IsDraggingDuration)
             {
-                _addInputButtonHovered = true;
-                Cursor = Cursors.Hand;
+                SyncTabContext();
+                _mappingsController.OnMouseMove(e);
+                SyncFromTabContext();
                 return;
             }
 
-            // Right panel: Input source remove buttons
-            for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
-            {
-                if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
-                {
-                    _hoveredInputSourceRemove = i;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-            }
-
-            // Right panel: Merge operation buttons (for axis category with 2+ inputs)
-            if (_mappingCategory == 1 && _selectedMappingRow >= 0)
-            {
-                for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
-                {
-                    if (!_mergeOpButtonBounds[i].IsEmpty && _mergeOpButtonBounds[i].Contains(e.X, e.Y))
-                    {
-                        _hoveredMergeOpButton = i;
-                        Cursor = Cursors.Hand;
-                        return;
-                    }
-                }
-            }
-
-            // Right panel: Button mode buttons (for button category)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0)
-            {
-                // Handle duration slider dragging
-                if (_draggingPulseDuration)
-                {
-                    UpdatePulseDurationFromMouse(e.X);
-                    MarkDirty();
-                    return;
-                }
-                if (_draggingHoldDuration)
-                {
-                    UpdateHoldDurationFromMouse(e.X);
-                    MarkDirty();
-                    return;
-                }
-
-                for (int i = 0; i < _buttonModeBounds.Length; i++)
-                {
-                    if (_buttonModeBounds[i].Contains(e.X, e.Y))
-                    {
-                        _hoveredButtonMode = i;
-                        Cursor = Cursors.Hand;
-                        return;
-                    }
-                }
-
-                // Output type buttons
-                if (_outputTypeBtnBounds.Contains(e.X, e.Y))
-                {
-                    _hoveredOutputType = 0;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-                if (_outputTypeKeyBounds.Contains(e.X, e.Y))
-                {
-                    _hoveredOutputType = 1;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-
-                // Key clear button (check before key capture field so it takes precedence)
-                if (_outputTypeIsKeyboard && !_keyClearButtonBounds.IsEmpty && _keyClearButtonBounds.Contains(e.X, e.Y))
-                {
-                    _keyClearButtonHovered = true;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-
-                // Key capture field
-                if (_outputTypeIsKeyboard && _keyCaptureBounds.Contains(e.X, e.Y))
-                {
-                    _keyCaptureBoundsHovered = true;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-
-                // Clear Mapping button
-                if (_clearAllButtonBounds.Contains(e.X, e.Y))
-                {
-                    _clearAllButtonHovered = true;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-            }
-
-            // Right panel: Curve editor handling (for axis category)
-            if (_mappingCategory == 1 && _selectedMappingRow >= 0)
-            {
-                var pt = new SKPoint(e.X, e.Y);
-
-                // Handle dragging operations
-                if (_draggingCurvePoint >= 0)
-                {
-                    UpdateDraggedCurvePoint(pt);
-                    MarkDirty();
-                    return;
-                }
-                if (_draggingDeadzoneHandle >= 0)
-                {
-                    UpdateDraggedDeadzoneHandle(pt);
-                    MarkDirty();
-                    return;
-                }
-                // Check curve point hover
-                if (_selectedCurveType == CurveType.Custom && _curveEditorBounds.Contains(pt))
-                {
-                    int newHovered = FindCurvePointAt(pt, _curveEditorBounds);
-                    if (newHovered != _hoveredCurvePoint)
-                    {
-                        _hoveredCurvePoint = newHovered;
-                        Cursor = newHovered >= 0 ? Cursors.Hand : Cursors.Cross;
-                        MarkDirty();
-                    }
-                    return;
-                }
-                else if (_hoveredCurvePoint >= 0)
-                {
-                    _hoveredCurvePoint = -1;
-                    MarkDirty();
-                }
-            }
-
-            // Left panel: vJoy device selector buttons
-            if (_vjoyPrevButtonBounds.Contains(e.X, e.Y) && _selectedVJoyDeviceIndex > 0)
-            {
-                _vjoyPrevHovered = true;
-                Cursor = Cursors.Hand;
-                return;
-            }
-            if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1)
-            {
-                _vjoyNextHovered = true;
-                Cursor = Cursors.Hand;
-                return;
-            }
-
-            // Left panel: Mapping row hover
-            for (int i = 0; i < _mappingRowBounds.Count; i++)
-            {
-                if (_mappingRowBounds[i].Contains(e.X, e.Y))
-                {
-                    _hoveredMappingRow = i;
-                    Cursor = Cursors.Hand;
-                    return;
-                }
-            }
-        }
-        else
-        {
-            _hoveredMappingRow = -1;
-            _hoveredAddButton = -1;
-            _hoveredRemoveButton = -1;
+            SyncTabContext();
+            _mappingsController.OnMouseMove(e);
+            SyncFromTabContext();
         }
 
         // Profile dropdown hover detection
@@ -2285,21 +1731,7 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
 
-        // Mapping category tabs hover detection (for Mappings tab)
-        _hoveredMappingCategory = -1;
-        if (_activeTab == 1)
-        {
-            if (_mappingCategoryButtonsBounds.Contains(e.X, e.Y))
-            {
-                _hoveredMappingCategory = 0;
-                Cursor = Cursors.Hand;
-            }
-            else if (_mappingCategoryAxesBounds.Contains(e.X, e.Y))
-            {
-                _hoveredMappingCategory = 1;
-                Cursor = Cursors.Hand;
-            }
-        }
+        // (Mapping category tab hover detection moved to MappingsTabController.OnMouseMove)
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
@@ -2338,19 +1770,12 @@ public partial class MainForm : Form
                 return;
             }
 
-            // Right-click on curve control points in Mappings tab
-            if (_activeTab == 1 && _mappingCategory == 1 && _selectedCurveType == CurveType.Custom)
+            // Right-click on Mappings tab (delegated to controller)
+            if (_activeTab == 1)
             {
-                var pt = new SKPoint(e.X, e.Y);
-                if (_curveEditorBounds.Contains(pt))
-                {
-                    int pointIndex = FindCurvePointAt(pt, _curveEditorBounds);
-                    if (pointIndex >= 0)
-                    {
-                        RemoveCurveControlPoint(pointIndex);
-                        return;
-                    }
-                }
+                SyncTabContext();
+                _mappingsController.OnMouseDown(e);
+                SyncFromTabContext();
             }
             return;
         }
@@ -2453,15 +1878,8 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
 
-        // Mapping category tab clicks (M1 Axes / M2 Buttons)
-        if (_activeTab == 1 && _hoveredMappingCategory >= 0)
-        {
-            _mappingCategory = _hoveredMappingCategory;
-            _selectedMappingRow = -1; // Reset selection when switching categories
-            _bindingsScrollOffset = 0; // Reset scroll when switching categories
-            CancelInputListening();
-            return;
-        }
+        // Mapping category tab clicks (delegated to controller)
+        // (handled within MappingsTabController.OnMouseDown)
 
         // Tab clicks - match positions calculated in DrawTitleBar
         float pad = FUIRenderer.SpaceLG;
@@ -2493,18 +1911,11 @@ public partial class MainForm : Form
                 {
                     if (_activeTab != i)
                     {
-                        // Clear any dragging state when switching tabs
-                        _draggingPulseDuration = false;
-                        _draggingHoldDuration = false;
+                        // Notify previous tab's controller of deactivation
+                        if (_activeTab == 1) _mappingsController.OnDeactivated();
 
-                        // Reset highlight state when switching to Mappings tab
-                        if (i == 1)
-                        {
-                            _highlightPrevButtonState.Clear();
-                            _highlightDebounce.Clear();
-                            _highlightedMappingRow = -1;
-                            UpdateMappingsPrimaryDeviceMap();
-                        }
+                        // Notify new tab's controller of activation
+                        if (i == 1) _mappingsController.OnActivated();
                     }
                     _activeTab = i;
                     break;
@@ -2530,186 +1941,12 @@ public partial class MainForm : Form
             return;
         }
 
-        // Mappings tab click handling
+        // Mappings tab click handling (delegated to controller)
         if (_activeTab == 1)
         {
-            // Right panel: Add input button - toggles listening
-            if (_addInputButtonHovered && _selectedMappingRow >= 0)
-            {
-                if (_isListeningForInput)
-                {
-                    CancelInputListening();
-                }
-                else
-                {
-                    StartInputListening(_selectedMappingRow);
-                }
-                return;
-            }
-
-            // Right panel: Remove input source
-            if (_hoveredInputSourceRemove >= 0)
-            {
-                RemoveInputSourceAtIndex(_hoveredInputSourceRemove);
-                return;
-            }
-
-            // Right panel: Merge operation selection (axis category with 2+ inputs)
-            if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _hoveredMergeOpButton >= 0)
-            {
-                UpdateMergeOperationForSelected(_hoveredMergeOpButton);
-                return;
-            }
-
-            // Right panel: Button mode selection (button category)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredButtonMode >= 0)
-            {
-                _selectedButtonMode = (ButtonMode)_hoveredButtonMode;
-                UpdateButtonModeForSelected();
-                return;
-            }
-
-            // Right panel: Pulse duration slider (button category, Pulse mode)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectedButtonMode == ButtonMode.Pulse)
-            {
-                var pt = new SKPoint(e.X, e.Y);
-                if (_pulseDurationSliderBounds.Contains(pt))
-                {
-                    _draggingPulseDuration = true;
-                    UpdatePulseDurationFromMouse(e.X);
-                    return;
-                }
-            }
-
-            // Right panel: Hold duration slider (button category, HoldToActivate mode)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectedButtonMode == ButtonMode.HoldToActivate)
-            {
-                var pt = new SKPoint(e.X, e.Y);
-                if (_holdDurationSliderBounds.Contains(pt))
-                {
-                    _draggingHoldDuration = true;
-                    UpdateHoldDurationFromMouse(e.X);
-                    return;
-                }
-            }
-
-            // Right panel: Output type selection (button category)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredOutputType >= 0)
-            {
-                _outputTypeIsKeyboard = (_hoveredOutputType == 1);
-                if (!_outputTypeIsKeyboard)
-                {
-                    _selectedKeyName = ""; // Clear key when switching to Button mode
-                }
-                UpdateOutputTypeForSelected();
-                return;
-            }
-
-            // Right panel: Key clear button (button category)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _outputTypeIsKeyboard && _keyClearButtonHovered)
-            {
-                ClearKeyboardBinding();
-                return;
-            }
-
-            // Right panel: Key capture field (button category)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _outputTypeIsKeyboard && _keyCaptureBoundsHovered)
-            {
-                _isCapturingKey = true;
-                _keyCaptureStartTime = DateTime.Now;
-                return;
-            }
-
-            // Right panel: Clear Mapping button (button category)
-            if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _clearAllButtonHovered)
-            {
-                ClearSelectedButtonMapping();
-                return;
-            }
-
-            // Right panel: Axis settings - curve type selection (axis category)
-            if (_mappingCategory == 1 && _selectedMappingRow >= 0)
-            {
-                // Check curve preset clicks
-                var pt = new SKPoint(e.X, e.Y);
-                if (HandleCurvePresetClick(pt))
-                    return;
-
-                // Check for curve control point drag start
-                if (_selectedCurveType == CurveType.Custom && _curveEditorBounds.Contains(pt))
-                {
-                    int pointIndex = FindCurvePointAt(pt, _curveEditorBounds);
-                    if (pointIndex >= 0)
-                    {
-                        _draggingCurvePoint = pointIndex;
-                        return;
-                    }
-                    else
-                    {
-                        // Click in curve area but not on point - add new point
-                        var graphPt = CurveScreenToGraph(pt, _curveEditorBounds);
-                        AddCurveControlPoint(graphPt);
-                        return;
-                    }
-                }
-
-                // Check deadzone handle click - select and start drag
-                int dzHandle = FindDeadzoneHandleAt(pt);
-                if (dzHandle >= 0)
-                {
-                    _selectedDeadzoneHandle = dzHandle;
-                    _draggingDeadzoneHandle = dzHandle;
-                    MarkDirty();
-                    return;
-                }
-
-                // Click on slider background (not on handle) - deselect
-                if (_deadzoneSliderBounds.Contains(pt))
-                {
-                    _selectedDeadzoneHandle = -1;
-                    MarkDirty();
-                    return;
-                }
-            }
-
-            // Left panel: vJoy device navigation
-            if (_vjoyPrevHovered && _selectedVJoyDeviceIndex > 0)
-            {
-                _selectedVJoyDeviceIndex--;
-                _selectedMappingRow = -1;
-                _bindingsScrollOffset = 0; // Reset scroll when changing device
-                CancelInputListening();
-                UpdateMappingsPrimaryDeviceMap();
-                return;
-            }
-            if (_vjoyNextHovered && _selectedVJoyDeviceIndex < _vjoyDevices.Count - 1)
-            {
-                _selectedVJoyDeviceIndex++;
-                _selectedMappingRow = -1;
-                _bindingsScrollOffset = 0; // Reset scroll when changing device
-                CancelInputListening();
-                UpdateMappingsPrimaryDeviceMap();
-                return;
-            }
-
-            // Left panel: Output row clicked - select it
-            if (_hoveredMappingRow >= 0)
-            {
-                if (_hoveredMappingRow != _selectedMappingRow)
-                {
-                    // Selecting a different row - cancel listening
-                    CancelInputListening();
-                    _selectedMappingRow = _hoveredMappingRow;
-                    // Load settings for the selected row
-                    LoadOutputTypeStateForRow();  // For buttons
-                    LoadAxisSettingsForRow();     // For axes
-                }
-                else
-                {
-                    _selectedMappingRow = _hoveredMappingRow;
-                }
-                return;
-            }
+            SyncTabContext();
+            _mappingsController.OnMouseDown(e);
+            SyncFromTabContext();
         }
 
         // (SVG control clicks handled by DevicesTabController)
@@ -2719,8 +1956,7 @@ public partial class MainForm : Form
     {
         _hoveredWindowControl = -1;
         _hoveredControlId = null;
-        _draggingCurvePoint = -1;
-        _draggingDeadzoneHandle = -1;
+        _mappingsController.OnMouseLeave();
         _devicesController.OnMouseLeave();
         _scBindingsController.OnMouseLeave();
     }
@@ -2745,21 +1981,13 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
 
-        if (_draggingCurvePoint >= 0 || _draggingDeadzoneHandle >= 0)
+        // Release mapping drag operations (delegated to Mappings controller)
+        if (_mappingsController.IsDraggingCurve || _mappingsController.IsDraggingDeadzone ||
+            _mappingsController.IsDraggingDuration)
         {
-            _draggingCurvePoint = -1;
-            _draggingDeadzoneHandle = -1;
-            SaveAxisSettingsForRow();  // Persist curve/deadzone changes
-            MarkDirty();
-        }
-
-        // Release duration slider dragging
-        if (_draggingPulseDuration || _draggingHoldDuration)
-        {
-            _draggingPulseDuration = false;
-            _draggingHoldDuration = false;
-            UpdateDurationForSelectedMapping();
-            MarkDirty();
+            SyncTabContext();
+            _mappingsController.OnMouseUp(e);
+            SyncFromTabContext();
         }
 
         // Release background slider dragging (delegated to Settings controller)
@@ -2782,14 +2010,12 @@ public partial class MainForm : Form
             return;
         }
 
-        // Handle scroll on MAPPINGS tab when mouse is over the bindings list
-        if (_activeTab == 1 && _bindingsListBounds.Contains(e.X, e.Y))
+        // Handle scroll on MAPPINGS tab (delegated to controller)
+        if (_activeTab == 1)
         {
-            float scrollAmount = -e.Delta / 4f; // Delta is usually ±120, divide for smooth scrolling
-            float maxScroll = Math.Max(0, _bindingsContentHeight - _bindingsListBounds.Height);
-
-            _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset + scrollAmount, 0, maxScroll);
-            MarkDirty();
+            SyncTabContext();
+            _mappingsController.OnMouseWheel(e);
+            SyncFromTabContext();
         }
     }
 
@@ -2904,7 +2130,9 @@ public partial class MainForm : Form
         // Content based on active tab
         if (_activeTab == 1) // MAPPINGS tab
         {
-            DrawMappingsTabContent(canvas, bounds, sideTabPad, contentTop, contentBottom);
+            SyncTabContext();
+            _mappingsController.Draw(canvas, bounds, sideTabPad, contentTop, contentBottom);
+            SyncFromTabContext();
         }
         else if (_activeTab == 2) // BINDINGS tab (Star Citizen integration)
         {

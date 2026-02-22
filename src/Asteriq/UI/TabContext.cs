@@ -54,7 +54,7 @@ public class TabContext
     // Profile UI state (shared, dropdown drawn in MainForm)
     public List<ProfileInfo> Profiles { get; set; } = new();
 
-    // Callbacks
+    // Callbacks (core - set via constructor)
     public Action MarkDirty { get; }
     public Action InvalidateCanvas { get; }
     public Action RefreshDevices { get; }
@@ -63,6 +63,17 @@ public class TabContext
     public Action UpdateMappingsPrimaryDeviceMap { get; }
     public Func<SKPoint, string?> HitTestSvg { get; }
     public Action OnMappingsChanged { get; }
+
+    // Callbacks (extended - set after construction for cross-tab operations)
+    public Action? CreateOneToOneMappings { get; set; }
+    public Action? ClearDeviceMappings { get; set; }
+    public Action? RemoveDisconnectedDevice { get; set; }
+    public Action<string>? OpenMappingDialogForControl { get; set; }
+    public Action? SaveDeviceOrder { get; set; }
+    public Action? SelectFirstDeviceInCategory { get; set; }
+    public Action? UpdateTrayMenu { get; set; }
+    public Func<SKSvg?>? GetActiveSvg { get; set; }
+    public Func<DeviceMap?, SKSvg?>? GetSvgForDeviceMap { get; set; }
 
     public TabContext(
         IInputService inputService,

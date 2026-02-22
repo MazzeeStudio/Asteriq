@@ -84,6 +84,7 @@ public partial class MainForm : Form
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
+    private DevicesTabController _devicesController = null!;
     private TabContext _tabContext = null!;
 
     // Profile UI state
@@ -111,34 +112,10 @@ public partial class MainForm : Form
     private SKBitmap? _cachedBackground;  // Cached background layer
     private bool _backgroundDirty = true;  // Background needs redraw
 
-    private int _hoveredDevice = -1;
     private int _selectedDevice = -1;  // Start with no selection, will be set in RefreshDevices
     private List<PhysicalDeviceInfo> _devices = new();
     private List<PhysicalDeviceInfo> _disconnectedDevices = new(); // Devices that were seen but are now disconnected
     private DeviceInputState? _currentInputState;
-
-    // Device category tabs (D1 = Physical, D2 = Virtual)
-    private int _deviceCategory = 0;  // 0 = Physical, 1 = Virtual
-    private int _hoveredDeviceCategory = -1;
-    private SKRect _deviceCategoryD1Bounds;
-    private SKRect _deviceCategoryD2Bounds;
-
-    
-    // Device list drag-to-reorder state
-    private bool _isDraggingDevice = false;
-    private int _dragDeviceIndex = -1;
-    private int _dragDropTargetIndex = -1;
-    private SKPoint _dragStartPoint;
-    private SKPoint _dragCurrentPoint;
-    private List<SKRect> _deviceItemBounds = new();  // Bounds of each device item for hit testing
-
-    // Device Actions panel buttons
-    private SKRect _map1to1ButtonBounds;
-    private bool _map1to1ButtonHovered;
-    private SKRect _clearMappingsButtonBounds;
-    private bool _clearMappingsButtonHovered;
-    private SKRect _removeDeviceButtonBounds;
-    private bool _removeDeviceButtonHovered;
 
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
     private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
@@ -166,8 +143,6 @@ public partial class MainForm : Form
     private bool _svgMirrored;
     private Dictionary<string, SKRect> _controlBounds = new();
     private Point _mousePosition; // For debug display
-    private DateTime _lastSvgControlClick = DateTime.MinValue;
-    private string? _lastClickedControlId;
 
     // Device mapping and active input tracking
     private DeviceMap? _deviceMap;
@@ -450,10 +425,6 @@ public partial class MainForm : Form
 
     // Input forwarding state (physical → vJoy)
     private bool _isForwarding = false;
-    private SKRect _startForwardingButtonBounds;
-    private SKRect _stopForwardingButtonBounds;
-    private bool _startForwardingButtonHovered;
-    private bool _stopForwardingButtonHovered;
 
     /// <summary>
     /// Constructor with dependency injection
@@ -531,7 +502,19 @@ public partial class MainForm : Form
         _tabContext.ControlBounds = _controlBounds;
         _tabContext.IsForwarding = _isForwarding;
 
+        // Wire up extended callbacks for cross-tab operations
+        _tabContext.CreateOneToOneMappings = CreateOneToOneMappings;
+        _tabContext.ClearDeviceMappings = ClearDeviceMappings;
+        _tabContext.RemoveDisconnectedDevice = RemoveDisconnectedDevice;
+        _tabContext.OpenMappingDialogForControl = OpenMappingDialogForControl;
+        _tabContext.SaveDeviceOrder = SaveDeviceOrder;
+        _tabContext.SelectFirstDeviceInCategory = SelectFirstDeviceInCategory;
+        _tabContext.UpdateTrayMenu = UpdateTrayMenu;
+        _tabContext.GetActiveSvg = GetActiveSvg;
+        _tabContext.GetSvgForDeviceMap = GetSvgForDeviceMap;
+
         _settingsController = new SettingsTabController(_tabContext);
+        _devicesController = new DevicesTabController(_tabContext);
     }
 
     private void SyncTabContext()
@@ -1779,14 +1762,11 @@ public partial class MainForm : Form
 
     private void SelectFirstDeviceInCategory()
     {
-        // Find first device matching current category
-        var filteredDevices = _deviceCategory == 0
-            ? _devices.Where(d => !d.IsVirtual).ToList()
-            : _devices.Where(d => d.IsVirtual).ToList();
+        // Select first physical (non-virtual) device as default
+        var filteredDevices = _devices.Where(d => !d.IsVirtual).ToList();
 
         if (filteredDevices.Count > 0)
         {
-            // Get the actual index in _devices
             _selectedDevice = _devices.IndexOf(filteredDevices[0]);
             if (_selectedDevice >= 0)
             {
@@ -2310,40 +2290,14 @@ public partial class MainForm : Form
             return;
         }
 
-        // Handle device list drag-to-reorder (physical devices only)
-        if (_activeTab == 0 && _deviceCategory == 0 && _dragDeviceIndex >= 0)
+        // Handle device list drag-to-reorder (delegated to Devices controller)
+        if (_activeTab == 0 && _devicesController.HasPendingDrag)
         {
-            var currentPoint = new SKPoint(e.X, e.Y);
-            float dragDistance = SKPoint.Distance(currentPoint, _dragStartPoint);
-
-            // Start actual drag if moved beyond threshold (5 pixels)
-            if (!_isDraggingDevice && dragDistance > 5)
-            {
-                _isDraggingDevice = true;
-                Cursor = Cursors.SizeAll;
-            }
-
-            if (_isDraggingDevice)
-            {
-                _dragCurrentPoint = currentPoint;
-
-                // Calculate drop target index based on Y position
-                float dragItemHeight = 60f;
-                float dragItemGap = FUIRenderer.ItemSpacing;
-                float dragContentTop = 90 + 32 + FUIRenderer.PanelPadding;
-
-                // Get filtered devices (physical only)
-                var physicalDevices = _devices.Where(d => !d.IsVirtual).ToList();
-
-                // Calculate which slot the cursor is over
-                float relativeY = e.Y - dragContentTop;
-                int targetIndex = (int)(relativeY / (dragItemHeight + dragItemGap));
-                targetIndex = Math.Clamp(targetIndex, 0, physicalDevices.Count);
-
-                _dragDropTargetIndex = targetIndex;
-                MarkDirty();
+            SyncTabContext();
+            _devicesController.OnMouseMove(e);
+            SyncFromTabContext();
+            if (_devicesController.IsDraggingDevice)
                 return;
-            }
         }
 
         // Mappings tab hover handling
@@ -2692,20 +2646,12 @@ public partial class MainForm : Form
                 break;
         }
 
-        // Device category tabs hover detection (for Devices tab)
-        _hoveredDeviceCategory = -1;
+        // Devices tab hover handling (delegated to controller)
         if (_activeTab == 0)
         {
-            if (_deviceCategoryD1Bounds.Contains(e.X, e.Y))
-            {
-                _hoveredDeviceCategory = 0;
-                Cursor = Cursors.Hand;
-            }
-            else if (_deviceCategoryD2Bounds.Contains(e.X, e.Y))
-            {
-                _hoveredDeviceCategory = 1;
-                Cursor = Cursors.Hand;
-            }
+            SyncTabContext();
+            _devicesController.OnMouseMove(e);
+            SyncFromTabContext();
         }
 
         // Mapping category tabs hover detection (for Mappings tab)
@@ -2723,51 +2669,6 @@ public partial class MainForm : Form
                 Cursor = Cursors.Hand;
             }
         }
-
-        // Device list hover detection - use same responsive layout as DrawStructureLayer
-        float sideTabPad = FUIRenderer.SpaceSM;  // 8px - Reduced padding for side-tabbed panels
-        float contentPad = FUIRenderer.SpaceXL;  // 24px
-        float contentTop = 88;  // 4px aligned - matches DrawStructureLayer
-        float contentWidth = ClientSize.Width - sideTabPad - contentPad;
-        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f);
-        float leftPanelWidth = layout.LeftPanelWidth;
-        float sideTabWidth = 28f;
-
-        if (e.X >= sideTabPad + sideTabWidth && e.X <= sideTabPad + leftPanelWidth)
-        {
-            float itemY = contentTop + 32 + FUIRenderer.PanelPadding;
-            float itemHeight = 60f;
-            float itemGap = FUIRenderer.ItemSpacing;
-
-            // Filter devices by category and find hovered index
-            var filteredDevices = _deviceCategory == 0
-                ? _devices.Where(d => !d.IsVirtual).ToList()
-                : _devices.Where(d => d.IsVirtual).ToList();
-
-            int filteredIndex = (int)((e.Y - itemY) / (itemHeight + itemGap));
-            if (filteredIndex >= 0 && filteredIndex < filteredDevices.Count)
-            {
-                // Map back to actual device index
-                _hoveredDevice = _devices.IndexOf(filteredDevices[filteredIndex]);
-            }
-            else
-            {
-                _hoveredDevice = -1;
-            }
-        }
-        else
-        {
-            _hoveredDevice = -1;
-        }
-
-        // Device action button hover detection
-        _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
-        _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
-        _removeDeviceButtonHovered = !_removeDeviceButtonBounds.IsEmpty && _removeDeviceButtonBounds.Contains(e.X, e.Y);
-        
-        // Forwarding button hover detection
-        _startForwardingButtonHovered = !_startForwardingButtonBounds.IsEmpty && _startForwardingButtonBounds.Contains(e.X, e.Y);
-        _stopForwardingButtonHovered = !_stopForwardingButtonBounds.IsEmpty && _stopForwardingButtonBounds.Contains(e.X, e.Y);
 
         // Window controls hover (matches FUIRenderer.DrawWindowControls sizing)
         float pad = FUIRenderer.SpaceLG;  // Standard padding for window controls
@@ -2790,20 +2691,6 @@ public partial class MainForm : Form
             _hoveredWindowControl = -1;
         }
 
-        // SVG silhouette hover detection
-        if (_silhouetteBounds.Contains(e.X, e.Y) && _joystickSvg is not null)
-        {
-            var hitControlId = HitTestSvg(new SKPoint(e.X, e.Y));
-            if (hitControlId != _hoveredControlId)
-            {
-                _hoveredControlId = hitControlId;
-                Cursor = hitControlId is not null ? Cursors.Hand : Cursors.Default;
-            }
-        }
-        else if (_hoveredControlId is not null)
-        {
-            _hoveredControlId = null;
-        }
     }
 
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
@@ -2925,14 +2812,12 @@ public partial class MainForm : Form
             return;
         }
 
-        // Device category tab clicks (D1 Physical / D2 Virtual)
-        if (_activeTab == 0 && _hoveredDeviceCategory >= 0)
+        // Devices tab click handling (delegated to controller)
+        if (_activeTab == 0)
         {
-            _deviceCategory = _hoveredDeviceCategory;
-            _selectedDevice = -1; // Reset before selecting first in new category
-            _currentInputState = null;
-            SelectFirstDeviceInCategory();
-            return;
+            SyncTabContext();
+            _devicesController.OnMouseDown(e);
+            SyncFromTabContext();
         }
 
         // Mapping category tab clicks (M1 Axes / M2 Buttons)
@@ -2943,61 +2828,6 @@ public partial class MainForm : Form
             _bindingsScrollOffset = 0; // Reset scroll when switching categories
             CancelInputListening();
             return;
-        }
-
-        // Device list clicks - initiate potential drag on physical devices
-        if (_activeTab == 0 && _deviceCategory == 0 && _hoveredDevice >= 0 && _hoveredDevice < _devices.Count)
-        {
-            _selectedDevice = _hoveredDevice;
-            _currentInputState = null;
-            // Load device map for the selected device
-            LoadDeviceMapForDevice(_devices[_selectedDevice]);
-            _activeInputTracker.Clear(); // Clear lead-lines when switching devices
-
-            // Start potential drag - will only become a drag if mouse moves enough
-            _dragDeviceIndex = _hoveredDevice;
-            _dragStartPoint = new SKPoint(e.X, e.Y);
-            _dragCurrentPoint = _dragStartPoint;
-        }
-        else if (_hoveredDevice >= 0 && _hoveredDevice < _devices.Count)
-        {
-            // Non-draggable device selection (virtual devices tab)
-            _selectedDevice = _hoveredDevice;
-            _currentInputState = null;
-            LoadDeviceMapForDevice(_devices[_selectedDevice]);
-            _activeInputTracker.Clear();
-        }
-
-        // Device action button clicks (only on Devices tab)
-        if (_activeTab == 0)
-        {
-            if (_map1to1ButtonHovered && !_map1to1ButtonBounds.IsEmpty)
-            {
-                CreateOneToOneMappings();
-                return;
-            }
-            if (_clearMappingsButtonHovered && !_clearMappingsButtonBounds.IsEmpty)
-            {
-                ClearDeviceMappings();
-                return;
-            }
-            if (_removeDeviceButtonHovered && !_removeDeviceButtonBounds.IsEmpty)
-            {
-                RemoveDisconnectedDevice();
-                return;
-            }
-            
-            // Forwarding button clicks
-            if (_startForwardingButtonHovered && !_startForwardingButtonBounds.IsEmpty)
-            {
-                StartForwarding();
-                return;
-            }
-            if (_stopForwardingButtonHovered && !_stopForwardingButtonBounds.IsEmpty)
-            {
-                StopForwarding();
-                return;
-            }
         }
 
         // Tab clicks - match positions calculated in DrawTitleBar
@@ -3247,116 +3077,28 @@ public partial class MainForm : Form
             }
         }
 
-        // SVG control clicks
-        if (_hoveredControlId is not null)
-        {
-            // Check for double-click (same control clicked within 500ms)
-            bool isDoubleClick = _lastClickedControlId == _hoveredControlId &&
-                                 (DateTime.Now - _lastSvgControlClick).TotalMilliseconds < 500;
-
-            if (isDoubleClick)
-            {
-                // Double-click - open mapping dialog for this control
-                OpenMappingDialogForControl(_hoveredControlId);
-                _lastClickedControlId = null;
-            }
-            else
-            {
-                // Single click - select the control
-                _selectedControlId = _hoveredControlId;
-                _leadLineProgress = 0f; // Reset animation for new selection
-                _lastClickedControlId = _hoveredControlId;
-                _lastSvgControlClick = DateTime.Now;
-            }
-        }
-        else if (_silhouetteBounds.Contains(e.X, e.Y))
-        {
-            // Clicked inside silhouette but not on a control - deselect
-            _selectedControlId = null;
-            _lastClickedControlId = null;
-        }
+        // (SVG control clicks handled by DevicesTabController)
     }
 
     private void OnCanvasMouseLeave(object? sender, EventArgs e)
     {
-        _hoveredDevice = -1;
         _hoveredWindowControl = -1;
         _hoveredControlId = null;
         _draggingCurvePoint = -1;
         _draggingDeadzoneHandle = -1;
+        _devicesController.OnMouseLeave();
     }
 
     private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
     {
-        // Complete device drag-to-reorder
-        if (_isDraggingDevice && _dragDeviceIndex >= 0 && _dragDeviceIndex < _devices.Count)
+        // Device drag-to-reorder release (delegated to Devices controller)
+        if (_devicesController.HasPendingDrag || _devicesController.IsDraggingDevice)
         {
-            var filteredDevices = _devices.Where(d => !d.IsVirtual).ToList();
-
-            // _dragDeviceIndex is actual index in _devices, find filtered index
-            var draggedDevice = _devices[_dragDeviceIndex];
-            int sourceFilteredIndex = filteredDevices.IndexOf(draggedDevice);
-
-            // Only reorder if valid source and different target
-            if (sourceFilteredIndex >= 0 && _dragDropTargetIndex >= 0 && _dragDropTargetIndex != sourceFilteredIndex)
-            {
-                // Calculate target filtered index (adjusted for removal)
-                int targetFilteredIndex = _dragDropTargetIndex;
-                if (targetFilteredIndex > sourceFilteredIndex)
-                    targetFilteredIndex--;
-
-                // Get the device at target position (or use end of list)
-                int targetActualIndex;
-                if (targetFilteredIndex >= 0 && targetFilteredIndex < filteredDevices.Count)
-                {
-                    var targetDevice = filteredDevices[targetFilteredIndex];
-                    targetActualIndex = _devices.IndexOf(targetDevice);
-                    // If dropping after source in the filtered list, insert after target
-                    if (_dragDropTargetIndex > sourceFilteredIndex)
-                        targetActualIndex++;
-                }
-                else
-                {
-                    // Dropping at end - find last physical device and insert after it
-                    targetActualIndex = _devices.Count;
-                    for (int i = _devices.Count - 1; i >= 0; i--)
-                    {
-                        if (!_devices[i].IsVirtual)
-                        {
-                            targetActualIndex = i + 1;
-                            break;
-                        }
-                    }
-                }
-
-                // Perform the move
-                int sourceActualIndex = _devices.IndexOf(draggedDevice);
-                _devices.RemoveAt(sourceActualIndex);
-                if (targetActualIndex > sourceActualIndex)
-                    targetActualIndex--;
-                _devices.Insert(targetActualIndex, draggedDevice);
-
-                // Update selection to follow the moved device
-                _selectedDevice = _devices.IndexOf(draggedDevice);
-
-                // Save the new order
-                SaveDeviceOrder();
-            }
-
-            // Reset drag state
-            _isDraggingDevice = false;
-            _dragDeviceIndex = -1;
-            _dragDropTargetIndex = -1;
-            Cursor = Cursors.Default;
-            MarkDirty();
-            return;
-        }
-
-        // Reset potential drag state even if we didn't actually drag
-        if (_dragDeviceIndex >= 0)
-        {
-            _dragDeviceIndex = -1;
-            _dragDropTargetIndex = -1;
+            SyncTabContext();
+            _devicesController.OnMouseUp(e);
+            SyncFromTabContext();
+            if (_devicesController.IsDraggingDevice)
+                return; // Was still dragging, now released
         }
 
         // Release SC Bindings scrollbar dragging
@@ -3583,31 +3325,10 @@ public partial class MainForm : Form
         }
         else
         {
-            // Tab 0: DEVICES tab layout
-            // Left panel: Device List (using reduced padding for side tabs)
-            var deviceListBounds = new SKRect(sideTabPad, contentTop, sideTabPad + leftPanelWidth, contentBottom);
-            DrawDeviceListPanel(canvas, deviceListBounds);
-
-            // Center panel: Device Details
-            var detailsBounds = new SKRect(centerStart, contentTop, centerEnd, contentBottom);
-            DrawDeviceDetailsPanel(canvas, detailsBounds);
-
-            // Right panel: Split into Device Actions (top) and Status (bottom)
-            // Only show if window is large enough for three columns
-            if (layout.ShowRightPanel)
-            {
-                float rightPanelX = bounds.Right - pad - rightPanelWidth;
-                float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
-                float panelGap = FUIRenderer.SpaceSM;  // 8px
-
-                // Top half: Device Actions panel
-                var deviceActionsBounds = new SKRect(rightPanelX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
-                DrawDeviceActionsPanel(canvas, deviceActionsBounds);
-
-                // Bottom half: Status panel
-                var statusBounds = new SKRect(rightPanelX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
-                DrawStatusPanel(canvas, statusBounds);
-            }
+            // Tab 0: DEVICES tab (delegated to controller)
+            SyncTabContext();
+            _devicesController.Draw(canvas, bounds, sideTabPad, contentTop, contentBottom);
+            SyncFromTabContext();
         }
 
         // Status bar
@@ -3979,6 +3700,47 @@ public partial class MainForm : Form
     private void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
         => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
 
+    /// <summary>
+    /// Draw SVG in bounds with optional mirroring. Updates shared SVG transform state.
+    /// Used by Mappings tab (will move to MappingsTabController in future extraction).
+    /// </summary>
+    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
+    {
+        if (svg.Picture is null) return;
+
+        var svgBounds = svg.Picture.CullRect;
+        if (svgBounds.Width <= 0 || svgBounds.Height <= 0) return;
+
+        float scaleX = bounds.Width / svgBounds.Width;
+        float scaleY = bounds.Height / svgBounds.Height;
+        float scale = Math.Min(scaleX, scaleY) * 0.95f;
+
+        float scaledWidth = svgBounds.Width * scale;
+        float scaledHeight = svgBounds.Height * scale;
+
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
+
+        _svgScale = scale;
+        _svgOffset = new SKPoint(offsetX, offsetY);
+        _svgMirrored = mirror;
+
+        canvas.Save();
+        canvas.Translate(offsetX, offsetY);
+
+        if (mirror)
+        {
+            canvas.Translate(scaledWidth, 0);
+            canvas.Scale(-scale, scale);
+        }
+        else
+        {
+            canvas.Scale(scale);
+        }
+
+        canvas.DrawPicture(svg.Picture);
+        canvas.Restore();
+    }
 
     private void DrawStatusBar(SKCanvas canvas, SKRect bounds)
     {
@@ -4214,6 +3976,37 @@ public partial class MainForm : Form
 
         // Double-click to open
         _trayIcon.DoubleClick += (s, e) => ShowAndActivateWindow();
+    }
+
+    /// <summary>
+    /// Start forwarding (thin wrapper for tray menu - actual logic in DevicesTabController).
+    /// </summary>
+    private void StartForwarding()
+    {
+        SyncTabContext();
+        // Reuse the same logic as the controller by invoking the button path
+        if (!_isForwarding)
+        {
+            var profile = _profileManager.ActiveProfile;
+            if (profile is null) return;
+            if (profile.AxisMappings.Count == 0 && profile.ButtonMappings.Count == 0 && profile.HatMappings.Count == 0) return;
+            _mappingEngine.LoadProfile(profile);
+            if (!_vjoyService.IsInitialized) return;
+            if (!_mappingEngine.Start()) return;
+            _isForwarding = true;
+            _trayIcon.SetActive(true);
+        }
+    }
+
+    /// <summary>
+    /// Stop forwarding (thin wrapper for tray menu - actual logic in DevicesTabController).
+    /// </summary>
+    private void StopForwarding()
+    {
+        if (!_isForwarding) return;
+        _mappingEngine.Stop();
+        _isForwarding = false;
+        _trayIcon.SetActive(false);
     }
 
     private void UpdateTrayMenu()

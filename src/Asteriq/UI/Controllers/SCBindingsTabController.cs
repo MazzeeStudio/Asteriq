@@ -28,6 +28,14 @@ public class SCBindingsTabController : ITabController
     private string? _scExportStatus;
     private DateTime _scExportStatusTime;
 
+    // Async schema loading state
+    private bool _scLoading = false;
+    private string _scLoadingMessage = "";
+    private int _schemaLoadVersion = 0;
+
+    // In-memory schema cache: avoids re-parsing XML when switching back to an already-loaded environment
+    private static readonly Dictionary<string, List<SCAction>> s_schemaCache = new();
+
     // SC UI bounds
     private SKRect _scInstallationSelectorBounds;
     private bool _scInstallationDropdownOpen;
@@ -575,45 +583,95 @@ public class SCBindingsTabController : ITabController
     {
         if (_scProfileCacheService is null || _scSchemaService is null) return;
 
-        try
+        int version = ++_schemaLoadVersion;
+        _scLoading = true;
+        _scLoadingMessage = "Loading...";
+        _scActions = null;
+        _scFilteredActions = null;
+        _scActionMaps.Clear();
+        _ctx.InvalidateCanvas();
+
+        Task.Run(() =>
         {
-            var profile = _scProfileCacheService.GetOrExtractProfile(installation);
-            if (profile is not null)
+            List<SCAction>? actions = null;
+            List<string> actionMaps = new();
+            List<SCMappingFile> availableProfiles = new();
+
+            try
             {
-                _scActions = _scSchemaService.ParseActions(profile);
-                _scExportProfile.TargetEnvironment = installation.Environment;
-                _scExportProfile.TargetBuildId = installation.BuildId;
+                // Check in-memory schema cache first (avoids re-parsing XML on environment switch)
+                var cacheKey = installation.GetCacheKey();
+                if (s_schemaCache.TryGetValue(cacheKey, out var cachedActions))
+                {
+                    actions = cachedActions;
+                    ReportProgress(version, $"Using cached schema for {installation.Environment}...");
+                }
+                else
+                {
+                    ReportProgress(version, "Checking cache...");
+                    var profile = _scProfileCacheService.GetOrExtractProfile(installation,
+                        msg => ReportProgress(version, msg));
 
-                // Build category list from joystick-relevant actions (includes action-level overrides like Emergency)
-                var joystickActions = _scSchemaService.FilterJoystickActions(_scActions);
-                _scActionMaps = SCCategoryMapper.GetSortedCategoriesFromActions(
-                    joystickActions.Select(a => (a.ActionMap, a.ActionName))
-                ).ToList();
+                    if (profile is not null)
+                    {
+                        ReportProgress(version, "Parsing actions...");
+                        actions = _scSchemaService.ParseActions(profile);
+                        s_schemaCache[cacheKey] = actions;
+                    }
+                }
 
-                // NOTE: We intentionally do NOT auto-apply defaults here.
-                // Defaults are only applied when user explicitly clicks "Reset Defaults".
-                // This allows users to create completely blank profiles if desired.
+                if (actions is not null)
+                {
+                    ReportProgress(version, "Building categories...");
+                    var joystickActions = _scSchemaService.FilterJoystickActions(actions);
+                    actionMaps = SCCategoryMapper.GetSortedCategoriesFromActions(
+                        joystickActions.Select(a => (a.ActionMap, a.ActionName))
+                    ).ToList();
 
-                // Default: show joystick-relevant actions only
-                RefreshFilteredActions();
-
-                // Calculate dynamic column widths based on binding content
-                CalculateDeviceColumnWidths();
-
-                // Load available profiles from mappings folder for import
-                _scAvailableProfiles = SCInstallationService.GetExistingProfiles(installation);
-
-                System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded {_scActions.Count} SC actions from {installation.Environment}");
+                    ReportProgress(version, "Loading profiles...");
+                    availableProfiles = SCInstallationService.GetExistingProfiles(installation);
+                }
             }
-        }
-        catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
+            catch (Exception ex) when (ex is XmlException or IOException or ArgumentException)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to load SC schema: {ex.Message}");
+            }
+
+            _ctx.OwnerForm.BeginInvoke(() =>
+            {
+                if (version != _schemaLoadVersion) return; // A newer load was started; discard this result
+
+                _scLoading = false;
+                _scActions = actions;
+                _scActionMaps = actionMaps;
+                _scAvailableProfiles = availableProfiles;
+
+                if (actions is not null)
+                {
+                    _scExportProfile.TargetEnvironment = installation.Environment;
+                    _scExportProfile.TargetBuildId = installation.BuildId;
+
+                    // NOTE: We intentionally do NOT auto-apply defaults here.
+                    // Defaults are only applied when user explicitly clicks "Reset Defaults".
+                    RefreshFilteredActions();
+                    CalculateDeviceColumnWidths();
+
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded {actions.Count} SC actions from {installation.Environment}");
+                }
+
+                _ctx.InvalidateCanvas();
+            });
+        });
+    }
+
+    private void ReportProgress(int version, string message)
+    {
+        _ctx.OwnerForm.BeginInvoke(() =>
         {
-            System.Diagnostics.Debug.WriteLine($"[MainForm] Failed to load SC schema: {ex.Message}");
-            _scActions = null;
-            _scFilteredActions = null;
-            _scActionMaps.Clear();
-            _scAvailableProfiles.Clear();
-        }
+            if (version != _schemaLoadVersion) return;
+            _scLoadingMessage = message;
+            _ctx.InvalidateCanvas();
+        });
     }
 
     /// <summary>
@@ -1436,7 +1494,10 @@ public class SCBindingsTabController : ITabController
 
         if (_scFilteredActions is null || _scFilteredActions.Count == 0)
         {
-            FUIRenderer.DrawText(canvas, _scActions is null ? "Loading actions..." : "No actions match filter",
+            string emptyMsg = _scLoading ? _scLoadingMessage
+                : _scActions is null ? "No SC installation found"
+                : "No actions match filter";
+            FUIRenderer.DrawText(canvas, emptyMsg,
                 new SKPoint(leftMargin, scrollY + 20f), FUIColors.TextDim, 11f);
         }
         else

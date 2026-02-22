@@ -397,7 +397,13 @@ public class SCBindingsTabController : ITabController
         }
     }
 
-    public void OnActivated() { }
+    public void OnActivated()
+    {
+        // Defer schema load to first tab activation so BeginInvoke runs with a valid form handle.
+        if (_scActions is null && !_scLoading)
+            StartSchemaLoad();
+    }
+
     public void OnDeactivated() { }
 
     #endregion
@@ -479,7 +485,10 @@ public class SCBindingsTabController : ITabController
     private void RefreshSCExportProfiles()
     {
         if (_scExportProfileService is null) return;
-        _scExportProfiles = _scExportProfileService.ListProfiles();
+        // Filter out legacy "asteriq" profile - it was auto-generated, never user-chosen
+        _scExportProfiles = _scExportProfileService.ListProfiles()
+            .Where(p => p.ProfileName != "asteriq")
+            .ToList();
     }
 
     /// <summary>
@@ -587,11 +596,12 @@ public class SCBindingsTabController : ITabController
             _selectedSCInstallation = 0;
         }
 
-        // Load schema for selected installation
+    }
+
+    private void StartSchemaLoad()
+    {
         if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
-        {
             LoadSCSchema(_scInstallations[_selectedSCInstallation]);
-        }
     }
 
     private void LoadSCSchema(SCInstallation installation)
@@ -2630,6 +2640,7 @@ public class SCBindingsTabController : ITabController
         if (_scRefreshButtonBounds.Contains(point))
         {
             RefreshSCInstallations();
+            StartSchemaLoad();
             _scExportStatus = "Installations refreshed";
             _scExportStatusTime = DateTime.Now;
             return;

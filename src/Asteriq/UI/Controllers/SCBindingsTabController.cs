@@ -617,6 +617,9 @@ public class SCBindingsTabController : ITabController
         _scActions = null;
         _scFilteredActions = null;
         _scActionMaps.Clear();
+        _scAvailableProfiles = new();      // clear stale profiles from previous installation immediately
+        _scProfileDropdownOpen = false;    // close dropdown so it doesn't show stale data
+        _scImportDropdownOpen = false;
         _ctx.InvalidateCanvas();
 
         Task.Run(() =>
@@ -1128,14 +1131,11 @@ public class SCBindingsTabController : ITabController
         // Clear mapping bounds since we removed the UI
         _scVJoyMappingBounds.Clear();
 
-        // Refresh available profiles when installation changes
-        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+        // Fallback: populate available profiles synchronously if load completed but list is still empty
+        if (!_scLoading && _scAvailableProfiles.Count == 0 &&
+            _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
         {
-            var installation = _scInstallations[_selectedSCInstallation];
-            if (_scAvailableProfiles.Count == 0 || _scImportDropdownOpen)
-            {
-                _scAvailableProfiles = SCInstallationService.GetExistingProfiles(installation);
-            }
+            _scAvailableProfiles = SCInstallationService.GetExistingProfiles(_scInstallations[_selectedSCInstallation]);
         }
 
         // Import button/selector

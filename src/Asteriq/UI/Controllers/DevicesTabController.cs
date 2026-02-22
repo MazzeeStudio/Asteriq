@@ -827,7 +827,7 @@ public class DevicesTabController : ITabController
         FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "POLL RATE", pollRateText, FUIColors.TextPrimary);
         itemY += statusItemHeight + itemGap;
 
-        string profileName = _ctx.MappingEngine.ActiveProfile?.Name ?? "NONE";
+        string profileName = _ctx.ProfileManager.ActiveProfile?.Name ?? "NONE";
         FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "PROFILE", profileName.ToUpper(), FUIColors.TextPrimary);
 
         float buttonHeight = 36f;

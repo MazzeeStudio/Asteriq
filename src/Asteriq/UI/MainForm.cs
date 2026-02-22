@@ -1928,6 +1928,7 @@ public partial class MainForm : Form
                     {
                         if (_activeTab == 1) _mappingsController.OnDeactivated();
                         if (i == 1) _mappingsController.OnActivated();
+                        if (i == 2) _scBindingsController.OnActivated();
                     }
                     _activeTab = i;
                     break;

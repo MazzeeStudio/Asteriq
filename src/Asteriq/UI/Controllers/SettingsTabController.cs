@@ -620,6 +620,7 @@ public class SettingsTabController : ITabController
             {
                 _ctx.AppSettings.FontSize = fontSizes[i];
                 FUIRenderer.FontSizeOption = fontSizes[i];
+                _ctx.ApplyFontScale?.Invoke();
                 _ctx.InvalidateCanvas();
                 return;
             }

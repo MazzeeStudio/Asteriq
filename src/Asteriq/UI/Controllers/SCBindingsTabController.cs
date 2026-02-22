@@ -1,4 +1,4 @@
-using System.Xml;
+﻿using System.Xml;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
@@ -2033,14 +2033,14 @@ public class SCBindingsTabController : ITabController
         float buttonGap = 6f;
 
         // Title
-        FUIRenderer.DrawText(canvas, "SC EXPORTS", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
+        FUIRenderer.DrawText(canvas, "CONTROL PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
         y += 18f;
 
-        // Profile dropdown (full width)
+        // Control Profile dropdown (full width)
         float dropdownHeight = 32f;
         _scProfileDropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
         bool dropdownHovered = _scProfileDropdownBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— No Export Selected —" : _scExportProfile.ProfileName;
+        string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— No Profile Selected —" : _scExportProfile.ProfileName;
         DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, dropdownLabel, dropdownHovered, _scProfileDropdownOpen);
         y += dropdownHeight + 6f;
 
@@ -3771,7 +3771,7 @@ public class SCBindingsTabController : ITabController
 
     private void EditSCProfileName()
     {
-        var name = FUIInputDialog.Show(_ctx.OwnerForm, "Export Profile Name", "Profile Name:",
+        var name = FUIInputDialog.Show(_ctx.OwnerForm, "Control Profile Name", "Profile Name:",
             _scExportProfile.ProfileName);
         if (name is not null)
             _scExportProfile.ProfileName = name;
@@ -4063,7 +4063,7 @@ public class SCBindingsTabController : ITabController
 
     private void CreateNewSCExportProfile()
     {
-        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "New SC Export Profile", "Profile Name:",
+        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "New Control Profile", "Profile Name:",
             "New Profile", "Create");
         if (newName is not null)
         {
@@ -4105,7 +4105,7 @@ public class SCBindingsTabController : ITabController
 
         using var confirmDialog = new FUIConfirmDialog(
             "Delete Profile",
-            $"Delete SC export profile '{_scExportProfile.ProfileName}'?\n\nThis cannot be undone.",
+            $"Delete control profile '{_scExportProfile.ProfileName}'?\n\nThis cannot be undone.",
             "Delete", "Cancel");
 
         if (confirmDialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)

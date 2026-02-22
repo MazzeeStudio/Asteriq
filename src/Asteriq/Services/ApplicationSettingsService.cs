@@ -122,6 +122,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public string? PreferredSCEnvironment
+    {
+        get => _cachedSettings.PreferredSCEnvironment;
+        set
+        {
+            _cachedSettings.PreferredSCEnvironment = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     private AppSettings LoadSettings()
     {
         if (!File.Exists(_settingsFile))
@@ -162,5 +172,6 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
+        public string? PreferredSCEnvironment { get; set; }
     }
 }

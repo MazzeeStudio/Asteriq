@@ -52,4 +52,9 @@ public interface IApplicationSettingsService
     /// Get or set auto-load setting for SC export profiles
     /// </summary>
     bool AutoLoadLastSCExportProfile { get; set; }
+
+    /// <summary>
+    /// Get or set the preferred SC environment (LIVE, PTU, EPTU) to select on startup
+    /// </summary>
+    string? PreferredSCEnvironment { get; set; }
 }

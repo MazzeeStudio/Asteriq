@@ -42,6 +42,7 @@ public class AppSettings
     // SC Export profile settings
     public string? LastSCExportProfile { get; set; }
     public bool AutoLoadLastSCExportProfile { get; set; } = true;
+    public string? PreferredSCEnvironment { get; set; }
 
     // Window state
     public int WindowWidth { get; set; } = 0;  // 0 = use default

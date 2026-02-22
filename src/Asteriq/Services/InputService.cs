@@ -3,6 +3,7 @@ using Asteriq.Models;
 using Asteriq.DirectInput;
 using Asteriq.Services.Abstractions;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 
 namespace Asteriq.Services;
 
@@ -22,6 +23,12 @@ public enum InputPollingBackend
 /// </summary>
 public class InputService : IInputService
 {
+    [DllImport("winmm.dll")]
+    private static extern int timeBeginPeriod(uint uPeriod);
+
+    [DllImport("winmm.dll")]
+    private static extern int timeEndPeriod(uint uPeriod);
+
     // Keyed by SDL instance ID (stable) rather than device index (can shift)
     private readonly ConcurrentDictionary<int, IntPtr> _openJoysticks = new();
     private readonly ConcurrentDictionary<int, PhysicalDeviceInfo> _deviceInfo = new();
@@ -32,6 +39,12 @@ public class InputService : IInputService
     private Task? _pollTask;
     private CancellationTokenSource? _pollCts;
     private bool _isInitialized;
+    private int _pollRateHz;
+
+    /// <summary>
+    /// The poll rate passed to StartPolling, in Hz. 0 if not yet started.
+    /// </summary>
+    public int PollRateHz => _pollRateHz;
     private HidDeviceService? _hidDeviceService;
     private List<HidDeviceService.HidDeviceInfo>? _hidDevicesCache;
     private readonly HashSet<string> _matchedHidDevicePaths = new();
@@ -399,10 +412,15 @@ public class InputService : IInputService
     {
         if (_isPolling) return;
 
+        _pollRateHz = pollRateHz;
         _isPolling = true;
         _pollCts = new CancellationTokenSource();
         int delayMs = 1000 / pollRateHz;
         var ct = _pollCts.Token;
+
+        // Request 1ms Windows timer resolution so Task.Delay fires accurately at high poll rates.
+        // Without this, the default ~15.6ms resolution turns a 500Hz (2ms) request into ~64Hz.
+        timeBeginPeriod(1);
 
         _pollTask = Task.Run(async () =>
         {
@@ -445,6 +463,12 @@ public class InputService : IInputService
 
         _pollCts?.Dispose();
         _pollCts = null;
+
+        if (_pollRateHz > 0)
+        {
+            timeEndPeriod(1);
+            _pollRateHz = 0;
+        }
     }
 
     /// <summary>
@@ -472,6 +496,12 @@ public class InputService : IInputService
 
         _pollCts?.Dispose();
         _pollCts = null;
+
+        if (_pollRateHz > 0)
+        {
+            timeEndPeriod(1);
+            _pollRateHz = 0;
+        }
     }
 
     /// <summary>

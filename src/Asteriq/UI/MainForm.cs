@@ -1088,7 +1088,7 @@ public partial class MainForm : Form
         _inputService.DeviceDisconnected += OnDeviceDisconnected;
         LoadDisconnectedDevices();
         RefreshDevices();
-        _inputService.StartPolling(100);
+        _inputService.StartPolling(500);
     }
 
     private void InitializeRenderLoop()

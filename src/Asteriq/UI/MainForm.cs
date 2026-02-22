@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -123,7 +123,7 @@ public partial class MainForm : Form
 
     // Tab state
     private int _activeTab = 0;
-    private readonly string[] _tabNames = { "DEVICES", "MAPPINGS", "SC EXPORT", "SETTINGS" };
+    private readonly string[] _tabNames = { "DEVICES", "MAPPINGS", "KEYBINDINGS", "SETTINGS" };
     private float _tabsStartX; // cached each draw pass, used by HitTest
 
     // Window control hover state

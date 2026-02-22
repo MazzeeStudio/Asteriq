@@ -128,7 +128,7 @@ public partial class MainForm
         _mappingRemoveButtonBounds.Clear();
         _bindingsListBounds = bounds;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
 
         bool hasVJoy = _vjoyDevices.Count > 0 && _selectedVJoyDeviceIndex < _vjoyDevices.Count;
         VJoyDeviceInfo? vjoyDevice = hasVJoy ? _vjoyDevices[_selectedVJoyDeviceIndex] : null;
@@ -815,7 +815,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return inputs;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return inputs;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return inputs;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -872,7 +872,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0 || _mappingCategory != 1) return null;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return null;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return null;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -1195,108 +1195,13 @@ public partial class MainForm
     }
 
     private void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked)
-    {
-        bool isHovered = bounds.Contains(_mousePosition.X, _mousePosition.Y);
-
-        // Box background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isChecked
-                ? FUIColors.Active.WithAlpha(60)
-                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2)
-        };
-        canvas.DrawRoundRect(bounds, 2, 2, bgPaint);
-
-        // Box frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = isChecked
-                ? FUIColors.Active
-                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
-            StrokeWidth = 1f
-        };
-        canvas.DrawRoundRect(bounds, 2, 2, framePaint);
-
-        // Checkmark
-        if (isChecked)
-        {
-            using var checkPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active,
-                StrokeWidth = 2f,
-                IsAntialias = true,
-                StrokeCap = SKStrokeCap.Round
-            };
-            float cx = bounds.MidX;
-            float cy = bounds.MidY;
-            float s = bounds.Width * 0.3f;
-            canvas.DrawLine(cx - s, cy, cx - s * 0.3f, cy + s * 0.7f, checkPaint);
-            canvas.DrawLine(cx - s * 0.3f, cy + s * 0.7f, cx + s, cy - s * 0.5f, checkPaint);
-        }
-    }
+        => FUIWidgets.DrawCheckbox(canvas, bounds, isChecked, _mousePosition);
 
     private void DrawInteractiveSlider(SKCanvas canvas, SKRect bounds, float value, SKColor color, bool dragging)
-    {
-        // Track background
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
-
-        // Track frame
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
-        // Fill
-        float fillWidth = bounds.Width * Math.Clamp(value, 0, 1);
-        if (fillWidth > 2)
-        {
-            var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(100) };
-            canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
-        }
-
-        // Handle
-        float handleX = bounds.Left + fillWidth;
-        float handleRadius = dragging ? 8f : 6f;
-        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = dragging ? color : FUIColors.TextPrimary, IsAntialias = true };
-        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
-
-        using var handleStroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = color, StrokeWidth = 1.5f, IsAntialias = true };
-        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
-    }
+        => FUIWidgets.DrawInteractiveSlider(canvas, bounds, value, color, dragging);
 
     private void DrawDurationSlider(SKCanvas canvas, SKRect bounds, float value, bool dragging)
-    {
-        value = Math.Clamp(value, 0f, 1f);
-
-        // Track background
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
-
-        // Track frame
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
-        // Fill
-        float fillWidth = bounds.Width * value;
-        if (fillWidth > 2)
-        {
-            var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80) };
-            canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
-        }
-
-        // Handle
-        float handleX = bounds.Left + fillWidth;
-        float handleRadius = dragging ? 8f : 6f;
-        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = dragging ? FUIColors.Active : FUIColors.TextPrimary, IsAntialias = true };
-        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
-
-        using var handleStroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1.5f, IsAntialias = true };
-        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
-    }
+        => FUIWidgets.DrawDurationSlider(canvas, bounds, value, dragging);
 
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
     {
@@ -1534,89 +1439,7 @@ public partial class MainForm
     /// Draw keycaps centered within given bounds
     /// </summary>
     private void DrawKeycapsInBounds(SKCanvas canvas, SKRect bounds, string keyName, List<string>? modifiers)
-    {
-        // Build list of key parts
-        var parts = new List<string>();
-        if (modifiers is not null && modifiers.Count > 0)
-        {
-            parts.AddRange(modifiers);
-        }
-        parts.Add(keyName);
-
-        float keycapHeight = 20f;
-        float keycapGap = 4f;
-        float keycapPadding = 8f;  // Padding on each side of text
-        float fontSize = 10f;
-        float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
-
-        // Use consistent font for measurement
-        using var measurePaint = new SKPaint
-        {
-            TextSize = scaledFontSize,
-            IsAntialias = true,
-            Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
-        };
-
-        // Calculate total width of all keycaps
-        float totalWidth = 0;
-        var keycapWidths = new List<float>();
-        var textWidths = new List<float>();
-        foreach (var part in parts)
-        {
-            string upperPart = part.ToUpperInvariant();
-            float textWidth = measurePaint.MeasureText(upperPart);
-            textWidths.Add(textWidth);
-            float keycapWidth = textWidth + keycapPadding * 2;
-            keycapWidths.Add(keycapWidth);
-            totalWidth += keycapWidth;
-        }
-        totalWidth += (parts.Count - 1) * keycapGap;
-
-        // Start position to center the keycaps
-        float startX = bounds.MidX - totalWidth / 2;
-        float keycapTop = bounds.MidY - keycapHeight / 2;
-
-        // Draw each keycap
-        for (int i = 0; i < parts.Count; i++)
-        {
-            string keyText = parts[i].ToUpperInvariant();
-            float keycapWidth = keycapWidths[i];
-            var keycapBounds = new SKRect(startX, keycapTop, startX + keycapWidth, keycapTop + keycapHeight);
-
-            // Keycap background
-            using var keycapBgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.TextPrimary.WithAlpha(25),
-                IsAntialias = true
-            };
-            canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
-
-            // Keycap frame
-            using var keycapFramePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.TextPrimary.WithAlpha(150),
-                StrokeWidth = 1f,
-                IsAntialias = true
-            };
-            canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
-
-            // Keycap text - draw with explicit padding from left edge
-            float textX = startX + keycapPadding;
-            float textY = keycapBounds.MidY + scaledFontSize / 3;
-            using var textPaint = new SKPaint
-            {
-                Color = FUIColors.TextPrimary,
-                TextSize = scaledFontSize,
-                IsAntialias = true,
-                Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
-            };
-            canvas.DrawText(keyText, textX, textY, textPaint);
-
-            startX += keycapWidth + keycapGap;
-        }
-    }
+        => FUIWidgets.DrawKeycapsInBounds(canvas, bounds, keyName, modifiers);
 
     private void DrawCurveVisualization(SKCanvas canvas, SKRect bounds)
     {
@@ -2640,83 +2463,13 @@ public partial class MainForm
     }
 
     private void DrawSlider(SKCanvas canvas, SKRect bounds, float value)
-    {
-        // Track background
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
-
-        // Fill
-        float fillWidth = bounds.Width * Math.Clamp(value, 0, 1);
-        var fillBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + fillWidth, bounds.Bottom);
-        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active };
-        canvas.DrawRoundRect(fillBounds, 4, 4, fillPaint);
-
-        // Handle
-        float handleX = bounds.Left + fillWidth;
-        float handleRadius = bounds.Height;
-        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
-        canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
-    }
+        => FUIWidgets.DrawSlider(canvas, bounds, value);
 
     private void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, bool on)
-    {
-        bool isHovered = bounds.Contains(_mousePosition.X, _mousePosition.Y);
-
-        // Track
-        SKColor trackColor = on
-            ? FUIColors.Active.WithAlpha(150)
-            : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = trackColor };
-        canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, trackPaint);
-
-        // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = on ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
-            StrokeWidth = 1f
-        };
-        canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, framePaint);
-
-        // Knob
-        float knobRadius = bounds.Height / 2 - 3;
-        float knobX = on ? bounds.Right - knobRadius - 3 : bounds.Left + knobRadius + 3;
-        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
-        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
-    }
+        => FUIWidgets.DrawToggleSwitch(canvas, bounds, on, _mousePosition);
 
     private void DrawSettingsSlider(SKCanvas canvas, SKRect bounds, int value, int maxValue)
-    {
-        float trackHeight = 4f;
-        float trackY = bounds.MidY - trackHeight / 2;
-        var trackRect = new SKRect(bounds.Left, trackY, bounds.Right, trackY + trackHeight);
-
-        // Track background
-        using var trackBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(trackRect, 2, 2, trackBgPaint);
-
-        // Track frame
-        using var trackFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-        canvas.DrawRoundRect(trackRect, 2, 2, trackFramePaint);
-
-        // Filled portion
-        float fillWidth = (bounds.Width - 6) * (value / (float)maxValue);
-        if (fillWidth > 0)
-        {
-            var fillRect = new SKRect(bounds.Left + 2, trackY + 1, bounds.Left + 2 + fillWidth, trackY + trackHeight - 1);
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
-            canvas.DrawRoundRect(fillRect, 1, 1, fillPaint);
-        }
-
-        // Knob
-        float knobX = bounds.Left + 3 + (bounds.Width - 6) * (value / (float)maxValue);
-        float knobRadius = 6f;
-        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright, IsAntialias = true };
-        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
-
-        using var knobFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobFramePaint);
-    }
+        => FUIWidgets.DrawSettingsSlider(canvas, bounds, value, maxValue);
 
     private void DrawMappingEditorPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
@@ -2872,25 +2625,7 @@ public partial class MainForm
     }
 
     private void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
-    {
-        var bgColor = active
-            ? FUIColors.Active.WithAlpha(60)
-            : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
-        var textColor = active ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = active ? FUIColors.Active : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
-    }
+        => FUIWidgets.DrawToggleButton(canvas, bounds, text, active, hovered);
 
     private float DrawManualEntrySection(SKCanvas canvas, SKRect bounds, float y, float leftMargin, float rightMargin)
     {
@@ -2946,27 +2681,7 @@ public partial class MainForm
     }
 
     private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
-    {
-        var bgColor = open ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = open ? FUIColors.Primary : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4),
-            FUIColors.TextPrimary, 11f);
-
-        // Arrow indicator
-        string arrow = open ? "▲" : "▼";
-        FUIRenderer.DrawText(canvas, arrow, new SKPoint(bounds.Right - 18, bounds.MidY + 4),
-            FUIColors.TextDim, 10f);
-    }
+        => FUIWidgets.DrawDropdown(canvas, bounds, text, open);
 
     private void DrawDeviceDropdownList(SKCanvas canvas, SKRect anchorBounds)
     {
@@ -3190,79 +2905,10 @@ public partial class MainForm
     }
 
     private void DrawActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
-    {
-        var bgColor = isPrimary
-            ? (hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(180))
-            : (hovered ? FUIColors.Primary.WithAlpha(60) : FUIColors.Background2);
-        var textColor = isPrimary
-            ? FUIColors.Background1
-            : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = isPrimary ? FUIColors.Active : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
-    }
+        => FUIWidgets.DrawActionButton(canvas, bounds, text, hovered, isPrimary);
 
     private void DrawArrowButton(SKCanvas canvas, SKRect bounds, string arrow, bool hovered, bool enabled)
-    {
-        var bgColor = enabled
-            ? (hovered ? FUIColors.Primary.WithAlpha(80) : FUIColors.Background2)
-            : FUIColors.Background1;
-        var arrowColor = enabled
-            ? (hovered ? FUIColors.TextBright : FUIColors.TextPrimary)
-            : FUIColors.TextDisabled;
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = enabled ? FUIColors.Frame : FUIColors.FrameDim,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        // Draw arrow shape instead of text (more reliable rendering)
-        float centerX = bounds.MidX;
-        float centerY = bounds.MidY;
-        float arrowSize = 8f;
-
-        using var arrowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = arrowColor,
-            IsAntialias = true
-        };
-
-        using var path = new SKPath();
-        if (arrow == "<")
-        {
-            // Left arrow: <
-            path.MoveTo(centerX + arrowSize / 2, centerY - arrowSize);
-            path.LineTo(centerX - arrowSize / 2, centerY);
-            path.LineTo(centerX + arrowSize / 2, centerY + arrowSize);
-            path.Close();
-        }
-        else
-        {
-            // Right arrow: >
-            path.MoveTo(centerX - arrowSize / 2, centerY - arrowSize);
-            path.LineTo(centerX + arrowSize / 2, centerY);
-            path.LineTo(centerX - arrowSize / 2, centerY + arrowSize);
-            path.Close();
-        }
-        canvas.DrawPath(path, arrowPaint);
-    }
+        => FUIWidgets.DrawArrowButton(canvas, bounds, arrow, hovered, enabled);
 
     private void DrawOutputMappingList(SKCanvas canvas, SKRect bounds)
     {
@@ -3280,7 +2926,7 @@ public partial class MainForm
         }
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
 
         float rowHeight = 32f;
         float rowGap = 4f;
@@ -3429,34 +3075,14 @@ public partial class MainForm
     }
 
     private void DrawSmallIconButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, bool isDanger = false)
-    {
-        var bgColor = hovered
-            ? (isDanger ? FUIColors.Warning.WithAlpha(60) : FUIColors.Active.WithAlpha(60))
-            : FUIColors.Background2.WithAlpha(100);
-        var textColor = hovered
-            ? (isDanger ? FUIColors.Warning : FUIColors.Active)
-            : FUIColors.TextDim;
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? (isDanger ? FUIColors.Warning : FUIColors.Active) : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, icon, bounds, textColor, 14f);
-    }
+        => FUIWidgets.DrawSmallIconButton(canvas, bounds, icon, hovered, isDanger);
 
     private void OpenMappingEditor(int rowIndex)
     {
-        if (!_profileService.HasActiveProfile)
+        if (!_profileManager.HasActiveProfile)
         {
             CreateNewProfilePrompt();
-            if (!_profileService.HasActiveProfile) return;
+            if (!_profileManager.HasActiveProfile) return;
         }
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
@@ -3479,7 +3105,7 @@ public partial class MainForm
 
     private void LoadExistingBinding(int rowIndex)
     {
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -3628,7 +3254,7 @@ public partial class MainForm
     {
         if (!_mappingEditorOpen || _pendingInput is null) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -3670,7 +3296,7 @@ public partial class MainForm
             profile.ButtonMappings.Add(mapping);
         }
 
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
         OnMappingsChanged();
         CloseMappingEditor();
     }
@@ -3723,10 +3349,10 @@ public partial class MainForm
         _selectedVJoyDeviceIndex = _vjoyDevices.IndexOf(vjoyDevice);
 
         // Ensure we have an active profile
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null)
         {
-            profile = _profileService.CreateAndActivateProfile($"1:1 - {physicalDevice.Name}");
+            profile = _profileManager.CreateAndActivateProfile($"1:1 - {physicalDevice.Name}");
         }
 
         // Build device ID for InputSource (using GUID)
@@ -3843,11 +3469,11 @@ public partial class MainForm
         }
 
         // Save the profile
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
         OnMappingsChanged();
 
         // Refresh profiles list
-        _profiles = _profileService.ListProfiles();
+        _profiles = _profileRepository.ListProfiles();
 
         // Switch to Mappings tab to show the new mappings
         _activeTab = 1;
@@ -4129,7 +3755,7 @@ public partial class MainForm
 
         if (!result) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         string deviceId = physicalDevice.InstanceGuid.ToString();
@@ -4139,7 +3765,7 @@ public partial class MainForm
         int buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
         int hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
 
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
         OnMappingsChanged();
 
         FUIMessageBox.ShowInfo(this,
@@ -4170,7 +3796,7 @@ public partial class MainForm
 
         if (!result) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         string deviceId = device.InstanceGuid.ToString();
 
         // Remove all mappings from this device
@@ -4180,7 +3806,7 @@ public partial class MainForm
             axisRemoved = profile.AxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
             buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
             hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
             OnMappingsChanged();
         }
 
@@ -4204,7 +3830,7 @@ public partial class MainForm
 
     private void CreateBindingForRow(int rowIndex, DetectedInput input)
     {
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4250,13 +3876,13 @@ public partial class MainForm
             profile.ButtonMappings.Add(mapping);
         }
 
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
         OnMappingsChanged();
     }
 
     private void RemoveBindingAtRow(int rowIndex, bool save = true)
     {
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4291,7 +3917,7 @@ public partial class MainForm
 
         if (save)
         {
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
             OnMappingsChanged();
         }
     }
@@ -4463,7 +4089,7 @@ public partial class MainForm
                 int targetRowIndex = rowIndex;
 
                 // Check for duplicate mapping
-                var profile = _profileService.ActiveProfile;
+                var profile = _profileManager.ActiveProfile;
                 if (profile is not null)
                 {
                     var existingMapping = FindExistingMappingForInput(profile, inputSource);
@@ -4518,7 +4144,7 @@ public partial class MainForm
 
             if (detected is not null && _pendingKeyboardKey is not null)
             {
-                var profile = _profileService.ActiveProfile;
+                var profile = _profileManager.ActiveProfile;
                 if (profile is null) return;
 
                 var newInputSource = detected.ToInputSource();
@@ -4555,7 +4181,7 @@ public partial class MainForm
                 };
                 profile.ButtonMappings.Add(mapping);
                 profile.ModifiedAt = DateTime.UtcNow;
-                _profileService.SaveActiveProfile();
+                _profileManager.SaveActiveProfile();
                 OnMappingsChanged();
 
                 // Update the pending input so UI can show it
@@ -4583,7 +4209,7 @@ public partial class MainForm
 
     private void SaveMappingForRow(int rowIndex, DetectedInput input, bool isAxis)
     {
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
@@ -4684,7 +4310,7 @@ public partial class MainForm
         }
 
         profile.ModifiedAt = DateTime.UtcNow;
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
         OnMappingsChanged();
         _pendingInput = null;
     }
@@ -4694,7 +4320,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4738,7 +4364,7 @@ public partial class MainForm
         }
 
         profile.ModifiedAt = DateTime.UtcNow;
-        _profileService.SaveActiveProfile();
+        _profileManager.SaveActiveProfile();
         OnMappingsChanged();
     }
 
@@ -4752,11 +4378,11 @@ public partial class MainForm
 
         axisMapping.MergeOp = ops[mergeOpIndex];
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is not null)
         {
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
         }
         OnMappingsChanged();
     }
@@ -4840,11 +4466,11 @@ public partial class MainForm
         }
 
         // Persist
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is not null)
         {
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
         }
     }
 
@@ -4864,7 +4490,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4892,7 +4518,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4907,7 +4533,7 @@ public partial class MainForm
         {
             mapping.Mode = _selectedButtonMode;
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
         }
     }
 
@@ -4918,7 +4544,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4943,7 +4569,7 @@ public partial class MainForm
                 mapping.Output.KeyName = _selectedKeyName;
             }
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
         }
     }
 
@@ -4954,7 +4580,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -4988,7 +4614,7 @@ public partial class MainForm
             mapping.Output.KeyName = _selectedKeyName;
             mapping.Output.Modifiers = _selectedModifiers?.ToList();
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
         }
     }
 
@@ -5002,7 +4628,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -5017,7 +4643,7 @@ public partial class MainForm
         {
             profile.ButtonMappings.Remove(mapping);
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
             OnMappingsChanged();
 
             // Reset UI state
@@ -5038,7 +4664,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -5055,7 +4681,7 @@ public partial class MainForm
             mapping.Output.KeyName = null;
             mapping.Output.Modifiers = null;
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
 
             // Update UI state
             _selectedKeyName = "";
@@ -5093,7 +4719,7 @@ public partial class MainForm
         if (_selectedMappingRow < 0) return;
         if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count) return;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
@@ -5108,44 +4734,12 @@ public partial class MainForm
             mapping.PulseDurationMs = _pulseDurationMs;
             mapping.HoldDurationMs = _holdDurationMs;
             profile.ModifiedAt = DateTime.UtcNow;
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
         }
     }
 
     private void DrawAddMappingButton(SKCanvas canvas, SKRect bounds, bool hovered)
-    {
-        var bgColor = hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Primary.WithAlpha(30);
-        var frameColor = hovered ? FUIColors.Active : FUIColors.Primary;
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = hovered ? 2f : 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        // Plus icon
-        float iconX = bounds.Left + 16;
-        float iconY = bounds.MidY;
-        using var iconPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? FUIColors.TextBright : FUIColors.TextPrimary,
-            StrokeWidth = 2f,
-            IsAntialias = true
-        };
-        canvas.DrawLine(iconX - 6, iconY, iconX + 6, iconY, iconPaint);
-        canvas.DrawLine(iconX, iconY - 6, iconX, iconY + 6, iconPaint);
-
-        FUIRenderer.DrawText(canvas, "ADD MAPPING",
-            new SKPoint(bounds.Left + 30, bounds.MidY + 5),
-            hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 12f);
-    }
+        => FUIWidgets.DrawAddMappingButton(canvas, bounds, hovered);
 
     private void DrawMappingList(SKCanvas canvas, SKRect bounds)
     {
@@ -5153,7 +4747,7 @@ public partial class MainForm
         float itemGap = 8f;
         float y = bounds.Top;
 
-        var profile = _profileService.ActiveProfile;
+        var profile = _profileManager.ActiveProfile;
         if (profile is null)
         {
             FUIRenderer.DrawText(canvas, "No profile selected",
@@ -5203,54 +4797,15 @@ public partial class MainForm
     }
 
     private void DrawMappingItem(SKCanvas canvas, SKRect bounds, string source, string target, string type, bool enabled)
-    {
-        // Background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = enabled ? FUIColors.Background2.WithAlpha(100) : FUIColors.Background1.WithAlpha(80)
-        };
-        canvas.DrawRect(bounds, bgPaint);
-
-        // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = enabled ? FUIColors.Frame : FUIColors.FrameDim,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRect(bounds, framePaint);
-
-        // Type badge
-        var typeColor = type == "BUTTON" ? FUIColors.Active : FUIColors.Primary;
-        FUIRenderer.DrawText(canvas, type, new SKPoint(bounds.Left + 10, bounds.Top + 18),
-            enabled ? typeColor : typeColor.WithAlpha(100), 10f);
-
-        // Source
-        FUIRenderer.DrawText(canvas, source, new SKPoint(bounds.Left + 80, bounds.Top + 18),
-            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 12f);
-
-        // Arrow
-        FUIRenderer.DrawText(canvas, "->", new SKPoint(bounds.Left + 80, bounds.Top + 36),
-            FUIColors.TextDim, 11f);
-
-        // Target
-        FUIRenderer.DrawText(canvas, target, new SKPoint(bounds.Left + 110, bounds.Top + 36),
-            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 12f);
-
-        // Status indicator
-        var statusColor = enabled ? FUIColors.Success : FUIColors.TextDisabled;
-        FUIRenderer.DrawGlowingDot(canvas, new SKPoint(bounds.Right - 20, bounds.MidY),
-            statusColor, 4f, enabled ? 6f : 2f);
-    }
+        => FUIWidgets.DrawMappingItem(canvas, bounds, source, target, type, enabled);
 
     private void OpenAddMappingDialog()
     {
         // Ensure we have an active profile
-        if (!_profileService.HasActiveProfile)
+        if (!_profileManager.HasActiveProfile)
         {
             CreateNewProfilePrompt();
-            if (!_profileService.HasActiveProfile) return;
+            if (!_profileManager.HasActiveProfile) return;
         }
 
         using var dialog = new MappingDialog(_inputService, _vjoyService);
@@ -5268,7 +4823,7 @@ public partial class MainForm
                     Output = result.Output!,
                     Mode = result.ButtonMode
                 };
-                _profileService.ActiveProfile!.ButtonMappings.Add(mapping);
+                _profileManager.ActiveProfile!.ButtonMappings.Add(mapping);
             }
             else if (result.Input.Type == InputType.Axis)
             {
@@ -5279,7 +4834,7 @@ public partial class MainForm
                     Output = result.Output!,
                     Curve = result.AxisCurve ?? new AxisCurve()
                 };
-                _profileService.ActiveProfile!.AxisMappings.Add(mapping);
+                _profileManager.ActiveProfile!.AxisMappings.Add(mapping);
             }
             else if (result.Input.Type == InputType.Hat)
             {
@@ -5290,11 +4845,11 @@ public partial class MainForm
                     Output = result.Output!,
                     UseContinuous = true // Default to continuous POV
                 };
-                _profileService.ActiveProfile!.HatMappings.Add(mapping);
+                _profileManager.ActiveProfile!.HatMappings.Add(mapping);
             }
 
             // Save the profile
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
             OnMappingsChanged();
         }
     }
@@ -5322,10 +4877,10 @@ public partial class MainForm
             return;
 
         // Ensure we have an active profile
-        if (!_profileService.HasActiveProfile)
+        if (!_profileManager.HasActiveProfile)
         {
             CreateNewProfilePrompt();
-            if (!_profileService.HasActiveProfile) return;
+            if (!_profileManager.HasActiveProfile) return;
         }
 
         // Create a pre-selected DetectedInput
@@ -5354,7 +4909,7 @@ public partial class MainForm
                     Output = result.Output!,
                     Mode = result.ButtonMode
                 };
-                _profileService.ActiveProfile!.ButtonMappings.Add(mapping);
+                _profileManager.ActiveProfile!.ButtonMappings.Add(mapping);
             }
             else if (result.Input.Type == InputType.Axis)
             {
@@ -5365,7 +4920,7 @@ public partial class MainForm
                     Output = result.Output!,
                     Curve = result.AxisCurve ?? new AxisCurve()
                 };
-                _profileService.ActiveProfile!.AxisMappings.Add(mapping);
+                _profileManager.ActiveProfile!.AxisMappings.Add(mapping);
             }
             else if (result.Input.Type == InputType.Hat)
             {
@@ -5376,11 +4931,11 @@ public partial class MainForm
                     Output = result.Output!,
                     UseContinuous = true
                 };
-                _profileService.ActiveProfile!.HatMappings.Add(mapping);
+                _profileManager.ActiveProfile!.HatMappings.Add(mapping);
             }
 
             // Save the profile
-            _profileService.SaveActiveProfile();
+            _profileManager.SaveActiveProfile();
             OnMappingsChanged();
         }
     }

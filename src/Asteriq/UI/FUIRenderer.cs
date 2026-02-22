@@ -111,31 +111,32 @@ public static class FUIRenderer
     public static float FontScaleFactor => _displayScaleFactor * _windowsTextScaleFactor * UserScaleMultiplier;
 
     /// <summary>
-    /// Scale a font size according to Windows + user settings
+    /// Scale a font size for DPI + Windows text setting only.
+    /// UserScaleMultiplier is applied via canvas.Scale() in OnPaintSurface so all
+    /// elements (text AND layout boxes) scale uniformly without overflow.
     /// </summary>
-    public static float ScaleFont(float baseSize) => baseSize * FontScaleFactor;
+    public static float ScaleFont(float baseSize) => baseSize * _displayScaleFactor * _windowsTextScaleFactor;
 
     /// <summary>
-    /// Scale spacing/padding to account for larger fonts
-    /// Uses a dampened scale to avoid excessive spacing
+    /// Scale spacing/padding to account for DPI. Dampened so spacing grows
+    /// less aggressively than font size.
     /// </summary>
     public static float ScaleSpacing(float baseSpacing)
     {
-        // Use square root for dampened scaling - if fonts are 1.5x, spacing is ~1.22x
-        float dampenedScale = 1f + (FontScaleFactor - 1f) * 0.5f;
+        float dpiScale = _displayScaleFactor * _windowsTextScaleFactor;
+        float dampenedScale = 1f + (dpiScale - 1f) * 0.5f;
         return baseSpacing * dampenedScale;
     }
 
     /// <summary>
     /// Scale layout values (margins, padding, sizes) by DPI only.
-    /// Use this for UI layout that should scale with display but not font preferences.
     /// </summary>
     public static float ScaleLayout(float baseValue) => baseValue * _displayScaleFactor;
 
     /// <summary>
     /// Scale line height for text rows
     /// </summary>
-    public static float ScaleLineHeight(float baseHeight) => baseHeight * FontScaleFactor;
+    public static float ScaleLineHeight(float baseHeight) => baseHeight * _displayScaleFactor * _windowsTextScaleFactor;
 
     // Legacy property for compatibility - returns an additive offset approximation
     [Obsolete("Use ScaleFont() instead for proper multiplicative scaling")]

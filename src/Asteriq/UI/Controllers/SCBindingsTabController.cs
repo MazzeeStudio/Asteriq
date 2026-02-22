@@ -485,10 +485,7 @@ public class SCBindingsTabController : ITabController
     private void RefreshSCExportProfiles()
     {
         if (_scExportProfileService is null) return;
-        // Filter out legacy "asteriq" profile - it was auto-generated, never user-chosen
-        _scExportProfiles = _scExportProfileService.ListProfiles()
-            .Where(p => p.ProfileName != "asteriq")
-            .ToList();
+        _scExportProfiles = _scExportProfileService.ListProfiles();
     }
 
     /// <summary>

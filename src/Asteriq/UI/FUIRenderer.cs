@@ -179,6 +179,21 @@ public static class FUIRenderer
     public const float FontTitle = 28f;       // Page/panel titles
     public const float FontTitleLarge = 40f;  // Hero titles
 
+    // Sub-caption sizes for dense UI elements (below Windows Type Ramp minimum)
+    public const float FontMicro = 8f;        // Tiny labels, icon annotations
+    public const float FontSmall = 9f;        // Hints, secondary metadata
+    public const float FontNote = 10f;        // Notes, compact labels, tooltips
+    public const float FontBodyCompact = 11f; // Dense body text (tight list views, badges)
+
+    // Control-specific corner radius — smaller than panel CornerRadiusSmall (4f)
+    // Used on small interactive controls: badges, checkboxes, inline buttons
+    public const float ControlCornerRadius = 3f;
+
+    // Badge and component heights
+    public const float BadgeHeightSmall = 16f;     // Tiny inline badges (type indicators)
+    public const float BadgeHeightStandard = 20f;  // Standard badges (binding display)
+    public const float DropdownItemHeight = 28f;   // Dropdown/list item row height
+
     // Line heights for proper text spacing
     public const float LineHeightCaption = 16f;
     public const float LineHeightBody = 20f;

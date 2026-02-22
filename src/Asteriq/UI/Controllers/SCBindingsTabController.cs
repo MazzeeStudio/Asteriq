@@ -1,18 +1,402 @@
 using System.Xml;
 using Asteriq.Models;
 using Asteriq.Services;
+using Asteriq.Services.Abstractions;
 using SkiaSharp;
 
-namespace Asteriq.UI;
+namespace Asteriq.UI.Controllers;
 
 /// <summary>
-/// MainForm partial - SC Bindings tab rendering and logic
+/// SC Bindings tab controller - Star Citizen binding export/import.
 /// </summary>
-public partial class MainForm
+public class SCBindingsTabController : ITabController
 {
+    private readonly TabContext _ctx;
+
+    // SC-specific services
+    private readonly ISCInstallationService _scInstallationService;
+    private readonly SCProfileCacheService _scProfileCacheService;
+    private readonly SCSchemaService _scSchemaService;
+    private readonly SCXmlExportService _scExportService;
+    private readonly SCExportProfileService _scExportProfileService;
+
+    // SC state
+    private List<SCInstallation> _scInstallations = new();
+    private int _selectedSCInstallation = 0;
+    private SCExportProfile _scExportProfile = new();
+    private List<SCAction>? _scActions;
+    private string? _scExportStatus;
+    private DateTime _scExportStatusTime;
+
+    // SC UI bounds
+    private SKRect _scInstallationSelectorBounds;
+    private bool _scInstallationDropdownOpen;
+    private SKRect _scInstallationDropdownBounds;
+    private int _hoveredSCInstallation = -1;
+    private SKRect _scExportButtonBounds;
+    private bool _scExportButtonHovered;
+    private SKRect _scExportFilenameBoxBounds;
+    private bool _scExportFilenameBoxFocused;
+    private string _scExportFilename = "";
+    private SKRect _scImportButtonBounds;
+    private bool _scImportButtonHovered;
+    private List<SCMappingFile> _scAvailableProfiles = new();
+    private bool _scImportDropdownOpen;
+    private SKRect _scImportDropdownBounds;
+    private int _scHoveredImportProfile = -1;
+    private SKRect _scRefreshButtonBounds;
+    private bool _scRefreshButtonHovered;
+    private SKRect _scClearAllButtonBounds;
+    private bool _scClearAllButtonHovered;
+    private SKRect _scResetDefaultsButtonBounds;
+    private bool _scResetDefaultsButtonHovered;
+    private SKRect _scProfileNameBounds;
+    private bool _scProfileNameHovered;
+    private List<SKRect> _scVJoyMappingBounds = new();
+    private int _hoveredVJoyMapping = -1;
+
+    // SC table state
+    private List<SCAction>? _scFilteredActions;
+    private string _scActionMapFilter = "";
+    private int _scSelectedActionIndex = -1;
+    private int _scHoveredActionIndex = -1;
+    private float _scBindingsScrollOffset = 0;
+    private float _scBindingsContentHeight = 0;
+    private SKRect _scBindingsListBounds;
+    private List<SKRect> _scActionRowBounds = new();
+    private SKRect _scActionMapFilterBounds;
+    private bool _scActionMapFilterDropdownOpen;
+    private SKRect _scActionMapFilterDropdownBounds;
+    private int _scHoveredActionMapFilter = -1;
+    private float _scActionMapFilterScrollOffset = 0;
+    private float _scActionMapFilterMaxScroll = 0;
+    private List<string> _scActionMaps = new();
+
+    // SC grid column state
+    private float _scGridActionColWidth = 300f;
+    private float _scGridDeviceColMinWidth = 160f;
+    private Dictionary<string, float> _scGridDeviceColWidths = new();
+    private float _scGridHorizontalScroll = 0f;
+    private float _scGridTotalWidth = 0f;
+    private List<SCGridColumn>? _scGridColumns;
+    private float _scDeviceColsStart = 0f;
+    private float _scVisibleDeviceWidth = 0f;
+
+    // SC cell interaction state
+    private (int actionIndex, int colIndex) _scSelectedCell = (-1, -1);
+    private (int actionIndex, int colIndex) _scHoveredCell = (-1, -1);
+    private bool _scIsListeningForInput = false;
+    private DateTime _scListeningStartTime;
+    private DateTime _scLastCellClickTime;
+    private const int SCListeningTimeoutMs = 5000;
+    private SCGridColumn? _scListeningColumn;
+    private HashSet<string> _scConflictingBindings = new();
+    private int _scHighlightedColumn = -1;
+
+    // SC scrollbar state
+    private bool _scIsDraggingVScroll = false;
+    private bool _scIsDraggingHScroll = false;
+    private float _scScrollDragStartY = 0;
+    private float _scScrollDragStartX = 0;
+    private float _scScrollDragStartOffset = 0;
+    private SKRect _scVScrollbarBounds;
+    private SKRect _scHScrollbarBounds;
+    private SKRect _scVScrollThumbBounds;
+    private SKRect _scHScrollThumbBounds;
+    private SKRect _scColumnHeadersBounds;
+
+    // SC search/filter state
+    private string _scSearchText = "";
+    private bool _scShowBoundOnly = false;
+    private SKRect _scSearchBoxBounds;
+    private bool _scSearchBoxFocused = false;
+    private SKRect _scShowBoundOnlyBounds;
+    private bool _scShowBoundOnlyHovered = false;
+
+    // SC category collapse state
+    private HashSet<string> _scCollapsedCategories = new();
+    private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();
+
+    // SC binding assignment state
+    private bool _scAssigningInput = false;
+    private SKRect _scAssignInputButtonBounds;
+    private bool _scAssignInputButtonHovered;
+    private SKRect _scClearBindingButtonBounds;
+    private bool _scClearBindingButtonHovered;
+
+    // SC export profile management
+    private List<SCExportProfileInfo> _scExportProfiles = new();
+    private SKRect _scProfileDropdownBounds;
+    private bool _scProfileDropdownOpen;
+    private SKRect _scProfileDropdownListBounds;
+    private int _scHoveredProfileIndex = -1;
+    private SKRect _scNewProfileButtonBounds;
+    private bool _scNewProfileButtonHovered;
+    private SKRect _scSaveProfileButtonBounds;
+    private bool _scSaveProfileButtonHovered;
+    private SKRect _scDeleteProfileButtonBounds = default;
+
+    // Public properties for MainForm mouse dispatch
+    public bool IsDraggingVScroll => _scIsDraggingVScroll;
+    public bool IsDraggingHScroll => _scIsDraggingHScroll;
+    public bool IsSearchBoxFocused => _scSearchBoxFocused;
+    public bool IsExportFilenameBoxFocused => _scExportFilenameBoxFocused;
+
+    public SCBindingsTabController(
+        TabContext ctx,
+        ISCInstallationService scInstallationService,
+        SCProfileCacheService scProfileCacheService,
+        SCSchemaService scSchemaService,
+        SCXmlExportService scExportService,
+        SCExportProfileService scExportProfileService)
+    {
+        _ctx = ctx;
+        _scInstallationService = scInstallationService;
+        _scProfileCacheService = scProfileCacheService;
+        _scSchemaService = scSchemaService;
+        _scExportService = scExportService;
+        _scExportProfileService = scExportProfileService;
+    }
+
+    #region ITabController
+
+    public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
+    {
+        DrawBindingsTabContent(canvas, bounds, padLeft, contentTop, contentBottom);
+    }
+
+    public void OnMouseDown(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Right)
+        {
+            HandleBindingsTabRightClick(new SKPoint(e.X, e.Y));
+            return;
+        }
+        if (e.Button == MouseButtons.Left)
+        {
+            HandleBindingsTabClick(new SKPoint(e.X, e.Y));
+        }
+    }
+
+    public void OnMouseMove(MouseEventArgs e)
+    {
+        // Handle scrollbar dragging
+        if (_scIsDraggingVScroll)
+        {
+            float deltaY = e.Y - _scScrollDragStartY;
+            float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
+            float trackHeight = _scVScrollbarBounds.Height - _scVScrollThumbBounds.Height;
+            if (trackHeight > 0 && maxScroll > 0)
+            {
+                float scrollDelta = (deltaY / trackHeight) * maxScroll;
+                _scBindingsScrollOffset = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxScroll);
+            }
+            _ctx.MarkDirty();
+            return;
+        }
+
+        if (_scIsDraggingHScroll)
+        {
+            float deltaX = e.X - _scScrollDragStartX;
+            float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
+            float trackWidth = _scHScrollbarBounds.Width - _scHScrollThumbBounds.Width;
+            if (trackWidth > 0 && maxHScroll > 0)
+            {
+                float scrollDelta = (deltaX / trackWidth) * maxHScroll;
+                _scGridHorizontalScroll = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxHScroll);
+            }
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // Installation dropdown hover
+        if (_scInstallationDropdownOpen && _scInstallationDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemHeight = 28f;
+            int itemIndex = (int)((e.Y - _scInstallationDropdownBounds.Top - 2) / itemHeight);
+            _hoveredSCInstallation = itemIndex >= 0 && itemIndex < _scInstallations.Count ? itemIndex : -1;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+        else
+        {
+            _hoveredSCInstallation = -1;
+        }
+
+        // Reset hover states
+        _hoveredVJoyMapping = -1;
+        _scHoveredActionIndex = -1;
+        _scHoveredActionMapFilter = -1;
+        _scHoveredCell = (-1, -1);
+
+        // Action map filter dropdown hover
+        if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemHeight = 24f;
+            float relativeY = e.Y - _scActionMapFilterDropdownBounds.Top - 2 + _scActionMapFilterScrollOffset;
+            int itemIndex = (int)(relativeY / itemHeight) - 1;
+            _scHoveredActionMapFilter = itemIndex >= -1 && itemIndex < _scActionMaps.Count ? itemIndex : -1;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+
+        // Action row and cell hover
+        if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions is not null)
+        {
+            float rowHeight = 28f;
+            float rowGap = 2f;
+            float categoryHeaderHeight = 28f;
+            float relativeY = e.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
+
+            string? lastActionMap = null;
+            float currentY = 0;
+
+            for (int i = 0; i < _scFilteredActions.Count; i++)
+            {
+                var action = _scFilteredActions[i];
+
+                if (action.ActionMap != lastActionMap)
+                {
+                    lastActionMap = action.ActionMap;
+                    currentY += categoryHeaderHeight;
+
+                    if (_scCollapsedCategories.Contains(action.ActionMap))
+                    {
+                        while (i < _scFilteredActions.Count - 1 &&
+                               _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                        {
+                            i++;
+                        }
+                        continue;
+                    }
+                }
+
+                float rowTop = currentY;
+                float rowBottom = currentY + rowHeight;
+
+                if (relativeY >= rowTop && relativeY < rowBottom)
+                {
+                    _scHoveredActionIndex = i;
+
+                    int hoveredCol = GetHoveredColumnIndex(e.X);
+                    if (hoveredCol >= 0)
+                    {
+                        _scHoveredCell = (i, hoveredCol);
+                    }
+
+                    _ctx.OwnerForm.Cursor = Cursors.Hand;
+                    break;
+                }
+
+                currentY += rowHeight + rowGap;
+            }
+        }
+
+        // vJoy mapping rows
+        for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
+        {
+            if (_scVJoyMappingBounds[i].Contains(e.X, e.Y))
+            {
+                _hoveredVJoyMapping = i;
+                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                break;
+            }
+        }
+
+        // Buttons and selectors
+        if (_scRefreshButtonBounds.Contains(e.X, e.Y) ||
+            _scExportButtonBounds.Contains(e.X, e.Y) ||
+            _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
+            _scProfileNameBounds.Contains(e.X, e.Y) ||
+            _scActionMapFilterBounds.Contains(e.X, e.Y) ||
+            _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
+            _scClearBindingButtonBounds.Contains(e.X, e.Y))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+
+        // Listening timeout
+        if (_scIsListeningForInput && (DateTime.Now - _scListeningStartTime).TotalMilliseconds > SCListeningTimeoutMs)
+        {
+            _scIsListeningForInput = false;
+            _scListeningColumn = null;
+        }
+    }
+
+    public void OnMouseUp(MouseEventArgs e)
+    {
+        if (_scIsDraggingVScroll || _scIsDraggingHScroll)
+        {
+            _scIsDraggingVScroll = false;
+            _scIsDraggingHScroll = false;
+            _ctx.MarkDirty();
+        }
+    }
+
+    public void OnMouseWheel(MouseEventArgs e)
+    {
+        // Action map filter dropdown scroll
+        if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+        {
+            float scrollAmount = -e.Delta / 4f;
+            _scActionMapFilterScrollOffset = Math.Clamp(_scActionMapFilterScrollOffset + scrollAmount, 0, _scActionMapFilterMaxScroll);
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // SC bindings list scroll
+        if (_scBindingsListBounds.Contains(e.X, e.Y))
+        {
+            float scrollAmount = -e.Delta / 4f;
+
+            if (Control.ModifierKeys.HasFlag(Keys.Shift))
+            {
+                float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
+                if (maxHScroll > 0)
+                {
+                    _scGridHorizontalScroll = Math.Clamp(_scGridHorizontalScroll + scrollAmount, 0, maxHScroll);
+                }
+            }
+            else
+            {
+                float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
+                _scBindingsScrollOffset = Math.Clamp(_scBindingsScrollOffset + scrollAmount, 0, maxScroll);
+            }
+            _ctx.MarkDirty();
+        }
+    }
+
+    public bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (_scSearchBoxFocused)
+            return HandleSearchBoxKey(keyData);
+        if (_scExportFilenameBoxFocused)
+            return HandleExportFilenameBoxKey(keyData);
+        return false;
+    }
+
+    public void OnMouseLeave()
+    {
+        _hoveredSCInstallation = -1;
+        _scHoveredActionIndex = -1;
+        _scHoveredCell = (-1, -1);
+    }
+
+    public void OnTick()
+    {
+        if (_scIsListeningForInput)
+        {
+            CheckSCBindingInput();
+        }
+    }
+
+    public void OnActivated() { }
+    public void OnDeactivated() { }
+
+    #endregion
+
     #region SC Bindings Initialization
 
-    private void InitializeSCBindings()
+    public void Initialize()
     {
         try
         {
@@ -21,19 +405,19 @@ public partial class MainForm
             // _scExportService, and _scExportProfileService are already assigned
 
             // Ensure vJoy devices are enumerated for SC Bindings columns
-            if (_vjoyDevices.Count == 0 && _vjoyService is not null)
+            if (_ctx.VJoyDevices.Count == 0 && _ctx.VJoyService is not null)
             {
-                _vjoyDevices = _vjoyService.EnumerateDevices();
+                _ctx.VJoyDevices = _ctx.VJoyService.EnumerateDevices();
             }
 
             RefreshSCInstallations();
             RefreshSCExportProfiles();
 
             // Try to load the last used SC export profile
-            var lastProfileName = _profileService.LastSCExportProfile;
+            var lastProfileName = _ctx.AppSettings.LastSCExportProfile;
             SCExportProfile? loadedProfile = null;
 
-            if (!string.IsNullOrEmpty(lastProfileName) && _profileService.AutoLoadLastSCExportProfile)
+            if (!string.IsNullOrEmpty(lastProfileName) && _ctx.AppSettings.AutoLoadLastSCExportProfile)
             {
                 loadedProfile = _scExportProfileService.LoadProfile(lastProfileName);
             }
@@ -52,7 +436,7 @@ public partial class MainForm
                 };
 
                 // Set up default vJoy mappings based on available vJoy devices
-                foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+                foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 {
                     _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
                 }
@@ -129,7 +513,7 @@ public partial class MainForm
         };
 
         // Add a column for each vJoy device that exists and is mapped in the export profile
-        foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+        foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
         {
             int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
             columns.Add(new SCGridColumn
@@ -167,8 +551,15 @@ public partial class MainForm
 
         _scInstallations = _scInstallationService.Installations.ToList();
 
-        // Select preferred installation if none selected
-        if (_selectedSCInstallation >= _scInstallations.Count)
+        // Restore preferred environment selection (e.g. LIVE, PTU)
+        var preferredEnv = _ctx.AppSettings.PreferredSCEnvironment;
+        if (!string.IsNullOrEmpty(preferredEnv))
+        {
+            int preferredIndex = _scInstallations.FindIndex(i =>
+                string.Equals(i.Environment, preferredEnv, StringComparison.OrdinalIgnoreCase));
+            _selectedSCInstallation = preferredIndex >= 0 ? preferredIndex : 0;
+        }
+        else if (_selectedSCInstallation >= _scInstallations.Count)
         {
             _selectedSCInstallation = 0;
         }
@@ -547,8 +938,8 @@ public partial class MainForm
             ? _scInstallations[_selectedSCInstallation].DisplayName
             : "No SC installation found";
 
-        bool selectorHovered = _scInstallationSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
+        bool selectorHovered = _scInstallationSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
         y += selectorHeight + lineHeight;
 
         // Installation details
@@ -592,7 +983,7 @@ public partial class MainForm
         float buttonWidth = 120f;
         float buttonHeight = FUIRenderer.TouchTargetCompact;  // 32px
         _scRefreshButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
-        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scRefreshButtonHovered = _scRefreshButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scRefreshButtonBounds, "REFRESH",
             _scRefreshButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
@@ -606,8 +997,8 @@ public partial class MainForm
 
         float nameFieldHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
         _scProfileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameFieldHeight);
-        _scProfileNameHovered = _scProfileNameBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawTextFieldReadOnly(canvas, _scProfileNameBounds, _scExportProfile.ProfileName, _scProfileNameHovered);
+        _scProfileNameHovered = _scProfileNameBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawTextFieldReadOnly(canvas, _scProfileNameBounds, _scExportProfile.ProfileName, _scProfileNameHovered);
         y += nameFieldHeight + 12f;  // 4px aligned
 
         // Export filename preview
@@ -657,7 +1048,7 @@ public partial class MainForm
         float buttonX = leftMargin + (rightMargin - leftMargin - buttonWidth) / 2;
 
         _scImportButtonBounds = new SKRect(buttonX, y, buttonX + buttonWidth, y + buttonHeight);
-        _scImportButtonHovered = _scImportButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scImportButtonHovered = _scImportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         string importText = _scAvailableProfiles.Count > 0
             ? $"Import ({_scAvailableProfiles.Count} profiles)"
@@ -722,7 +1113,7 @@ public partial class MainForm
 
         // Export button
         _scExportButtonBounds = new SKRect(buttonX, y, buttonX + buttonWidth, y + buttonHeight);
-        _scExportButtonHovered = _scExportButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         // Can export if: SC installation exists AND (no JS bindings OR has vJoy mappings)
         var hasJsBindings = _scExportProfile.Bindings.Any(b => b.DeviceType == SCDeviceType.Joystick);
@@ -854,8 +1245,8 @@ public partial class MainForm
             ? _scInstallations[_selectedSCInstallation].DisplayName
             : "No SC found";
 
-        bool selectorHovered = _scInstallationSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
+        bool selectorHovered = _scInstallationSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSelector(canvas, _scInstallationSelectorBounds, installationText, selectorHovered || _scInstallationDropdownOpen, _scInstallations.Count > 0);
     }
 
     private void DrawSCBindingsTablePanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -879,10 +1270,16 @@ public partial class MainForm
         // Title row with action count
         FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
 
-        // Action count on right of title
+        // Action count on right of title - show "N of T" when filtered
         int actionCount = _scFilteredActions?.Count ?? 0;
         int boundCount = _scFilteredActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
-        string countText = $"{actionCount} actions, {boundCount} bound";
+        bool isFiltered = !string.IsNullOrEmpty(_scActionMapFilter) || !string.IsNullOrEmpty(_scSearchText) || _scShowBoundOnly;
+        int totalCount = _scSchemaService is not null && _scActions is not null
+            ? _scSchemaService.FilterJoystickActions(_scActions).Count
+            : actionCount;
+        string countText = isFiltered
+            ? $"{actionCount} of {totalCount}, {boundCount} bound"
+            : $"{actionCount} actions, {boundCount} bound";
         float countTextWidth = FUIRenderer.MeasureText(countText, 9f);
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 9f);
 
@@ -898,8 +1295,8 @@ public partial class MainForm
         float filterX = rightMargin - filterWidth;
         _scActionMapFilterBounds = new SKRect(filterX, y, rightMargin, y + filterRowHeight);
         string filterText = string.IsNullOrEmpty(_scActionMapFilter) ? "All Categories" : FormatActionMapName(_scActionMapFilter);
-        bool filterHovered = _scActionMapFilterBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        DrawSelector(canvas, _scActionMapFilterBounds, filterText, filterHovered || _scActionMapFilterDropdownOpen, _scActionMaps.Count > 0);
+        bool filterHovered = _scActionMapFilterBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSelector(canvas, _scActionMapFilterBounds, filterText, filterHovered || _scActionMapFilterDropdownOpen, _scActionMaps.Count > 0);
 
         // Search box on the left (max 280px wide)
         float maxSearchWidth = 280f;
@@ -910,7 +1307,7 @@ public partial class MainForm
         float checkboxX = leftMargin + maxSearchWidth + gap;
         _scShowBoundOnlyBounds = new SKRect(checkboxX, y + (filterRowHeight - checkboxSize) / 2,
             checkboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
-        _scShowBoundOnlyHovered = _scShowBoundOnlyBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scShowBoundOnlyHovered = _scShowBoundOnlyBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         DrawSCCheckbox(canvas, _scShowBoundOnlyBounds, _scShowBoundOnly, _scShowBoundOnlyHovered);
 
         // "Bound only" label after checkbox
@@ -1067,7 +1464,7 @@ public partial class MainForm
                     // Draw category header (always visible)
                     if (scrollY >= listTop - categoryHeaderHeight && scrollY < listBottom)
                     {
-                        bool headerHovered = headerBounds.Contains(_mousePosition.X, _mousePosition.Y);
+                        bool headerHovered = headerBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
                         // Background
                         var bgColor = headerHovered ? FUIColors.Primary.WithAlpha(50) : FUIColors.Primary.WithAlpha(30);
@@ -1313,7 +1710,7 @@ public partial class MainForm
             _scVScrollbarBounds = new SKRect(scrollbarX, listTop, scrollbarX + scrollbarWidth, listTop + scrollbarHeight);
             _scVScrollThumbBounds = new SKRect(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight);
 
-            bool vScrollHovered = _scVScrollbarBounds.Contains(_mousePosition.X, _mousePosition.Y) || _scIsDraggingVScroll;
+            bool vScrollHovered = _scVScrollbarBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || _scIsDraggingVScroll;
 
             using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(vScrollHovered ? (byte)120 : (byte)80), IsAntialias = true };
             canvas.DrawRoundRect(_scVScrollbarBounds, 4f, 4f, trackPaint);
@@ -1337,7 +1734,7 @@ public partial class MainForm
             _scHScrollbarBounds = new SKRect(deviceColsStart, scrollbarY, deviceColsStart + scrollbarWidth, scrollbarY + scrollbarHeight);
             _scHScrollThumbBounds = new SKRect(thumbX, scrollbarY, thumbX + thumbWidth, scrollbarY + scrollbarHeight);
 
-            bool hScrollHovered = _scHScrollbarBounds.Contains(_mousePosition.X, _mousePosition.Y) || _scIsDraggingHScroll;
+            bool hScrollHovered = _scHScrollbarBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || _scIsDraggingHScroll;
 
             using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(hScrollHovered ? (byte)120 : (byte)80), IsAntialias = true };
             canvas.DrawRoundRect(_scHScrollbarBounds, 4f, 4f, trackPaint);
@@ -1478,293 +1875,22 @@ public partial class MainForm
     /// Draws a keycap-style badge for a binding
     /// </summary>
     private void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
-    {
-        // Measure text to determine badge width
-        float fontSize = 9f;
-        float textWidth = FUIRenderer.MeasureText(text, fontSize);
+        => SCBindingsRenderer.DrawBindingBadge(canvas, x, y, maxWidth, text, color, isDefault, inputType);
 
-        // Add space for type indicator if provided
-        float indicatorWidth = inputType.HasValue ? 14f : 0f;
-        float badgeWidth = Math.Min(maxWidth - 2, textWidth + indicatorWidth + 10);
-        float badgeHeight = 16f;
-
-        var badgeBounds = new SKRect(x, y, x + badgeWidth, y + badgeHeight);
-
-        // Badge background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
-
-        // Badge border
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
-
-        float textX = x + 5;
-
-        // Draw type indicator if provided
-        if (inputType.HasValue)
-        {
-            DrawInputTypeIndicator(canvas, x + 4, y + badgeHeight / 2, inputType.Value, color);
-            textX = x + indicatorWidth + 2;
-        }
-
-        // Badge text (truncate if needed)
-        string displayText = text;
-        float availableTextWidth = badgeWidth - (textX - x) - 5;
-        if (textWidth > availableTextWidth)
-        {
-            displayText = TruncateTextToWidth(text, availableTextWidth - 4, fontSize);
-        }
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(textX, y + badgeHeight / 2 + 3), color, fontSize);
-    }
-
-    /// <summary>
-    /// Draws a keycap-style badge for a binding, centered within the given cell bounds
-    /// Uses larger font and centered positioning for better readability
-    /// </summary>
     private void DrawBindingBadgeCentered(SKCanvas canvas, SKRect cellBounds, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
-    {
-        // Use larger font for better readability
-        float fontSize = 11f;
-        float textWidth = FUIRenderer.MeasureText(text, fontSize);
+        => SCBindingsRenderer.DrawBindingBadgeCentered(canvas, cellBounds, text, color, isDefault, inputType);
 
-        // Add space for type indicator if provided
-        float indicatorWidth = inputType.HasValue ? 14f : 0f;
-        float padding = 8f;
-        float badgeWidth = Math.Min(cellBounds.Width - 6, textWidth + indicatorWidth + padding * 2);
-        float badgeHeight = 20f;
-
-        // Center the badge in the cell
-        float badgeX = cellBounds.Left + (cellBounds.Width - badgeWidth) / 2;
-        float badgeY = cellBounds.Top + (cellBounds.Height - badgeHeight) / 2;
-
-        var badgeBounds = new SKRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight);
-
-        // Badge background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 4f, 4f, bgPaint);
-
-        // Badge border
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 4f, 4f, borderPaint);
-
-        float textX = badgeX + padding;
-
-        // Draw type indicator if provided
-        if (inputType.HasValue)
-        {
-            DrawInputTypeIndicator(canvas, badgeX + 4, badgeY + badgeHeight / 2, inputType.Value, color);
-            textX = badgeX + indicatorWidth + 4;
-        }
-
-        // Badge text (truncate if needed), vertically centered
-        string displayText = text;
-        float availableTextWidth = badgeWidth - (textX - badgeX) - padding;
-        if (textWidth > availableTextWidth)
-        {
-            displayText = TruncateTextToWidth(text, availableTextWidth - 4, fontSize);
-        }
-
-        // Center text vertically in badge
-        float textY = badgeY + badgeHeight / 2 + 4;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(textX, textY), color, fontSize);
-    }
-
-    /// <summary>
-    /// Draws multiple keycap badges for a binding (one per modifier + main key)
-    /// Each key component gets its own separate badge, centered within the cell
-    /// </summary>
     private void DrawMultiKeycapBinding(SKCanvas canvas, SKRect cellBounds, List<string> components, SKColor color, SCInputType? inputType)
-    {
-        if (components.Count == 0) return;
+        => SCBindingsRenderer.DrawMultiKeycapBinding(canvas, cellBounds, components, color, inputType);
 
-        float fontSize = 10f;
-        float badgeHeight = 18f;
-        float badgePadding = 8f;  // Horizontal padding inside badge
-        float gap = 3f;  // Gap between badges
-
-        // Calculate total width needed
-        float totalWidth = 0f;
-        var badgeWidths = new float[components.Count];
-        for (int i = 0; i < components.Count; i++)
-        {
-            float textWidth = FUIRenderer.MeasureText(components[i], fontSize);
-            // Add indicator space only to the last (main key) badge
-            float indicatorSpace = (i == components.Count - 1 && inputType.HasValue) ? 12f : 0f;
-            badgeWidths[i] = textWidth + badgePadding * 2 + indicatorSpace;
-            totalWidth += badgeWidths[i];
-            if (i > 0) totalWidth += gap;
-        }
-
-        // Start position (centered)
-        float startX = cellBounds.Left + (cellBounds.Width - totalWidth) / 2;
-        float badgeY = cellBounds.Top + (cellBounds.Height - badgeHeight) / 2;
-        float currentX = startX;
-
-        for (int i = 0; i < components.Count; i++)
-        {
-            var comp = components[i];
-            float badgeWidth = badgeWidths[i];
-            bool isMainKey = i == components.Count - 1;
-
-            var badgeBounds = new SKRect(currentX, badgeY, currentX + badgeWidth, badgeY + badgeHeight);
-
-            // Badge background - modifiers slightly dimmer
-            byte bgAlpha = isMainKey ? (byte)50 : (byte)35;
-            using var bgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = color.WithAlpha(bgAlpha),
-                IsAntialias = true
-            };
-            canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
-
-            // Badge border - modifiers slightly dimmer
-            byte borderAlpha = isMainKey ? (byte)180 : (byte)120;
-            using var borderPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = color.WithAlpha(borderAlpha),
-                StrokeWidth = 1f,
-                IsAntialias = true
-            };
-            canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
-
-            float textX = currentX + badgePadding;
-
-            // Draw type indicator only on main key
-            if (isMainKey && inputType.HasValue)
-            {
-                DrawInputTypeIndicator(canvas, currentX + 4, badgeY + badgeHeight / 2, inputType.Value, color);
-                textX = currentX + 14f;
-            }
-
-            // Draw text
-            float textY = badgeY + badgeHeight / 2 + 3.5f;
-            var textColor = isMainKey ? color : color.WithAlpha(200);
-            FUIRenderer.DrawText(canvas, comp, new SKPoint(textX, textY), textColor, fontSize);
-
-            currentX += badgeWidth + gap;
-        }
-    }
-
-    /// <summary>
-    /// Calculates the total width needed to draw multiple keycap badges
-    /// </summary>
     private float MeasureMultiKeycapWidth(List<string> components, SCInputType? inputType)
-    {
-        float fontSize = 10f;
-        float badgePadding = 8f;
-        float gap = 3f;
+        => SCBindingsRenderer.MeasureMultiKeycapWidth(components, inputType);
 
-        float totalWidth = 0f;
-        for (int i = 0; i < components.Count; i++)
-        {
-            float textWidth = FUIRenderer.MeasureText(components[i], fontSize);
-            float indicatorSpace = (i == components.Count - 1 && inputType.HasValue) ? 12f : 0f;
-            totalWidth += textWidth + badgePadding * 2 + indicatorSpace;
-            if (i > 0) totalWidth += gap;
-        }
-
-        return totalWidth;
-    }
-
-    /// <summary>
-    /// Draws a small type indicator icon for axis, button, or hat
-    /// </summary>
     private void DrawInputTypeIndicator(SKCanvas canvas, float x, float centerY, SCInputType inputType, SKColor color)
-    {
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(150),
-            StrokeWidth = 1.2f,
-            IsAntialias = true
-        };
+        => SCBindingsRenderer.DrawInputTypeIndicator(canvas, x, centerY, inputType, color);
 
-        switch (inputType)
-        {
-            case SCInputType.Axis:
-                // Double-headed arrow for axis
-                float arrowLen = 4f;
-                canvas.DrawLine(x, centerY, x + arrowLen * 2, centerY, paint);
-                // Left arrow head
-                canvas.DrawLine(x, centerY, x + 2, centerY - 2, paint);
-                canvas.DrawLine(x, centerY, x + 2, centerY + 2, paint);
-                // Right arrow head
-                canvas.DrawLine(x + arrowLen * 2, centerY, x + arrowLen * 2 - 2, centerY - 2, paint);
-                canvas.DrawLine(x + arrowLen * 2, centerY, x + arrowLen * 2 - 2, centerY + 2, paint);
-                break;
-
-            case SCInputType.Button:
-                // Small filled circle for button
-                paint.Style = SKPaintStyle.Fill;
-                canvas.DrawCircle(x + 4, centerY, 3f, paint);
-                break;
-
-            case SCInputType.Hat:
-                // Diamond/cross for hat
-                float hatSize = 3f;
-                float cx = x + 4;
-                canvas.DrawLine(cx, centerY - hatSize, cx, centerY + hatSize, paint);
-                canvas.DrawLine(cx - hatSize, centerY, cx + hatSize, centerY, paint);
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Draws a small conflict warning indicator (exclamation mark in triangle)
-    /// </summary>
     private void DrawConflictIndicator(SKCanvas canvas, float x, float y)
-    {
-        float size = 8f;
-
-        // Draw triangle background - use Warning color since conflicts are valid
-        using var fillPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Warning,
-            IsAntialias = true
-        };
-
-        var path = new SKPath();
-        path.MoveTo(x + size / 2, y);
-        path.LineTo(x + size, y + size);
-        path.LineTo(x, y + size);
-        path.Close();
-        canvas.DrawPath(path, fillPaint);
-
-        // Draw exclamation mark
-        using var textPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = SKColors.White,
-            IsAntialias = true,
-            TextSize = 7f
-        };
-        canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
-    }
+        => SCBindingsRenderer.DrawConflictIndicator(canvas, x, y);
 
     /// <summary>
     /// Detects the input type from an input name (for joystick bindings)
@@ -1791,30 +1917,8 @@ public partial class MainForm
         return SCInputType.Button;
     }
 
-    /// <summary>
-    /// Truncates text to fit within a specified width, adding ellipsis if needed
-    /// </summary>
     private string TruncateTextToWidth(string text, float maxWidth, float fontSize)
-    {
-        float textWidth = FUIRenderer.MeasureText(text, fontSize);
-        if (textWidth <= maxWidth)
-            return text;
-
-        // Binary search for best fit
-        int low = 0;
-        int high = text.Length;
-        while (low < high)
-        {
-            int mid = (low + high + 1) / 2;
-            string testText = text.Substring(0, mid) + "...";
-            if (FUIRenderer.MeasureText(testText, fontSize) <= maxWidth)
-                low = mid;
-            else
-                high = mid - 1;
-        }
-
-        return low > 0 ? text.Substring(0, low) + "..." : "...";
-    }
+        => FUIWidgets.TruncateTextToWidth(text, maxWidth, fontSize);
 
     private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
     {
@@ -1842,7 +1946,7 @@ public partial class MainForm
         // Profile dropdown (full width)
         float dropdownHeight = 32f;
         _scProfileDropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
-        bool dropdownHovered = _scProfileDropdownBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        bool dropdownHovered = _scProfileDropdownBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, _scExportProfile.ProfileName, dropdownHovered, _scProfileDropdownOpen);
         y += dropdownHeight + 6f;
 
@@ -1852,13 +1956,13 @@ public partial class MainForm
 
         // Save button (rightmost)
         _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y, rightMargin, y + textBtnHeight);
-        _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
 
         // New button (left of Save)
         float newBtnX = rightMargin - textBtnWidth * 2 - buttonGap;
         _scNewProfileButtonBounds = new SKRect(newBtnX, y, newBtnX + textBtnWidth, y + textBtnHeight);
-        _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         DrawTextButton(canvas, _scNewProfileButtonBounds, "+ New", _scNewProfileButtonHovered);
 
         y += textBtnHeight + 10f;
@@ -1894,7 +1998,7 @@ public partial class MainForm
             float btnHeight = 24f;
 
             _scAssignInputButtonBounds = new SKRect(leftMargin, y, leftMargin + btnWidth, y + btnHeight);
-            _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+            _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
             var existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
 
@@ -1912,7 +2016,7 @@ public partial class MainForm
             }
 
             _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 8, y, rightMargin, y + btnHeight);
-            _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+            _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
             bool hasBinding = existingBinding is not null;
 
             if (hasBinding)
@@ -1937,7 +2041,7 @@ public partial class MainForm
         float smallBtnHeight = 24f;
 
         _scClearAllButtonBounds = new SKRect(leftMargin, y, leftMargin + smallBtnWidth, y + smallBtnHeight);
-        _scClearAllButtonHovered = _scClearAllButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scClearAllButtonHovered = _scClearAllButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         bool hasBoundActions = _scExportProfile.Bindings.Count > 0;
         if (hasBoundActions)
         {
@@ -1952,7 +2056,7 @@ public partial class MainForm
         }
 
         _scResetDefaultsButtonBounds = new SKRect(leftMargin + smallBtnWidth + 5, y, rightMargin, y + smallBtnHeight);
-        _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scResetDefaultsButtonBounds, "RESET DFLTS",
             _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
@@ -1962,7 +2066,7 @@ public partial class MainForm
         float buttonWidth = rightMargin - leftMargin;
         float buttonHeight = 32f;
         _scExportButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
-        _scExportButtonHovered = _scExportButtonBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         bool canExport = _scInstallations.Count > 0;
         DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
@@ -1986,95 +2090,16 @@ public partial class MainForm
     }
 
     private void DrawVJoyMappingRow(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
-    {
-        var bgColor = isHovered ? FUIColors.Background2.WithAlpha(150) : FUIColors.Background1.WithAlpha(80);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRect(bounds, bgPaint);
-
-        if (isHovered)
-        {
-            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(150), StrokeWidth = 1f, IsAntialias = true };
-            canvas.DrawRect(bounds, borderPaint);
-        }
-
-        float textY = bounds.MidY + 4;
-
-        // vJoy label
-        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 10, textY), FUIColors.TextPrimary, 11f);
-
-        // Arrow
-        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 80, textY), FUIColors.TextDim, 11f);
-
-        // SC instance
-        var scColor = FUIColors.Active;
-        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 110, textY), scColor, 11f, true);
-
-        // Click hint
-        if (isHovered)
-        {
-            FUIRenderer.DrawText(canvas, "click to change", new SKPoint(bounds.Right - 90, textY), FUIColors.TextDim, 9f);
-        }
-    }
+        => SCBindingsRenderer.DrawVJoyMappingRow(canvas, bounds, vjoyId, scInstance, isHovered);
 
     private void DrawVJoyMappingRowCompact(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
-    {
-        if (isHovered)
-        {
-            using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100), IsAntialias = true };
-            canvas.DrawRect(bounds, hoverPaint);
-        }
-
-        float textY = bounds.MidY + 4;
-        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 5, textY), FUIColors.TextPrimary, 10f);
-        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 60, textY), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 80, textY), FUIColors.Active, 10f, true);
-    }
+        => SCBindingsRenderer.DrawVJoyMappingRowCompact(canvas, bounds, vjoyId, scInstance, isHovered);
 
     private void DrawExportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-    {
-        var bgColor = isEnabled
-            ? (isHovered ? FUIColors.Active.WithAlpha(180) : FUIColors.Active.WithAlpha(120))
-            : FUIColors.Background2.WithAlpha(100);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        using var path = FUIRenderer.CreateFrame(bounds, 4f);
-        canvas.DrawPath(path, bgPaint);
-
-        var borderColor = isEnabled ? FUIColors.Active : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1.5f, IsAntialias = true };
-        canvas.DrawPath(path, borderPaint);
-
-        var textColor = isEnabled ? FUIColors.TextBright : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
-    }
+        => FUIWidgets.DrawExportButton(canvas, bounds, text, isHovered, isEnabled);
 
     private void DrawImportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-    {
-        var bgColor = isEnabled
-            ? (isHovered ? FUIColors.Primary.WithAlpha(150) : FUIColors.Primary.WithAlpha(80))
-            : FUIColors.Background2.WithAlpha(100);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        using var path = FUIRenderer.CreateFrame(bounds, 4f);
-        canvas.DrawPath(path, bgPaint);
-
-        var borderColor = isEnabled ? FUIColors.Primary : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1.5f, IsAntialias = true };
-        canvas.DrawPath(path, borderPaint);
-
-        var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
-
-        // Draw dropdown arrow
-        if (isEnabled)
-        {
-            float arrowX = bounds.Right - 16;
-            float arrowY = bounds.MidY;
-            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = textColor, StrokeWidth = 1.5f, IsAntialias = true };
-            canvas.DrawLine(arrowX - 4, arrowY - 2, arrowX, arrowY + 2, arrowPaint);
-            canvas.DrawLine(arrowX, arrowY + 2, arrowX + 4, arrowY - 2, arrowPaint);
-        }
-    }
+        => FUIWidgets.DrawImportButton(canvas, bounds, text, isHovered, isEnabled);
 
     private void DrawSCImportDropdown(SKCanvas canvas, SKRect buttonBounds)
     {
@@ -2112,7 +2137,7 @@ public partial class MainForm
             var profile = _scAvailableProfiles[i];
             var itemBounds = new SKRect(_scImportDropdownBounds.Left, y, _scImportDropdownBounds.Right, y + itemHeight);
 
-            bool isHovered = itemBounds.Contains(_mousePosition.X, _mousePosition.Y);
+            bool isHovered = itemBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
             if (isHovered)
                 _scHoveredImportProfile = i;
 
@@ -2193,7 +2218,7 @@ public partial class MainForm
         var allItemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y,
             _scActionMapFilterDropdownBounds.Right - 2 - scrollbarWidth, y + itemHeight);
 
-        bool allHovered = _scHoveredActionMapFilter == -1 && allItemBounds.Contains(_mousePosition.X, _mousePosition.Y);
+        bool allHovered = _scHoveredActionMapFilter == -1 && allItemBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         bool allSelected = string.IsNullOrEmpty(_scActionMapFilter);
 
         // Only draw if visible
@@ -2328,6 +2353,7 @@ public partial class MainForm
                 {
                     _selectedSCInstallation = _hoveredSCInstallation;
                     LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+                    _ctx.AppSettings.PreferredSCEnvironment = _scInstallations[_selectedSCInstallation].Environment;
                 }
                 _scInstallationDropdownOpen = false;
                 return;
@@ -3033,12 +3059,12 @@ public partial class MainForm
             _scBaselineFrames = 0;
 
             // Capture baseline from current SDL2 state
-            for (int idx = 0; idx < _devices.Count; idx++)
+            for (int idx = 0; idx < _ctx.Devices.Count; idx++)
             {
-                var device = _devices[idx];
+                var device = _ctx.Devices[idx];
                 if (device.IsVirtual || !device.IsConnected) continue;
 
-                var state = _inputService.GetDeviceState(idx);
+                var state = _ctx.InputService.GetDeviceState(idx);
                 if (state is not null)
                 {
                     _scAxisBaseline[device.InstanceGuid] = (float[])state.Axes.Clone();
@@ -3058,12 +3084,12 @@ public partial class MainForm
             return null;
 
         // Check each physical device for input changes
-        for (int idx = 0; idx < _devices.Count; idx++)
+        for (int idx = 0; idx < _ctx.Devices.Count; idx++)
         {
-            var device = _devices[idx];
+            var device = _ctx.Devices[idx];
             if (device.IsVirtual || !device.IsConnected) continue;
 
-            var state = _inputService.GetDeviceState(idx);
+            var state = _ctx.InputService.GetDeviceState(idx);
             if (state is null) continue;
 
             _scAxisBaseline.TryGetValue(device.InstanceGuid, out var baselineAxes);
@@ -3175,7 +3201,7 @@ public partial class MainForm
     private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex, SCGridColumn col)
     {
         // Look up the mapping in the active profile
-        var profile = _profileService.ActiveProfile;
+        var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is not null)
         {
             // Try to find a mapping for this physical input using GUID
@@ -3406,7 +3432,7 @@ public partial class MainForm
             string deviceName = $"JS{col.SCInstance}";
 
             var dialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
-            dialog.ShowDialog(this);
+            dialog.ShowDialog(_ctx.OwnerForm);
 
             switch (dialog.Result)
             {
@@ -3604,7 +3630,7 @@ public partial class MainForm
             $"Clear all {_scExportProfile.Bindings.Count} binding(s) from profile '{_scExportProfile.ProfileName}'?\n\nThis will remove ALL bindings.\nUse 'Reset to Defaults' to restore SC default bindings.",
             "Clear", "Cancel");
 
-        if (dialog.ShowDialog(this) == DialogResult.Yes)
+        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
         {
             int count = _scExportProfile.Bindings.Count;
             _scExportProfile.ClearBindings();
@@ -3625,7 +3651,7 @@ public partial class MainForm
             "Reset all bindings to default values from\nStar Citizen's defaultProfile.xml?\n\nThis will clear your custom bindings and reload the defaults.",
             "Reset", "Cancel");
 
-        if (dialog.ShowDialog(this) == DialogResult.Yes)
+        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
         {
             // Clear existing bindings
             _scExportProfile.ClearBindings();
@@ -3705,7 +3731,7 @@ public partial class MainForm
         dialog.AcceptButton = okButton;
         dialog.CancelButton = cancelButton;
 
-        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
+        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
         {
             _scExportProfile.ProfileName = textBox.Text.Trim();
         }
@@ -3717,7 +3743,7 @@ public partial class MainForm
             return;
 
         var action = _scFilteredActions[_scSelectedActionIndex];
-        var availableVJoy = _vjoyDevices.Where(v => v.Exists).ToList();
+        var availableVJoy = _ctx.VJoyDevices.Where(v => v.Exists).ToList();
 
         if (availableVJoy.Count == 0)
         {
@@ -3725,13 +3751,13 @@ public partial class MainForm
                 "No vJoy",
                 "No vJoy devices available.\nPlease configure vJoy.",
                 "OK", "Cancel");
-            warningDialog.ShowDialog(this);
+            warningDialog.ShowDialog(_ctx.OwnerForm);
             return;
         }
 
         using var dialog = new SCAssignmentDialog(action, availableVJoy);
 
-        if (dialog.ShowDialog(this) == DialogResult.OK)
+        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.OK)
         {
             var vjoyId = dialog.SelectedVJoyId;
             var inputName = dialog.SelectedInputName;
@@ -3890,7 +3916,7 @@ public partial class MainForm
         dialog.CancelButton = cancelButton;
 
         dialog.Tag = SCConflictResolution.Cancel;
-        dialog.ShowDialog(this);
+        dialog.ShowDialog(_ctx.OwnerForm);
 
         return (SCConflictResolution)(dialog.Tag ?? SCConflictResolution.Cancel);
     }
@@ -3911,226 +3937,25 @@ public partial class MainForm
     }
 
     private void DrawSearchBox(SKCanvas canvas, SKRect bounds, string text, bool focused)
-    {
-        // Background
-        var bgColor = focused ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(100);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 4f, 4f, bgPaint);
-
-        // Border
-        var borderColor = focused ? FUIColors.Active : FUIColors.Frame;
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 4f, 4f, borderPaint);
-
-        // Search icon
-        float iconX = bounds.Left + 8f;
-        float iconY = bounds.MidY;
-        using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.TextDim, StrokeWidth = 1.5f, IsAntialias = true };
-        canvas.DrawCircle(iconX + 5, iconY - 1, 5f, iconPaint);
-        canvas.DrawLine(iconX + 9, iconY + 3, iconX + 13, iconY + 7, iconPaint);
-
-        // Text or placeholder
-        float textX = bounds.Left + 24f;
-        float textY = bounds.MidY + 4f;
-        if (string.IsNullOrEmpty(text))
-        {
-            FUIRenderer.DrawText(canvas, "Search actions...", new SKPoint(textX, textY), FUIColors.TextDim, 10f);
-        }
-        else
-        {
-            FUIRenderer.DrawText(canvas, text, new SKPoint(textX, textY), FUIColors.TextPrimary, 10f);
-
-            // Clear button (X)
-            if (bounds.Contains(_mousePosition.X, _mousePosition.Y))
-            {
-                float clearX = bounds.Right - 18f;
-                float clearY = bounds.MidY;
-                using var clearPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.TextDim, StrokeWidth = 1.5f, IsAntialias = true };
-                canvas.DrawLine(clearX - 4, clearY - 4, clearX + 4, clearY + 4, clearPaint);
-                canvas.DrawLine(clearX + 4, clearY - 4, clearX - 4, clearY + 4, clearPaint);
-            }
-        }
-
-        // Cursor when focused - position at end of text
-        if (focused)
-        {
-            // Use FUIRenderer.MeasureText for consistent measurement with DrawText
-            float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 10f));
-            if ((DateTime.Now.Millisecond / 500) % 2 == 0)
-            {
-                using var cursorPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
-                canvas.DrawLine(cursorX, bounds.Top + 5, cursorX, bounds.Bottom - 5, cursorPaint);
-            }
-        }
-    }
+        => FUIWidgets.DrawSearchBox(canvas, bounds, text, focused, _ctx.MousePosition);
 
     private void DrawCollapseIndicator(SKCanvas canvas, float x, float y, bool isCollapsed, bool isHovered)
-    {
-        var color = isHovered ? FUIColors.TextBright : FUIColors.Primary;
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = color,
-            IsAntialias = true
-        };
-
-        var path = new SKPath();
-        if (isCollapsed)
-        {
-            // Right-pointing triangle (collapsed)
-            path.MoveTo(x, y - 4);
-            path.LineTo(x + 6, y);
-            path.LineTo(x, y + 4);
-        }
-        else
-        {
-            // Down-pointing triangle (expanded)
-            path.MoveTo(x - 2, y - 3);
-            path.LineTo(x + 6, y - 3);
-            path.LineTo(x + 2, y + 3);
-        }
-        path.Close();
-        canvas.DrawPath(path, paint);
-    }
+        => FUIWidgets.DrawCollapseIndicator(canvas, x, y, isCollapsed, isHovered);
 
     private void DrawSCCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool isHovered)
-    {
-        // Background
-        var bgColor = isChecked ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2.WithAlpha(100);
-        if (isHovered) bgColor = bgColor.WithAlpha((byte)Math.Min(255, bgColor.Alpha + 40));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        // Border
-        var borderColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        // Checkmark
-        if (isChecked)
-        {
-            using var checkPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 2f, IsAntialias = true, StrokeCap = SKStrokeCap.Round };
-            float cx = bounds.MidX;
-            float cy = bounds.MidY;
-            canvas.DrawLine(cx - 4, cy, cx - 1, cy + 3, checkPaint);
-            canvas.DrawLine(cx - 1, cy + 3, cx + 4, cy - 3, checkPaint);
-        }
-    }
+        => FUIWidgets.DrawSCCheckbox(canvas, bounds, isChecked, isHovered);
 
     private void DrawSCProfileDropdown(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
-    {
-        // Background
-        var bgColor = open ? FUIColors.Active.WithAlpha(40) : (hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(120));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        // Border
-        var borderColor = open ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        // Text
-        string displayText = text.Length > 18 ? text.Substring(0, 15) + "..." : text;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 6, bounds.MidY + 4f), FUIColors.TextPrimary, 10f);
-
-        // Dropdown arrow
-        float arrowX = bounds.Right - 14f;
-        float arrowY = bounds.MidY;
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
-        using var arrowPath = new SKPath();
-        arrowPath.MoveTo(arrowX - 4, arrowY - 2);
-        arrowPath.LineTo(arrowX + 4, arrowY - 2);
-        arrowPath.LineTo(arrowX, arrowY + 3);
-        arrowPath.Close();
-        canvas.DrawPath(arrowPath, arrowPaint);
-    }
+        => SCBindingsRenderer.DrawSCProfileDropdown(canvas, bounds, text, hovered, open);
 
     private void DrawSCProfileDropdownWide(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
-    {
-        // Background
-        var bgColor = open ? FUIColors.Active.WithAlpha(40) : (hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(120));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        // Border
-        var borderColor = open ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        // Text - wider truncation
-        float maxTextWidth = bounds.Width - 30f;  // Leave room for arrow
-        string displayText = text;
-        if (FUIRenderer.MeasureText(text, 10f) > maxTextWidth)
-        {
-            // Truncate to fit
-            int len = text.Length;
-            while (len > 0 && FUIRenderer.MeasureText(text.Substring(0, len) + "...", 10f) > maxTextWidth)
-                len--;
-            displayText = len > 0 ? text.Substring(0, len) + "..." : "...";
-        }
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 8, bounds.MidY + 4f), FUIColors.TextPrimary, 10f);
-
-        // Dropdown arrow
-        float arrowX = bounds.Right - 14f;
-        float arrowY = bounds.MidY;
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
-        using var arrowPath = new SKPath();
-        arrowPath.MoveTo(arrowX - 4, arrowY - 2);
-        arrowPath.LineTo(arrowX + 4, arrowY - 2);
-        arrowPath.LineTo(arrowX, arrowY + 3);
-        arrowPath.Close();
-        canvas.DrawPath(arrowPath, arrowPaint);
-    }
+        => SCBindingsRenderer.DrawSCProfileDropdownWide(canvas, bounds, text, hovered, open);
 
     private void DrawProfileRefreshButton(SKCanvas canvas, SKRect bounds, bool hovered)
-    {
-        var bgColor = hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Background2.WithAlpha(120);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        var borderColor = hovered ? FUIColors.Active : FUIColors.Frame;
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        // Refresh icon (circular arrow)
-        float cx = bounds.MidX;
-        float cy = bounds.MidY;
-        float r = 5f;
-        var iconColor = hovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-        using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 1.5f, IsAntialias = true, StrokeCap = SKStrokeCap.Round };
-
-        using var arcPath = new SKPath();
-        arcPath.AddArc(new SKRect(cx - r, cy - r, cx + r, cy + r), -45, 270);
-        canvas.DrawPath(arcPath, iconPaint);
-
-        // Arrow head
-        using var arrowPath = new SKPath();
-        arrowPath.MoveTo(cx + r - 1, cy - r + 2);
-        arrowPath.LineTo(cx + r + 2, cy - r - 1);
-        arrowPath.LineTo(cx + r + 1, cy - r + 3);
-        canvas.DrawPath(arrowPath, iconPaint);
-    }
+        => FUIWidgets.DrawProfileRefreshButton(canvas, bounds, hovered);
 
     private void DrawTextButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool disabled = false)
-    {
-        SKColor bgColor;
-        if (disabled)
-            bgColor = FUIColors.Background2.WithAlpha(60);
-        else if (hovered)
-            bgColor = FUIColors.Active.WithAlpha(80);
-        else
-            bgColor = FUIColors.Background2.WithAlpha(100);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        var borderColor = disabled ? FUIColors.Frame.WithAlpha(80) : (hovered ? FUIColors.Active : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        var textColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 9f);
-    }
+        => FUIWidgets.DrawTextButton(canvas, bounds, text, hovered, disabled);
 
     private void DrawSCProfileDropdownList(SKCanvas canvas, SKRect bounds)
     {
@@ -4169,7 +3994,7 @@ public partial class MainForm
         {
             var profile = _scExportProfiles[i];
             var rowBounds = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
-            bool isHovered = rowBounds.Contains(_mousePosition.X, _mousePosition.Y);
+            bool isHovered = rowBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
             bool isCurrent = profile.ProfileName == _scExportProfile.ProfileName;
 
             // FUI hover/selected style with accent bar
@@ -4226,7 +4051,7 @@ public partial class MainForm
             {
                 var scFile = _scAvailableProfiles[i];
                 var rowBounds = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
-                bool isHovered = rowBounds.Contains(_mousePosition.X, _mousePosition.Y);
+                bool isHovered = rowBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
                 if (isHovered)
                 {
@@ -4249,62 +4074,7 @@ public partial class MainForm
     }
 
     private void DrawSCProfileButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, string tooltip, bool disabled = false)
-    {
-        // Background
-        SKColor bgColor;
-        if (disabled)
-            bgColor = FUIColors.Background2.WithAlpha(60);
-        else if (hovered)
-            bgColor = FUIColors.Active.WithAlpha(80);
-        else
-            bgColor = FUIColors.Background2.WithAlpha(120);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        // Border
-        var borderColor = disabled ? FUIColors.Frame.WithAlpha(80) : (hovered ? FUIColors.Active : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        // Icon - use text-based icons for simplicity
-        var iconColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-
-        // Custom drawing for common icons
-        if (icon == "💾" || tooltip == "Save")
-        {
-            // Disk icon
-            float cx = bounds.MidX;
-            float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 1.5f, IsAntialias = true };
-            canvas.DrawRect(cx - 5, cy - 5, 10, 10, iconPaint);
-            canvas.DrawLine(cx - 2, cy - 5, cx - 2, cy - 2, iconPaint);
-            canvas.DrawLine(cx + 2, cy - 5, cx + 2, cy - 2, iconPaint);
-        }
-        else if (icon == "+")
-        {
-            // Plus icon
-            float cx = bounds.MidX;
-            float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 2f, IsAntialias = true };
-            canvas.DrawLine(cx - 5, cy, cx + 5, cy, iconPaint);
-            canvas.DrawLine(cx, cy - 5, cx, cy + 5, iconPaint);
-        }
-        else if (icon == "×")
-        {
-            // X icon
-            float cx = bounds.MidX;
-            float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 2f, IsAntialias = true };
-            canvas.DrawLine(cx - 4, cy - 4, cx + 4, cy + 4, iconPaint);
-            canvas.DrawLine(cx + 4, cy - 4, cx - 4, cy + 4, iconPaint);
-        }
-        else
-        {
-            // Fallback to text
-            FUIRenderer.DrawTextCentered(canvas, icon, bounds, iconColor, 12f);
-        }
-    }
+        => SCBindingsRenderer.DrawSCProfileButton(canvas, bounds, icon, hovered, tooltip, disabled);
 
     #endregion
 
@@ -4315,7 +4085,7 @@ public partial class MainForm
         if (_scExportProfileService is null) return;
 
         _scExportProfileService.SaveProfile(_scExportProfile);
-        _profileService.LastSCExportProfile = _scExportProfile.ProfileName;
+        _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
         RefreshSCExportProfiles();
 
         _scExportStatus = $"Profile '{_scExportProfile.ProfileName}' saved";
@@ -4381,7 +4151,7 @@ public partial class MainForm
         dialog.AcceptButton = okButton;
         dialog.CancelButton = cancelButton;
 
-        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
+        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
         {
             var newName = textBox.Text.Trim();
 
@@ -4392,7 +4162,7 @@ public partial class MainForm
                     "Profile Exists",
                     $"A profile named '{newName}' already exists.",
                     "OK", "Cancel");
-                existsDialog.ShowDialog(this);
+                existsDialog.ShowDialog(_ctx.OwnerForm);
                 return;
             }
 
@@ -4405,7 +4175,7 @@ public partial class MainForm
             };
 
             // Set up default vJoy mappings
-            foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+            foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
             {
                 _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
             }
@@ -4425,7 +4195,7 @@ public partial class MainForm
             $"Delete SC export profile '{_scExportProfile.ProfileName}'?\n\nThis cannot be undone.",
             "Delete", "Cancel");
 
-        if (confirmDialog.ShowDialog(this) == DialogResult.Yes)
+        if (confirmDialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
         {
             var deletedName = _scExportProfile.ProfileName;
             _scExportProfileService.DeleteProfile(deletedName);
@@ -4438,14 +4208,14 @@ public partial class MainForm
                 if (nextProfile is not null)
                 {
                     _scExportProfile = nextProfile;
-                    _profileService.LastSCExportProfile = nextProfile.ProfileName;
+                    _ctx.AppSettings.LastSCExportProfile = nextProfile.ProfileName;
                 }
             }
             else
             {
                 // Create default profile
                 _scExportProfile = new SCExportProfile { ProfileName = "asteriq" };
-                foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+                foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 {
                     _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
                 }
@@ -4464,7 +4234,7 @@ public partial class MainForm
         if (profile is not null)
         {
             _scExportProfile = profile;
-            _profileService.LastSCExportProfile = profileName;
+            _ctx.AppSettings.LastSCExportProfile = profileName;
             _scProfileDropdownOpen = false;
             _scExportStatus = $"Loaded profile '{profileName}'";
             _scExportStatusTime = DateTime.Now;
@@ -4478,7 +4248,7 @@ public partial class MainForm
         // Warn if there are existing bindings that would be replaced
         if (_scExportProfile.Bindings.Count > 0)
         {
-            var result = FUIMessageBox.ShowQuestion(this,
+            var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
                 $"Profile '{_scExportProfile.ProfileName}' has {_scExportProfile.Bindings.Count} existing binding(s).\n\n" +
                 "Import will replace all current bindings. Continue?",
                 "Replace Bindings");
@@ -4537,6 +4307,162 @@ public partial class MainForm
         _scExportStatusTime = DateTime.Now;
 
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Imported {importResult.Bindings.Count} bindings from {mappingFile.FilePath}");
+    }
+
+    #endregion
+
+    #region Keyboard & Column Helpers
+
+    // Windows API for detecting held keys
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    // Virtual key codes for left/right modifiers
+    private const int VK_LSHIFT = 0xA0;
+    private const int VK_RSHIFT = 0xA1;
+    private const int VK_LCONTROL = 0xA2;
+    private const int VK_RCONTROL = 0xA3;
+    private const int VK_LMENU = 0xA4;  // Left Alt
+    private const int VK_RMENU = 0xA5;  // Right Alt
+
+    private static bool IsKeyHeld(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
+    private bool HandleSearchBoxKey(Keys keyData)
+    {
+        var key = keyData & Keys.KeyCode;
+
+        if (key == Keys.Escape)
+        {
+            _scSearchBoxFocused = false;
+            return true;
+        }
+
+        if (key == Keys.Back)
+        {
+            if (_scSearchText.Length > 0)
+            {
+                _scSearchText = _scSearchText.Substring(0, _scSearchText.Length - 1);
+                RefreshFilteredActions();
+            }
+            return true;
+        }
+
+        if (key == Keys.Delete)
+        {
+            _scSearchText = "";
+            RefreshFilteredActions();
+            return true;
+        }
+
+        char c = KeyToChar(key, (keyData & Keys.Shift) == Keys.Shift);
+        if (c != '\0' && _scSearchText.Length < 50)
+        {
+            _scSearchText += c;
+            RefreshFilteredActions();
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HandleExportFilenameBoxKey(Keys keyData)
+    {
+        var key = keyData & Keys.KeyCode;
+
+        if (key == Keys.Escape || key == Keys.Enter)
+        {
+            _scExportFilenameBoxFocused = false;
+            return true;
+        }
+
+        if (key == Keys.Back)
+        {
+            if (_scExportFilename.Length > 0)
+            {
+                _scExportFilename = _scExportFilename.Substring(0, _scExportFilename.Length - 1);
+            }
+            return true;
+        }
+
+        if (key == Keys.Delete)
+        {
+            _scExportFilename = "";
+            return true;
+        }
+
+        char c = KeyToFilenameChar(key, (keyData & Keys.Shift) == Keys.Shift);
+        if (c != '\0' && _scExportFilename.Length < 50)
+        {
+            _scExportFilename += c;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static char KeyToFilenameChar(Keys key, bool shift)
+    {
+        if (key >= Keys.A && key <= Keys.Z)
+        {
+            char c = (char)('a' + (key - Keys.A));
+            return shift ? char.ToUpper(c) : c;
+        }
+
+        if (key >= Keys.D0 && key <= Keys.D9)
+        {
+            return (char)('0' + (key - Keys.D0));
+        }
+
+        return key switch
+        {
+            Keys.OemMinus => shift ? '_' : '-',
+            Keys.Oemplus => '=',
+            Keys.OemPeriod => '.',
+            _ => '\0'
+        };
+    }
+
+    private static char KeyToChar(Keys key, bool shift)
+    {
+        if (key >= Keys.A && key <= Keys.Z)
+        {
+            char c = (char)('a' + (key - Keys.A));
+            return shift ? char.ToUpper(c) : c;
+        }
+
+        if (key >= Keys.D0 && key <= Keys.D9)
+        {
+            return (char)('0' + (key - Keys.D0));
+        }
+
+        return key switch
+        {
+            Keys.Space => ' ',
+            Keys.OemMinus => shift ? '_' : '-',
+            Keys.Oemplus => shift ? '+' : '=',
+            Keys.OemPeriod => '.',
+            Keys.Oemcomma => ',',
+            _ => '\0'
+        };
+    }
+
+    private int GetHoveredColumnIndex(float x)
+    {
+        if (_scGridColumns is null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
+            return -1;
+
+        float relativeX = x - _scDeviceColsStart + _scGridHorizontalScroll;
+
+        float cumX = 0f;
+        for (int c = 0; c < _scGridColumns.Count; c++)
+        {
+            float colW = _scGridDeviceColWidths.TryGetValue(_scGridColumns[c].Id, out var w) ? w : _scGridDeviceColMinWidth;
+            if (relativeX >= cumX && relativeX < cumX + colW)
+                return c;
+            cumX += colW;
+        }
+
+        return -1;
     }
 
     #endregion

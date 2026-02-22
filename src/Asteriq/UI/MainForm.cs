@@ -85,6 +85,7 @@ public partial class MainForm : Form
     // Tab controllers
     private SettingsTabController _settingsController = null!;
     private DevicesTabController _devicesController = null!;
+    private SCBindingsTabController _scBindingsController = null!;
     private TabContext _tabContext = null!;
 
     // Profile UI state
@@ -301,127 +302,7 @@ public partial class MainForm : Form
     private bool _axisInverted = false;
 
     // (Settings tab fields moved to SettingsTabController)
-
-    // Star Citizen bindings tab state (all injected via constructor, never null)
-    private ISCInstallationService _scInstallationService = null!;
-    private SCProfileCacheService _scProfileCacheService = null!;
-    private SCSchemaService _scSchemaService = null!;
-    private SCXmlExportService _scExportService = null!;
-    private List<SCInstallation> _scInstallations = new();
-    private int _selectedSCInstallation = 0;
-    private SCExportProfile _scExportProfile = new();
-    private List<SCAction>? _scActions;
-    private string? _scExportStatus;
-    private DateTime _scExportStatusTime;
-
-    // SC Bindings tab UI bounds
-    private SKRect _scInstallationSelectorBounds;
-    private bool _scInstallationDropdownOpen;
-    private SKRect _scInstallationDropdownBounds;
-    private int _hoveredSCInstallation = -1;
-    private SKRect _scExportButtonBounds;
-    private bool _scExportButtonHovered;
-    private SKRect _scExportFilenameBoxBounds;
-    private bool _scExportFilenameBoxFocused;
-    private string _scExportFilename = "";  // Custom export filename, empty = auto-generate
-    private SKRect _scImportButtonBounds;
-    private bool _scImportButtonHovered;
-    private List<SCMappingFile> _scAvailableProfiles = new();
-    private bool _scImportDropdownOpen;
-    private SKRect _scImportDropdownBounds;
-    private int _scHoveredImportProfile = -1;
-    private SKRect _scRefreshButtonBounds;
-    private bool _scRefreshButtonHovered;
-    private SKRect _scClearAllButtonBounds;
-    private bool _scClearAllButtonHovered;
-    private SKRect _scResetDefaultsButtonBounds;
-    private bool _scResetDefaultsButtonHovered;
-    private SKRect _scProfileNameBounds;
-    private bool _scProfileNameHovered;
-    private List<SKRect> _scVJoyMappingBounds = new();
-    private int _hoveredVJoyMapping = -1;
-
-    // SC Bindings table state
-    private List<SCAction>? _scFilteredActions;
-    private string _scActionMapFilter = "";  // Empty = show all, otherwise filter by action map
-    private int _scSelectedActionIndex = -1;
-    private int _scHoveredActionIndex = -1;
-    private float _scBindingsScrollOffset = 0;
-    private float _scBindingsContentHeight = 0;
-    private SKRect _scBindingsListBounds;
-    private List<SKRect> _scActionRowBounds = new();
-    private SKRect _scActionMapFilterBounds;
-    private bool _scActionMapFilterDropdownOpen;
-    private SKRect _scActionMapFilterDropdownBounds;
-    private int _scHoveredActionMapFilter = -1;
-    private float _scActionMapFilterScrollOffset = 0;
-    private float _scActionMapFilterMaxScroll = 0;
-    private List<string> _scActionMaps = new();  // List of unique action maps
-
-    // SC Bindings grid column state
-    private float _scGridActionColWidth = 300f;   // Action name column
-    private float _scGridDeviceColMinWidth = 160f;   // Minimum device column width
-    private Dictionary<string, float> _scGridDeviceColWidths = new();  // Calculated width per column based on content
-    private float _scGridHorizontalScroll = 0f;   // Horizontal scroll offset for device columns
-    private float _scGridTotalWidth = 0f;         // Total width of all columns
-    private List<SCGridColumn>? _scGridColumns;   // Cached column definitions
-    private float _scDeviceColsStart = 0f;        // X position where device columns start
-    private float _scVisibleDeviceWidth = 0f;     // Width of visible device column area
-
-    // SC Bindings cell interaction state
-    private (int actionIndex, int colIndex) _scSelectedCell = (-1, -1);  // Currently selected cell
-    private (int actionIndex, int colIndex) _scHoveredCell = (-1, -1);   // Currently hovered cell
-    private bool _scIsListeningForInput = false;  // True when waiting for user input
-    private DateTime _scListeningStartTime;       // When listening started (for timeout)
-    private DateTime _scLastCellClickTime;        // When the last cell was clicked (for double-click detection)
-    private const int SCListeningTimeoutMs = 5000; // 5 second timeout for input listening
-    private SCGridColumn? _scListeningColumn;     // Which column we're listening for
-    private HashSet<string> _scConflictingBindings = new();  // Set of binding keys that have conflicts
-    private int _scHighlightedColumn = -1;        // Column index to highlight (-1 = none)
-
-    // SC Bindings scrollbar interaction state
-    private bool _scIsDraggingVScroll = false;    // Dragging vertical scrollbar
-    private bool _scIsDraggingHScroll = false;    // Dragging horizontal scrollbar
-    private float _scScrollDragStartY = 0;        // Y position when drag started
-    private float _scScrollDragStartX = 0;        // X position when drag started
-    private float _scScrollDragStartOffset = 0;   // Scroll offset when drag started
-    private SKRect _scVScrollbarBounds;           // Vertical scrollbar track bounds
-    private SKRect _scHScrollbarBounds;           // Horizontal scrollbar track bounds
-    private SKRect _scVScrollThumbBounds;         // Vertical scrollbar thumb bounds
-    private SKRect _scHScrollThumbBounds;         // Horizontal scrollbar thumb bounds
-    private SKRect _scColumnHeadersBounds;        // Bounds of the column headers row
-
-    // SC Bindings search and filter state
-    private string _scSearchText = "";           // Search text for filtering actions
-    private bool _scShowBoundOnly = false;       // Show only actions with bindings
-    private SKRect _scSearchBoxBounds;
-    private bool _scSearchBoxFocused = false;
-    private SKRect _scShowBoundOnlyBounds;
-    private bool _scShowBoundOnlyHovered = false;
-
-    // SC Category collapse state
-    private HashSet<string> _scCollapsedCategories = new();  // Action maps that are collapsed
-    private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();  // Bounds for category headers
-
-    // SC Binding assignment state
-    private bool _scAssigningInput = false;
-    private SKRect _scAssignInputButtonBounds;
-    private bool _scAssignInputButtonHovered;
-    private SKRect _scClearBindingButtonBounds;
-    private bool _scClearBindingButtonHovered;
-
-    // SC Export profile management (injected via constructor, never null)
-    private SCExportProfileService _scExportProfileService = null!;
-    private List<SCExportProfileInfo> _scExportProfiles = new();
-    private SKRect _scProfileDropdownBounds;
-    private bool _scProfileDropdownOpen;
-    private SKRect _scProfileDropdownListBounds;
-    private int _scHoveredProfileIndex = -1;
-    private SKRect _scNewProfileButtonBounds;
-    private bool _scNewProfileButtonHovered;
-    private SKRect _scSaveProfileButtonBounds;
-    private bool _scSaveProfileButtonHovered;
-    private SKRect _scDeleteProfileButtonBounds = default;
+    // (SC Bindings tab fields moved to SCBindingsTabController)
 
     // Input forwarding state (physical → vJoy)
     private bool _isForwarding = false;
@@ -455,12 +336,6 @@ public partial class MainForm : Form
         _vjoyService = vjoyService ?? throw new ArgumentNullException(nameof(vjoyService));
         _mappingEngine = mappingEngine ?? throw new ArgumentNullException(nameof(mappingEngine));
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
-        _scInstallationService = scInstallationService ?? throw new ArgumentNullException(nameof(scInstallationService));
-        _scProfileCacheService = scProfileCacheService ?? throw new ArgumentNullException(nameof(scProfileCacheService));
-        _scSchemaService = scSchemaService ?? throw new ArgumentNullException(nameof(scSchemaService));
-        _scExportService = scExportService ?? throw new ArgumentNullException(nameof(scExportService));
-        _scExportProfileService = scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService));
-
         // Update tray icon tooltip
         _trayIcon.SetToolTip($"Asteriq v{s_appVersion}");
 
@@ -472,11 +347,20 @@ public partial class MainForm : Form
         InitializeRenderLoop();
         LoadSvgAssets();
         InitializeProfiles();
-        InitializeSCBindings();
-        InitializeTabControllers();
+        InitializeTabControllers(
+            scInstallationService ?? throw new ArgumentNullException(nameof(scInstallationService)),
+            scProfileCacheService ?? throw new ArgumentNullException(nameof(scProfileCacheService)),
+            scSchemaService ?? throw new ArgumentNullException(nameof(scSchemaService)),
+            scExportService ?? throw new ArgumentNullException(nameof(scExportService)),
+            scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService)));
     }
 
-    private void InitializeTabControllers()
+    private void InitializeTabControllers(
+        ISCInstallationService scInstallationService,
+        SCProfileCacheService scProfileCacheService,
+        SCSchemaService scSchemaService,
+        SCXmlExportService scExportService,
+        SCExportProfileService scExportProfileService)
     {
         _tabContext = new TabContext(
             _inputService, _profileManager, _profileRepository, _appSettings,
@@ -515,6 +399,10 @@ public partial class MainForm : Form
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
+        _scBindingsController = new SCBindingsTabController(
+            _tabContext, scInstallationService, scProfileCacheService,
+            scSchemaService, scExportService, scExportProfileService);
+        _scBindingsController.Initialize();
     }
 
     private void SyncTabContext()
@@ -1322,16 +1210,13 @@ public partial class MainForm : Form
             return true; // Consume the key
         }
 
-        // Handle SC Bindings search box input
-        if (_scSearchBoxFocused && _activeTab == 2)
+        // Handle SC Bindings keyboard input (search box, filename box)
+        if (_activeTab == 2)
         {
-            return HandleSearchBoxKey(keyData);
-        }
-
-        // Handle export filename box input
-        if (_scExportFilenameBoxFocused && _activeTab == 2)
-        {
-            return HandleExportFilenameBoxKey(keyData);
+            SyncTabContext();
+            bool handled = _scBindingsController.ProcessCmdKey(ref msg, keyData);
+            SyncFromTabContext();
+            if (handled) return true;
         }
 
         // Cancel key capture with Escape
@@ -1347,148 +1232,9 @@ public partial class MainForm : Form
                 CancelInputListening();
                 return true;
             }
-            if (_scSearchBoxFocused)
-            {
-                _scSearchBoxFocused = false;
-                return true;
-            }
-            if (_scExportFilenameBoxFocused)
-            {
-                _scExportFilenameBoxFocused = false;
-                return true;
-            }
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
-    }
-
-    private bool HandleSearchBoxKey(Keys keyData)
-    {
-        // Remove modifiers for comparison
-        var key = keyData & Keys.KeyCode;
-
-        if (key == Keys.Escape)
-        {
-            _scSearchBoxFocused = false;
-            return true;
-        }
-
-        if (key == Keys.Back)
-        {
-            if (_scSearchText.Length > 0)
-            {
-                _scSearchText = _scSearchText.Substring(0, _scSearchText.Length - 1);
-                RefreshFilteredActions();
-            }
-            return true;
-        }
-
-        if (key == Keys.Delete)
-        {
-            _scSearchText = "";
-            RefreshFilteredActions();
-            return true;
-        }
-
-        // Allow alphanumeric and common characters
-        char c = KeyToChar(key, (keyData & Keys.Shift) == Keys.Shift);
-        if (c != '\0' && _scSearchText.Length < 50)
-        {
-            _scSearchText += c;
-            RefreshFilteredActions();
-            return true;
-        }
-
-        return false; // Let other keys pass through
-    }
-
-    private bool HandleExportFilenameBoxKey(Keys keyData)
-    {
-        // Remove modifiers for comparison
-        var key = keyData & Keys.KeyCode;
-
-        if (key == Keys.Escape || key == Keys.Enter)
-        {
-            _scExportFilenameBoxFocused = false;
-            return true;
-        }
-
-        if (key == Keys.Back)
-        {
-            if (_scExportFilename.Length > 0)
-            {
-                _scExportFilename = _scExportFilename.Substring(0, _scExportFilename.Length - 1);
-            }
-            return true;
-        }
-
-        if (key == Keys.Delete)
-        {
-            _scExportFilename = "";
-            return true;
-        }
-
-        // Allow alphanumeric and filename-safe characters (no spaces, special chars)
-        char c = KeyToFilenameChar(key, (keyData & Keys.Shift) == Keys.Shift);
-        if (c != '\0' && _scExportFilename.Length < 50)
-        {
-            _scExportFilename += c;
-            return true;
-        }
-
-        return false; // Let other keys pass through
-    }
-
-    private static char KeyToFilenameChar(Keys key, bool shift)
-    {
-        // Letters
-        if (key >= Keys.A && key <= Keys.Z)
-        {
-            char c = (char)('a' + (key - Keys.A));
-            return shift ? char.ToUpper(c) : c;
-        }
-
-        // Numbers
-        if (key >= Keys.D0 && key <= Keys.D9)
-        {
-            return (char)('0' + (key - Keys.D0));
-        }
-
-        // Only filename-safe characters
-        return key switch
-        {
-            Keys.OemMinus => shift ? '_' : '-',
-            Keys.Oemplus => '=',
-            Keys.OemPeriod => '.',
-            _ => '\0'
-        };
-    }
-
-    private static char KeyToChar(Keys key, bool shift)
-    {
-        // Letters
-        if (key >= Keys.A && key <= Keys.Z)
-        {
-            char c = (char)('a' + (key - Keys.A));
-            return shift ? char.ToUpper(c) : c;
-        }
-
-        // Numbers
-        if (key >= Keys.D0 && key <= Keys.D9)
-        {
-            return (char)('0' + (key - Keys.D0));
-        }
-
-        // Space and common characters
-        return key switch
-        {
-            Keys.Space => ' ',
-            Keys.OemMinus => shift ? '_' : '-',
-            Keys.Oemplus => shift ? '+' : '=',
-            Keys.OemPeriod => '.',
-            Keys.Oemcomma => ',',
-            _ => '\0'
-        };
     }
 
     private static string? GetKeyNameFromKeys(Keys keys)
@@ -1715,10 +1461,12 @@ public partial class MainForm : Form
             needsUpdate = true;
         }
 
-        // Check for SC binding input when in listening mode
-        if (_activeTab == 2 && _scIsListeningForInput)
+        // SC Bindings tab tick (input listening check)
+        if (_activeTab == 2)
         {
-            CheckSCBindingInput();
+            SyncTabContext();
+            _scBindingsController.OnTick();
+            SyncFromTabContext();
         }
 
         // Only invalidate if animations ran or something is dirty, and we're not resizing
@@ -2252,32 +2000,12 @@ public partial class MainForm : Form
         // Store mouse position for debug display
         _mousePosition = e.Location;
 
-        // Handle SC Bindings scrollbar dragging
-        if (_scIsDraggingVScroll)
+        // Handle SC Bindings scrollbar dragging (delegated to SC Bindings controller)
+        if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll)
         {
-            float deltaY = e.Y - _scScrollDragStartY;
-            float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
-            float trackHeight = _scVScrollbarBounds.Height - _scVScrollThumbBounds.Height;
-            if (trackHeight > 0 && maxScroll > 0)
-            {
-                float scrollDelta = (deltaY / trackHeight) * maxScroll;
-                _scBindingsScrollOffset = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxScroll);
-            }
-            MarkDirty();
-            return;
-        }
-
-        if (_scIsDraggingHScroll)
-        {
-            float deltaX = e.X - _scScrollDragStartX;
-            float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
-            float trackWidth = _scHScrollbarBounds.Width - _scHScrollThumbBounds.Width;
-            if (trackWidth > 0 && maxHScroll > 0)
-            {
-                float scrollDelta = (deltaX / trackWidth) * maxHScroll;
-                _scGridHorizontalScroll = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxHScroll);
-            }
-            MarkDirty();
+            SyncTabContext();
+            _scBindingsController.OnMouseMove(e);
+            SyncFromTabContext();
             return;
         }
 
@@ -2500,125 +2228,12 @@ public partial class MainForm : Form
             _hoveredProfileIndex = -1;
         }
 
-        // SC Installation dropdown hover detection (Bindings tab)
-        if (_activeTab == 2 && _scInstallationDropdownOpen && _scInstallationDropdownBounds.Contains(e.X, e.Y))
-        {
-            float itemHeight = 28f;
-            int itemIndex = (int)((e.Y - _scInstallationDropdownBounds.Top - 2) / itemHeight);
-            _hoveredSCInstallation = itemIndex >= 0 && itemIndex < _scInstallations.Count ? itemIndex : -1;
-            Cursor = Cursors.Hand;
-            return;
-        }
-        else if (_activeTab == 2)
-        {
-            _hoveredSCInstallation = -1;
-        }
-
-        // SC Bindings tab hover detection
+        // SC Bindings tab hover detection (delegated to SC Bindings controller)
         if (_activeTab == 2)
         {
-            // Reset hover states
-            _hoveredVJoyMapping = -1;
-            _scHoveredActionIndex = -1;
-            _scHoveredActionMapFilter = -1;
-            _scHoveredCell = (-1, -1);
-
-            // Action map filter dropdown hover
-            if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
-            {
-                float itemHeight = 24f;
-                // Account for scroll offset when calculating hovered item
-                float relativeY = e.Y - _scActionMapFilterDropdownBounds.Top - 2 + _scActionMapFilterScrollOffset;
-                int itemIndex = (int)(relativeY / itemHeight) - 1;
-                _scHoveredActionMapFilter = itemIndex >= -1 && itemIndex < _scActionMaps.Count ? itemIndex : -1;
-                Cursor = Cursors.Hand;
-            }
-
-            // Action row and cell hover detection
-            if (_scBindingsListBounds.Contains(e.X, e.Y) && _scFilteredActions is not null)
-            {
-                // Find which row is hovered, accounting for scroll offset and group headers
-                float rowHeight = 28f;  // Must match drawing code
-                float rowGap = 2f;
-                float categoryHeaderHeight = 28f;
-                float relativeY = e.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
-
-                string? lastActionMap = null;
-                float currentY = 0;
-
-                for (int i = 0; i < _scFilteredActions.Count; i++)
-                {
-                    var action = _scFilteredActions[i];
-
-                    // Account for category header
-                    if (action.ActionMap != lastActionMap)
-                    {
-                        lastActionMap = action.ActionMap;
-                        currentY += categoryHeaderHeight;
-
-                        // If collapsed, skip all actions in this category
-                        if (_scCollapsedCategories.Contains(action.ActionMap))
-                        {
-                            while (i < _scFilteredActions.Count - 1 &&
-                                   _scFilteredActions[i + 1].ActionMap == action.ActionMap)
-                            {
-                                i++;
-                            }
-                            continue;
-                        }
-                    }
-
-                    float rowTop = currentY;
-                    float rowBottom = currentY + rowHeight;
-
-                    if (relativeY >= rowTop && relativeY < rowBottom)
-                    {
-                        _scHoveredActionIndex = i;
-
-                        // Check for cell hover
-                        int hoveredCol = GetHoveredColumnIndex(e.X);
-                        if (hoveredCol >= 0)
-                        {
-                            _scHoveredCell = (i, hoveredCol);
-                        }
-
-                        Cursor = Cursors.Hand;
-                        break;
-                    }
-
-                    currentY += rowHeight + rowGap;
-                }
-            }
-
-            // vJoy mapping rows
-            for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
-            {
-                if (_scVJoyMappingBounds[i].Contains(e.X, e.Y))
-                {
-                    _hoveredVJoyMapping = i;
-                    Cursor = Cursors.Hand;
-                    break;
-                }
-            }
-
-            // Buttons and selectors
-            if (_scRefreshButtonBounds.Contains(e.X, e.Y) ||
-                _scExportButtonBounds.Contains(e.X, e.Y) ||
-                _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
-                _scProfileNameBounds.Contains(e.X, e.Y) ||
-                _scActionMapFilterBounds.Contains(e.X, e.Y) ||
-                _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
-                _scClearBindingButtonBounds.Contains(e.X, e.Y))
-            {
-                Cursor = Cursors.Hand;
-            }
-
-            // Check for listening timeout
-            if (_scIsListeningForInput && (DateTime.Now - _scListeningStartTime).TotalMilliseconds > SCListeningTimeoutMs)
-            {
-                _scIsListeningForInput = false;
-                _scListeningColumn = null;
-            }
+            SyncTabContext();
+            _scBindingsController.OnMouseMove(e);
+            SyncFromTabContext();
         }
 
         // Update cursor based on hit test (for resize feedback)
@@ -2698,10 +2313,12 @@ public partial class MainForm : Form
         // Handle right-click
         if (e.Button == MouseButtons.Right)
         {
-            // Right-click on SC Bindings tab to clear cell binding
+            // Right-click on SC Bindings tab (delegated to SC Bindings controller)
             if (_activeTab == 2)
             {
-                HandleBindingsTabRightClick(new SKPoint(e.X, e.Y));
+                SyncTabContext();
+                _scBindingsController.OnMouseDown(e);
+                SyncFromTabContext();
                 return;
             }
 
@@ -2888,10 +2505,12 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
 
-        // Bindings (SC) tab click handling
+        // Bindings (SC) tab click handling (delegated to SC Bindings controller)
         if (_activeTab == 2)
         {
-            HandleBindingsTabClick(new SKPoint(e.X, e.Y));
+            SyncTabContext();
+            _scBindingsController.OnMouseDown(e);
+            SyncFromTabContext();
             return;
         }
 
@@ -3087,6 +2706,7 @@ public partial class MainForm : Form
         _draggingCurvePoint = -1;
         _draggingDeadzoneHandle = -1;
         _devicesController.OnMouseLeave();
+        _scBindingsController.OnMouseLeave();
     }
 
     private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
@@ -3101,12 +2721,12 @@ public partial class MainForm : Form
                 return; // Was still dragging, now released
         }
 
-        // Release SC Bindings scrollbar dragging
-        if (_scIsDraggingVScroll || _scIsDraggingHScroll)
+        // Release SC Bindings scrollbar dragging (delegated to SC Bindings controller)
+        if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll)
         {
-            _scIsDraggingVScroll = false;
-            _scIsDraggingHScroll = false;
-            MarkDirty();
+            SyncTabContext();
+            _scBindingsController.OnMouseUp(e);
+            SyncFromTabContext();
         }
 
         if (_draggingCurvePoint >= 0 || _draggingDeadzoneHandle >= 0)
@@ -3137,12 +2757,12 @@ public partial class MainForm : Form
 
     private void OnCanvasMouseWheel(object? sender, MouseEventArgs e)
     {
-        // Handle scroll on action map filter dropdown when open
-        if (_activeTab == 2 && _scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+        // Handle scroll on SC Bindings tab (delegated to SC Bindings controller)
+        if (_activeTab == 2)
         {
-            float scrollAmount = -e.Delta / 4f;
-            _scActionMapFilterScrollOffset = Math.Clamp(_scActionMapFilterScrollOffset + scrollAmount, 0, _scActionMapFilterMaxScroll);
-            MarkDirty();
+            SyncTabContext();
+            _scBindingsController.OnMouseWheel(e);
+            SyncFromTabContext();
             return;
         }
 
@@ -3153,29 +2773,6 @@ public partial class MainForm : Form
             float maxScroll = Math.Max(0, _bindingsContentHeight - _bindingsListBounds.Height);
 
             _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset + scrollAmount, 0, maxScroll);
-            MarkDirty();
-        }
-
-        // Handle scroll on BINDINGS (SC) tab when mouse is over the SC bindings list
-        if (_activeTab == 2 && _scBindingsListBounds.Contains(e.X, e.Y))
-        {
-            float scrollAmount = -e.Delta / 4f;
-
-            // Shift+Wheel = horizontal scroll
-            if (Control.ModifierKeys.HasFlag(Keys.Shift))
-            {
-                float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
-                if (maxHScroll > 0)
-                {
-                    _scGridHorizontalScroll = Math.Clamp(_scGridHorizontalScroll + scrollAmount, 0, maxHScroll);
-                }
-            }
-            else
-            {
-                // Normal vertical scroll
-                float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
-                _scBindingsScrollOffset = Math.Clamp(_scBindingsScrollOffset + scrollAmount, 0, maxScroll);
-            }
             MarkDirty();
         }
     }
@@ -3203,26 +2800,6 @@ public partial class MainForm : Form
     /// <summary>
     /// Gets the column index at the given X coordinate in SC Bindings grid, or -1 if not in a device column
     /// </summary>
-    private int GetHoveredColumnIndex(float x)
-    {
-        if (_scGridColumns is null || x < _scDeviceColsStart || x > _scDeviceColsStart + _scVisibleDeviceWidth)
-            return -1;
-
-        float relativeX = x - _scDeviceColsStart + _scGridHorizontalScroll;
-
-        // Walk through columns to find which one contains this X
-        float cumX = 0f;
-        for (int c = 0; c < _scGridColumns.Count; c++)
-        {
-            float colW = _scGridDeviceColWidths.TryGetValue(_scGridColumns[c].Id, out var w) ? w : _scGridDeviceColMinWidth;
-            if (relativeX >= cumX && relativeX < cumX + colW)
-                return c;
-            cumX += colW;
-        }
-
-        return -1;
-    }
-
     #endregion
 
     #region Rendering
@@ -3315,7 +2892,9 @@ public partial class MainForm : Form
         }
         else if (_activeTab == 2) // BINDINGS tab (Star Citizen integration)
         {
-            DrawBindingsTabContent(canvas, bounds, pad, contentTop, contentBottom);
+            SyncTabContext();
+            _scBindingsController.Draw(canvas, bounds, pad, contentTop, contentBottom);
+            SyncFromTabContext();
         }
         else if (_activeTab == 3) // SETTINGS tab
         {

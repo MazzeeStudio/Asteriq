@@ -32,7 +32,7 @@ public class DriverSetupForm : Form
     private SKRect _exitButtonBounds;
     private SKRect _vJoyLinkBounds;
     private SKRect _hidHideLinkBounds;
-    private int _hoveredRegion = -1; // 0=continue, 1=exit, 2=vjoy-link, 3=hidhide-link
+    private int _hoveredRegion = -1; // 0=left-btn (continue or skip), 1=exit, 2=vjoy-link, 3=hidhide-link
 
     // Dragging
     private bool _isDragging;
@@ -50,6 +50,7 @@ public class DriverSetupForm : Form
     private const float InstallBtnOffsetY = 82f;      // install button y relative to panel top
 
     public bool SetupComplete { get; private set; }
+    public bool SkippedVJoy { get; private set; }
 
     public DriverSetupForm(DriverSetupManager driverSetupManager)
     {
@@ -221,9 +222,10 @@ public class DriverSetupForm : Form
         }
         else
         {
-            FUIRenderer.DrawButton(canvas, _continueButtonBounds, "CONTINUE", FUIRenderer.ButtonState.Normal);
-            using var dimPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(0, 0, 0, 140) };
-            canvas.DrawRect(_continueButtonBounds, dimPaint);
+            // vJoy not installed - offer skip instead of a disabled continue
+            FUIRenderer.DrawButton(canvas, _continueButtonBounds, "SKIP VJOY",
+                _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                FUIColors.Warning.WithAlpha(180));
         }
 
         // L-corner decorations
@@ -267,7 +269,7 @@ public class DriverSetupForm : Form
         var pt = new SKPoint(e.X, e.Y);
         int newHovered = -1;
 
-        if (_continueEnabled && _continueButtonBounds.Contains(pt)) newHovered = 0;
+        if (_continueButtonBounds.Contains(pt)) newHovered = 0;
         else if (_exitButtonBounds.Contains(pt)) newHovered = 1;
         else if (_vJoyLinkBounds.Contains(pt)) newHovered = 2;
         else if (_hidHideLinkBounds.Contains(pt)) newHovered = 3;
@@ -301,7 +303,22 @@ public class DriverSetupForm : Form
         _isDragging = false;
         if (e.Button != MouseButtons.Left) return;
 
-        if (_hoveredRegion == 0 && _continueEnabled) { SetupComplete = true; DialogResult = DialogResult.OK; Close(); }
+        if (_hoveredRegion == 0)
+        {
+            if (_continueEnabled)
+            {
+                SetupComplete = true;
+                DialogResult = DialogResult.OK;
+                Close();
+            }
+            else
+            {
+                SkippedVJoy = true;
+                SetupComplete = true;
+                DialogResult = DialogResult.OK;
+                Close();
+            }
+        }
         else if (_hoveredRegion == 1) { DialogResult = DialogResult.Cancel; Close(); }
         else if (_hoveredRegion == 2) OpenUrl(_driverSetup.GetVJoyReleasesUrl());
         else if (_hoveredRegion == 3) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
@@ -368,8 +385,8 @@ public class DriverSetupForm : Form
         }
         else
         {
-            _statusText = "vJoy driver is required to run Asteriq.";
-            _statusColor = FUIColors.Danger;
+            _statusText = "vJoy required for forwarding. You may continue in configuration-only mode.";
+            _statusColor = FUIColors.Warning;
             _continueEnabled = false;
         }
 

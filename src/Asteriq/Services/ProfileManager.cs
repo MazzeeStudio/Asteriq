@@ -82,6 +82,20 @@ public class ProfileManager : IProfileManager
         if (profile is not null)
         {
             ActiveProfile = profile;
+            return;
+        }
+
+        // Saved profile no longer exists on disk - clear stale ID and try the first available
+        _settings.LastProfileId = null;
+        var available = _repository.ListProfiles();
+        if (available.Count > 0)
+        {
+            var first = _repository.LoadProfile(available[0].Id);
+            if (first is not null)
+            {
+                ActiveProfile = first;
+                _settings.LastProfileId = first.Id;
+            }
         }
     }
 }

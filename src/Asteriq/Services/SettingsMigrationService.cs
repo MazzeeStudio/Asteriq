@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Asteriq.Models;
 using Asteriq.Services.Abstractions;
 using Asteriq.UI;
@@ -59,7 +60,8 @@ public class SettingsMigrationService
             var json = File.ReadAllText(_oldSettingsFile);
             var oldSettings = JsonSerializer.Deserialize<OldAppSettings>(json, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
             });
 
             if (oldSettings is null)
@@ -108,7 +110,9 @@ public class SettingsMigrationService
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            _logger.LogError(ex, "Settings migration failed");
+            _logger.LogError(ex, "Settings migration failed - marking as migrated to prevent infinite retry");
+            try { File.WriteAllText(_migrationMarkerFile, DateTime.UtcNow.ToString("O")); }
+            catch (Exception markerEx) when (markerEx is IOException or UnauthorizedAccessException) { _logger.LogWarning(markerEx, "Failed to write migration marker"); }
             return false;
         }
     }

@@ -2009,7 +2009,7 @@ public class SCBindingsTabController : ITabController
         float buttonGap = 6f;
 
         // Title
-        FUIRenderer.DrawText(canvas, "PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
+        FUIRenderer.DrawText(canvas, "SC EXPORTS", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
         y += 18f;
 
         // Profile dropdown (full width)

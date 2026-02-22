@@ -358,74 +358,11 @@ public partial class MainForm : Form
 
     private void CreateNewProfilePrompt()
     {
-        // Simple input dialog for profile name
-        // In production, this would be a proper FUI-styled dialog
         string defaultName = $"Profile {_profiles.Count + 1}";
-
-        using var dialog = new Form
+        var name = FUIInputDialog.Show(this, "New Profile", "Profile Name:", defaultName, "Create");
+        if (name is not null)
         {
-            Text = "New Profile",
-            Width = 320,
-            Height = 140,
-            StartPosition = FormStartPosition.CenterParent,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            MinimizeBox = false,
-            BackColor = Color.FromArgb(20, 22, 30)
-        };
-
-        var label = new Label
-        {
-            Text = "Profile Name:",
-            Left = 16,
-            Top = 16,
-            Width = 280,
-            ForeColor = Color.FromArgb(180, 190, 210)
-        };
-
-        var textBox = new TextBox
-        {
-            Text = defaultName,
-            Left = 16,
-            Top = 40,
-            Width = 275,
-            BackColor = Color.FromArgb(35, 38, 50),
-            ForeColor = Color.FromArgb(220, 230, 240)
-        };
-        textBox.SelectAll();
-
-        var okButton = new Button
-        {
-            Text = "Create",
-            Left = 130,
-            Top = 70,
-            Width = 75,
-            DialogResult = DialogResult.OK,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(40, 90, 120),
-            ForeColor = Color.White
-        };
-
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            Left = 215,
-            Top = 70,
-            Width = 75,
-            DialogResult = DialogResult.Cancel,
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(50, 52, 60),
-            ForeColor = Color.FromArgb(180, 190, 210)
-        };
-
-        dialog.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
-        dialog.AcceptButton = okButton;
-        dialog.CancelButton = cancelButton;
-
-        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(textBox.Text))
-        {
-            _profileManager.CreateAndActivateProfile(textBox.Text.Trim());
-            // New profile has no mappings yet, but initialize primary device tracking
+            _profileManager.CreateAndActivateProfile(name);
             UpdateMappingsPrimaryDeviceMap();
             RefreshProfileList();
         }

@@ -93,14 +93,16 @@ public static class FUIRenderer
 
     /// <summary>
     /// User preference multiplier - allows fine-tuning on top of Windows setting
-    /// Small = 1.2x, Medium = 1.4x, Large = 1.6x
+    /// VSmall=1.0x, Small=1.2x, Medium=1.3x (default), Large=1.4x, XLarge=1.6x
     /// </summary>
     public static float UserScaleMultiplier => _fontSizeOption switch
     {
-        FontSizeOption.Small => 1.0f,
-        FontSizeOption.Medium => 1.2f,
+        FontSizeOption.VSmall => 1.0f,
+        FontSizeOption.Small => 1.2f,
+        FontSizeOption.Medium => 1.3f,
         FontSizeOption.Large => 1.4f,
-        _ => 1.4f
+        FontSizeOption.XLarge => 1.6f,
+        _ => 1.3f
     };
 
     /// <summary>

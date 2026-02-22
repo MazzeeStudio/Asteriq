@@ -18,8 +18,11 @@ public class SettingsTabController : ITabController
     // Theme selector state
     private SKRect[] _themeButtonBounds = new SKRect[12];
 
-    // Font size / font family selector state
-    private SKRect[] _fontSizeButtonBounds = new SKRect[3];
+    // Font size stepper ([-] value [+]) — index 0 = minus, 1 = plus
+    private static readonly FontSizeOption[] s_fontSizeSteps =
+        { FontSizeOption.VSmall, FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large, FontSizeOption.XLarge };
+    private static readonly float[] s_fontSizeMultipliers = { 1.0f, 1.2f, 1.3f, 1.4f, 1.6f };
+    private SKRect[] _fontSizeButtonBounds = new SKRect[2];
     private SKRect[] _fontFamilyButtonBounds = new SKRect[2];
 
     // Background settings slider bounds
@@ -290,48 +293,53 @@ public class SettingsTabController : ITabController
         }
         y += iconBtnHeight + sectionSpacing;
 
-        // Font size section
-        FontSizeOption[] fontSizeValues = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
-        string[] fontSizeLabels = { "-", "=", "+" };
+        // Font size stepper: [-]  1.3x  [+]
         float fontBtnWidth = 32f;
         float fontBtnHeight = 32f;
         float fontBtnGap = 4f;
-        float fontBtnsWidth = fontBtnWidth * 3 + fontBtnGap * 2;
-        float fontLabelMaxWidth = contentWidth - fontBtnsWidth - minControlGap;
+        float fontValueWidth = 48f;
+        float fontStepperWidth = fontBtnWidth * 2 + fontBtnGap * 2 + fontValueWidth;
+        float fontLabelMaxWidth = contentWidth - fontStepperWidth - minControlGap;
 
         string fontLabel = $"Font Size (Display: {FUIRenderer.DisplayScaleFactor:P0})";
         FUIRenderer.DrawTextTruncated(canvas, fontLabel, new SKPoint(leftMargin, y + 6),
             fontLabelMaxWidth, FUIColors.TextPrimary, 11f);
 
-        float fontBtnsStartX = rightMargin - fontBtnsWidth;
+        int currentFontStep = Array.IndexOf(s_fontSizeSteps, _ctx.AppSettings.FontSize);
+        if (currentFontStep < 0) currentFontStep = 2; // default to Medium
+        bool canDecrease = currentFontStep > 0;
+        bool canIncrease = currentFontStep < s_fontSizeSteps.Length - 1;
 
-        for (int i = 0; i < fontSizeValues.Length; i++)
-        {
-            var fontBounds = new SKRect(
-                fontBtnsStartX + i * (fontBtnWidth + fontBtnGap), y,
-                fontBtnsStartX + i * (fontBtnWidth + fontBtnGap) + fontBtnWidth, y + fontBtnHeight);
+        float stepperX = rightMargin - fontStepperWidth;
 
-            _fontSizeButtonBounds[i] = fontBounds;
+        // [-] button
+        var minusBounds = new SKRect(stepperX, y, stepperX + fontBtnWidth, y + fontBtnHeight);
+        _fontSizeButtonBounds[0] = minusBounds;
+        bool minusHovered = canDecrease && minusBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var minusBg = !canDecrease ? FUIColors.Background1 : (minusHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+        var minusFrame = !canDecrease ? FUIColors.Frame.WithAlpha(60) : (minusHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var minusText = !canDecrease ? FUIColors.TextDim.WithAlpha(60) : (minusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+        using (var p = new SKPaint { Style = SKPaintStyle.Fill, Color = minusBg }) canvas.DrawRect(minusBounds, p);
+        using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = minusFrame, StrokeWidth = 1f }) canvas.DrawRect(minusBounds, p);
+        FUIRenderer.DrawTextCentered(canvas, "-", minusBounds, minusText, 14f, scaleFont: false);
 
-            bool isActive = _ctx.AppSettings.FontSize == fontSizeValues[i];
-            bool isHovered = fontBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        // Current value label
+        float currentMultiplier = s_fontSizeMultipliers[currentFontStep];
+        string valueText = $"{currentMultiplier:F1}x";
+        var valueBounds = new SKRect(stepperX + fontBtnWidth + fontBtnGap, y, stepperX + fontBtnWidth + fontBtnGap + fontValueWidth, y + fontBtnHeight);
+        FUIRenderer.DrawTextCentered(canvas, valueText, valueBounds, FUIColors.TextBright, 12f, scaleFont: false);
 
-            var bgColorFont = isActive
-                ? FUIColors.Active.WithAlpha(60)
-                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-            var frameColorFont = isActive
-                ? FUIColors.Active
-                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-            var textColorFont = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+        // [+] button
+        var plusBounds = new SKRect(valueBounds.Right + fontBtnGap, y, valueBounds.Right + fontBtnGap + fontBtnWidth, y + fontBtnHeight);
+        _fontSizeButtonBounds[1] = plusBounds;
+        bool plusHovered = canIncrease && plusBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var plusBg = !canIncrease ? FUIColors.Background1 : (plusHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+        var plusFrame = !canIncrease ? FUIColors.Frame.WithAlpha(60) : (plusHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var plusText = !canIncrease ? FUIColors.TextDim.WithAlpha(60) : (plusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+        using (var p = new SKPaint { Style = SKPaintStyle.Fill, Color = plusBg }) canvas.DrawRect(plusBounds, p);
+        using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = plusFrame, StrokeWidth = 1f }) canvas.DrawRect(plusBounds, p);
+        FUIRenderer.DrawTextCentered(canvas, "+", plusBounds, plusText, 14f, scaleFont: false);
 
-            using var fontBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColorFont };
-            canvas.DrawRect(fontBounds, fontBgPaint);
-
-            using var fontFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColorFont, StrokeWidth = isActive ? 1.5f : 1f };
-            canvas.DrawRect(fontBounds, fontFramePaint);
-
-            FUIRenderer.DrawTextCentered(canvas, fontSizeLabels[i], fontBounds, textColorFont, 14f, scaleFont: false);
-        }
         y += fontBtnHeight + sectionSpacing;
 
         // Font family section
@@ -612,14 +620,22 @@ public class SettingsTabController : ITabController
             return;
         }
 
-        // Font size button clicks
-        FontSizeOption[] fontSizes = { FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large };
-        for (int i = 0; i < _fontSizeButtonBounds.Length; i++)
+        // Font size stepper clicks ([-] and [+])
         {
-            if (_fontSizeButtonBounds[i].Contains(pt))
+            int step = Array.IndexOf(s_fontSizeSteps, _ctx.AppSettings.FontSize);
+            if (step < 0) step = 2;
+            if (_fontSizeButtonBounds[0].Contains(pt) && step > 0)
             {
-                _ctx.AppSettings.FontSize = fontSizes[i];
-                FUIRenderer.FontSizeOption = fontSizes[i];
+                _ctx.AppSettings.FontSize = s_fontSizeSteps[step - 1];
+                FUIRenderer.FontSizeOption = s_fontSizeSteps[step - 1];
+                _ctx.ApplyFontScale?.Invoke();
+                _ctx.InvalidateCanvas();
+                return;
+            }
+            if (_fontSizeButtonBounds[1].Contains(pt) && step < s_fontSizeSteps.Length - 1)
+            {
+                _ctx.AppSettings.FontSize = s_fontSizeSteps[step + 1];
+                FUIRenderer.FontSizeOption = s_fontSizeSteps[step + 1];
                 _ctx.ApplyFontScale?.Invoke();
                 _ctx.InvalidateCanvas();
                 return;

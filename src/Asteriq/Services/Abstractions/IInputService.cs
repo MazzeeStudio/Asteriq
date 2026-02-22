@@ -49,6 +49,11 @@ public interface IInputService : IDisposable
     DeviceInputState? GetDeviceState(int deviceIndex);
 
     /// <summary>
+    /// The poll rate that was passed to StartPolling, in Hz. 0 if not yet started.
+    /// </summary>
+    int PollRateHz { get; }
+
+    /// <summary>
     /// Start polling for input
     /// </summary>
     void StartPolling(int pollRateHz = 500);

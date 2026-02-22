@@ -435,15 +435,21 @@ public class SCBindingsTabController : ITabController
                 _scExportProfile = loadedProfile;
                 System.Diagnostics.Debug.WriteLine($"[MainForm] Loaded last SC export profile: {loadedProfile.ProfileName}");
             }
+            else if (_scExportProfiles.Count > 0)
+            {
+                // No last profile setting - load the first available one
+                var first = _scExportProfileService?.LoadProfile(_scExportProfiles[0].ProfileName);
+                if (first is not null)
+                {
+                    _scExportProfile = first;
+                    _ctx.AppSettings.LastSCExportProfile = first.ProfileName;
+                }
+            }
             else
             {
-                // Initialize export profile with default name
-                _scExportProfile = new SCExportProfile
-                {
-                    ProfileName = "asteriq"
-                };
-
-                // Set up default vJoy mappings based on available vJoy devices
+                // No profiles exist yet - start with a blank unnamed export
+                // (user must click "+ New" to name and save it)
+                _scExportProfile = new SCExportProfile();
                 foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 {
                     _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
@@ -1056,13 +1062,15 @@ public class SCBindingsTabController : ITabController
         float nameFieldHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
         _scProfileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameFieldHeight);
         _scProfileNameHovered = _scProfileNameBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawTextFieldReadOnly(canvas, _scProfileNameBounds, _scExportProfile.ProfileName, _scProfileNameHovered);
+        string profileNameDisplay = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— not saved —" : _scExportProfile.ProfileName;
+        FUIWidgets.DrawTextFieldReadOnly(canvas, _scProfileNameBounds, profileNameDisplay, _scProfileNameHovered);
         y += nameFieldHeight + 12f;  // 4px aligned
 
         // Export filename preview
         FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight;
-        FUIRenderer.DrawText(canvas, _scExportProfile.GetExportFileName(), new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+        string exportFilenameDisplay = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— save export to generate filename —" : _scExportProfile.GetExportFileName();
+        FUIRenderer.DrawText(canvas, exportFilenameDisplay, new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
     }
 
     private void DrawSCExportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -2008,7 +2016,8 @@ public class SCBindingsTabController : ITabController
         float dropdownHeight = 32f;
         _scProfileDropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
         bool dropdownHovered = _scProfileDropdownBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, _scExportProfile.ProfileName, dropdownHovered, _scProfileDropdownOpen);
+        string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— No Export Selected —" : _scExportProfile.ProfileName;
+        DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, dropdownLabel, dropdownHovered, _scProfileDropdownOpen);
         y += dropdownHeight + 6f;
 
         // Buttons row: + New, Save (aligned right)
@@ -4012,6 +4021,13 @@ public class SCBindingsTabController : ITabController
     {
         if (_scExportProfileService is null) return;
 
+        // If there's no name yet, prompt the user (same as Create New)
+        if (string.IsNullOrEmpty(_scExportProfile.ProfileName))
+        {
+            CreateNewSCExportProfile();
+            return;
+        }
+
         _scExportProfileService.SaveProfile(_scExportProfile);
         _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
         RefreshSCExportProfiles();
@@ -4085,8 +4101,9 @@ public class SCBindingsTabController : ITabController
             }
             else
             {
-                // Create default profile
-                _scExportProfile = new SCExportProfile { ProfileName = "asteriq" };
+                // All profiles deleted - reset to blank unnamed state
+                _ctx.AppSettings.LastSCExportProfile = null;
+                _scExportProfile = new SCExportProfile();
                 foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 {
                     _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);

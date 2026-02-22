@@ -9,7 +9,7 @@ public class SCExportProfile
     /// <summary>
     /// User-friendly name for the exported profile
     /// </summary>
-    public string ProfileName { get; set; } = "asteriq";
+    public string ProfileName { get; set; } = "";
 
     /// <summary>
     /// Target SC environment (LIVE, PTU, etc.)
@@ -177,7 +177,8 @@ public class SCExportProfile
     /// </summary>
     public string GetExportFileName()
     {
-        var sanitized = string.Join("_", ProfileName.Split(Path.GetInvalidFileNameChars()));
+        var name = string.IsNullOrEmpty(ProfileName) ? "unnamed" : ProfileName;
+        var sanitized = string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
         return $"layout_{sanitized}_exported.xml";
     }
 }

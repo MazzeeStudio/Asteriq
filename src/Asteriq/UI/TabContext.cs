@@ -69,6 +69,8 @@ public class TabContext
     public Action? ClearDeviceMappings { get; set; }
     public Action? RemoveDisconnectedDevice { get; set; }
     public Action<string>? OpenMappingDialogForControl { get; set; }
+    public Action? CreateNewProfilePrompt { get; set; }
+    public Action? SaveDisconnectedDevices { get; set; }
     public Action? SaveDeviceOrder { get; set; }
     public Action? SelectFirstDeviceInCategory { get; set; }
     public Action? UpdateTrayMenu { get; set; }

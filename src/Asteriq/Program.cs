@@ -186,7 +186,8 @@ static class Program
         migrationService.MigrateIfNeeded();
 
         // Check required drivers before creating MainForm
-        if (!CheckRequiredDrivers(serviceProvider))
+        bool forceDriverSetup = args.Contains("--driver-setup");
+        if (!CheckRequiredDrivers(serviceProvider, forceDriverSetup))
         {
             // User cancelled driver setup - exit
             serviceProvider.Dispose();
@@ -262,13 +263,14 @@ static class Program
 
     /// <summary>
     /// Check if required drivers are installed. Returns false if user cancels setup.
+    /// Pass forceShow=true to always display the setup modal (useful for testing).
     /// </summary>
-    private static bool CheckRequiredDrivers(IServiceProvider serviceProvider)
+    private static bool CheckRequiredDrivers(IServiceProvider serviceProvider, bool forceShow = false)
     {
         var driverSetup = serviceProvider.GetRequiredService<Services.DriverSetupManager>();
         var status = driverSetup.GetSetupStatus();
 
-        if (status.IsComplete)
+        if (status.IsComplete && !forceShow)
         {
             return true; // All required drivers are installed
         }
@@ -299,6 +301,10 @@ Commands:
   (none)              Launch the GUI application
 
   --help, -h, /?      Show this help message
+
+  --driver-setup      Force driver setup modal to appear on startup,
+                      even if drivers are already detected. Useful for
+                      testing the setup flow without modifying the registry.
 
   --diag, -d          Run input diagnostics
                       Lists all connected joysticks and displays real-time

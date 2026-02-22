@@ -18,11 +18,14 @@ public class DirectInputService : IDisposable
         Initialize();
     }
 
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetModuleHandle(IntPtr lpModuleName);
+
     private void Initialize()
     {
         var iid = IID_IDirectInput8W;
         int hr = DirectInput8Create(
-            Marshal.GetHINSTANCE(typeof(DirectInputService).Module),
+            GetModuleHandle(IntPtr.Zero), // executable HINSTANCE; works correctly in single-file apps
             DIRECTINPUT_VERSION,
             ref iid,
             out _directInput,

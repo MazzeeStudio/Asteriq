@@ -277,15 +277,15 @@ static class Program
         using var setupForm = ActivatorUtilities.CreateInstance<UI.DriverSetupForm>(serviceProvider);
         var result = setupForm.ShowDialog();
 
-        if (result == DialogResult.OK && setupForm.SetupComplete)
-        {
-            // Re-check status after setup
-            status = driverSetup.GetSetupStatus();
-            return status.IsComplete;
-        }
+        if (result != DialogResult.OK || !setupForm.SetupComplete)
+            return false; // User closed or cancelled
 
-        // User cancelled or setup incomplete
-        return false;
+        if (setupForm.SkippedVJoy)
+            return true; // User chose configuration-only mode without vJoy
+
+        // Re-check status after installation
+        status = driverSetup.GetSetupStatus();
+        return status.IsComplete;
     }
 
     private static void ShowHelp()

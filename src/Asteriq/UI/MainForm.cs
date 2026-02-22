@@ -703,6 +703,7 @@ public partial class MainForm : Form
                         map.VidPid.Equals(vidPidStr, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
+                        SyncDeviceMapToTabContext();
                         return;
                     }
                 }
@@ -718,6 +719,7 @@ public partial class MainForm : Form
                         map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
+                        SyncDeviceMapToTabContext();
                         System.Diagnostics.Debug.WriteLine($"Loaded device map (name match): {path} for device: {deviceName}");
                         return;
                     }
@@ -733,6 +735,7 @@ public partial class MainForm : Form
                     if (map.DeviceType.Equals(detectedType, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
+                        SyncDeviceMapToTabContext();
                         System.Diagnostics.Debug.WriteLine($"Loaded device map (type match '{detectedType}'): {path} for device: {deviceName}");
                         return;
                     }
@@ -753,6 +756,7 @@ public partial class MainForm : Form
                 // Override mirror setting for left-hand devices using generic map
                 _deviceMap.Mirror = true;
             }
+            SyncDeviceMapToTabContext();
             System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json for device: {deviceName} (left={isLeftHand})");
             return;
         }
@@ -760,6 +764,17 @@ public partial class MainForm : Form
         // Fall back to generic joystick map
         var defaultMapPath2 = Path.Combine(mapsDir, "joystick.json");
         _deviceMap = DeviceMap.Load(defaultMapPath2);
+        SyncDeviceMapToTabContext();
+    }
+
+    /// <summary>
+    /// Syncs the current _deviceMap to TabContext so SyncFromTabContext doesn't clobber it.
+    /// Called after LoadDeviceMapForDevice modifies _deviceMap via callback.
+    /// </summary>
+    private void SyncDeviceMapToTabContext()
+    {
+        if (_tabContext is not null)
+            _tabContext.DeviceMap = _deviceMap;
     }
 
     /// <summary>
@@ -1510,8 +1525,9 @@ public partial class MainForm : Form
 
     private void SelectFirstDeviceInCategory()
     {
-        // Select first physical (non-virtual) device as default
-        var filteredDevices = _devices.Where(d => !d.IsVirtual).ToList();
+        // Use the controller's active device category (0 = physical, 1 = virtual)
+        bool selectVirtual = _devicesController is not null && _devicesController.DeviceCategory == 1;
+        var filteredDevices = _devices.Where(d => d.IsVirtual == selectVirtual).ToList();
 
         if (filteredDevices.Count > 0)
         {

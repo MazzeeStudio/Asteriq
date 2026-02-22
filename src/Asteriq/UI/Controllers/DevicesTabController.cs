@@ -45,6 +45,11 @@ public class DevicesTabController : ITabController
     private string? _lastClickedControlId;
 
     /// <summary>
+    /// The active device category (0 = physical, 1 = virtual/vJoy).
+    /// </summary>
+    public int DeviceCategory => _deviceCategory;
+
+    /// <summary>
     /// True if a device drag-to-reorder is in progress (checked by MainForm for mouse dispatch).
     /// </summary>
     public bool IsDraggingDevice => _isDraggingDevice;

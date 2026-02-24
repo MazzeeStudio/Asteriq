@@ -786,10 +786,15 @@ public partial class MainForm : Form
             _vjoyDevices = _vjoyService.EnumerateDevices();
         }
 
-        if (_vjoyDevices.Count == 0 || _selectedVJoyDeviceIndex >= _vjoyDevices.Count)
+        if (_vjoyDevices.Count == 0)
             return;
 
-        var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+        // Use context index when available — tab controllers may update it before SyncFromTabContext runs
+        int effectiveIndex = _tabContext?.SelectedVJoyDeviceIndex ?? _selectedVJoyDeviceIndex;
+        if (effectiveIndex >= _vjoyDevices.Count)
+            return;
+
+        var vjoyDevice = _vjoyDevices[effectiveIndex];
 
         // Check for a user-specified silhouette override first
         var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyDevice.Id);

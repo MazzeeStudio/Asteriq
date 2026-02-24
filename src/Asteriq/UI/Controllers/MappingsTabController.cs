@@ -135,6 +135,13 @@ public class MappingsTabController : ITabController
     private Dictionary<string, DateTime> _highlightDebounce = new(); // Debounce: last highlight time per button
     private const int HighlightDebounceCooldownMs = 500; // Minimum time between highlights for same button
 
+    // Auto-scroll on input (center panel checkbox)
+    private bool _autoScrollEnabled;
+    private SKRect _autoScrollCheckboxBounds;
+    private bool _autoScrollCheckboxHovered;
+    private string? _noMappingFlashText;
+    private DateTime _noMappingFlashTime;
+
     // Curve editor state
     private SKRect _curveEditorBounds;
     private List<SKPoint> _curveControlPoints = new() { new(0, 0), new(1, 1) };
@@ -370,6 +377,14 @@ public class MappingsTabController : ITabController
             return;
         }
 
+        // Center panel: Auto-scroll checkbox toggle
+        if (_autoScrollCheckboxBounds.Contains(e.X, e.Y))
+        {
+            _autoScrollEnabled = !_autoScrollEnabled;
+            _ctx.MarkDirty();
+            return;
+        }
+
         // Right panel: Add input button - toggles listening
         if (_addInputButtonHovered && _selectedMappingRow >= 0)
         {
@@ -569,6 +584,15 @@ public class MappingsTabController : ITabController
         _hoveredInputSourceRemove = -1;
         _hoveredMergeOpButton = -1;
         _hoveredMappingCategory = -1;
+        _autoScrollCheckboxHovered = false;
+
+        // Center panel: Auto-scroll checkbox hover
+        if (_autoScrollCheckboxBounds.Contains(e.X, e.Y))
+        {
+            _autoScrollCheckboxHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
 
         // Right panel: Add input button
         if (_addInputButtonBounds.Contains(e.X, e.Y))
@@ -837,6 +861,7 @@ public class MappingsTabController : ITabController
         _draggingDeadzoneHandle = -1;
         _draggingPulseDuration = false;
         _draggingHoldDuration = false;
+        _autoScrollCheckboxHovered = false;
     }
 
     public void OnTick()
@@ -848,6 +873,15 @@ public class MappingsTabController : ITabController
                 _ctx.MarkDirty();
             else
                 _mappingHighlightControl = null;
+        }
+
+        if (_noMappingFlashText is not null)
+        {
+            float elapsed = (float)(DateTime.Now - _noMappingFlashTime).TotalSeconds;
+            if (elapsed < 2.5f)
+                _ctx.MarkDirty();
+            else
+                _noMappingFlashText = null;
         }
     }
 
@@ -921,7 +955,32 @@ public class MappingsTabController : ITabController
                 _highlightedVJoyDevice = mapping.Output.VJoyDevice;
                 _highlightStartTime = DateTime.Now;
                 _highlightDebounce[debounceKey] = DateTime.Now; // Record highlight time for debounce
+
+                // Auto-scroll to bring the mapped row into view (Buttons category only)
+                if (_autoScrollEnabled && _mappingCategory == 0)
+                {
+                    bool hasVJoy = _ctx.VJoyDevices.Count > 0 && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count;
+                    if (hasVJoy && _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex].Id == _highlightedVJoyDevice)
+                    {
+                        const float rowHeight = 32f;
+                        const float rowGap = 4f;
+                        float rowTop = mapping.Output.Index * (rowHeight + rowGap);
+                        // Center the row in the visible list area
+                        float targetScroll = rowTop - _bindingsListBounds.Height / 2f + rowHeight / 2f;
+                        float maxScroll = Math.Max(0, _bindingsContentHeight - _bindingsListBounds.Height);
+                        _bindingsScrollOffset = Math.Clamp(targetScroll, 0, maxScroll);
+                    }
+                }
+
+                _noMappingFlashText = null; // Clear any "no mapping" indicator
                 break;
+            }
+            else if (_autoScrollEnabled)
+            {
+                // Button pressed with no mapping - flash an indicator
+                _noMappingFlashText = $"BUTTON {i + 1} — NO MAPPING";
+                _noMappingFlashTime = DateTime.Now;
+                _highlightDebounce[debounceKey] = DateTime.Now; // Debounce the no-mapping flash too
             }
         }
 
@@ -1464,21 +1523,26 @@ public class MappingsTabController : ITabController
         var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) ?? _ctx.JoystickSvg;
         bool shouldMirror = _ctx.MappingsPrimaryDeviceMap?.Mirror ?? false;
 
+        // Reserve space at the bottom for the auto-scroll checkbox row
+        float checkboxRowHeight = 26f;
+        float checkboxAreaTop = bounds.Bottom - frameInset - checkboxRowHeight;
+
         if (svg?.Picture is not null)
         {
             // Limit size to 900px max and apply same rendering as device tab
             float maxSize = 900f;
             float maxWidth = Math.Min(bounds.Width - 40, maxSize);
-            float maxHeight = Math.Min(bounds.Height - 40, maxSize);
+            float maxHeight = Math.Min(bounds.Height - 40 - checkboxRowHeight, maxSize);
 
-            // Create constrained bounds centered in the panel
+            // Create constrained bounds centered in the available area (above checkbox row)
             float constrainedWidth = Math.Min(maxWidth, maxHeight); // Keep square-ish
             float constrainedHeight = constrainedWidth;
+            float availableCenterY = bounds.Top + (checkboxAreaTop - bounds.Top) / 2f;
             var constrainedBounds = new SKRect(
                 centerX - constrainedWidth / 2,
-                centerY - constrainedHeight / 2,
+                availableCenterY - constrainedHeight / 2,
                 centerX + constrainedWidth / 2,
-                centerY + constrainedHeight / 2
+                availableCenterY + constrainedHeight / 2
             );
 
             _ctx.SilhouetteBounds = constrainedBounds;
@@ -1489,8 +1553,38 @@ public class MappingsTabController : ITabController
         {
             _ctx.SilhouetteBounds = SKRect.Empty;
             FUIRenderer.DrawTextCentered(canvas, "Device Preview",
-                new SKRect(bounds.Left, centerY - 20, bounds.Right, centerY + 20),
+                new SKRect(bounds.Left, centerY - 20, bounds.Right, checkboxAreaTop),
                 FUIColors.TextDim, 14f);
+        }
+
+        // Auto-scroll checkbox at bottom of panel
+        float leftMargin = bounds.Left + frameInset + 12;
+        float checkboxSize = 12f;
+        float checkboxY = checkboxAreaTop + (checkboxRowHeight - checkboxSize) / 2f;
+        _autoScrollCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
+        DrawCheckbox(canvas, _autoScrollCheckboxBounds, _autoScrollEnabled);
+
+        var labelColor = _autoScrollCheckboxHovered ? FUIColors.TextBright : FUIColors.TextDim;
+        FUIRenderer.DrawText(canvas, "AUTO-SCROLL TO MAPPING",
+            new SKPoint(leftMargin + checkboxSize + 7, checkboxY + checkboxSize - 1),
+            labelColor, 10f);
+
+        // "No mapping" flash indicator — centered above the checkbox row, fades out
+        if (_noMappingFlashText is not null)
+        {
+            float elapsed = (float)(DateTime.Now - _noMappingFlashTime).TotalSeconds;
+            float opacity = elapsed < 1f ? 1f : Math.Max(0f, 1f - (elapsed - 1f) / 1.5f);
+            if (opacity > 0.01f)
+            {
+                var noMapColor = FUIColors.Warning.WithAlpha((byte)(opacity * 220));
+                FUIRenderer.DrawTextCentered(canvas, _noMappingFlashText,
+                    new SKRect(bounds.Left, checkboxAreaTop - 22, bounds.Right, checkboxAreaTop),
+                    noMapColor, 10f);
+            }
+            else
+            {
+                _noMappingFlashText = null;
+            }
         }
     }
 
@@ -5970,7 +6064,9 @@ public class MappingsTabController : ITabController
 
     /// <summary>
     /// Finds the DeviceMap control for the given mapping row index.
-    /// Rows 0-7 = axes, rows 8+ = buttons.
+    /// Row index is relative to the current category (Buttons or Axes), starting at 0.
+    /// Category 0 (Buttons): row i = button output index i.
+    /// Category 1 (Axes): row i = axis output index i.
     /// Returns null if no mapping or no device map anchor.
     /// </summary>
     private ControlDefinition? GetControlForRow(int rowIndex)
@@ -5984,19 +6080,18 @@ public class MappingsTabController : ITabController
         if (profile is null) return null;
 
         string? binding;
-        if (rowIndex < 8)
+        if (_mappingCategory == 1)
         {
-            // Axis row: find the physical axis input mapped to this vJoy axis slot
+            // Axes category: row i = axis output index i
             var mapping = profile.AxisMappings.FirstOrDefault(m =>
                 m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == rowIndex);
             binding = mapping?.Inputs.Count > 0 ? GetAxisBindingName(mapping.Inputs[0].Index) : null;
         }
         else
         {
-            // Button row: find the physical button input mapped to this vJoy button slot
-            int buttonIndex = rowIndex - 8;
+            // Buttons category: row i = button output index i
             var mapping = profile.ButtonMappings.FirstOrDefault(m =>
-                m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == buttonIndex);
+                m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == rowIndex);
             binding = mapping?.Inputs.Count > 0 ? $"button{mapping.Inputs[0].Index + 1}" : null;
         }
 

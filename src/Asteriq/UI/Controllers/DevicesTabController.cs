@@ -808,9 +808,57 @@ public class DevicesTabController : ITabController
             _clearMappingsButtonBounds = SKRect.Empty;
             _removeDeviceButtonBounds = SKRect.Empty;
 
+            uint vjoyId = GetSelectedVJoyId();
+            var vjoyInfo = vjoyId > 0 ? _ctx.VJoyDevices.FirstOrDefault(v => v.Id == vjoyId) : null;
+
+            // Show vJoy slot header
+            FUIRenderer.DrawText(canvas, "VIRTUAL DEVICE",
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+            y += 16f;
+
+            string vjoyName = vjoyId > 0 ? $"vJoy Slot {vjoyId}" : _ctx.Devices[_ctx.SelectedDevice].Name;
+            FUIRenderer.DrawText(canvas, vjoyName, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextPrimary, 11f);
+            y += 20f;
+
+            if (vjoyInfo is not null)
+            {
+                int axisCount = new[] { vjoyInfo.HasAxisX, vjoyInfo.HasAxisY, vjoyInfo.HasAxisZ,
+                    vjoyInfo.HasAxisRX, vjoyInfo.HasAxisRY, vjoyInfo.HasAxisRZ,
+                    vjoyInfo.HasSlider0, vjoyInfo.HasSlider1 }.Count(b => b);
+                int hatCount = vjoyInfo.DiscPovCount + vjoyInfo.ContPovCount;
+                FUIRenderer.DrawText(canvas, $"{axisCount} axes  {vjoyInfo.ButtonCount} btns  {hatCount} hats",
+                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                y += 20f;
+            }
+
+            // Show primary mapped physical device
+            y += 6f;
+            FUIRenderer.DrawText(canvas, "MAPPED DEVICE",
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+            y += 16f;
+
+            var primaryDevice = GetPrimaryPhysicalDevice(vjoyId);
+            if (primaryDevice is not null)
+            {
+                string devName = primaryDevice.Name.Length > 22 ? primaryDevice.Name[..20] + "..." : primaryDevice.Name;
+                FUIRenderer.DrawText(canvas, devName, new SKPoint(contentBounds.Left + pad, y),
+                    primaryDevice.IsConnected ? FUIColors.TextPrimary : FUIColors.TextDim, 11f);
+                y += 20f;
+                FUIRenderer.DrawText(canvas, $"{primaryDevice.AxisCount} axes  {primaryDevice.ButtonCount} btns  {primaryDevice.HatCount} hats",
+                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                y += 20f;
+            }
+            else
+            {
+                FUIRenderer.DrawText(canvas, "None", new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDisabled, 11f);
+                y += 20f;
+            }
+
+            // Silhouette picker
+            y += 6f;
             FUIRenderer.DrawText(canvas, "VISUAL IDENTITY",
                 new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
-            y += 20f;
+            y += 16f;
 
             float arrowButtonSize = 24f;
             float leftMargin = contentBounds.Left + pad;
@@ -1001,23 +1049,49 @@ public class DevicesTabController : ITabController
 
     #region Silhouette Picker
 
+    /// <summary>
+    /// Gets the vJoy slot ID for the currently selected virtual device.
+    /// Uses VJoyDevices list by position first (most reliable); falls back to name regex.
+    /// </summary>
     private uint GetSelectedVJoyId()
     {
         if (_deviceCategory != 1 || _ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count)
             return 0;
         var device = _ctx.Devices[_ctx.SelectedDevice];
         if (!device.IsVirtual) return 0;
+
+        // Primary: match by index within virtual devices to VJoyDevices list
+        var virtualDevices = _ctx.Devices.Where(d => d.IsVirtual).ToList();
+        int virtualIndex = virtualDevices.IndexOf(device);
+        if (virtualIndex >= 0 && virtualIndex < _ctx.VJoyDevices.Count)
+            return _ctx.VJoyDevices[virtualIndex].Id;
+
+        // Fallback: parse slot number from device name (e.g. "vJoy Device 1" → 1)
         var match = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+");
         return match.Success && uint.TryParse(match.Value, out uint id) ? id : 0;
+    }
+
+    /// <summary>
+    /// Gets the primary physical device mapped to the currently selected vJoy slot.
+    /// Returns null if nothing is mapped.
+    /// </summary>
+    private PhysicalDeviceInfo? GetPrimaryPhysicalDevice(uint vjoyId)
+    {
+        if (vjoyId == 0) return null;
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return null;
+        var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyId);
+        if (string.IsNullOrEmpty(primaryGuid)) return null;
+        return _ctx.Devices.FirstOrDefault(d =>
+            !d.IsVirtual && d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
     }
 
     private (string Label, bool HasPrev, bool HasNext) GetSilhouettePickerState()
     {
         uint vjoyId = GetSelectedVJoyId();
-        if (vjoyId == 0) return ("", false, false);
-
-        var currentKey = _ctx.AppSettings.GetVJoySilhouetteOverride(vjoyId);
         var maps = _ctx.AvailableDeviceMaps;
+
+        string? currentKey = vjoyId > 0 ? _ctx.AppSettings.GetVJoySilhouetteOverride(vjoyId) : null;
 
         int currentIndex = string.IsNullOrEmpty(currentKey)
             ? 0
@@ -1028,8 +1102,9 @@ public class DevicesTabController : ITabController
             ? $"Auto ({_ctx.DeviceMap?.Device ?? "none"})"
             : maps[currentIndex - 1].DisplayName;
 
+        bool canNav = vjoyId > 0;
         int total = maps.Count + 1;
-        return (label, currentIndex > 0, currentIndex < total - 1);
+        return (label, canNav && currentIndex > 0, canNav && currentIndex < total - 1);
     }
 
     private void StepSilhouette(int delta)

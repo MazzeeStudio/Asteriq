@@ -516,6 +516,30 @@ public partial class MainForm : Form
         var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
         string? deviceName = device?.Name;
 
+        // For virtual (vJoy) devices, check for a silhouette override first
+        if (device is not null && device.IsVirtual)
+        {
+            var vMatch = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+");
+            if (vMatch.Success && uint.TryParse(vMatch.Value, out uint vjoyId))
+            {
+                var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyId);
+                if (!string.IsNullOrEmpty(overrideKey))
+                {
+                    var overridePath = Path.Combine(mapsDir, $"{overrideKey}.json");
+                    if (File.Exists(overridePath))
+                    {
+                        _deviceMap = DeviceMap.Load(overridePath);
+                        SyncDeviceMapToTabContext();
+                        return;
+                    }
+                }
+            }
+            // No override - use generic joystick map for vJoy devices
+            _deviceMap = DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
+            SyncDeviceMapToTabContext();
+            return;
+        }
+
         // Try to find a device-specific map
         if (device is not null && !string.IsNullOrEmpty(deviceName))
         {

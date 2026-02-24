@@ -44,6 +44,12 @@ public class DevicesTabController : ITabController
     private DateTime _lastSvgControlClick = DateTime.MinValue;
     private string? _lastClickedControlId;
 
+    // Silhouette picker (D3 panel, virtual device selected)
+    private SKRect _silhouettePrevButtonBounds;
+    private SKRect _silhouetteNextButtonBounds;
+    private bool _silhouettePrevHovered;
+    private bool _silhouetteNextHovered;
+
     /// <summary>
     /// The active device category (0 = physical, 1 = virtual/vJoy).
     /// </summary>
@@ -154,6 +160,10 @@ public class DevicesTabController : ITabController
             _ctx.RemoveDisconnectedDevice?.Invoke();
             return;
         }
+
+        // Silhouette picker clicks (D3 panel, virtual device selected)
+        if (_silhouettePrevHovered) { StepSilhouette(-1); return; }
+        if (_silhouetteNextHovered) { StepSilhouette(+1); return; }
 
         // Forwarding button clicks
         if (_startForwardingButtonHovered && !_startForwardingButtonBounds.IsEmpty)
@@ -283,6 +293,21 @@ public class DevicesTabController : ITabController
         _startForwardingButtonHovered = !_startForwardingButtonBounds.IsEmpty && _startForwardingButtonBounds.Contains(e.X, e.Y);
         _stopForwardingButtonHovered = !_stopForwardingButtonBounds.IsEmpty && _stopForwardingButtonBounds.Contains(e.X, e.Y);
 
+        // Silhouette picker hover detection (D3 panel, virtual device selected)
+        _silhouettePrevHovered = false;
+        _silhouetteNextHovered = false;
+        var (_, silhouetteHasPrev, silhouetteHasNext) = GetSilhouettePickerState();
+        if (!_silhouettePrevButtonBounds.IsEmpty && _silhouettePrevButtonBounds.Contains(e.X, e.Y) && silhouetteHasPrev)
+        {
+            _silhouettePrevHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+        else if (!_silhouetteNextButtonBounds.IsEmpty && _silhouetteNextButtonBounds.Contains(e.X, e.Y) && silhouetteHasNext)
+        {
+            _silhouetteNextHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+
         // SVG silhouette hover detection
         if (_ctx.SilhouetteBounds.Contains(e.X, e.Y) && _ctx.JoystickSvg is not null)
         {
@@ -370,6 +395,8 @@ public class DevicesTabController : ITabController
     {
         _hoveredDevice = -1;
         _hoveredDeviceCategory = -1;
+        _silhouettePrevHovered = false;
+        _silhouetteNextHovered = false;
         _ctx.HoveredControlId = null;
     }
 
@@ -725,6 +752,8 @@ public class DevicesTabController : ITabController
 
         bool hasPhysicalDevice = _deviceCategory == 0 && _ctx.SelectedDevice >= 0 &&
                                   _ctx.SelectedDevice < _ctx.Devices.Count && !_ctx.Devices[_ctx.SelectedDevice].IsVirtual;
+        bool hasVirtualDevice = _deviceCategory == 1 && _ctx.SelectedDevice >= 0 &&
+                                 _ctx.SelectedDevice < _ctx.Devices.Count && _ctx.Devices[_ctx.SelectedDevice].IsVirtual;
 
         if (hasPhysicalDevice)
         {
@@ -773,13 +802,40 @@ public class DevicesTabController : ITabController
                 FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, FUIColors.Danger);
             }
         }
-        else
+        else if (hasVirtualDevice)
         {
             _map1to1ButtonBounds = SKRect.Empty;
             _clearMappingsButtonBounds = SKRect.Empty;
             _removeDeviceButtonBounds = SKRect.Empty;
 
-            FUIRenderer.DrawText(canvas, "Select a physical device",
+            FUIRenderer.DrawText(canvas, "VISUAL IDENTITY",
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+            y += 20f;
+
+            float arrowButtonSize = 24f;
+            float leftMargin = contentBounds.Left + pad;
+            float rightMargin = contentBounds.Right - pad;
+
+            var (silhouetteLabel, hasPrev, hasNext) = GetSilhouettePickerState();
+
+            _silhouettePrevButtonBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
+            FUIWidgets.DrawArrowButton(canvas, _silhouettePrevButtonBounds, "<", _silhouettePrevHovered, hasPrev);
+
+            var labelBounds = new SKRect(leftMargin + arrowButtonSize, y, rightMargin - arrowButtonSize, y + arrowButtonSize);
+            FUIRenderer.DrawTextCentered(canvas, silhouetteLabel, labelBounds, FUIColors.TextBright, 10f);
+
+            _silhouetteNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
+            FUIWidgets.DrawArrowButton(canvas, _silhouetteNextButtonBounds, ">", _silhouetteNextHovered, hasNext);
+        }
+        else
+        {
+            _map1to1ButtonBounds = SKRect.Empty;
+            _clearMappingsButtonBounds = SKRect.Empty;
+            _removeDeviceButtonBounds = SKRect.Empty;
+            _silhouettePrevButtonBounds = SKRect.Empty;
+            _silhouetteNextButtonBounds = SKRect.Empty;
+
+            FUIRenderer.DrawText(canvas, "Select a device",
                 new SKPoint(contentBounds.Left + pad, y + 20), FUIColors.TextDim, 10f);
             FUIRenderer.DrawText(canvas, "to see available actions",
                 new SKPoint(contentBounds.Left + pad, y + 36), FUIColors.TextDim, 10f);
@@ -939,6 +995,63 @@ public class DevicesTabController : ITabController
         _ctx.TrayIcon.SetActive(false);
         _ctx.UpdateTrayMenu?.Invoke();
         System.Diagnostics.Debug.WriteLine("Stopped forwarding");
+    }
+
+    #endregion
+
+    #region Silhouette Picker
+
+    private uint GetSelectedVJoyId()
+    {
+        if (_deviceCategory != 1 || _ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count)
+            return 0;
+        var device = _ctx.Devices[_ctx.SelectedDevice];
+        if (!device.IsVirtual) return 0;
+        var match = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+");
+        return match.Success && uint.TryParse(match.Value, out uint id) ? id : 0;
+    }
+
+    private (string Label, bool HasPrev, bool HasNext) GetSilhouettePickerState()
+    {
+        uint vjoyId = GetSelectedVJoyId();
+        if (vjoyId == 0) return ("", false, false);
+
+        var currentKey = _ctx.AppSettings.GetVJoySilhouetteOverride(vjoyId);
+        var maps = _ctx.AvailableDeviceMaps;
+
+        int currentIndex = string.IsNullOrEmpty(currentKey)
+            ? 0
+            : maps.FindIndex(m => m.Key == currentKey) + 1;
+        if (currentIndex < 0) currentIndex = 0;
+
+        string label = currentIndex == 0
+            ? $"Auto ({_ctx.DeviceMap?.Device ?? "none"})"
+            : maps[currentIndex - 1].DisplayName;
+
+        int total = maps.Count + 1;
+        return (label, currentIndex > 0, currentIndex < total - 1);
+    }
+
+    private void StepSilhouette(int delta)
+    {
+        uint vjoyId = GetSelectedVJoyId();
+        if (vjoyId == 0) return;
+
+        var currentKey = _ctx.AppSettings.GetVJoySilhouetteOverride(vjoyId);
+        var maps = _ctx.AvailableDeviceMaps;
+
+        int currentIndex = string.IsNullOrEmpty(currentKey)
+            ? 0
+            : maps.FindIndex(m => m.Key == currentKey) + 1;
+        if (currentIndex < 0) currentIndex = 0;
+
+        int newIndex = Math.Clamp(currentIndex + delta, 0, maps.Count);
+        string? newKey = newIndex == 0 ? null : maps[newIndex - 1].Key;
+
+        _ctx.AppSettings.SetVJoySilhouetteOverride(vjoyId, newKey);
+        _ctx.LoadDeviceMapForDevice(_ctx.Devices[_ctx.SelectedDevice]);
+        _ctx.UpdateMappingsPrimaryDeviceMap();
+        _ctx.InvalidateCanvas();
     }
 
     #endregion

@@ -956,6 +956,19 @@ public class MappingsTabController : ITabController
                 _highlightStartTime = DateTime.Now;
                 _highlightDebounce[debounceKey] = DateTime.Now; // Record highlight time for debounce
 
+                // Show lead line on the silhouette for the physical control that was pressed
+                if (_ctx.MappingsPrimaryDeviceMap is not null)
+                {
+                    // SDL2 button index i → device-map binding "button{i+1}"
+                    string physBinding = $"button{i + 1}";
+                    var control = _ctx.MappingsPrimaryDeviceMap.FindControlByBinding(physBinding);
+                    if (control is not null)
+                    {
+                        _mappingHighlightControl = control;
+                        _mappingHighlightTime = DateTime.Now;
+                    }
+                }
+
                 // Auto-scroll to bring the mapped row into view (Buttons category only)
                 if (_autoScrollEnabled && _mappingCategory == 0)
                 {

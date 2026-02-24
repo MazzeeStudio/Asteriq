@@ -33,6 +33,9 @@ public class SCBindingsTabController : ITabController
     private string _scLoadingMessage = "";
     private int _schemaLoadVersion = 0;
 
+    // Dirty tracking: true when the profile name has been edited but not yet saved
+    private bool _scProfileDirty = false;
+
     // In-memory schema cache: avoids re-parsing XML when switching back to an already-loaded environment
     private static readonly Dictionary<string, List<SCAction>> s_schemaCache = new();
 
@@ -430,14 +433,15 @@ public class SCBindingsTabController : ITabController
             RefreshSCInstallations();
             RefreshSCExportProfiles();
 
-            // Try to load the last used SC export profile.
+            // Try to load the last used SC export profile for the current environment.
             // Skip "asteriq" - that was the old auto-generated default name, never user-chosen.
-            var lastProfileName = _ctx.AppSettings.LastSCExportProfile;
+            var currentEnv = CurrentEnvironment;
+            var lastProfileName = currentEnv is not null
+                ? _ctx.AppSettings.GetLastSCExportProfileForEnvironment(currentEnv)
+                : _ctx.AppSettings.LastSCExportProfile;
+
             if (lastProfileName == "asteriq")
-            {
-                _ctx.AppSettings.LastSCExportProfile = null;
                 lastProfileName = null;
-            }
 
             SCExportProfile? loadedProfile = null;
             if (!string.IsNullOrEmpty(lastProfileName) && _ctx.AppSettings.AutoLoadLastSCExportProfile)
@@ -448,11 +452,11 @@ public class SCBindingsTabController : ITabController
             if (loadedProfile is not null)
             {
                 _scExportProfile = loadedProfile;
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded last SC export: {loadedProfile.ProfileName}");
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded last SC export for {currentEnv}: {loadedProfile.ProfileName}");
             }
             else
             {
-                // No last profile (or it was the old "asteriq" default) - load first non-legacy profile
+                // No last profile for this environment - load first non-legacy profile
                 var firstNamed = _scExportProfiles.FirstOrDefault(p => p.ProfileName != "asteriq");
                 if (firstNamed is not null)
                 {
@@ -460,7 +464,8 @@ public class SCBindingsTabController : ITabController
                     if (first is not null)
                     {
                         _scExportProfile = first;
-                        _ctx.AppSettings.LastSCExportProfile = first.ProfileName;
+                        if (currentEnv is not null)
+                            _ctx.AppSettings.SetLastSCExportProfileForEnvironment(currentEnv, first.ProfileName);
                     }
                 }
                 else
@@ -580,6 +585,14 @@ public class SCBindingsTabController : ITabController
         public bool IsJoystick { get; set; }
     }
 
+    /// <summary>
+    /// Returns the environment string of the currently selected SC installation, or null if none.
+    /// </summary>
+    private string? CurrentEnvironment =>
+        _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
+            ? _scInstallations[_selectedSCInstallation].Environment
+            : null;
+
     private void RefreshSCInstallations()
     {
         if (_scInstallationService is null) return;
@@ -607,7 +620,7 @@ public class SCBindingsTabController : ITabController
             LoadSCSchema(_scInstallations[_selectedSCInstallation]);
     }
 
-    private void LoadSCSchema(SCInstallation installation)
+    private void LoadSCSchema(SCInstallation installation, bool autoLoadProfileForEnvironment = false)
     {
         if (_scProfileCacheService is null || _scSchemaService is null) return;
 
@@ -686,6 +699,11 @@ public class SCBindingsTabController : ITabController
 
                     if (actions is not null)
                     {
+                        // On an explicit installation switch, load the remembered profile for
+                        // the new environment (or fall back to first available).
+                        if (autoLoadProfileForEnvironment)
+                            LoadProfileForEnvironment(installation.Environment);
+
                         _scExportProfile.TargetEnvironment = installation.Environment;
                         _scExportProfile.TargetBuildId = installation.BuildId;
 
@@ -701,6 +719,38 @@ public class SCBindingsTabController : ITabController
                 });
             } // end finally
         });
+    }
+
+    /// <summary>
+    /// Loads the last-remembered control profile for the given SC environment.
+    /// Falls back to the first available profile, or a blank profile if none exist.
+    /// Called on the UI thread from the schema load callback after an installation switch.
+    /// </summary>
+    private void LoadProfileForEnvironment(string environment)
+    {
+        var lastProfileName = _ctx.AppSettings.GetLastSCExportProfileForEnvironment(environment);
+
+        SCExportProfile? profile = null;
+        if (!string.IsNullOrEmpty(lastProfileName))
+            profile = _scExportProfileService?.LoadProfile(lastProfileName);
+
+        // No fallback to global profiles — each environment gets its own remembered profile
+        // or starts blank. Never bleed a profile from another installation.
+        if (profile is not null)
+        {
+            _scExportProfile = profile;
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Switched to profile '{profile.ProfileName}' for {environment}");
+        }
+        else
+        {
+            _scExportProfile = new SCExportProfile();
+            foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
+                _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] No remembered profile for {environment} — started blank");
+        }
+
+        _scProfileDirty = false;
+        UpdateConflictingBindings();
     }
 
     private void ReportProgress(int version, string message)
@@ -1095,7 +1145,9 @@ public class SCBindingsTabController : ITabController
         float nameFieldHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
         _scProfileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameFieldHeight);
         _scProfileNameHovered = _scProfileNameBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        string profileNameDisplay = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— not saved —" : _scExportProfile.ProfileName;
+        string profileNameDisplay = string.IsNullOrEmpty(_scExportProfile.ProfileName)
+            ? "— not saved —"
+            : _scProfileDirty ? $"{_scExportProfile.ProfileName}*" : _scExportProfile.ProfileName;
         FUIWidgets.DrawTextFieldReadOnly(canvas, _scProfileNameBounds, profileNameDisplay, _scProfileNameHovered);
         y += nameFieldHeight + 12f;  // 4px aligned
 
@@ -2046,7 +2098,9 @@ public class SCBindingsTabController : ITabController
         float dropdownHeight = 32f;
         _scProfileDropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
         bool dropdownHovered = _scProfileDropdownBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— No Profile Selected —" : _scExportProfile.ProfileName;
+        string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName)
+            ? "— No Profile Selected —"
+            : _scProfileDirty ? $"{_scExportProfile.ProfileName}*" : _scExportProfile.ProfileName;
         DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, dropdownLabel, dropdownHovered, _scProfileDropdownOpen);
         y += dropdownHeight + 6f;
 
@@ -2450,10 +2504,25 @@ public class SCBindingsTabController : ITabController
             if (_scInstallationDropdownBounds.Contains(point))
             {
                 // Click on dropdown item
-                if (_hoveredSCInstallation >= 0 && _hoveredSCInstallation < _scInstallations.Count)
+                if (_hoveredSCInstallation >= 0 && _hoveredSCInstallation < _scInstallations.Count
+                    && _hoveredSCInstallation != _selectedSCInstallation)
                 {
+                    if (_scProfileDirty)
+                    {
+                        using var dialog = new FUIConfirmDialog(
+                            "Unsaved Changes",
+                            $"Profile '{_scExportProfile.ProfileName}' has an unsaved name change.\n\nSwitch installation and discard changes?",
+                            "Discard & Switch", "Cancel");
+                        if (dialog.ShowDialog(_ctx.OwnerForm) != DialogResult.Yes)
+                        {
+                            _scInstallationDropdownOpen = false;
+                            return;
+                        }
+                    }
+
                     _selectedSCInstallation = _hoveredSCInstallation;
-                    LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+                    _scProfileDirty = false;
+                    LoadSCSchema(_scInstallations[_selectedSCInstallation], autoLoadProfileForEnvironment: true);
                     _ctx.AppSettings.PreferredSCEnvironment = _scInstallations[_selectedSCInstallation].Environment;
                 }
                 _scInstallationDropdownOpen = false;
@@ -3799,7 +3868,11 @@ public class SCBindingsTabController : ITabController
         var name = FUIInputDialog.Show(_ctx.OwnerForm, "Control Profile Name", "Profile Name:",
             _scExportProfile.ProfileName);
         if (name is not null)
+        {
             _scExportProfile.ProfileName = name;
+            _scProfileDirty = true;
+            _ctx.InvalidateCanvas();
+        }
     }
 
     private void AssignSCBinding()
@@ -4086,6 +4159,9 @@ public class SCBindingsTabController : ITabController
         }
 
         _scExportProfileService.SaveProfile(_scExportProfile);
+        _scProfileDirty = false;
+        if (CurrentEnvironment is not null)
+            _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, _scExportProfile.ProfileName);
         _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
         RefreshSCExportProfiles();
 
@@ -4153,13 +4229,19 @@ public class SCBindingsTabController : ITabController
                 if (nextProfile is not null)
                 {
                     _scExportProfile = nextProfile;
+                    _scProfileDirty = false;
+                    if (CurrentEnvironment is not null)
+                        _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, nextProfile.ProfileName);
                     _ctx.AppSettings.LastSCExportProfile = nextProfile.ProfileName;
                 }
             }
             else
             {
                 // All profiles deleted - reset to blank unnamed state
+                if (CurrentEnvironment is not null)
+                    _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, null);
                 _ctx.AppSettings.LastSCExportProfile = null;
+                _scProfileDirty = false;
                 _scExportProfile = new SCExportProfile();
                 foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 {
@@ -4180,6 +4262,9 @@ public class SCBindingsTabController : ITabController
         if (profile is not null)
         {
             _scExportProfile = profile;
+            _scProfileDirty = false;
+            if (CurrentEnvironment is not null)
+                _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, profileName);
             _ctx.AppSettings.LastSCExportProfile = profileName;
             _scProfileDropdownOpen = false;
             _scExportStatus = $"Loaded profile '{profileName}'";
@@ -4246,6 +4331,9 @@ public class SCBindingsTabController : ITabController
         _scExportProfileService?.SaveProfile(_scExportProfile);
         if (!string.IsNullOrEmpty(oldProfileName) && oldProfileName != _scExportProfile.ProfileName)
             _scExportProfileService?.DeleteProfile(oldProfileName);
+        _scProfileDirty = false;
+        if (CurrentEnvironment is not null)
+            _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, _scExportProfile.ProfileName);
         _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
         RefreshSCExportProfiles();
 

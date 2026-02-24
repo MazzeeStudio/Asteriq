@@ -122,6 +122,21 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public string? GetLastSCExportProfileForEnvironment(string environment)
+    {
+        _cachedSettings.LastSCExportProfileByEnvironment.TryGetValue(environment, out var name);
+        return name;
+    }
+
+    public void SetLastSCExportProfileForEnvironment(string environment, string? profileName)
+    {
+        if (string.IsNullOrEmpty(profileName))
+            _cachedSettings.LastSCExportProfileByEnvironment.Remove(environment);
+        else
+            _cachedSettings.LastSCExportProfileByEnvironment[environment] = profileName;
+        SaveSettings(_cachedSettings);
+    }
+
     public string? PreferredSCEnvironment
     {
         get => _cachedSettings.PreferredSCEnvironment;
@@ -172,6 +187,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
+        public Dictionary<string, string> LastSCExportProfileByEnvironment { get; set; } = new();
         public string? PreferredSCEnvironment { get; set; }
     }
 }

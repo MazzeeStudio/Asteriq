@@ -23,6 +23,10 @@ public class MappingsTabController : ITabController
     // Mappings tab UI state - Left panel (output list)
     private int _selectedMappingRow = -1;
     private int _hoveredMappingRow = -1;
+
+    // Silhouette highlight: shown when a mapping row is selected
+    private ControlDefinition? _mappingHighlightControl;
+    private DateTime _mappingHighlightTime;
     private SKRect _vjoyPrevButtonBounds;
     private SKRect _vjoyNextButtonBounds;
     private bool _vjoyPrevHovered;
@@ -541,6 +545,9 @@ public class MappingsTabController : ITabController
             {
                 _selectedMappingRow = _hoveredMappingRow;
             }
+            // Trigger silhouette highlight for the selected row
+            _mappingHighlightControl = GetControlForRow(_selectedMappingRow);
+            _mappingHighlightTime = DateTime.Now;
             return;
         }
     }
@@ -832,7 +839,17 @@ public class MappingsTabController : ITabController
         _draggingHoldDuration = false;
     }
 
-    public void OnTick() { }
+    public void OnTick()
+    {
+        if (_mappingHighlightControl is not null)
+        {
+            float elapsed = (float)(DateTime.Now - _mappingHighlightTime).TotalSeconds;
+            if (elapsed < 3f)
+                _ctx.MarkDirty();
+            else
+                _mappingHighlightControl = null;
+        }
+    }
 
     public void OnActivated()
     {
@@ -1464,11 +1481,13 @@ public class MappingsTabController : ITabController
                 centerY + constrainedHeight / 2
             );
 
+            _ctx.SilhouetteBounds = constrainedBounds;
             DrawSvgInBounds(canvas, svg, constrainedBounds, shouldMirror);
+            DrawMappingHighlightLeadLine(canvas, constrainedBounds);
         }
         else
         {
-            // Placeholder text
+            _ctx.SilhouetteBounds = SKRect.Empty;
             FUIRenderer.DrawTextCentered(canvas, "Device Preview",
                 new SKRect(bounds.Left, centerY - 20, bounds.Right, centerY + 20),
                 FUIColors.TextDim, 14f);
@@ -5931,6 +5950,123 @@ public class MappingsTabController : ITabController
             "HAT" or "POV" => (InputType.Hat, 0),
             _ => (null, 0)
         };
+    }
+
+    #endregion
+
+    #region Silhouette Lead Line
+
+    /// <summary>
+    /// Returns the binding string for an SDL2 axis index (e.g. 0 → "x", 3 → "rx").
+    /// Must match MainForm.GetAxisBindingName.
+    /// </summary>
+    private static string GetAxisBindingName(int axisIndex) => axisIndex switch
+    {
+        0 => "x",  1 => "y",  2 => "z",
+        3 => "rx", 4 => "ry", 5 => "rz",
+        6 => "slider1", 7 => "slider2",
+        _ => $"axis{axisIndex}"
+    };
+
+    /// <summary>
+    /// Finds the DeviceMap control for the given mapping row index.
+    /// Rows 0-7 = axes, rows 8+ = buttons.
+    /// Returns null if no mapping or no device map anchor.
+    /// </summary>
+    private ControlDefinition? GetControlForRow(int rowIndex)
+    {
+        var deviceMap = _ctx.MappingsPrimaryDeviceMap;
+        if (deviceMap is null) return null;
+        if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return null;
+
+        var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return null;
+
+        string? binding;
+        if (rowIndex < 8)
+        {
+            // Axis row: find the physical axis input mapped to this vJoy axis slot
+            var mapping = profile.AxisMappings.FirstOrDefault(m =>
+                m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == rowIndex);
+            binding = mapping?.Inputs.Count > 0 ? GetAxisBindingName(mapping.Inputs[0].Index) : null;
+        }
+        else
+        {
+            // Button row: find the physical button input mapped to this vJoy button slot
+            int buttonIndex = rowIndex - 8;
+            var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+                m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == buttonIndex);
+            binding = mapping?.Inputs.Count > 0 ? $"button{mapping.Inputs[0].Index + 1}" : null;
+        }
+
+        return binding is not null ? deviceMap.FindControlByBinding(binding) : null;
+    }
+
+    /// <summary>
+    /// Converts a device-map viewBox coordinate to canvas screen coordinates,
+    /// using the scale/offset set by the most recent DrawSvgInBounds call.
+    /// </summary>
+    private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
+    {
+        var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) ?? _ctx.JoystickSvg;
+        if (svg?.Picture is null)
+            return new SKPoint(viewBoxX, viewBoxY);
+
+        float screenX = _ctx.SvgMirrored
+            ? _ctx.SvgOffset.X + svg.Picture.CullRect.Width * _ctx.SvgScale - viewBoxX * _ctx.SvgScale
+            : _ctx.SvgOffset.X + viewBoxX * _ctx.SvgScale;
+
+        float screenY = _ctx.SvgOffset.Y + viewBoxY * _ctx.SvgScale;
+        return new SKPoint(screenX, screenY);
+    }
+
+    /// <summary>
+    /// Draws a lead line from the highlighted control anchor to its label position.
+    /// Fades over 1 second hold + 2 seconds fade.
+    /// </summary>
+    private void DrawMappingHighlightLeadLine(SKCanvas canvas, SKRect panelBounds)
+    {
+        if (_mappingHighlightControl?.Anchor is null) return;
+
+        float elapsed = (float)(DateTime.Now - _mappingHighlightTime).TotalSeconds;
+        float opacity = elapsed < 1f ? 1f : Math.Max(0f, 1f - (elapsed - 1f) / 2f);
+        if (opacity < 0.01f) return;
+
+        SKPoint anchorScreen = ViewBoxToScreen(_mappingHighlightControl.Anchor.X, _mappingHighlightControl.Anchor.Y);
+
+        float labelX, labelY;
+        bool goesRight = true;
+
+        if (_mappingHighlightControl.LabelOffset is not null)
+        {
+            var labelScreen = ViewBoxToScreen(
+                _mappingHighlightControl.Anchor.X + _mappingHighlightControl.LabelOffset.X,
+                _mappingHighlightControl.Anchor.Y + _mappingHighlightControl.LabelOffset.Y);
+            labelX = labelScreen.X;
+            labelY = labelScreen.Y;
+            bool offsetGoesRight = _mappingHighlightControl.LabelOffset.X >= 0;
+            goesRight = _ctx.SvgMirrored ? !offsetGoesRight : offsetGoesRight;
+        }
+        else
+        {
+            labelY = panelBounds.Top + 80;
+            labelX = _ctx.SilhouetteBounds.Right + 20;
+        }
+
+        var fakeInput = new ActiveInputState
+        {
+            Binding = _mappingHighlightControl.Label,
+            Value = 1f,
+            IsAxis = false,
+            Control = _mappingHighlightControl,
+            LastActivity = _mappingHighlightTime,
+            AppearProgress = 1f
+        };
+
+        DeviceLeadLineRenderer.DrawInputLeadLine(
+            canvas, anchorScreen, new SKPoint(labelX, labelY),
+            goesRight, opacity, fakeInput, _ctx.SvgMirrored, _ctx.SvgScale);
     }
 
     #endregion

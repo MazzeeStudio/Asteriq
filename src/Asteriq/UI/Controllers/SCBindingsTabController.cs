@@ -931,8 +931,7 @@ public class SCBindingsTabController : ITabController
         if (_scShowBoundOnly)
         {
             actions = actions.Where(a =>
-                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null ||
-                a.DefaultBindings.Any()
+                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null
             ).ToList();
         }
 

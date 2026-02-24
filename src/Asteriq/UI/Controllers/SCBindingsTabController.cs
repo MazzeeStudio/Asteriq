@@ -27,6 +27,9 @@ public class SCBindingsTabController : ITabController
     private List<SCAction>? _scActions;
     private string? _scExportStatus;
     private DateTime _scExportStatusTime;
+    private SCStatusKind _scStatusKind = SCStatusKind.Info;
+
+    private enum SCStatusKind { Info, Success, Warning, Error }
 
     // Async schema loading state
     private bool _scLoading = false;
@@ -1273,15 +1276,9 @@ public class SCBindingsTabController : ITabController
         {
             var elapsed = DateTime.Now - _scExportStatusTime;
             if (elapsed.TotalSeconds < 10)
-            {
-                var statusColor = _scExportStatus.Contains("Success") ? FUIColors.Success : FUIColors.Warning;
-                FUIRenderer.DrawTextCentered(canvas, _scExportStatus,
-                    new SKRect(leftMargin, y, rightMargin, y + 20f), statusColor, 11f);
-            }
+                DrawStatusBanner(canvas, new SKRect(leftMargin, y, rightMargin, y + 24f));
             else
-            {
                 _scExportStatus = null;
-            }
         }
     }
 
@@ -2231,15 +2228,9 @@ public class SCBindingsTabController : ITabController
         {
             var elapsed = DateTime.Now - _scExportStatusTime;
             if (elapsed.TotalSeconds < 10)
-            {
-                var statusColor = _scExportStatus.Contains("Success") ? FUIColors.Success : FUIColors.Warning;
-                FUIRenderer.DrawTextCentered(canvas, _scExportStatus,
-                    new SKRect(leftMargin, y, rightMargin, y + 16f), statusColor, 9f);
-            }
+                DrawStatusBanner(canvas, new SKRect(leftMargin, y, rightMargin, y + 24f));
             else
-            {
                 _scExportStatus = null;
-            }
         }
     }
 
@@ -2733,8 +2724,7 @@ public class SCBindingsTabController : ITabController
         {
             RefreshSCInstallations();
             StartSchemaLoad();
-            _scExportStatus = "Installations refreshed";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus("Installations refreshed");
             return;
         }
 
@@ -3578,8 +3568,7 @@ public class SCBindingsTabController : ITabController
         _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
         _scExportProfileService?.SaveProfile(_scExportProfile);
 
-        _scExportStatus = $"Bound {action.ActionName} to kb1_{inputName}";
-        _scExportStatusTime = DateTime.Now;
+        SetStatus($"Bound {action.ActionName} to kb1_{inputName}");
     }
 
     private void AssignMouseBinding(SCAction action, string inputName)
@@ -3599,8 +3588,7 @@ public class SCBindingsTabController : ITabController
         _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
         _scExportProfileService?.SaveProfile(_scExportProfile);
 
-        _scExportStatus = $"Bound {action.ActionName} to mo1_{inputName}";
-        _scExportStatusTime = DateTime.Now;
+        SetStatus($"Bound {action.ActionName} to mo1_{inputName}");
     }
 
     private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName)
@@ -3672,8 +3660,7 @@ public class SCBindingsTabController : ITabController
         _scExportProfileService?.SaveProfile(_scExportProfile);
         UpdateConflictingBindings();
 
-        _scExportStatus = $"Bound {action.ActionName} to js{col.SCInstance}_{inputName}";
-        _scExportStatusTime = DateTime.Now;
+        SetStatus($"Bound {action.ActionName} to js{col.SCInstance}_{inputName}");
     }
 
     private static string KeyToSCInput(Keys key)
@@ -3759,8 +3746,7 @@ public class SCBindingsTabController : ITabController
     {
         if (_scExportService is null || _scInstallations.Count == 0)
         {
-            _scExportStatus = "No SC installation available";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus("No SC installation available", SCStatusKind.Error);
             return;
         }
 
@@ -3768,8 +3754,7 @@ public class SCBindingsTabController : ITabController
         var hasJoystickBindings = _scExportProfile.Bindings.Any(b => b.DeviceType == SCDeviceType.Joystick);
         if (hasJoystickBindings && _scExportProfile.VJoyToSCInstance.Count == 0)
         {
-            _scExportStatus = "No vJoy mappings configured for joystick bindings";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus("No vJoy mappings configured for joystick bindings", SCStatusKind.Warning);
             return;
         }
 
@@ -3781,8 +3766,7 @@ public class SCBindingsTabController : ITabController
             var validation = _scExportService.Validate(_scExportProfile);
             if (!validation.IsValid)
             {
-                _scExportStatus = $"Validation failed: {validation.Errors.FirstOrDefault()}";
-                _scExportStatusTime = DateTime.Now;
+                SetStatus($"Validation failed: {validation.Errors.FirstOrDefault()}", SCStatusKind.Error);
                 return;
             }
 
@@ -3800,15 +3784,13 @@ public class SCBindingsTabController : ITabController
             // Refresh available profiles list after export
             _scAvailableProfiles = SCInstallationService.GetExistingProfiles(installation);
 
-            _scExportStatus = $"Success! Exported to {filename}";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Success! Exported to {filename}", SCStatusKind.Success);
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] Exported SC profile to: {exportPath}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            _scExportStatus = $"Export failed: {ex.Message}";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Export failed: {ex.Message}", SCStatusKind.Error);
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC export failed: {ex}");
         }
     }
@@ -3827,8 +3809,7 @@ public class SCBindingsTabController : ITabController
             _scExportProfileService?.SaveProfile(_scExportProfile);
             UpdateConflictingBindings();
 
-            _scExportStatus = $"Cleared {count} binding(s)";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Cleared {count} binding(s)");
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] Cleared all SC bindings");
         }
@@ -3857,8 +3838,7 @@ public class SCBindingsTabController : ITabController
 
             UpdateConflictingBindings();
 
-            _scExportStatus = "Reset to defaults";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus("Reset to defaults");
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] Reset SC bindings to defaults");
         }
@@ -3954,8 +3934,7 @@ public class SCBindingsTabController : ITabController
             _scExportProfileService?.SaveProfile(_scExportProfile);
             UpdateConflictingBindings();
 
-            _scExportStatus = $"Bound {action.ActionName} to js{_scExportProfile.GetSCInstance(vjoyId)}_{inputName}";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Bound {action.ActionName} to js{_scExportProfile.GetSCInstance(vjoyId)}_{inputName}");
         }
 
         _scAssigningInput = false;
@@ -4166,8 +4145,7 @@ public class SCBindingsTabController : ITabController
         _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
         RefreshSCExportProfiles();
 
-        _scExportStatus = $"Profile '{_scExportProfile.ProfileName}' saved";
-        _scExportStatusTime = DateTime.Now;
+        SetStatus($"Profile '{_scExportProfile.ProfileName}' saved", SCStatusKind.Success);
     }
 
     private void CreateNewSCExportProfile()
@@ -4203,8 +4181,7 @@ public class SCBindingsTabController : ITabController
             }
 
             SaveSCExportProfile();
-            _scExportStatus = $"Created profile '{newName}'";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Created profile '{newName}'", SCStatusKind.Success);
         }
     }
 
@@ -4250,8 +4227,7 @@ public class SCBindingsTabController : ITabController
                 }
             }
 
-            _scExportStatus = $"Deleted profile '{deletedName}'";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Deleted profile '{deletedName}'");
         }
     }
 
@@ -4268,9 +4244,7 @@ public class SCBindingsTabController : ITabController
                 _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, profileName);
             _ctx.AppSettings.LastSCExportProfile = profileName;
             _scProfileDropdownOpen = false;
-            _scExportStatus = $"Loaded profile '{profileName}'";
-            _scExportStatusTime = DateTime.Now;
-            _ctx.InvalidateCanvas();
+            SetStatus($"Loaded profile '{profileName}'");
         }
     }
 
@@ -4299,8 +4273,7 @@ public class SCBindingsTabController : ITabController
 
         if (!importResult.Success)
         {
-            _scExportStatus = $"Import failed: {importResult.Error}";
-            _scExportStatusTime = DateTime.Now;
+            SetStatus($"Import failed: {importResult.Error}", SCStatusKind.Error);
             return;
         }
 
@@ -4347,11 +4320,47 @@ public class SCBindingsTabController : ITabController
         var finalJs = _scExportProfile.Bindings.Count(b => b.DeviceType == SCDeviceType.Joystick);
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Profile after save: {finalKb} KB, {finalMo} Mouse, {finalJs} Joystick bindings");
 
-        _scExportStatus = $"Imported {importResult.Bindings.Count} bindings ({jsCount} JS, {kbCount} KB, {moCount} Mouse)";
-        _scExportStatusTime = DateTime.Now;
-        _ctx.InvalidateCanvas();
+        SetStatus($"Imported {importResult.Bindings.Count} bindings ({jsCount} JS, {kbCount} KB, {moCount} Mouse)", SCStatusKind.Success);
 
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Imported {importResult.Bindings.Count} bindings from {mappingFile.FilePath}");
+    }
+
+    #endregion
+
+    #region Status Helpers
+
+    /// <summary>Sets the status message, kind, and timestamp in one call, then invalidates the canvas.</summary>
+    private void SetStatus(string message, SCStatusKind kind = SCStatusKind.Info)
+    {
+        _scExportStatus = message;
+        _scStatusKind = kind;
+        _scExportStatusTime = DateTime.Now;
+        _ctx.InvalidateCanvas();
+    }
+
+    /// <summary>
+    /// Draws a themed status banner: tinted background, left accent bar, centred text.
+    /// The colour is driven by <see cref="_scStatusKind"/> so it always matches the active theme.
+    /// </summary>
+    private void DrawStatusBanner(SKCanvas canvas, SKRect bounds)
+    {
+        if (string.IsNullOrEmpty(_scExportStatus)) return;
+
+        var color = _scStatusKind switch
+        {
+            SCStatusKind.Success => FUIColors.Success,
+            SCStatusKind.Error   => FUIColors.Danger,
+            SCStatusKind.Warning => FUIColors.Warning,
+            _                    => FUIColors.TextDim,
+        };
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(25), IsAntialias = true };
+        canvas.DrawRoundRect(bounds, 2f, 2f, bgPaint);
+
+        using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(180) };
+        canvas.DrawRect(new SKRect(bounds.Left, bounds.Top, bounds.Left + 3f, bounds.Bottom), accentPaint);
+
+        FUIRenderer.DrawTextCentered(canvas, _scExportStatus, bounds, color, 10f);
     }
 
     #endregion

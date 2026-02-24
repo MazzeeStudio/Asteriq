@@ -556,6 +556,7 @@ public class SCBindingsTabController : ITabController
         };
 
         // Add a column for each vJoy device that exists and is mapped in the export profile
+        var existingVJoyIds = _ctx.VJoyDevices.Where(v => v.Exists).Select(v => v.Id).ToHashSet();
         foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
         {
             int scInstance = _scExportProfile.GetSCInstance(vjoy.Id);
@@ -567,6 +568,24 @@ public class SCBindingsTabController : ITabController
                 VJoyDeviceId = vjoy.Id,
                 SCInstance = scInstance,
                 IsJoystick = true
+            });
+        }
+
+        // Add read-only columns for JS instances stored in the profile that have no backing vJoy device.
+        // This lets users view bindings they previously configured even when vJoy isn't installed.
+        foreach (var kv in _scExportProfile.VJoyToSCInstance
+            .Where(kv => !existingVJoyIds.Contains(kv.Key))
+            .OrderBy(kv => kv.Value))
+        {
+            columns.Add(new SCGridColumn
+            {
+                Id = $"js{kv.Value}",
+                Header = $"JS{kv.Value}",
+                DevicePrefix = $"js{kv.Value}",
+                VJoyDeviceId = kv.Key,
+                SCInstance = kv.Value,
+                IsJoystick = true,
+                IsReadOnly = true
             });
         }
 
@@ -586,6 +605,11 @@ public class SCBindingsTabController : ITabController
         public bool IsKeyboard { get; set; }
         public bool IsMouse { get; set; }
         public bool IsJoystick { get; set; }
+        /// <summary>
+        /// True when this JS column exists in the profile but has no backing vJoy device.
+        /// The column renders stored bindings read-only; no new assignments can be made.
+        /// </summary>
+        public bool IsReadOnly { get; set; }
     }
 
     /// <summary>
@@ -1547,21 +1571,33 @@ public class SCBindingsTabController : ITabController
             {
                 var col = columns[c];
 
-                // Highlight background if this column is selected
-                if (c == _scHighlightedColumn)
+                // Highlight background if this column is selected (read-only columns cannot be highlighted)
+                if (c == _scHighlightedColumn && !col.IsReadOnly)
                 {
                     using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
                     canvas.DrawRect(new SKRect(colX, y, colX + colW, y + headerRowHeight), highlightPaint);
                 }
 
-                // Use consistent theme colors for all column headers
-                var headerColor = c == _scHighlightedColumn ? FUIColors.Active :
-                                  col.IsJoystick ? FUIColors.Active : FUIColors.TextPrimary;
+                if (col.IsReadOnly)
+                {
+                    // Read-only column: dimmed header + "NO DEVICE" sub-label
+                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
+                    float centeredX = colX + (colW - headerTextWidth) / 2;
+                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), FUIColors.TextDim, 9f, true);
+                    float subLabelWidth = FUIRenderer.MeasureText("NO DEVICE", 7f);
+                    FUIRenderer.DrawText(canvas, "NO DEVICE", new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.TextDim.WithAlpha(120), 7f);
+                }
+                else
+                {
+                    // Use consistent theme colors for all column headers
+                    var headerColor = c == _scHighlightedColumn ? FUIColors.Active :
+                                      col.IsJoystick ? FUIColors.Active : FUIColors.TextPrimary;
 
-                // Center the header text in the column
-                float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
-                float centeredX = colX + (colW - headerTextWidth) / 2;
-                FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), headerColor, 9f, true);
+                    // Center the header text in the column
+                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
+                    float centeredX = colX + (colW - headerTextWidth) / 2;
+                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), headerColor, 9f, true);
+                }
 
                 // Draw column separator on left edge
                 using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(50), StrokeWidth = 1 };
@@ -2493,7 +2529,7 @@ public class SCBindingsTabController : ITabController
         if (!anyDropdownOpen && _scColumnHeadersBounds.Contains(point.X, point.Y))
         {
             int clickedCol = GetClickedColumnIndex(point.X);
-            if (clickedCol >= 0)
+            if (clickedCol >= 0 && (_scGridColumns is null || !_scGridColumns[clickedCol].IsReadOnly))
             {
                 // Toggle highlight: if same column clicked, unhighlight; otherwise highlight new column
                 _scHighlightedColumn = (_scHighlightedColumn == clickedCol) ? -1 : clickedCol;
@@ -2927,6 +2963,10 @@ public class SCBindingsTabController : ITabController
             return;
 
         var col = _scGridColumns[colIndex];
+
+        // Read-only columns display bindings but do not accept new assignments
+        if (col.IsReadOnly)
+            return;
 
         // If already listening, cancel
         if (_scIsListeningForInput)

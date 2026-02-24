@@ -2608,7 +2608,8 @@ public partial class MainForm : Form
             new SKPoint(40, y + 22), FUIColors.TextDim, 10f);
 
         // Left-center: connection status
-        string deviceText = _devices.Count == 1 ? "1 DEVICE CONNECTED" : $"{_devices.Count} DEVICES CONNECTED";
+        int physicalCount = _devices.Count(d => !d.IsVirtual);
+        string deviceText = physicalCount == 1 ? "1 DEVICE CONNECTED" : $"{physicalCount} DEVICES CONNECTED";
         FUIRenderer.DrawText(canvas, deviceText,
             new SKPoint(180, y + 22), FUIColors.TextDim, 12f);
 

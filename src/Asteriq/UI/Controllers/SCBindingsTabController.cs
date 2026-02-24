@@ -1414,16 +1414,26 @@ public class SCBindingsTabController : ITabController
         // Title row with action count
         FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
 
-        // Action count on right of title - show "N of T" when filtered
+        // Action count on right of title
         int actionCount = _scFilteredActions?.Count ?? 0;
-        int boundCount = _scFilteredActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
-        bool isFiltered = !string.IsNullOrEmpty(_scActionMapFilter) || !string.IsNullOrEmpty(_scSearchText) || _scShowBoundOnly;
         int totalCount = _scSchemaService is not null && _scActions is not null
             ? _scSchemaService.FilterJoystickActions(_scActions).Count
             : actionCount;
-        string countText = isFiltered
-            ? $"{actionCount} of {totalCount}, {boundCount} bound"
-            : $"{actionCount} actions, {boundCount} bound";
+        // Total bound is always against the full unfiltered list so it reflects the whole profile
+        int totalBound = _scActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
+        int boundCount = _scFilteredActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
+        bool otherFilters = !string.IsNullOrEmpty(_scActionMapFilter) || !string.IsNullOrEmpty(_scSearchText);
+        bool isFiltered = otherFilters || _scShowBoundOnly;
+
+        string countText;
+        if (!isFiltered)
+            countText = $"{totalCount} actions, {totalBound} bound";
+        else if (_scShowBoundOnly && !otherFilters)
+            countText = $"{totalBound} of {totalCount} bound";       // "239 of 1113 bound"
+        else if (_scShowBoundOnly)
+            countText = $"{actionCount} of {totalBound} bound";       // "26 of 239 bound" (within current filter)
+        else
+            countText = $"{actionCount} of {totalCount}, {boundCount} bound"; // "55 of 1113, 26 bound"
         float countTextWidth = FUIRenderer.MeasureText(countText, 9f);
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 9f);
 

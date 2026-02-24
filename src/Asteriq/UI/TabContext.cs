@@ -64,6 +64,14 @@ public class TabContext
     public Func<SKPoint, string?> HitTestSvg { get; }
     public Action OnMappingsChanged { get; }
 
+    /// <summary>
+    /// All device maps available for silhouette selection.
+    /// Key = filename without extension (e.g. "joystick", "throttle", "virpil_alpha_prime_r").
+    /// DisplayName = the human-readable device name from the map (e.g. "VPC WarBRD").
+    /// Populated once at startup by MainForm; empty until then.
+    /// </summary>
+    public List<(string Key, string DisplayName)> AvailableDeviceMaps { get; set; } = new();
+
     // Callbacks (extended - set after construction for cross-tab operations)
     public Action? CreateOneToOneMappings { get; set; }
     public Action? ClearDeviceMappings { get; set; }

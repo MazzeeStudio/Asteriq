@@ -27,6 +27,10 @@ public class MappingsTabController : ITabController
     private SKRect _vjoyNextButtonBounds;
     private bool _vjoyPrevHovered;
     private bool _vjoyNextHovered;
+    private SKRect _silhouettePrevButtonBounds;
+    private SKRect _silhouetteNextButtonBounds;
+    private bool _silhouettePrevHovered;
+    private bool _silhouetteNextHovered;
     private List<SKRect> _mappingRowBounds = new();
     private List<SKRect> _mappingAddButtonBounds = new();
     private List<SKRect> _mappingRemoveButtonBounds = new();
@@ -525,6 +529,10 @@ public class MappingsTabController : ITabController
             return;
         }
 
+        // Left panel: silhouette picker navigation
+        if (_silhouettePrevHovered) { StepSilhouette(-1); return; }
+        if (_silhouetteNextHovered) { StepSilhouette(+1); return; }
+
         // Left panel: Output row clicked - select it
         if (_hoveredMappingRow >= 0)
         {
@@ -550,6 +558,8 @@ public class MappingsTabController : ITabController
         // Reset hover states
         _vjoyPrevHovered = false;
         _vjoyNextHovered = false;
+        _silhouettePrevHovered = false;
+        _silhouetteNextHovered = false;
         _hoveredMappingRow = -1;
         _hoveredAddButton = -1;
         _hoveredRemoveButton = -1;
@@ -709,6 +719,21 @@ public class MappingsTabController : ITabController
         if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
         {
             _vjoyNextHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Left panel: silhouette picker buttons
+        var (_, hasPrev, hasNext) = GetSilhouettePickerState();
+        if (_silhouettePrevButtonBounds != default && _silhouettePrevButtonBounds.Contains(e.X, e.Y) && hasPrev)
+        {
+            _silhouettePrevHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+        if (_silhouetteNextButtonBounds != default && _silhouetteNextButtonBounds.Contains(e.X, e.Y) && hasNext)
+        {
+            _silhouetteNextHovered = true;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
         }
@@ -1051,7 +1076,29 @@ public class MappingsTabController : ITabController
 
         _vjoyNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
         DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1);
-        y += arrowButtonSize + 16;
+        y += arrowButtonSize + 6;
+
+        // Silhouette picker: [<]  Auto (VPC WarBRD)  [>]
+        if (_ctx.VJoyDevices.Count > 0)
+        {
+            var (silhouetteLabel, hasPrev, hasNext) = GetSilhouettePickerState();
+
+            _silhouettePrevButtonBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
+            DrawArrowButton(canvas, _silhouettePrevButtonBounds, "<", _silhouettePrevHovered, hasPrev);
+
+            var silhouetteLabelBounds = new SKRect(leftMargin + arrowButtonSize, y, rightMargin - arrowButtonSize, y + arrowButtonSize);
+            FUIRenderer.DrawTextCentered(canvas, silhouetteLabel, silhouetteLabelBounds, FUIColors.TextDim, 10f);
+
+            _silhouetteNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
+            DrawArrowButton(canvas, _silhouetteNextButtonBounds, ">", _silhouetteNextHovered, hasNext);
+            y += arrowButtonSize + 10;
+        }
+        else
+        {
+            _silhouettePrevButtonBounds = default;
+            _silhouetteNextButtonBounds = default;
+            y += 10;
+        }
 
         // Scrollable binding rows (filtered by category)
         float listBottom = contentBounds.Bottom - 10;
@@ -5931,6 +5978,71 @@ public class MappingsTabController : ITabController
             "HAT" or "POV" => (InputType.Hat, 0),
             _ => (null, 0)
         };
+    }
+
+    #endregion
+
+    #region Silhouette Picker
+
+    /// <summary>
+    /// Returns the display label for the silhouette picker and whether prev/next are available,
+    /// based on the current vJoy slot's AppSettings override (null = Auto).
+    /// </summary>
+    private (string Label, bool HasPrev, bool HasNext) GetSilhouettePickerState()
+    {
+        if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count)
+            return ("Auto", false, false);
+
+        var vjoyId = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex].Id;
+        var currentKey = _ctx.AppSettings.GetVJoySilhouetteOverride(vjoyId);
+        var maps = _ctx.AvailableDeviceMaps;
+
+        // Build the ordered list: null (Auto) followed by each map key
+        int currentIndex = string.IsNullOrEmpty(currentKey)
+            ? 0
+            : maps.FindIndex(m => m.Key == currentKey) + 1;  // +1 because index 0 = Auto
+        if (currentIndex < 0) currentIndex = 0;
+
+        string label;
+        if (currentIndex == 0)
+        {
+            // Auto: show detected map name in parens if available
+            string autoName = _ctx.MappingsPrimaryDeviceMap?.Device ?? "none";
+            label = $"Auto ({autoName})";
+        }
+        else
+        {
+            label = maps[currentIndex - 1].DisplayName;
+        }
+
+        int total = maps.Count + 1;  // +1 for Auto
+        return (label, currentIndex > 0, currentIndex < total - 1);
+    }
+
+    /// <summary>
+    /// Steps the silhouette selection for the current vJoy slot by delta (+1 or -1).
+    /// </summary>
+    private void StepSilhouette(int delta)
+    {
+        if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count)
+            return;
+
+        var vjoyId = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex].Id;
+        var currentKey = _ctx.AppSettings.GetVJoySilhouetteOverride(vjoyId);
+        var maps = _ctx.AvailableDeviceMaps;
+
+        // Build ordered list: index 0 = Auto (null), 1..N = maps
+        int currentIndex = string.IsNullOrEmpty(currentKey)
+            ? 0
+            : maps.FindIndex(m => m.Key == currentKey) + 1;
+        if (currentIndex < 0) currentIndex = 0;
+
+        int newIndex = Math.Clamp(currentIndex + delta, 0, maps.Count);
+        string? newKey = newIndex == 0 ? null : maps[newIndex - 1].Key;
+
+        _ctx.AppSettings.SetVJoySilhouetteOverride(vjoyId, newKey);
+        _ctx.UpdateMappingsPrimaryDeviceMap();
+        _ctx.InvalidateCanvas();
     }
 
     #endregion

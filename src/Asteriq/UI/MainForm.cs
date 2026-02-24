@@ -307,7 +307,10 @@ public partial class MainForm : Form
         _currentInputState = _tabContext.CurrentInputState;
         _selectedVJoyDeviceIndex = _tabContext.SelectedVJoyDeviceIndex;
         _deviceMap = _tabContext.DeviceMap;
-        _mappingsPrimaryDeviceMap = _tabContext.MappingsPrimaryDeviceMap;
+        // Note: _mappingsPrimaryDeviceMap is NOT read back from context here.
+        // It is written only by UpdateMappingsPrimaryDeviceMap and pushed to context
+        // by SyncTabContext. Pulling it back would clobber updates made mid-frame
+        // by tab controller callbacks (e.g. switching vJoy devices in the Mappings tab).
         _hoveredControlId = _tabContext.HoveredControlId;
         _selectedControlId = _tabContext.SelectedControlId;
         _silhouetteBounds = _tabContext.SilhouetteBounds;

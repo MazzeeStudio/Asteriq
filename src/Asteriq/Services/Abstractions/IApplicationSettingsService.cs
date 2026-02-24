@@ -69,4 +69,17 @@ public interface IApplicationSettingsService
     /// Get or set the preferred SC environment (LIVE, PTU, EPTU) to select on startup
     /// </summary>
     string? PreferredSCEnvironment { get; set; }
+
+    /// <summary>
+    /// Get the user-specified silhouette override for a vJoy slot.
+    /// Returns null if no override is set (auto-detect from physical device).
+    /// The value is the device map filename key (e.g., "joystick", "throttle", "virpil_alpha_prime_r").
+    /// </summary>
+    string? GetVJoySilhouetteOverride(uint vjoyId);
+
+    /// <summary>
+    /// Set the silhouette override for a vJoy slot.
+    /// Pass null to clear the override and return to auto-detection.
+    /// </summary>
+    void SetVJoySilhouetteOverride(uint vjoyId, string? mapKey);
 }

@@ -240,6 +240,7 @@ public partial class MainForm : Form
         _tabContext.ThrottleSvg = _throttleSvg;
         _tabContext.ControlBounds = _controlBounds;
         _tabContext.IsForwarding = _isForwarding;
+        _tabContext.AvailableDeviceMaps = LoadAvailableDeviceMaps();
 
         // Wire up extended callbacks for cross-tab operations (non-mapping callbacks)
         _tabContext.CreateNewProfilePrompt = CreateNewProfilePrompt;
@@ -709,7 +710,31 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Update the device map used for Mappings tab visualization based on vJoy primary device
+    /// Enumerates all device map JSON files in the Maps directory and returns them as
+    /// (Key, DisplayName) pairs. Called once at startup and stored in TabContext.
+    /// </summary>
+    private List<(string Key, string DisplayName)> LoadAvailableDeviceMaps()
+    {
+        var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+        var result = new List<(string Key, string DisplayName)>();
+        if (!Directory.Exists(mapsDir)) return result;
+
+        foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json").OrderBy(f => f))
+        {
+            if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var map = DeviceMap.Load(mapFile);
+            if (map is null) continue;
+            string key = Path.GetFileNameWithoutExtension(mapFile);
+            string displayName = string.IsNullOrEmpty(map.Device) ? key : map.Device;
+            result.Add((key, displayName));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Update the device map used for Mappings tab visualization based on vJoy primary device.
+    /// Checks for a user silhouette override in AppSettings first; falls back to auto-detection.
     /// </summary>
     private void UpdateMappingsPrimaryDeviceMap()
     {
@@ -725,6 +750,21 @@ public partial class MainForm : Form
             return;
 
         var vjoyDevice = _vjoyDevices[_selectedVJoyDeviceIndex];
+
+        // Check for a user-specified silhouette override first
+        var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyDevice.Id);
+        if (!string.IsNullOrEmpty(overrideKey))
+        {
+            var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+            var overridePath = Path.Combine(mapsDir, $"{overrideKey}.json");
+            if (File.Exists(overridePath))
+            {
+                _mappingsPrimaryDeviceMap = DeviceMap.Load(overridePath);
+                return;
+            }
+        }
+
+        // Auto: derive from the primary physical device mapped to this vJoy slot
         var profile = _profileManager.ActiveProfile;
         if (profile is null)
             return;
@@ -733,14 +773,11 @@ public partial class MainForm : Form
         if (string.IsNullOrEmpty(primaryGuid))
             return;
 
-        // Find the physical device by GUID
         var primaryDevice = _devices.FirstOrDefault(d =>
             d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
 
         if (primaryDevice is not null)
-        {
             _mappingsPrimaryDeviceMap = LoadDeviceMapForDeviceInfo(primaryDevice);
-        }
     }
 
     /// <summary>

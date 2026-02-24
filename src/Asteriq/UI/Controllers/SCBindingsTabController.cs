@@ -2486,7 +2486,9 @@ public class SCBindingsTabController : ITabController
         }
 
         // Column header click - toggle column highlight
-        if (_scColumnHeadersBounds.Contains(point.X, point.Y))
+        // Guard: skip if any dropdown is open (they render over the column header area)
+        bool anyDropdownOpen = _scInstallationDropdownOpen || _scActionMapFilterDropdownOpen || _scProfileDropdownOpen;
+        if (!anyDropdownOpen && _scColumnHeadersBounds.Contains(point.X, point.Y))
         {
             int clickedCol = GetClickedColumnIndex(point.X);
             if (clickedCol >= 0)

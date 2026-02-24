@@ -78,7 +78,7 @@ public class SCExportProfileService
             var json = File.ReadAllText(filePath);
             return JsonSerializer.Deserialize<SCExportProfile>(json, _jsonOptions);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             System.Diagnostics.Debug.WriteLine($"[SCExportProfileService] Failed to load profile: {ex.Message}");
             return null;

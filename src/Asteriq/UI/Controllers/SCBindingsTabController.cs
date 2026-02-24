@@ -1581,6 +1581,7 @@ public class SCBindingsTabController : ITabController
         if (_scFilteredActions is null || _scFilteredActions.Count == 0)
         {
             string emptyMsg = _scLoading ? _scLoadingMessage
+                : _scActions is null && !string.IsNullOrEmpty(_scLoadingMessage) ? _scLoadingMessage
                 : _scActions is null ? "No SC installation found"
                 : "No actions match filter";
             FUIRenderer.DrawText(canvas, emptyMsg,
@@ -3776,17 +3777,28 @@ public class SCBindingsTabController : ITabController
                 : $"{_scExportFilename}.xml";
 
             // Ensure mappings directory exists
-            SCInstallationService.EnsureMappingsDirectory(installation);
+            if (!SCInstallationService.EnsureMappingsDirectory(installation))
+            {
+                SetStatus($"Cannot create SC mappings directory: {installation.MappingsPath}", SCStatusKind.Error);
+                return;
+            }
 
             string exportPath = Path.Combine(installation.MappingsPath, filename);
             _scExportService.ExportToFile(_scExportProfile, exportPath);
 
-            // Refresh available profiles list after export
-            _scAvailableProfiles = SCInstallationService.GetExistingProfiles(installation);
-
+            // Export succeeded — notify user before non-critical post-export operations
             SetStatus($"Success! Exported to {filename}", SCStatusKind.Success);
-
             System.Diagnostics.Debug.WriteLine($"[MainForm] Exported SC profile to: {exportPath}");
+
+            // Refresh available profiles list (non-critical — export already succeeded)
+            try
+            {
+                _scAvailableProfiles = SCInstallationService.GetExistingProfiles(installation);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to refresh available profiles after export: {ex.Message}");
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

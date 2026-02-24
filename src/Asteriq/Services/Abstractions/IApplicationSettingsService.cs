@@ -54,6 +54,18 @@ public interface IApplicationSettingsService
     bool AutoLoadLastSCExportProfile { get; set; }
 
     /// <summary>
+    /// Get the last used SC export profile name for a specific SC environment (LIVE, TECH-PREVIEW, etc.)
+    /// Returns null if no profile has been remembered for that environment.
+    /// </summary>
+    string? GetLastSCExportProfileForEnvironment(string environment);
+
+    /// <summary>
+    /// Set the last used SC export profile name for a specific SC environment.
+    /// Pass null to clear the remembered profile for that environment.
+    /// </summary>
+    void SetLastSCExportProfileForEnvironment(string environment, string? profileName);
+
+    /// <summary>
     /// Get or set the preferred SC environment (LIVE, PTU, EPTU) to select on startup
     /// </summary>
     string? PreferredSCEnvironment { get; set; }

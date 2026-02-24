@@ -519,8 +519,24 @@ public partial class MainForm : Form
         // For virtual (vJoy) devices, check for a silhouette override first
         if (device is not null && device.IsVirtual)
         {
-            var vMatch = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+");
-            if (vMatch.Success && uint.TryParse(vMatch.Value, out uint vjoyId))
+            // Derive vjoy ID using index-based lookup (most reliable; SDL2 names vary)
+            uint vjoyId = 0;
+            if (_vjoyDevices.Count > 0)
+            {
+                var virtualDevices = _devices.Where(d => d.IsVirtual).ToList();
+                int virtualIndex = virtualDevices.IndexOf(device);
+                if (virtualIndex >= 0 && virtualIndex < _vjoyDevices.Count)
+                    vjoyId = _vjoyDevices[virtualIndex].Id;
+            }
+            // Fallback: parse from name (e.g. "vJoy Device 1" → 1)
+            if (vjoyId == 0)
+            {
+                var vMatch = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+");
+                if (vMatch.Success && uint.TryParse(vMatch.Value, out uint parsedId))
+                    vjoyId = parsedId;
+            }
+
+            if (vjoyId > 0)
             {
                 var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyId);
                 if (!string.IsNullOrEmpty(overrideKey))

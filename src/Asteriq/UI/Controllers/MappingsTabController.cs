@@ -684,7 +684,7 @@ public class MappingsTabController : ITabController
             if (_outputTypeIsKeyboard && _keyCaptureBounds.Contains(e.X, e.Y))
             {
                 _keyCaptureBoundsHovered = true;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                _ctx.OwnerForm.Cursor = Cursors.IBeam;
                 return;
             }
 

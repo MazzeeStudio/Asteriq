@@ -70,6 +70,59 @@ public class SettingsTabController : ITabController
         if (_draggingBgSlider is not null)
         {
             UpdateBgSliderFromPoint(e.X);
+            return;
+        }
+
+        var pt = new SKPoint(e.X, e.Y);
+
+        // Profile action buttons
+        if (_newProfileButtonBounds.Contains(pt) ||
+            (_duplicateProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null) ||
+            _importProfileButtonBounds.Contains(pt) ||
+            (_exportProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null) ||
+            (_deleteProfileButtonBounds != default && _deleteProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Theme buttons
+        foreach (var b in _themeButtonBounds)
+        {
+            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+        }
+
+        // Font size stepper buttons
+        foreach (var b in _fontSizeButtonBounds)
+        {
+            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+        }
+
+        // Font family buttons
+        foreach (var b in _fontFamilyButtonBounds)
+        {
+            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+        }
+
+        // Tray icon type buttons
+        foreach (var b in _trayIconTypeButtonBounds)
+        {
+            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+        }
+
+        // Toggles
+        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Background sliders
+        if (_bgGridSliderBounds.Contains(pt) || _bgGlowSliderBounds.Contains(pt) ||
+            _bgNoiseSliderBounds.Contains(pt) || _bgScanlineSliderBounds.Contains(pt) ||
+            _bgVignetteSliderBounds.Contains(pt))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
     }
 

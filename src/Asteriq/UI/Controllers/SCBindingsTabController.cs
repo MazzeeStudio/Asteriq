@@ -319,17 +319,42 @@ public class SCBindingsTabController : ITabController
             }
         }
 
+        // Text input fields - IBeam cursor
+        if (_scSearchBoxBounds.Contains(e.X, e.Y) || _scExportFilenameBoxBounds.Contains(e.X, e.Y))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.IBeam;
+        }
+
         // Buttons and selectors
         if (_scRefreshButtonBounds.Contains(e.X, e.Y) ||
             _scExportButtonBounds.Contains(e.X, e.Y) ||
             _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
             _scProfileNameBounds.Contains(e.X, e.Y) ||
+            _scProfileDropdownBounds.Contains(e.X, e.Y) ||
+            _scNewProfileButtonBounds.Contains(e.X, e.Y) ||
+            _scSaveProfileButtonBounds.Contains(e.X, e.Y) ||
+            (_scDeleteProfileButtonBounds != default && _scDeleteProfileButtonBounds.Contains(e.X, e.Y)) ||
             _scActionMapFilterBounds.Contains(e.X, e.Y) ||
             _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
-            _scClearBindingButtonBounds.Contains(e.X, e.Y))
+            _scClearBindingButtonBounds.Contains(e.X, e.Y) ||
+            _scClearAllButtonBounds.Contains(e.X, e.Y) ||
+            _scResetDefaultsButtonBounds.Contains(e.X, e.Y) ||
+            _scShowBoundOnlyBounds.Contains(e.X, e.Y) ||
+            (!_scVScrollbarBounds.IsEmpty && _scVScrollbarBounds.Contains(e.X, e.Y)) ||
+            (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
+
+        // Category collapse headers
+        foreach (var headerBounds in _scCategoryHeaderBounds.Values)
+        {
+            if (headerBounds.Contains(e.X, e.Y)) { _ctx.OwnerForm.Cursor = Cursors.Hand; break; }
+        }
+
+        // Profile dropdown list items when open
+        if (_scProfileDropdownOpen && _scProfileDropdownListBounds.Contains(e.X, e.Y))
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Listening timeout
         if (_scIsListeningForInput && (DateTime.Now - _scListeningStartTime).TotalMilliseconds > SCListeningTimeoutMs)
@@ -2655,9 +2680,12 @@ public class SCBindingsTabController : ITabController
             }
             else
             {
-                // Click outside - close dropdown
+                // Click outside list - close dropdown
                 _scProfileDropdownOpen = false;
-                // Don't return - allow other clicks to process
+                // If the click was on the toggle button itself, stop here so it doesn't re-open below
+                if (_scProfileDropdownBounds.Contains(point))
+                    return;
+                // Otherwise allow the click to reach other handlers below
             }
         }
 

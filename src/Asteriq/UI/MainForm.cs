@@ -552,8 +552,42 @@ public partial class MainForm : Form
                         return;
                     }
                 }
+
+                // Auto: try to find the physical device assigned to this vJoy slot
+                var profile = _profileManager.ActiveProfile;
+                if (profile is not null)
+                {
+                    var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyId);
+                    if (string.IsNullOrEmpty(primaryGuid))
+                    {
+                        var assignment = profile.GetAssignmentForVJoy(vjoyId);
+                        if (assignment is not null && !string.IsNullOrEmpty(assignment.PhysicalDevice.Guid))
+                            primaryGuid = assignment.PhysicalDevice.Guid;
+                    }
+
+                    PhysicalDeviceInfo? physicalDevice = null;
+                    if (!string.IsNullOrEmpty(primaryGuid))
+                        physicalDevice = _devices.FirstOrDefault(d =>
+                            !d.IsVirtual && d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
+
+                    // Fallback: match by device name
+                    if (physicalDevice is null)
+                    {
+                        var assignment = profile.GetAssignmentForVJoy(vjoyId);
+                        if (assignment is not null && !string.IsNullOrEmpty(assignment.PhysicalDevice.Name))
+                            physicalDevice = _devices.FirstOrDefault(d =>
+                                !d.IsVirtual && d.Name.Equals(assignment.PhysicalDevice.Name, StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    if (physicalDevice is not null)
+                    {
+                        _deviceMap = LoadDeviceMapForDeviceInfo(physicalDevice);
+                        SyncDeviceMapToTabContext();
+                        return;
+                    }
+                }
             }
-            // No override - use generic joystick map for vJoy devices
+            // No override and no physical device found - use generic joystick map
             _deviceMap = DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
             SyncDeviceMapToTabContext();
             return;

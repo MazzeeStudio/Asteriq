@@ -212,9 +212,10 @@ public partial class MainForm : Form
         // Apply correct MinimumSize now that font settings are loaded
         ApplyFontScaleToWindowSize();
 
-        // Silent background update check — result will be visible in Settings tab
-        _ = _updateService.CheckAsync().ContinueWith(_ => _canvas?.Invoke(() => _canvas.Invalidate()),
-            TaskContinuationOptions.ExecuteSynchronously);
+        // Silent background update check — only if user has enabled auto-check
+        if (_appSettings.AutoCheckUpdates)
+            _ = _updateService.CheckAsync().ContinueWith(_ => _canvas?.Invoke(() => _canvas.Invalidate()),
+                TaskContinuationOptions.ExecuteSynchronously);
     }
 
     private void InitializeTabControllers(
@@ -2804,11 +2805,24 @@ public partial class MainForm : Form
         FUIRenderer.DrawText(canvas, "READY",
             new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 12f);
 
-        // Right: version and time
+        // Right: update indicator + version and time
         string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";
         float versionWidth = FUIRenderer.MeasureText(versionTime, 12f);
-        FUIRenderer.DrawText(canvas, versionTime,
-            new SKPoint(bounds.Right - versionWidth - 20, y + 22), FUIColors.TextDim, 12f);
+        var footerUpdateStatus = _updateService.Status;
+        if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.UpdateAvailable)
+        {
+            string sym = footerUpdateStatus == UpdateStatus.UpdateAvailable ? "\u2193" : "\u2713";
+            var symColor = footerUpdateStatus == UpdateStatus.UpdateAvailable ? FUIColors.Warning : FUIColors.Active;
+            float symWidth = FUIRenderer.MeasureText(sym, 12f);
+            float startX = bounds.Right - symWidth - 6f - versionWidth - 20;
+            FUIRenderer.DrawText(canvas, sym, new SKPoint(startX, y + 22), symColor, 12f);
+            FUIRenderer.DrawText(canvas, versionTime, new SKPoint(startX + symWidth + 6f, y + 22), FUIColors.TextDim, 12f);
+        }
+        else
+        {
+            FUIRenderer.DrawText(canvas, versionTime,
+                new SKPoint(bounds.Right - versionWidth - 20, y + 22), FUIColors.TextDim, 12f);
+        }
     }
 
     private void DrawOverlayLayer(SKCanvas canvas, SKRect bounds)

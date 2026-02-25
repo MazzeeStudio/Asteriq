@@ -19,6 +19,11 @@ public interface IApplicationSettingsService
     bool AutoLoadLastProfile { get; set; }
 
     /// <summary>
+    /// Get or set whether to automatically check for updates on startup
+    /// </summary>
+    bool AutoCheckUpdates { get; set; }
+
+    /// <summary>
     /// Font size setting for accessibility (Small/Medium/Large)
     /// </summary>
     FontSizeOption FontSize { get; set; }

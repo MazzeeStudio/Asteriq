@@ -77,59 +77,77 @@ public sealed class UpdateService : IUpdateService
     public async Task DownloadAndInstallAsync(IProgress<int>? progress = null, CancellationToken ct = default)
     {
         if (DownloadUrl is null)
-            throw new InvalidOperationException("No download URL available.");
-
-        string tempPath = Path.Combine(Path.GetTempPath(), "Asteriq_update.exe");
-        string? currentExe = Environment.ProcessPath;
-
-        if (string.IsNullOrEmpty(currentExe))
-            throw new InvalidOperationException("Cannot determine current executable path.");
-
-        // Download
-        var client = _httpClientFactory.CreateClient("Asteriq");
-        using var response = await client.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        long? total = response.Content.Headers.ContentLength;
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var file = File.Create(tempPath);
-
-        var buffer = new byte[81920];
-        long downloaded = 0;
-        int read;
-
-        while ((read = await stream.ReadAsync(buffer, ct)) > 0)
         {
-            await file.WriteAsync(buffer.AsMemory(0, read), ct);
-            downloaded += read;
-            if (total > 0)
-                progress?.Report((int)(downloaded * 100 / total.Value));
+            Status = UpdateStatus.Error;
+            return;
         }
 
-        await file.FlushAsync(ct);
-        file.Close();
-
-        // Write swap script and launch it
-        string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
-        string script = $"""
-            Start-Sleep -Seconds 2
-            Copy-Item -Path '{tempPath}' -Destination '{currentExe}' -Force
-            Start-Process '{currentExe}'
-            Remove-Item '{tempPath}' -ErrorAction SilentlyContinue
-            Remove-Item '{scriptPath}' -ErrorAction SilentlyContinue
-            """;
-
-        await File.WriteAllTextAsync(scriptPath, script, ct);
-
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        string? currentExe = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(currentExe))
         {
-            FileName = "powershell.exe",
-            Arguments = $"-NonInteractive -WindowStyle Hidden -File \"{scriptPath}\"",
-            UseShellExecute = true,
-            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-        });
+            _logger.LogError("Cannot determine current executable path for update.");
+            Status = UpdateStatus.Error;
+            return;
+        }
 
-        Application.Exit();
+        Status = UpdateStatus.Checking; // reuse Checking as "downloading" visual state
+
+        try
+        {
+            string tempPath = Path.Combine(Path.GetTempPath(), "Asteriq_update.exe");
+
+            // Download
+            var client = _httpClientFactory.CreateClient("Asteriq");
+            using var response = await client.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+
+            long? total = response.Content.Headers.ContentLength;
+            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var file = File.Create(tempPath);
+
+            var buffer = new byte[81920];
+            long downloaded = 0;
+            int read;
+
+            while ((read = await stream.ReadAsync(buffer, ct)) > 0)
+            {
+                await file.WriteAsync(buffer.AsMemory(0, read), ct);
+                downloaded += read;
+                if (total > 0)
+                    progress?.Report((int)(downloaded * 100 / total.Value));
+            }
+
+            await file.FlushAsync(ct);
+            file.Close();
+
+            // Write swap script and launch it
+            string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
+            string script = $"""
+                Start-Sleep -Seconds 2
+                Copy-Item -Path '{tempPath}' -Destination '{currentExe}' -Force
+                Start-Process '{currentExe}'
+                Remove-Item '{tempPath}' -ErrorAction SilentlyContinue
+                Remove-Item '{scriptPath}' -ErrorAction SilentlyContinue
+                """;
+
+            await File.WriteAllTextAsync(scriptPath, script, ct);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NonInteractive -WindowStyle Hidden -File \"{scriptPath}\"",
+                UseShellExecute = true,
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+            });
+
+            // Exit from the thread pool — safe from any thread unlike Application.Exit()
+            Environment.Exit(0);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Update download/install failed.");
+            Status = UpdateStatus.Error;
+        }
     }
 
     private static bool IsNewer(string latest, string current)

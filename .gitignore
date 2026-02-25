@@ -41,6 +41,7 @@ src/Asteriq/publish/
 src/Asteriq/publish-single/
 src/Asteriq/publish-small/
 publish/
+publish-release/
 dist/
 *.v*.zip
 

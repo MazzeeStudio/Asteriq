@@ -1329,6 +1329,9 @@ public partial class MainForm : Form
         if (filteredDevices.Count > 0)
         {
             _selectedDevice = _devices.IndexOf(filteredDevices[0]);
+            // Keep context in sync so SyncFromTabContext doesn't clobber the new selection
+            if (_tabContext is not null)
+                _tabContext.SelectedDevice = _selectedDevice;
             if (_selectedDevice >= 0)
             {
                 LoadDeviceMapForDevice(_devices[_selectedDevice]);
@@ -2065,6 +2068,7 @@ public partial class MainForm : Form
                     if (_activeTab != i)
                     {
                         if (_activeTab == 1) _mappingsController.OnDeactivated();
+                        if (i == 0) _devicesController.OnActivated();
                         if (i == 1) _mappingsController.OnActivated();
                         if (i == 2) _scBindingsController.OnActivated();
                     }

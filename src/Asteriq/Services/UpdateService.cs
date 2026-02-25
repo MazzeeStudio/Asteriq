@@ -122,17 +122,17 @@ public sealed class UpdateService : IUpdateService
 
             // Write swap script and launch it
             string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
-            string script = $"""
+            string script = $$"""
                 Start-Sleep -Seconds 2
-                try {{
-                    Copy-Item -Path '{tempPath}' -Destination '{currentExe}' -Force -ErrorAction Stop
-                    Start-Process -FilePath '{currentExe}'
-                }} catch {{
-                    # Copy failed — relaunch the original so the app isn't just gone
-                    Start-Process -FilePath '{currentExe}'
-                }}
-                Remove-Item -Path '{tempPath}' -ErrorAction SilentlyContinue
-                Remove-Item -Path '{scriptPath}' -ErrorAction SilentlyContinue
+                try {
+                    Copy-Item -Path '{{tempPath}}' -Destination '{{currentExe}}' -Force -ErrorAction Stop
+                    Start-Process -FilePath '{{currentExe}}'
+                } catch {
+                    # Copy failed - relaunch the original so the app is not left closed
+                    Start-Process -FilePath '{{currentExe}}'
+                }
+                Remove-Item -Path '{{tempPath}}' -ErrorAction SilentlyContinue
+                Remove-Item -Path '{{scriptPath}}' -ErrorAction SilentlyContinue
                 """;
 
             await File.WriteAllTextAsync(scriptPath, script, ct);

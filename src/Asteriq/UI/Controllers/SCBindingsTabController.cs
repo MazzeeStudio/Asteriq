@@ -264,22 +264,24 @@ public class SCBindingsTabController : ITabController
             float categoryHeaderHeight = 28f;
             float relativeY = e.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
 
-            string? lastActionMap = null;
+            string? lastCategoryName = null;
             float currentY = 0;
 
             for (int i = 0; i < _scFilteredActions.Count; i++)
             {
                 var action = _scFilteredActions[i];
+                // Must use the same category mapping as the draw code so header heights stay in sync
+                string categoryName = SCCategoryMapper.GetCategoryNameForAction(action.ActionMap, action.ActionName);
 
-                if (action.ActionMap != lastActionMap)
+                if (categoryName != lastCategoryName)
                 {
-                    lastActionMap = action.ActionMap;
+                    lastCategoryName = categoryName;
                     currentY += categoryHeaderHeight;
 
-                    if (_scCollapsedCategories.Contains(action.ActionMap))
+                    if (_scCollapsedCategories.Contains(categoryName))
                     {
                         while (i < _scFilteredActions.Count - 1 &&
-                               _scFilteredActions[i + 1].ActionMap == action.ActionMap)
+                               SCCategoryMapper.GetCategoryNameForAction(_scFilteredActions[i + 1].ActionMap, _scFilteredActions[i + 1].ActionName) == categoryName)
                         {
                             i++;
                         }

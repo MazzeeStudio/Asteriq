@@ -124,10 +124,15 @@ public sealed class UpdateService : IUpdateService
             string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
             string script = $"""
                 Start-Sleep -Seconds 2
-                Copy-Item -Path '{tempPath}' -Destination '{currentExe}' -Force
-                Start-Process '{currentExe}'
-                Remove-Item '{tempPath}' -ErrorAction SilentlyContinue
-                Remove-Item '{scriptPath}' -ErrorAction SilentlyContinue
+                try {{
+                    Copy-Item -Path '{tempPath}' -Destination '{currentExe}' -Force -ErrorAction Stop
+                    Start-Process -FilePath '{currentExe}'
+                }} catch {{
+                    # Copy failed — relaunch the original so the app isn't just gone
+                    Start-Process -FilePath '{currentExe}'
+                }}
+                Remove-Item -Path '{tempPath}' -ErrorAction SilentlyContinue
+                Remove-Item -Path '{scriptPath}' -ErrorAction SilentlyContinue
                 """;
 
             await File.WriteAllTextAsync(scriptPath, script, ct);

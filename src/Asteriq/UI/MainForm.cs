@@ -2805,18 +2805,37 @@ public partial class MainForm : Form
         FUIRenderer.DrawText(canvas, "READY",
             new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 12f);
 
-        // Right: update indicator + version and time
+        // Right: update indicator shape + version and time
         string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";
         float versionWidth = FUIRenderer.MeasureText(versionTime, 12f);
         var footerUpdateStatus = _updateService.Status;
         if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.UpdateAvailable)
         {
-            string sym = footerUpdateStatus == UpdateStatus.UpdateAvailable ? "\u2193" : "\u2713";
-            var symColor = footerUpdateStatus == UpdateStatus.UpdateAvailable ? FUIColors.Warning : FUIColors.Active;
-            float symWidth = FUIRenderer.MeasureText(sym, 12f);
-            float startX = bounds.Right - symWidth - 6f - versionWidth - 20;
-            FUIRenderer.DrawText(canvas, sym, new SKPoint(startX, y + 22), symColor, 12f);
-            FUIRenderer.DrawText(canvas, versionTime, new SKPoint(startX + symWidth + 6f, y + 22), FUIColors.TextDim, 12f);
+            const float indicatorSize = 7f;
+            const float indicatorGap = 6f;
+            float textX = bounds.Right - versionWidth - 20;
+            float startX = textX - indicatorGap - indicatorSize;
+            float centerY = y + 22 - indicatorSize / 2f;
+
+            if (footerUpdateStatus == UpdateStatus.UpToDate)
+            {
+                // Small filled circle — mirrors the vJOY status dot style
+                using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                canvas.DrawCircle(startX + indicatorSize / 2f, centerY, indicatorSize / 2f, dotPaint);
+            }
+            else
+            {
+                // Small downward triangle — signals something to download
+                using var triPath = new SKPath();
+                triPath.MoveTo(startX, centerY - indicatorSize / 2f);
+                triPath.LineTo(startX + indicatorSize, centerY - indicatorSize / 2f);
+                triPath.LineTo(startX + indicatorSize / 2f, centerY + indicatorSize / 2f);
+                triPath.Close();
+                using var triPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                canvas.DrawPath(triPath, triPaint);
+            }
+
+            FUIRenderer.DrawText(canvas, versionTime, new SKPoint(textX, y + 22), FUIColors.TextDim, 12f);
         }
         else
         {

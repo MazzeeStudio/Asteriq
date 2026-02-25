@@ -777,7 +777,9 @@ public partial class MainForm : Form
 
     /// <summary>
     /// Update the device map used for Mappings tab visualization based on vJoy primary device.
-    /// Checks for a user silhouette override in AppSettings first; falls back to auto-detection.
+    /// Always derives from the actual physical device assigned/mapped to the slot — the visual
+    /// identity override (set in Devices tab) is intentionally ignored here so the Mappings tab
+    /// always reflects the real physical device silhouette.
     /// </summary>
     private void UpdateMappingsPrimaryDeviceMap()
     {
@@ -799,20 +801,7 @@ public partial class MainForm : Form
 
         var vjoyDevice = _vjoyDevices[effectiveIndex];
 
-        // Check for a user-specified silhouette override first
-        var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyDevice.Id);
-        if (!string.IsNullOrEmpty(overrideKey))
-        {
-            var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
-            var overridePath = Path.Combine(mapsDir, $"{overrideKey}.json");
-            if (File.Exists(overridePath))
-            {
-                _mappingsPrimaryDeviceMap = DeviceMap.Load(overridePath);
-                return;
-            }
-        }
-
-        // Auto: derive from the primary physical device mapped to this vJoy slot
+        // Derive from the primary physical device mapped to this vJoy slot
         var profile = _profileManager.ActiveProfile;
         if (profile is null)
             return;

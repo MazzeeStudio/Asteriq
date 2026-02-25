@@ -530,8 +530,10 @@ public class MappingsTabController : ITabController
             _ctx.SelectedVJoyDeviceIndex--;
             _selectedMappingRow = -1;
             _bindingsScrollOffset = 0; // Reset scroll when changing device
+            _mappingHighlightControl = null; // Clear silhouette lead line for previous device
             CancelInputListening();
             _ctx.UpdateMappingsPrimaryDeviceMap();
+            _ctx.MarkDirty();
             return;
         }
         if (_vjoyNextHovered && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
@@ -539,8 +541,10 @@ public class MappingsTabController : ITabController
             _ctx.SelectedVJoyDeviceIndex++;
             _selectedMappingRow = -1;
             _bindingsScrollOffset = 0; // Reset scroll when changing device
+            _mappingHighlightControl = null; // Clear silhouette lead line for previous device
             CancelInputListening();
             _ctx.UpdateMappingsPrimaryDeviceMap();
+            _ctx.MarkDirty();
             return;
         }
 
@@ -956,8 +960,11 @@ public class MappingsTabController : ITabController
                 _highlightStartTime = DateTime.Now;
                 _highlightDebounce[debounceKey] = DateTime.Now; // Record highlight time for debounce
 
-                // Show lead line on the silhouette for the physical control that was pressed
-                if (_ctx.MappingsPrimaryDeviceMap is not null)
+                // Show lead line on the silhouette only if this mapping belongs to the currently viewed vJoy device
+                bool isCurrentVJoy = _ctx.VJoyDevices.Count > 0 &&
+                                     _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count &&
+                                     _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex].Id == mapping.Output.VJoyDevice;
+                if (isCurrentVJoy && _ctx.MappingsPrimaryDeviceMap is not null)
                 {
                     // SDL2 button index i → device-map binding "button{i+1}"
                     string physBinding = $"button{i + 1}";

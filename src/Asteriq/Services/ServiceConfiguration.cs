@@ -32,12 +32,15 @@ public static class ServiceConfiguration
         services.AddSingleton<SettingsMigrationService>();
 
 
-        // HTTP client factory for driver downloads
+        // HTTP client factory for driver downloads and update checks
         services.AddHttpClient("Asteriq", client =>
         {
             client.DefaultRequestHeaders.Add("User-Agent", "Asteriq/1.0");
             client.Timeout = TimeSpan.FromMinutes(10); // Long timeout for large driver downloads
         });
+
+        // Update service
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // Star Citizen integration services (Singleton - cache state)
         services.AddSingleton<ISCInstallationService, SCInstallationService>();

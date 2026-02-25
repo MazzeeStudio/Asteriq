@@ -81,6 +81,7 @@ public partial class MainForm : Form
     private readonly IVJoyService _vjoyService;
     private readonly IMappingEngine _mappingEngine;
     private readonly SystemTrayIcon _trayIcon;
+    private readonly IUpdateService _updateService;
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
@@ -172,6 +173,7 @@ public partial class MainForm : Form
         IVJoyService vjoyService,
         IMappingEngine mappingEngine,
         SystemTrayIcon trayIcon,
+        IUpdateService updateService,
         ISCInstallationService scInstallationService,
         SCProfileCacheService scProfileCacheService,
         SCSchemaService scSchemaService,
@@ -188,6 +190,7 @@ public partial class MainForm : Form
         _vjoyService = vjoyService ?? throw new ArgumentNullException(nameof(vjoyService));
         _mappingEngine = mappingEngine ?? throw new ArgumentNullException(nameof(mappingEngine));
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
+        _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         // Update tray icon tooltip
         _trayIcon.SetToolTip($"Asteriq v{s_appVersion}");
 
@@ -208,6 +211,10 @@ public partial class MainForm : Form
 
         // Apply correct MinimumSize now that font settings are loaded
         ApplyFontScaleToWindowSize();
+
+        // Silent background update check — result will be visible in Settings tab
+        _ = _updateService.CheckAsync().ContinueWith(_ => _canvas?.Invoke(() => _canvas.Invalidate()),
+            TaskContinuationOptions.ExecuteSynchronously);
     }
 
     private void InitializeTabControllers(
@@ -219,7 +226,7 @@ public partial class MainForm : Form
     {
         _tabContext = new TabContext(
             _inputService, _profileManager, _profileRepository, _appSettings,
-            _themeService, _vjoyService, _mappingEngine, _trayIcon,
+            _themeService, _vjoyService, _mappingEngine, _trayIcon, _updateService,
             _activeInputTracker, _background, this,
             markDirty: MarkDirty,
             invalidateCanvas: () => _canvas.Invalidate(),

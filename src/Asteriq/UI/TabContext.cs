@@ -20,6 +20,7 @@ public class TabContext
     public IVJoyService VJoyService { get; }
     public IMappingEngine MappingEngine { get; }
     public SystemTrayIcon TrayIcon { get; }
+    public IUpdateService UpdateService { get; }
 
     // Shared mutable state
     public List<PhysicalDeviceInfo> Devices { get; set; } = new();
@@ -99,6 +100,7 @@ public class TabContext
         IVJoyService vjoyService,
         IMappingEngine mappingEngine,
         SystemTrayIcon trayIcon,
+        IUpdateService updateService,
         ActiveInputTracker activeInputTracker,
         FUIBackground background,
         Form ownerForm,
@@ -119,6 +121,7 @@ public class TabContext
         VJoyService = vjoyService;
         MappingEngine = mappingEngine;
         TrayIcon = trayIcon;
+        UpdateService = updateService;
         ActiveInputTracker = activeInputTracker;
         Background = background;
         OwnerForm = ownerForm;

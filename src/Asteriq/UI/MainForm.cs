@@ -2815,21 +2815,22 @@ public partial class MainForm : Form
             const float indicatorGap = 6f;
             float textX = bounds.Right - versionWidth - 20;
             float startX = textX - indicatorGap - indicatorSize;
-            float centerY = y + 22 - indicatorSize / 2f;
+            float midY = y + 17f; // visual centre of 12 pt text row
 
             if (footerUpdateStatus == UpdateStatus.UpToDate)
             {
                 // Small filled circle — mirrors the vJOY status dot style
                 using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
-                canvas.DrawCircle(startX + indicatorSize / 2f, centerY, indicatorSize / 2f, dotPaint);
+                canvas.DrawCircle(startX + indicatorSize / 2f, midY, indicatorSize / 2f, dotPaint);
             }
             else
             {
-                // Small downward triangle — signals something to download
+                // Downward triangle — taller than wide so it reads as an arrow, not a blob
+                const float triH = 9f;
                 using var triPath = new SKPath();
-                triPath.MoveTo(startX, centerY - indicatorSize / 2f);
-                triPath.LineTo(startX + indicatorSize, centerY - indicatorSize / 2f);
-                triPath.LineTo(startX + indicatorSize / 2f, centerY + indicatorSize / 2f);
+                triPath.MoveTo(startX, midY - triH / 2f);
+                triPath.LineTo(startX + indicatorSize, midY - triH / 2f);
+                triPath.LineTo(startX + indicatorSize / 2f, midY + triH / 2f);
                 triPath.Close();
                 using var triPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
                 canvas.DrawPath(triPath, triPaint);

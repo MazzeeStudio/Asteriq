@@ -818,11 +818,29 @@ public partial class MainForm : Form
             return;
 
         var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyDevice.Id);
+
+        // Fallback: use device assignment when no primary detected from mappings
+        if (string.IsNullOrEmpty(primaryGuid))
+        {
+            var assignment = profile.GetAssignmentForVJoy(vjoyDevice.Id);
+            if (assignment is not null && !string.IsNullOrEmpty(assignment.PhysicalDevice.Guid))
+                primaryGuid = assignment.PhysicalDevice.Guid;
+        }
+
         if (string.IsNullOrEmpty(primaryGuid))
             return;
 
         var primaryDevice = _devices.FirstOrDefault(d =>
             d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
+
+        // Fallback: match by device name if GUID doesn't resolve (e.g. SDL GUID shifted between sessions)
+        if (primaryDevice is null)
+        {
+            var assignment = profile.GetAssignmentForVJoy(vjoyDevice.Id);
+            if (assignment is not null && !string.IsNullOrEmpty(assignment.PhysicalDevice.Name))
+                primaryDevice = _devices.FirstOrDefault(d =>
+                    !d.IsVirtual && d.Name.Equals(assignment.PhysicalDevice.Name, StringComparison.OrdinalIgnoreCase));
+        }
 
         if (primaryDevice is not null)
             _mappingsPrimaryDeviceMap = LoadDeviceMapForDeviceInfo(primaryDevice);

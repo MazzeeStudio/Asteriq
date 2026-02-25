@@ -61,6 +61,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool AutoCheckUpdates
+    {
+        get => _cachedSettings.AutoCheckUpdates;
+        set
+        {
+            _cachedSettings.AutoCheckUpdates = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public FontSizeOption FontSize
     {
         get => _cachedSettings.FontSize;
@@ -196,6 +206,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
     {
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;
+        public bool AutoCheckUpdates { get; set; } = true;
         public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
         public bool CloseToTray { get; set; }

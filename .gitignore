@@ -39,6 +39,8 @@ test.ico
 src/Asteriq/publish/
 src/Asteriq/publish-single/
 src/Asteriq/publish-small/
+publish/
+dist/
 *.v*.zip
 
 # Mockups (design exploration, not part of main codebase)

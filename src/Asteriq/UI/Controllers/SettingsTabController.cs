@@ -36,6 +36,11 @@ public class SettingsTabController : ITabController
     private SKRect[] _trayIconTypeButtonBounds = new SKRect[2];
     private string? _draggingBgSlider;
 
+    // Support panel button bounds
+    private SKRect _bmacButtonBounds;
+    private SKRect _referralCopyButtonBounds;
+    private SKRect _referralLinkButtonBounds;
+
     public SettingsTabController(TabContext ctx)
     {
         _ctx = ctx;
@@ -46,17 +51,23 @@ public class SettingsTabController : ITabController
         float frameInset = FUIRenderer.FrameInset;
         var contentBounds = new SKRect(padLeft, contentTop, bounds.Right - padLeft, contentBottom);
 
+        const float supportPanelHeight = 100f;
+        float supportPanelSep = FUIRenderer.SpaceLG;
+        float topAreaBottom = contentBounds.Bottom - supportPanelHeight - supportPanelSep;
+        var supportBounds = new SKRect(contentBounds.Left, topAreaBottom + supportPanelSep, contentBounds.Right, contentBounds.Bottom);
+
         // Two-panel layout: Left (profile management) | Right (application settings)
         float panelGap = FUIRenderer.SpaceLG;
         float leftPanelWidth = 400f;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
-            contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
+            contentBounds.Left + leftPanelWidth, topAreaBottom);
         var rightBounds = new SKRect(leftBounds.Right + panelGap, contentBounds.Top,
-            contentBounds.Right, contentBounds.Bottom);
+            contentBounds.Right, topAreaBottom);
 
         DrawProfileManagementPanel(canvas, leftBounds, frameInset);
         DrawApplicationSettingsPanel(canvas, rightBounds, frameInset);
+        DrawSupportPanel(canvas, supportBounds, frameInset);
     }
 
     public void OnMouseDown(MouseEventArgs e)
@@ -121,6 +132,13 @@ public class SettingsTabController : ITabController
         if (_bgGridSliderBounds.Contains(pt) || _bgGlowSliderBounds.Contains(pt) ||
             _bgNoiseSliderBounds.Contains(pt) || _bgScanlineSliderBounds.Contains(pt) ||
             _bgVignetteSliderBounds.Contains(pt))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Support panel buttons
+        if (_bmacButtonBounds.Contains(pt) || _referralCopyButtonBounds.Contains(pt) || _referralLinkButtonBounds.Contains(pt))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
@@ -631,6 +649,75 @@ public class SettingsTabController : ITabController
         FUIRenderer.DrawText(canvas, bg.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
     }
 
+    private void DrawSupportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+
+        float cornerPadding = FUIRenderer.SpaceXL;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
+
+        // Header row: "SUPPORT" left, SC referral descriptor right-aligned
+        FUIRenderer.DrawText(canvas, "SUPPORT", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        const string scDescriptor = "Referral Code \u00b7 50,000 Bonus aUEC";
+        float descWidth = FUIRenderer.MeasureText(scDescriptor, 9f);
+        FUIRenderer.DrawText(canvas, scDescriptor, new SKPoint(rightMargin - descWidth, y + 1f), FUIColors.TextDim, 9f);
+        y += FUIRenderer.ScaleLineHeight(20f);
+
+        float btnHeight = 28f;
+
+        // Left: Buy Me a Coffee button
+        float bmacWidth = 170f;
+        _bmacButtonBounds = new SKRect(leftMargin, y, leftMargin + bmacWidth, y + btnHeight);
+        bool bmacHovered = _bmacButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        DrawSupportActionButton(canvas, _bmacButtonBounds, "BUY ME A COFFEE", bmacHovered, false);
+
+        // Right: Join Star Citizen button — anchored to right margin
+        float scLinkWidth = 180f;
+        _referralLinkButtonBounds = new SKRect(rightMargin - scLinkWidth, y, rightMargin, y + btnHeight);
+        bool scLinkHovered = _referralLinkButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        DrawSupportActionButton(canvas, _referralLinkButtonBounds, "JOIN STAR CITIZEN \u2192", scLinkHovered, false);
+
+        // Center: code field + copy button — centered between BMAC and JOIN
+        float codeFieldWidth = 138f;
+        float copyBtnWidth = 56f;
+        float referralGroupWidth = codeFieldWidth + FUIRenderer.SpaceSM + copyBtnWidth;
+        float referralGroupX = leftMargin + (rightMargin - leftMargin - referralGroupWidth) / 2;
+
+        var codeDisplayBounds = new SKRect(referralGroupX, y, referralGroupX + codeFieldWidth, y + btnHeight);
+        FUIWidgets.DrawSettingsValueField(canvas, codeDisplayBounds, "STAR-RBDQ-Z4JG");
+
+        _referralCopyButtonBounds = new SKRect(
+            codeDisplayBounds.Right + FUIRenderer.SpaceSM, y,
+            codeDisplayBounds.Right + FUIRenderer.SpaceSM + copyBtnWidth, y + btnHeight);
+        bool copyHovered = _referralCopyButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        DrawSupportActionButton(canvas, _referralCopyButtonBounds, "COPY", copyHovered, true);
+    }
+
+    private static void DrawSupportActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool accent)
+    {
+        var accentColor = accent ? FUIColors.Active : FUIColors.Primary;
+        var bgColor = hovered ? accentColor.WithAlpha(40) : FUIColors.Background2;
+        var frameColor = hovered ? accentColor : FUIColors.Frame;
+        var textColor = hovered ? FUIColors.TextBright : FUIColors.TextPrimary;
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
+
+        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = hovered ? 1.5f : 1f };
+        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+    }
+
     private void StoreThemeButtonBounds(int index, SKRect bounds)
     {
         if (index >= 0 && index < _themeButtonBounds.Length)
@@ -762,6 +849,31 @@ public class SettingsTabController : ITabController
         if (_bgNoiseSliderBounds.Contains(pt)) { _draggingBgSlider = "noise"; UpdateBgSliderFromPoint(pt.X); return; }
         if (_bgScanlineSliderBounds.Contains(pt)) { _draggingBgSlider = "scanline"; UpdateBgSliderFromPoint(pt.X); return; }
         if (_bgVignetteSliderBounds.Contains(pt)) { _draggingBgSlider = "vignette"; UpdateBgSliderFromPoint(pt.X); return; }
+
+        // Support panel clicks
+        if (_bmacButtonBounds.Contains(pt))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://buymeacoffee.com/nerosilentr",
+                UseShellExecute = true
+            });
+            return;
+        }
+        if (_referralCopyButtonBounds.Contains(pt))
+        {
+            Clipboard.SetText("STAR-RBDQ-Z4JG");
+            return;
+        }
+        if (_referralLinkButtonBounds.Contains(pt))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG",
+                UseShellExecute = true
+            });
+            return;
+        }
     }
 
     #endregion

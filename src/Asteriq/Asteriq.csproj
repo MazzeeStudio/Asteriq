@@ -9,7 +9,7 @@
 
     <!-- Version configuration -->
     <MajorVersion>0</MajorVersion>
-    <MinorVersion>7</MinorVersion>
+    <MinorVersion>8</MinorVersion>
     <!-- Disable git hash suffix on version -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 

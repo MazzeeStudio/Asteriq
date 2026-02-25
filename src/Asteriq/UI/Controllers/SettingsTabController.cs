@@ -907,7 +907,10 @@ public class SettingsTabController : ITabController
             var status = _ctx.UpdateService.Status;
             if (status == UpdateStatus.UpdateAvailable)
             {
-                _ = _ctx.UpdateService.DownloadAndInstallAsync();
+                _ = _ctx.UpdateService.DownloadAndInstallAsync().ContinueWith(
+                    _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
+                    TaskContinuationOptions.ExecuteSynchronously);
+                _ctx.InvalidateCanvas();
             }
             else if (status is UpdateStatus.Unknown or UpdateStatus.Error)
             {

@@ -1780,6 +1780,8 @@ public partial class MainForm : Form
         var se = ScaleMouseEvent(e);
         // Store mouse position in scaled canvas coordinates for hit-testing in draw pass
         _mousePosition = se.Location;
+        // Default cursor each frame; individual handlers override as needed
+        Cursor = Cursors.Default;
 
         // Handle SC Bindings scrollbar dragging (delegated to SC Bindings controller)
         if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll)
@@ -1796,6 +1798,7 @@ public partial class MainForm : Form
             SyncTabContext();
             _settingsController.OnMouseMove(se);
             SyncFromTabContext();
+            Cursor = Cursors.SizeWE;
             return;
         }
 
@@ -1830,9 +1833,26 @@ public partial class MainForm : Form
         // Profile dropdown hover detection
         if (_profileDropdownOpen && _profileDropdownBounds.Contains(se.X, se.Y))
         {
-            float itemHeight = 24f;
-            int itemIndex = (int)((se.Y - _profileDropdownBounds.Top - 2) / itemHeight);
-            _hoveredProfileIndex = itemIndex;
+            const float itemHeight = 28f;   // must match DrawProfileDropdown
+            const float padding = 8f;
+            const float separatorGap = 4f;  // itemY += 4 after the separator line
+
+            float relY = se.Y - _profileDropdownBounds.Top - padding;
+            if (relY < 0)
+            {
+                _hoveredProfileIndex = -1;
+            }
+            else if (relY < _profiles.Count * itemHeight)
+            {
+                _hoveredProfileIndex = (int)(relY / itemHeight);
+            }
+            else
+            {
+                float actionsRelY = relY - _profiles.Count * itemHeight - separatorGap;
+                _hoveredProfileIndex = actionsRelY >= 0
+                    ? _profiles.Count + (int)(actionsRelY / itemHeight)
+                    : -1;
+            }
             Cursor = Cursors.Hand;
             return;
         }
@@ -1870,7 +1890,6 @@ public partial class MainForm : Form
                 Cursor = Cursors.SizeNESW;
                 break;
             default:
-                Cursor = Cursors.Default;
                 break;
         }
 
@@ -1882,7 +1901,19 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
 
+        // Settings tab hover handling (delegated to controller)
+        if (_activeTab == 3)
+        {
+            SyncTabContext();
+            _settingsController.OnMouseMove(se);
+            SyncFromTabContext();
+        }
+
         // (Mapping category tab hover detection moved to MappingsTabController.OnMouseMove)
+
+        // Profile selector cursor (when dropdown is closed)
+        if (!_profileDropdownOpen && !_profileSelectorBounds.IsEmpty && _profileSelectorBounds.Contains(se.X, se.Y))
+            Cursor = Cursors.Hand;
 
         // Window controls hover - all coords in scaled canvas space
         float pad = FUIRenderer.SpaceLG;
@@ -1899,11 +1930,18 @@ public partial class MainForm : Form
             else if (relX >= btnSize + btnGap && relX < btnSize * 2 + btnGap) _hoveredWindowControl = 1;
             else if (relX >= (btnSize + btnGap) * 2 && relX < btnSize * 3 + btnGap * 2) _hoveredWindowControl = 2;
             else _hoveredWindowControl = -1;
+
+            // Tab bar cursor (tabs are in the title bar area, right of _tabsStartX)
+            if (_hoveredWindowControl < 0 && _tabsStartX > 0 && se.X >= _tabsStartX)
+                Cursor = Cursors.Hand;
         }
         else
         {
             _hoveredWindowControl = -1;
         }
+
+        if (_hoveredWindowControl >= 0)
+            Cursor = Cursors.Hand;
 
     }
 

@@ -1537,11 +1537,18 @@ public class MappingsTabController : ITabController
 
         // Show device silhouette - use primary device's map if available
         float centerX = bounds.MidX;
-        float centerY = bounds.MidY;
 
         // Get the appropriate SVG based on primary device map
         var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) ?? _ctx.JoystickSvg;
         bool shouldMirror = _ctx.MappingsPrimaryDeviceMap?.Mirror ?? false;
+
+        // Device name label at top of panel
+        float labelRowHeight = 20f;
+        float labelY = bounds.Top + frameInset + labelRowHeight;
+        string deviceLabel = _ctx.MappingsPrimaryDeviceMap?.Device ?? "—";
+        FUIRenderer.DrawTextCentered(canvas, deviceLabel,
+            new SKRect(bounds.Left, bounds.Top + frameInset, bounds.Right, labelY),
+            FUIColors.TextDim, 10f);
 
         // Reserve space at the bottom for the auto-scroll checkbox row
         float checkboxRowHeight = 26f;
@@ -1552,12 +1559,12 @@ public class MappingsTabController : ITabController
             // Limit size to 900px max and apply same rendering as device tab
             float maxSize = 900f;
             float maxWidth = Math.Min(bounds.Width - 40, maxSize);
-            float maxHeight = Math.Min(bounds.Height - 40 - checkboxRowHeight, maxSize);
+            float maxHeight = Math.Min(bounds.Height - 40 - checkboxRowHeight - labelRowHeight, maxSize);
 
-            // Create constrained bounds centered in the available area (above checkbox row)
+            // Create constrained bounds centered in the available area (below label, above checkbox row)
             float constrainedWidth = Math.Min(maxWidth, maxHeight); // Keep square-ish
             float constrainedHeight = constrainedWidth;
-            float availableCenterY = bounds.Top + (checkboxAreaTop - bounds.Top) / 2f;
+            float availableCenterY = labelY + (checkboxAreaTop - labelY) / 2f;
             var constrainedBounds = new SKRect(
                 centerX - constrainedWidth / 2,
                 availableCenterY - constrainedHeight / 2,
@@ -1573,7 +1580,7 @@ public class MappingsTabController : ITabController
         {
             _ctx.SilhouetteBounds = SKRect.Empty;
             FUIRenderer.DrawTextCentered(canvas, "Device Preview",
-                new SKRect(bounds.Left, centerY - 20, bounds.Right, checkboxAreaTop),
+                new SKRect(bounds.Left, labelY, bounds.Right, checkboxAreaTop),
                 FUIColors.TextDim, 14f);
         }
 

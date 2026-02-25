@@ -1,4 +1,4 @@
-using Asteriq.Models;
+﻿using Asteriq.Models;
 using SkiaSharp;
 
 namespace Asteriq.UI;
@@ -187,7 +187,7 @@ internal static class FUIWidgets
         FUIRenderer.DrawText(canvas, "SHIFT LAYERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight;
 
-        FUIRenderer.DrawText(canvas, "Hold a button to activate alternative mappings", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "[Coming soon] Hold a button to activate alternative mappings", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
         y += lineHeight + 4;
 
         float layerRowHeight = FUIRenderer.TouchTargetStandard;

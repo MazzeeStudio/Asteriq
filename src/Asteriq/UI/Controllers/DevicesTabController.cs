@@ -284,14 +284,23 @@ public class DevicesTabController : ITabController
             _hoveredDevice = -1;
         }
 
+        if (_hoveredDevice >= 0)
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+
         // Device action button hover detection
         _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
         _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
         _removeDeviceButtonHovered = !_removeDeviceButtonBounds.IsEmpty && _removeDeviceButtonBounds.Contains(e.X, e.Y);
 
+        if (_map1to1ButtonHovered || _clearMappingsButtonHovered || _removeDeviceButtonHovered)
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+
         // Forwarding button hover detection
         _startForwardingButtonHovered = !_startForwardingButtonBounds.IsEmpty && _startForwardingButtonBounds.Contains(e.X, e.Y);
         _stopForwardingButtonHovered = !_stopForwardingButtonBounds.IsEmpty && _stopForwardingButtonBounds.Contains(e.X, e.Y);
+
+        if (_startForwardingButtonHovered || _stopForwardingButtonHovered)
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Silhouette picker hover detection (D3 panel, virtual device selected)
         _silhouettePrevHovered = false;

@@ -402,7 +402,11 @@ public class DevicesTabController : ITabController
 
     public void OnTick() { }
 
-    public void OnActivated() { }
+    public void OnActivated()
+    {
+        if (_ctx.SelectedDevice < 0)
+            _ctx.SelectFirstDeviceInCategory?.Invoke();
+    }
 
     public void OnDeactivated() { }
 

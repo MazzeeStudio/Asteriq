@@ -36,7 +36,7 @@ $distDir = "dist"
 if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
 
 $zipName = "Asteriq-v$version.zip"
-$zipPath = Join-Path (Get-Location) $distDir $zipName
+$zipPath = Join-Path (Join-Path (Get-Location) $distDir) $zipName
 
 if (Test-Path $zipPath) { Remove-Item $zipPath }
 

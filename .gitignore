@@ -19,8 +19,9 @@ packages/
 *.nuget.props
 *.nuget.targets
 
-# IDE
+# IDE / local tooling
 .idea/
+.claude/
 *.swp
 *~
 

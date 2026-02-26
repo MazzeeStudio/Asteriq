@@ -17,7 +17,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
     private readonly JsonSerializerOptions _jsonOptions;
     private AppSettings _cachedSettings;
 
-    public event EventHandler<FontSizeOption>? FontSizeChanged;
+    public event EventHandler<float>? FontSizeChanged;
 
     public ApplicationSettingsService(ILogger<ApplicationSettingsService> logger)
     {
@@ -71,7 +71,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
-    public FontSizeOption FontSize
+    public float FontSize
     {
         get => _cachedSettings.FontSize;
         set
@@ -183,7 +183,9 @@ public class ApplicationSettingsService : IApplicationSettingsService
         try
         {
             var json = File.ReadAllText(_settingsFile);
-            return JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
+            settings.FontSize = Math.Clamp(settings.FontSize, 0.8f, 1.5f);
+            return settings;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -207,7 +209,10 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;
         public bool AutoCheckUpdates { get; set; } = true;
-        public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
+
+        [JsonConverter(typeof(FontScaleConverter))]
+        public float FontSize { get; set; } = 1.0f;
+
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
         public bool CloseToTray { get; set; }
         public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;
@@ -217,5 +222,39 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public string? PreferredSCEnvironment { get; set; }
         /// <summary>Per-vJoy-slot silhouette override. Key = vJoy ID, Value = device map filename key.</summary>
         public Dictionary<uint, string> VJoySilhouetteOverrides { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Reads legacy FontSizeOption strings ("VSmall"…"XLarge") as floats,
+    /// and passes through numeric values unchanged.
+    /// </summary>
+    private class FontScaleConverter : JsonConverter<float>
+    {
+        public override float Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Number)
+                return reader.GetSingle();
+
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                var text = reader.GetString();
+                return text switch
+                {
+                    "VSmall" => 1.0f,
+                    "Small" => 1.2f,
+                    "Medium" => 1.3f,
+                    "Large" => 1.4f,
+                    "XLarge" => 1.6f,
+                    _ => 1.0f
+                };
+            }
+
+            return 1.0f;
+        }
+
+        public override void Write(Utf8JsonWriter writer, float value, JsonSerializerOptions options)
+        {
+            writer.WriteNumberValue(value);
+        }
     }
 }

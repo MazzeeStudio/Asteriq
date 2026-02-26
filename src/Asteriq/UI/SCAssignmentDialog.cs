@@ -47,7 +47,8 @@ public class SCAssignmentDialog : Form
     private void InitializeForm()
     {
         Text = $"Assign: {_action.ActionName}";
-        Size = new Size(450, 300);
+        float s = FUIRenderer.CanvasScaleFactor;
+        Size = new Size((int)(450 * s), (int)(300 * s));
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Color.FromArgb(15, 18, 25);
@@ -72,11 +73,13 @@ public class SCAssignmentDialog : Form
 
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
     {
-        _mousePosition = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
+        _mousePosition = new SKPoint(mx, my);
         _hoveredButton = -1;
         for (int i = 0; i < _buttonBounds.Length; i++)
         {
-            if (_buttonBounds[i].Contains(e.X, e.Y))
+            if (_buttonBounds[i].Contains(mx, my))
             {
                 _hoveredButton = i;
                 Cursor = Cursors.Hand;
@@ -179,7 +182,9 @@ public class SCAssignmentDialog : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Void);
 

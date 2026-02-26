@@ -24,14 +24,14 @@ public interface IApplicationSettingsService
     bool AutoCheckUpdates { get; set; }
 
     /// <summary>
-    /// Font size setting for accessibility (Small/Medium/Large)
+    /// Interface scale factor (0.8 – 1.5, default 1.0)
     /// </summary>
-    FontSizeOption FontSize { get; set; }
+    float FontSize { get; set; }
 
     /// <summary>
-    /// Event fired when font size setting changes
+    /// Event fired when interface scale setting changes
     /// </summary>
-    event EventHandler<FontSizeOption>? FontSizeChanged;
+    event EventHandler<float>? FontSizeChanged;
 
     /// <summary>
     /// Font family setting (Carbon/Consolas)

@@ -32,7 +32,8 @@ public class FUIConfirmDialog : Form
     private void InitializeForm()
     {
         Text = _title;
-        Size = new Size(400, 220);
+        float s = FUIRenderer.CanvasScaleFactor;
+        Size = new Size((int)(400 * s), (int)(220 * s));
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = Color.Black;
@@ -69,7 +70,9 @@ public class FUIConfirmDialog : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         // Background
         canvas.Clear(FUIColors.Background1);
@@ -160,7 +163,8 @@ public class FUIConfirmDialog : Form
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        var pt = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / s, e.Y / s);
         int newHovered = -1;
 
         if (_confirmButtonBounds.Contains(pt))
@@ -179,7 +183,8 @@ public class FUIConfirmDialog : Form
     {
         if (e.Button != MouseButtons.Left) return;
 
-        var pt = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / s, e.Y / s);
 
         if (_confirmButtonBounds.Contains(pt))
         {

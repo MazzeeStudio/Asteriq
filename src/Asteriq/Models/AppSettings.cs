@@ -3,13 +3,14 @@ using Asteriq.UI;
 namespace Asteriq.Models;
 
 /// <summary>
-/// Font size options for accessibility
+/// Legacy font size options — kept for JSON backward compatibility only.
 /// </summary>
+[Obsolete("Use float InterfaceScale instead")]
 public enum FontSizeOption
 {
     VSmall,  // 1.0x
     Small,   // 1.2x
-    Medium,  // 1.3x (default)
+    Medium,  // 1.3x
     Large,   // 1.4x
     XLarge   // 1.6x
 }
@@ -30,7 +31,7 @@ public class AppSettings
 {
     public Guid? LastProfileId { get; set; }
     public bool AutoLoadLastProfile { get; set; } = true;
-    public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
+    public float FontSize { get; set; } = 1.0f;
     public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
     public FUITheme Theme { get; set; } = FUITheme.Midnight;
 

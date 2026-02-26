@@ -278,7 +278,7 @@ static class Program
         // Initialize font/theme scaling before showing the form (MainForm does this, but it hasn't run yet)
         UI.FUIRenderer.InitializeFontScaling();
         var appSettings = serviceProvider.GetRequiredService<IApplicationSettingsService>();
-        UI.FUIRenderer.FontSizeOption = appSettings.FontSize;
+        UI.FUIRenderer.InterfaceScale = appSettings.FontSize;
         UI.FUIRenderer.FontFamily = appSettings.FontFamily;
         var themeService = serviceProvider.GetRequiredService<IApplicationSettingsService>();
         var uiTheme = serviceProvider.GetRequiredService<Services.Abstractions.IUIThemeService>();

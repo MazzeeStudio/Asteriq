@@ -74,7 +74,17 @@ public class SettingsMigrationService
             _logger.LogInformation("Migrating application settings...");
             _appSettings.LastProfileId = oldSettings.LastProfileId;
             _appSettings.AutoLoadLastProfile = oldSettings.AutoLoadLastProfile;
-            _appSettings.FontSize = oldSettings.FontSize;
+            #pragma warning disable CS0618 // FontSizeOption is obsolete
+            _appSettings.FontSize = oldSettings.FontSize switch
+            {
+                FontSizeOption.VSmall => 1.0f,
+                FontSizeOption.Small => 1.2f,
+                FontSizeOption.Medium => 1.3f,
+                FontSizeOption.Large => 1.4f,
+                FontSizeOption.XLarge => 1.6f,
+                _ => 1.0f
+            };
+            #pragma warning restore CS0618
             _appSettings.FontFamily = oldSettings.FontFamily;
             _appSettings.CloseToTray = oldSettings.CloseToTray;
             _appSettings.TrayIconType = oldSettings.TrayIconType;
@@ -124,7 +134,9 @@ public class SettingsMigrationService
     {
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;
+        #pragma warning disable CS0618 // FontSizeOption is obsolete — needed for reading legacy settings
         public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
+        #pragma warning restore CS0618
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
         public bool CloseToTray { get; set; }
         public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;

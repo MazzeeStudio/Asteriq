@@ -16,7 +16,7 @@ public static class FUIRenderer
     public static CornerStyle CurrentCornerStyle = CornerStyle.Chamfered;
 
     // Font scaling - combines Windows system setting with user preference
-    private static FontSizeOption _fontSizeOption = FontSizeOption.Medium;
+    private static float _interfaceScale = 1.0f;
     private static UIFontFamily _fontFamily = UIFontFamily.Carbon;
     private static float _windowsTextScaleFactor = 1.0f;
     private static float _displayScaleFactor = 1.0f;  // DPI scale (150% = 1.5)
@@ -74,12 +74,12 @@ public static class FUIRenderer
     }
 
     /// <summary>
-    /// Current font size option (Small/Medium/Large) for user fine-tuning
+    /// User interface scale factor (0.8 – 1.5, default 1.0)
     /// </summary>
-    public static FontSizeOption FontSizeOption
+    public static float InterfaceScale
     {
-        get => _fontSizeOption;
-        set => _fontSizeOption = value;
+        get => _interfaceScale;
+        set => _interfaceScale = value;
     }
 
     /// <summary>
@@ -92,18 +92,15 @@ public static class FUIRenderer
     }
 
     /// <summary>
-    /// User preference multiplier - allows fine-tuning on top of Windows setting
-    /// VSmall=1.0x, Small=1.2x, Medium=1.3x (default), Large=1.4x, XLarge=1.6x
+    /// User interface scale multiplier (same as InterfaceScale).
     /// </summary>
-    public static float UserScaleMultiplier => _fontSizeOption switch
-    {
-        FontSizeOption.VSmall => 1.0f,
-        FontSizeOption.Small => 1.2f,
-        FontSizeOption.Medium => 1.3f,
-        FontSizeOption.Large => 1.4f,
-        FontSizeOption.XLarge => 1.6f,
-        _ => 1.3f
-    };
+    public static float UserScaleMultiplier => _interfaceScale;
+
+    /// <summary>
+    /// Combined canvas scale factor (DPI × Windows text setting × user preference).
+    /// Applied via canvas.Scale() in OnPaintSurface so ALL drawn elements scale uniformly.
+    /// </summary>
+    public static float CanvasScaleFactor => _displayScaleFactor * _windowsTextScaleFactor * UserScaleMultiplier;
 
     /// <summary>
     /// Combined font scale factor (DPI × Windows text setting × user preference)
@@ -111,32 +108,38 @@ public static class FUIRenderer
     public static float FontScaleFactor => _displayScaleFactor * _windowsTextScaleFactor * UserScaleMultiplier;
 
     /// <summary>
-    /// Scale a font size for DPI + Windows text setting only.
-    /// UserScaleMultiplier is applied via canvas.Scale() in OnPaintSurface so all
-    /// elements (text AND layout boxes) scale uniformly without overflow.
+    /// Maximum interface scale that keeps the UI usable on a given screen width.
+    /// Returns the value rounded down to the nearest 0.1.
     /// </summary>
-    public static float ScaleFont(float baseSize) => baseSize * _displayScaleFactor * _windowsTextScaleFactor;
-
-    /// <summary>
-    /// Scale spacing/padding to account for DPI. Dampened so spacing grows
-    /// less aggressively than font size.
-    /// </summary>
-    public static float ScaleSpacing(float baseSpacing)
+    public static float MaxInterfaceScale(int screenWidth)
     {
-        float dpiScale = _displayScaleFactor * _windowsTextScaleFactor;
-        float dampenedScale = 1f + (dpiScale - 1f) * 0.5f;
-        return baseSpacing * dampenedScale;
+        float max = screenWidth / (_displayScaleFactor * _windowsTextScaleFactor * 1100f);
+        return MathF.Floor(max * 10f) / 10f;
     }
 
     /// <summary>
-    /// Scale layout values (margins, padding, sizes) by DPI only.
+    /// Identity - DPI/text scaling is now handled by the canvas transform.
+    /// Retained for source compatibility; simply returns baseSize unchanged.
     /// </summary>
-    public static float ScaleLayout(float baseValue) => baseValue * _displayScaleFactor;
+    public static float ScaleFont(float baseSize) => baseSize;
 
     /// <summary>
-    /// Scale line height for text rows
+    /// Identity - DPI/text scaling is now handled by the canvas transform.
+    /// Retained for source compatibility; simply returns baseSpacing unchanged.
     /// </summary>
-    public static float ScaleLineHeight(float baseHeight) => baseHeight * _displayScaleFactor * _windowsTextScaleFactor;
+    public static float ScaleSpacing(float baseSpacing) => baseSpacing;
+
+    /// <summary>
+    /// Identity - DPI/text scaling is now handled by the canvas transform.
+    /// Retained for source compatibility; simply returns baseValue unchanged.
+    /// </summary>
+    public static float ScaleLayout(float baseValue) => baseValue;
+
+    /// <summary>
+    /// Identity - DPI/text scaling is now handled by the canvas transform.
+    /// Retained for source compatibility; simply returns baseHeight unchanged.
+    /// </summary>
+    public static float ScaleLineHeight(float baseHeight) => baseHeight;
 
     // Legacy property for compatibility - returns an additive offset approximation
     [Obsolete("Use ScaleFont() instead for proper multiplicative scaling")]
@@ -679,7 +682,7 @@ public static class FUIRenderer
     public static void DrawText(SKCanvas canvas, string text, SKPoint position,
         SKColor color, float size = 14f, bool withGlow = false, SKTypeface? typeface = null, bool scaleFont = true)
     {
-        float scaledSize = scaleFont ? ScaleFont(size) : size;
+        float scaledSize = size;
 
         if (withGlow)
         {
@@ -694,7 +697,7 @@ public static class FUIRenderer
     public static void DrawTextCentered(SKCanvas canvas, string text, SKRect bounds,
         SKColor color, float size = 14f, bool withGlow = false, bool scaleFont = true)
     {
-        float scaledSize = scaleFont ? ScaleFont(size) : size;
+        float scaledSize = size;
 
         using var paint = CreateTextPaint(color, scaledSize);
         float textWidth = paint.MeasureText(text);
@@ -709,7 +712,7 @@ public static class FUIRenderer
     /// </summary>
     public static float MeasureText(string text, float size = 14f, bool scaleFont = true)
     {
-        float scaledSize = scaleFont ? ScaleFont(size) : size;
+        float scaledSize = size;
         using var paint = CreateTextPaint(SKColors.White, scaledSize);
         return paint.MeasureText(text);
     }
@@ -786,7 +789,7 @@ public static class FUIRenderer
 
         float labelWidth = MeasureText(label, fontSize);
         float valueWidth = MeasureText(value, fontSize);
-        float minGap = ScaleSpacing(10f);
+        float minGap = 10f;
 
         // If total width exceeds available space, truncate label
         float availableForLabel = rowWidth - valueWidth - minGap;
@@ -856,11 +859,11 @@ public static class FUIRenderer
         // Map font sizes to their line heights
         return fontSize switch
         {
-            <= FontCaption => ScaleLineHeight(LineHeightCaption),
-            <= FontBody => ScaleLineHeight(LineHeightBody),
-            <= FontBodyLarge => ScaleLineHeight(LineHeightBodyLarge),
-            <= FontSubtitle => ScaleLineHeight(LineHeightSubtitle),
-            _ => ScaleLineHeight(LineHeightTitle)
+            <= FontCaption => LineHeightCaption,
+            <= FontBody => LineHeightBody,
+            <= FontBodyLarge => LineHeightBodyLarge,
+            <= FontSubtitle => LineHeightSubtitle,
+            _ => LineHeightTitle
         };
     }
 
@@ -1045,8 +1048,8 @@ public static class FUIRenderer
             LeftMargin = bounds.Left + FrameInset + cornerPadding,
             RightMargin = bounds.Right - FrameInset - SpaceLG,
             ContentWidth = (bounds.Right - FrameInset - SpaceLG) - (bounds.Left + FrameInset + cornerPadding),
-            RowHeight = ScaleLineHeight(LineHeightBody),
-            SectionSpacing = ScaleLineHeight(LineHeightBody)
+            RowHeight = LineHeightBody,
+            SectionSpacing = LineHeightBody
         };
     }
 
@@ -1056,7 +1059,7 @@ public static class FUIRenderer
     public static float DrawPanelHeader(SKCanvas canvas, string title, float x, float y)
     {
         DrawText(canvas, title, new SKPoint(x, y), FUIColors.TextBright, FontBody, true);
-        return y + ScaleLineHeight(LineHeightTitle);  // 36px line height for title
+        return y + LineHeightTitle;  // 36px line height for title
     }
 
     /// <summary>
@@ -1065,7 +1068,7 @@ public static class FUIRenderer
     public static float DrawSectionHeader(SKCanvas canvas, string text, float x, float y)
     {
         DrawCaption(canvas, text, new SKPoint(x, y));
-        return y + ScaleLineHeight(LineHeightBody);  // Add standard line height after header
+        return y + LineHeightBody;  // Add standard line height after header
     }
 
     /// <summary>
@@ -1073,7 +1076,7 @@ public static class FUIRenderer
     /// </summary>
     public static float AdvanceRow(float currentY, float lineHeight = 0)
     {
-        return currentY + (lineHeight > 0 ? lineHeight : ScaleLineHeight(LineHeightBody));
+        return currentY + (lineHeight > 0 ? lineHeight : LineHeightBody);
     }
 
     #endregion

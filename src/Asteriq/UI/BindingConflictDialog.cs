@@ -65,7 +65,8 @@ public class BindingConflictDialog : Form
         // Calculate size based on content
         int conflictCount = Math.Min(_conflicts.Count, 5); // Show max 5 in list
         int height = 220 + conflictCount * 22;
-        ClientSize = new Size(450, height);
+        float s = FUIRenderer.CanvasScaleFactor;
+        ClientSize = new Size((int)(450 * s), (int)(height * s));
 
         // Create canvas
         _canvas = new SKControl
@@ -93,7 +94,9 @@ public class BindingConflictDialog : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Background0);
 
@@ -267,13 +270,15 @@ public class BindingConflictDialog : Form
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
         int newHovered = -1;
 
-        if (_cancelButtonBounds.Contains(e.X, e.Y))
+        if (_cancelButtonBounds.Contains(mx, my))
             newHovered = 0;
-        else if (_applyButtonBounds.Contains(e.X, e.Y))
+        else if (_applyButtonBounds.Contains(mx, my))
             newHovered = 1;
-        else if (_replaceButtonBounds.Contains(e.X, e.Y))
+        else if (_replaceButtonBounds.Contains(mx, my))
             newHovered = 2;
 
         if (newHovered != _hoveredButton)
@@ -295,25 +300,28 @@ public class BindingConflictDialog : Form
     {
         if (e.Button != MouseButtons.Left) return;
 
-        if (_cancelButtonBounds.Contains(e.X, e.Y))
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
+
+        if (_cancelButtonBounds.Contains(mx, my))
         {
             Result = BindingConflictResult.Cancel;
             DialogResult = DialogResult.Cancel;
             Close();
         }
-        else if (_applyButtonBounds.Contains(e.X, e.Y))
+        else if (_applyButtonBounds.Contains(mx, my))
         {
             Result = BindingConflictResult.ApplyAnyway;
             DialogResult = DialogResult.OK;
             Close();
         }
-        else if (_replaceButtonBounds.Contains(e.X, e.Y))
+        else if (_replaceButtonBounds.Contains(mx, my))
         {
             Result = BindingConflictResult.ReplaceAll;
             DialogResult = DialogResult.OK;
             Close();
         }
-        else if (e.Y < 40) // Title bar area for dragging
+        else if (my < 40) // Title bar area for dragging
         {
             _isDragging = true;
             _dragStart = e.Location;

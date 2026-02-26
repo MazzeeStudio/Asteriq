@@ -21,9 +21,6 @@ public class SettingsTabController : ITabController
     private SKRect[] _themeButtonBounds = new SKRect[12];
 
     // Font size stepper ([-] value [+]) — index 0 = minus, 1 = plus
-    private static readonly FontSizeOption[] s_fontSizeSteps =
-        { FontSizeOption.VSmall, FontSizeOption.Small, FontSizeOption.Medium, FontSizeOption.Large, FontSizeOption.XLarge };
-    private static readonly float[] s_fontSizeMultipliers = { 1.0f, 1.2f, 1.3f, 1.4f, 1.6f };
     private SKRect[] _fontSizeButtonBounds = new SKRect[2];
     private SKRect[] _fontFamilyButtonBounds = new SKRect[2];
 
@@ -62,17 +59,21 @@ public class SettingsTabController : ITabController
         float topAreaBottom = contentBounds.Bottom - supportPanelHeight - supportPanelSep;
         var supportBounds = new SKRect(contentBounds.Left, topAreaBottom + supportPanelSep, contentBounds.Right, contentBounds.Bottom);
 
-        // Two-panel layout: Left (profile management) | Right (application settings)
+        // Three-panel layout: Profile Management | System | Visual (each ~1/3 width)
         float panelGap = FUIRenderer.SpaceLG;
-        float leftPanelWidth = 400f;
+        float availableWidth = contentBounds.Width - panelGap * 2;
+        float colWidth = availableWidth / 3f;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
-            contentBounds.Left + leftPanelWidth, topAreaBottom);
-        var rightBounds = new SKRect(leftBounds.Right + panelGap, contentBounds.Top,
+            contentBounds.Left + colWidth, topAreaBottom);
+        var centerBounds = new SKRect(leftBounds.Right + panelGap, contentBounds.Top,
+            leftBounds.Right + panelGap + colWidth, topAreaBottom);
+        var rightBounds = new SKRect(centerBounds.Right + panelGap, contentBounds.Top,
             contentBounds.Right, topAreaBottom);
 
         DrawProfileManagementPanel(canvas, leftBounds, frameInset);
-        DrawApplicationSettingsPanel(canvas, rightBounds, frameInset);
+        DrawSystemSettingsSubPanel(canvas, centerBounds, frameInset);
+        DrawVisualSettingsSubPanel(canvas, rightBounds, frameInset);
         DrawSupportPanel(canvas, supportBounds, frameInset);
     }
 
@@ -190,7 +191,7 @@ public class SettingsTabController : ITabController
         {
             y = FUIRenderer.DrawSectionHeader(canvas, "ACTIVE PROFILE", leftMargin, y);
 
-            float nameBoxHeight = FUIRenderer.ScaleLineHeight(32f);
+            float nameBoxHeight = 32f;
             var nameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
             using var nameBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30) };
             canvas.DrawRoundRect(nameBounds, 4, 4, nameBgPaint);
@@ -198,9 +199,9 @@ public class SettingsTabController : ITabController
             using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
             canvas.DrawRoundRect(nameBounds, 4, 4, nameFramePaint);
 
-            float nameTextY = y + (nameBoxHeight - FUIRenderer.ScaleFont(FUIRenderer.FontBody)) / 2 + FUIRenderer.ScaleFont(FUIRenderer.FontBody) - 3;
+            float nameTextY = y + (nameBoxHeight - FUIRenderer.FontBody) / 2 + FUIRenderer.FontBody - 3;
             FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, FUIRenderer.FontBody, true);
-            y += nameBoxHeight + FUIRenderer.ScaleLineHeight(24f);
+            y += nameBoxHeight + 24f;
 
             float lineHeight = metrics.RowHeight;
             y = FUIRenderer.DrawSectionHeader(canvas, "STATISTICS", leftMargin, y);
@@ -212,22 +213,22 @@ public class SettingsTabController : ITabController
             FUIWidgets.DrawProfileStat(canvas, leftMargin, y, "Hat Mappings", profile.HatMappings.Count.ToString());
             y += lineHeight;
             FUIWidgets.DrawProfileStat(canvas, leftMargin, y, "Shift Layers", profile.ShiftLayers.Count.ToString());
-            y += lineHeight + FUIRenderer.ScaleSpacing(6f);
+            y += lineHeight + 6f;
 
             FUIWidgets.DrawProfileStat(canvas, leftMargin, y, "Created", profile.CreatedAt.ToLocalTime().ToString("g"));
             y += lineHeight;
             FUIWidgets.DrawProfileStat(canvas, leftMargin, y, "Modified", profile.ModifiedAt.ToLocalTime().ToString("g"));
-            y += lineHeight + FUIRenderer.ScaleSpacing(10f);
+            y += lineHeight + 10f;
         }
         else
         {
             FUIRenderer.DrawText(canvas, "No profile active", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-            y += FUIRenderer.ScaleLineHeight(40f);
+            y += 40f;
         }
 
         y = FUIRenderer.DrawSectionHeader(canvas, "ACTIONS", leftMargin, y);
 
-        float buttonHeight = FUIRenderer.ScaleLineHeight(28f);
+        float buttonHeight = 28f;
         float buttonGap = FUIRenderer.SpaceSM;
         float buttonWidth = (metrics.ContentWidth - buttonGap) / 2;
 
@@ -255,7 +256,7 @@ public class SettingsTabController : ITabController
             canvas.DrawRoundRect(_deleteProfileButtonBounds, 4, 4, delFramePaint);
 
             FUIRenderer.DrawTextCentered(canvas, "Delete Profile", _deleteProfileButtonBounds, FUIColors.Danger, 11f);
-            y += buttonHeight + FUIRenderer.ScaleLineHeight(20f);
+            y += buttonHeight + 20f;
 
             if (y < bottom - 60)
             {
@@ -295,18 +296,18 @@ public class SettingsTabController : ITabController
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
         float contentWidth = rightMargin - leftMargin;
-        float sectionSpacing = FUIRenderer.ScaleLineHeight(20f);
-        float rowHeight = FUIRenderer.ScaleLineHeight(24f);
-        float minControlGap = FUIRenderer.ScaleSpacing(12f);
+        float sectionSpacing = 20f;
+        float rowHeight = 24f;
+        float minControlGap = 12f;
 
         FUIRenderer.DrawText(canvas, "SYSTEM", new SKPoint(leftMargin, y), FUIColors.TextBright, FUIRenderer.FontBody, true);
-        y += FUIRenderer.ScaleLineHeight(32f);
+        y += 32f;
 
         // Auto-load setting
         float toggleWidth = 48f;
         float toggleHeight = 24f;
         float autoLoadLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
-        float autoLoadLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
+        float autoLoadLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Auto-load profile", new SKPoint(leftMargin, autoLoadLabelY),
             autoLoadLabelMaxWidth, FUIColors.TextPrimary, 11f);
         float toggleY = y + (rowHeight - toggleHeight) / 2;
@@ -316,7 +317,7 @@ public class SettingsTabController : ITabController
 
         // Close to Tray toggle
         float closeToTrayLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
-        float closeToTrayLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
+        float closeToTrayLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Close to tray", new SKPoint(leftMargin, closeToTrayLabelY),
             closeToTrayLabelMaxWidth, FUIColors.TextPrimary, 11f);
         float closeToTrayToggleY = y + (rowHeight - toggleHeight) / 2;
@@ -380,7 +381,7 @@ public class SettingsTabController : ITabController
         string vjoyStatus = vjoyEnabled ? "Driver active" : "Not available";
         var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
 
-        float statusTextSize = FUIRenderer.ScaleFont(11f);
+        float statusTextSize = 11f;
         float statusLineHeight = statusTextSize + 4;
         float statusDotRadius = 4f;
         float statusDotY = y + (statusLineHeight / 2);
@@ -416,13 +417,13 @@ public class SettingsTabController : ITabController
 
         // "Check for updates automatically" toggle
         float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
-        float autoCheckLabelY = y + (rowHeight - FUIRenderer.ScaleFont(11f)) / 2 + FUIRenderer.ScaleFont(11f) - 3;
+        float autoCheckLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Check for updates automatically", new SKPoint(leftMargin, autoCheckLabelY),
             autoCheckLabelMaxWidth, FUIColors.TextPrimary, 11f);
         float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
         _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _ctx.AppSettings.AutoCheckUpdates, _ctx.MousePosition);
-        y += rowHeight + FUIRenderer.ScaleSpacing(8f);
+        y += rowHeight + 8f;
 
         // Update action button — label and state depend on current update status
         var updateStatus = _ctx.UpdateService.Status;
@@ -436,7 +437,7 @@ public class SettingsTabController : ITabController
             _                            => "CHECK FOR UPDATES",
         };
         bool updateBtnEnabled = updateStatus is UpdateStatus.Unknown or UpdateStatus.UpdateAvailable or UpdateStatus.Error;
-        float updateBtnHeight = FUIRenderer.ScaleLineHeight(32f);
+        float updateBtnHeight = 32f;
         _updateButtonBounds = new SKRect(leftMargin, y, rightMargin, y + updateBtnHeight);
         bool updateHovered = updateBtnEnabled && _updateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         DrawSupportActionButton(canvas, _updateButtonBounds, updateBtnLabel, updateHovered, true, !updateBtnEnabled);
@@ -458,13 +459,13 @@ public class SettingsTabController : ITabController
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
         float contentWidth = rightMargin - leftMargin;
-        float sectionSpacing = FUIRenderer.ScaleLineHeight(16f);
+        float sectionSpacing = 16f;
 
         FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, FUIRenderer.FontBody, true);
-        y += FUIRenderer.ScaleLineHeight(32f);
+        y += 32f;
 
         // Theme section
-        float themeLabelWidth = FUIRenderer.ScaleSpacing(36f);
+        float themeLabelWidth = 36f;
         float themeAreaWidth = contentWidth - themeLabelWidth;
         float themeBtnGap = 4f;
         float themeBtnWidth = Math.Min(40f, (themeAreaWidth - themeBtnGap * 3) / 4);
@@ -539,12 +540,12 @@ public class SettingsTabController : ITabController
             if (w > maxLabelWidth) maxLabelWidth = w;
         }
 
-        float labelColumnWidth = maxLabelWidth + FUIRenderer.ScaleSpacing(10f);
-        float valueColumnWidth = FUIRenderer.MeasureText("100", 10f) + FUIRenderer.ScaleSpacing(8f);
+        float labelColumnWidth = maxLabelWidth + 10f;
+        float valueColumnWidth = FUIRenderer.MeasureText("100", 10f) + 8f;
         float sliderLeft = leftMargin + labelColumnWidth;
         float sliderRight = rightMargin - valueColumnWidth;
-        float sliderRowHeight = FUIRenderer.ScaleLineHeight(22f);
-        float sliderRowGap = FUIRenderer.ScaleSpacing(8f);
+        float sliderRowHeight = 22f;
+        float sliderRowGap = 8f;
 
         if (sliderRight - sliderLeft < 50)
         {
@@ -626,10 +627,11 @@ public class SettingsTabController : ITabController
         FUIRenderer.DrawTextTruncated(canvas, "Interface Scale", new SKPoint(leftMargin, y + 6),
             contentWidth - fontStepperWidth - FUIRenderer.SpaceSM, FUIColors.TextPrimary, 10f);
 
-        int currentFontStep = Array.IndexOf(s_fontSizeSteps, _ctx.AppSettings.FontSize);
-        if (currentFontStep < 0) currentFontStep = 2;
-        bool canDecrease = currentFontStep > 0;
-        bool canIncrease = currentFontStep < s_fontSizeSteps.Length - 1;
+        float scale = _ctx.AppSettings.FontSize;
+        float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
+        float max = MathF.Min(dynamicMax, 1.5f);
+        bool canDecrease = scale > 0.8f + 0.01f;
+        bool canIncrease = scale < max - 0.01f;
         float stepperX = rightMargin - fontStepperWidth;
 
         var minusBounds = new SKRect(stepperX, y, stepperX + fontBtnWidth, y + fontBtnHeight);
@@ -642,7 +644,7 @@ public class SettingsTabController : ITabController
         using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = minusFrame, StrokeWidth = 1f }) canvas.DrawRect(minusBounds, p);
         FUIRenderer.DrawTextCentered(canvas, "-", minusBounds, minusText, 14f, scaleFont: false);
 
-        string valueText = $"{s_fontSizeMultipliers[currentFontStep]:F1}x";
+        string valueText = $"{scale:F1}x";
         var valueBounds = new SKRect(stepperX + fontBtnWidth + fontBtnGap, y, stepperX + fontBtnWidth + fontBtnGap + fontValueWidth, y + fontBtnHeight);
         FUIRenderer.DrawTextCentered(canvas, valueText, valueBounds, FUIColors.TextBright, 11f, scaleFont: false);
 
@@ -678,7 +680,7 @@ public class SettingsTabController : ITabController
         const string scDescriptor = "Referral Code \u00b7 50,000 Bonus aUEC";
         float descWidth = FUIRenderer.MeasureText(scDescriptor, 9f);
         FUIRenderer.DrawText(canvas, scDescriptor, new SKPoint(rightMargin - descWidth, y + 1f), FUIColors.TextDim, 9f);
-        y += FUIRenderer.ScaleLineHeight(20f);
+        y += 20f;
 
         float btnHeight = 28f;
 
@@ -780,20 +782,26 @@ public class SettingsTabController : ITabController
 
         // Font size stepper clicks ([-] and [+])
         {
-            int step = Array.IndexOf(s_fontSizeSteps, _ctx.AppSettings.FontSize);
-            if (step < 0) step = 2;
-            if (_fontSizeButtonBounds[0].Contains(pt) && step > 0)
+            float scale = _ctx.AppSettings.FontSize;
+            float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
+            float max = MathF.Min(dynamicMax, 1.5f);
+
+            if (_fontSizeButtonBounds[0].Contains(pt) && scale > 0.8f + 0.01f)
             {
-                _ctx.AppSettings.FontSize = s_fontSizeSteps[step - 1];
-                FUIRenderer.FontSizeOption = s_fontSizeSteps[step - 1];
+                float newScale = MathF.Round((scale - 0.1f) * 10f) / 10f;
+                newScale = MathF.Max(newScale, 0.8f);
+                _ctx.AppSettings.FontSize = newScale;
+                FUIRenderer.InterfaceScale = newScale;
                 _ctx.ApplyFontScale?.Invoke();
                 _ctx.InvalidateCanvas();
                 return;
             }
-            if (_fontSizeButtonBounds[1].Contains(pt) && step < s_fontSizeSteps.Length - 1)
+            if (_fontSizeButtonBounds[1].Contains(pt) && scale < max - 0.01f)
             {
-                _ctx.AppSettings.FontSize = s_fontSizeSteps[step + 1];
-                FUIRenderer.FontSizeOption = s_fontSizeSteps[step + 1];
+                float newScale = MathF.Round((scale + 0.1f) * 10f) / 10f;
+                newScale = MathF.Min(newScale, max);
+                _ctx.AppSettings.FontSize = newScale;
+                FUIRenderer.InterfaceScale = newScale;
                 _ctx.ApplyFontScale?.Invoke();
                 _ctx.InvalidateCanvas();
                 return;

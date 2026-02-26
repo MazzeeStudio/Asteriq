@@ -13,6 +13,9 @@
     <!-- Disable git hash suffix on version -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
+    <!-- High DPI support -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
     <!-- Application icon -->
     <ApplicationIcon>asteriq.ico</ApplicationIcon>
   </PropertyGroup>

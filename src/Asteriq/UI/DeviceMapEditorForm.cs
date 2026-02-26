@@ -120,8 +120,9 @@ public class DeviceMapEditorForm : Form
     private void InitializeForm()
     {
         Text = "Device Map Editor";
-        Size = new Size(1400, 900);
-        MinimumSize = new Size(1000, 700);
+        float s = FUIRenderer.CanvasScaleFactor;
+        Size = new Size((int)(1400 * s), (int)(900 * s));
+        MinimumSize = new Size((int)(1000 * s), (int)(700 * s));
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.Black;
@@ -309,7 +310,9 @@ public class DeviceMapEditorForm : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         // Clear background
         canvas.Clear(FUIColors.Background0);
@@ -1183,7 +1186,7 @@ public class DeviceMapEditorForm : Form
     private SKRect MeasureText(string text, float size)
     {
         // Use the same scaled size as FUIRenderer.DrawText
-        float scaledSize = FUIRenderer.ScaleFont(size);
+        float scaledSize = size;
         using var paint = new SKPaint { TextSize = scaledSize, IsAntialias = true };
         var width = paint.MeasureText(text);
         var metrics = paint.FontMetrics;
@@ -1237,10 +1240,12 @@ public class DeviceMapEditorForm : Form
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        _mousePos = new SKPoint(e.X, e.Y);
-        _mouseViewBox = ScreenToViewBox(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
+        _mousePos = new SKPoint(mx, my);
+        _mouseViewBox = ScreenToViewBox(mx, my);
 
-        // Window dragging
+        // Window dragging (use raw coords for PointToScreen)
         if (_isDragging)
         {
             var newLocation = PointToScreen(new Point(e.X - _dragStart.X, e.Y - _dragStart.Y));
@@ -1330,11 +1335,11 @@ public class DeviceMapEditorForm : Form
         }
 
         // Update hover states
-        UpdateHoverStates(e.X, e.Y);
+        UpdateHoverStates(mx, my);
         _canvas.Invalidate();
     }
 
-    private void UpdateHoverStates(int x, int y)
+    private void UpdateHoverStates(float x, float y)
     {
         var pt = new SKPoint(x, y);
 
@@ -1375,10 +1380,12 @@ public class DeviceMapEditorForm : Form
 
     private void OnMouseDown(object? sender, MouseEventArgs e)
     {
-        var pt = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
+        var pt = new SKPoint(mx, my);
 
-        // Title bar dragging
-        if (e.Y < TitleBarHeight && e.X < Width - 50)
+        // Title bar dragging (use raw coords for drag start, but canvas-space for hit-test)
+        if (my < TitleBarHeight && mx < Width / s - 50)
         {
             _isDragging = true;
             _dragStart = e.Location;
@@ -1386,7 +1393,7 @@ public class DeviceMapEditorForm : Form
         }
 
         // Close button
-        if (e.Y < TitleBarHeight && e.X >= Width - 50)
+        if (my < TitleBarHeight && mx >= Width / s - 50)
         {
             Close();
             return;
@@ -1517,7 +1524,7 @@ public class DeviceMapEditorForm : Form
 
     private void HandleSvgPanelClick(MouseEventArgs e)
     {
-        var viewBoxPos = ScreenToViewBox(e.X, e.Y);
+        var viewBoxPos = _mouseViewBox;
         bool shiftHeld = (Control.ModifierKeys & Keys.Shift) != 0;
 
         // Shift+Click: Reposition anchor of selected control to click position

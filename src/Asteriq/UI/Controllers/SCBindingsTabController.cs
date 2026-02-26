@@ -146,6 +146,8 @@ public class SCBindingsTabController : ITabController
     private SKRect _scSaveProfileButtonBounds;
     private bool _scSaveProfileButtonHovered;
     private SKRect _scDeleteProfileButtonBounds = default;
+    private SKRect _scProfileEditBounds;
+    private bool _scProfileEditHovered;
     // Inline delete button that appears on hover in the profile dropdown list
     private SKRect _scDropdownDeleteButtonBounds;
     private string _scDropdownDeleteProfileName = "";
@@ -181,6 +183,10 @@ public class SCBindingsTabController : ITabController
 
     public void OnMouseDown(MouseEventArgs e)
     {
+        // When listening for mouse input, let the detection tick handle the press
+        if (_scIsListeningForInput && _scListeningColumn is { IsMouse: true })
+            return;
+
         if (e.Button == MouseButtons.Right)
         {
             HandleBindingsTabRightClick(new SKPoint(e.X, e.Y));
@@ -318,6 +324,7 @@ public class SCBindingsTabController : ITabController
             _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
             _scProfileNameBounds.Contains(e.X, e.Y) ||
             _scProfileDropdownBounds.Contains(e.X, e.Y) ||
+            (_scProfileEditBounds != SKRect.Empty && _scProfileEditBounds.Contains(e.X, e.Y)) ||
             _scNewProfileButtonBounds.Contains(e.X, e.Y) ||
             _scSaveProfileButtonBounds.Contains(e.X, e.Y) ||
             (_scDeleteProfileButtonBounds != default && _scDeleteProfileButtonBounds.Contains(e.X, e.Y)) ||
@@ -2260,6 +2267,42 @@ public class SCBindingsTabController : ITabController
             ? "— No Profile Selected —"
             : _scProfileDirty ? $"{_scExportProfile.ProfileName}*" : _scExportProfile.ProfileName;
         DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, dropdownLabel, dropdownHovered, _scProfileDropdownOpen);
+
+        // Pencil edit icon inside dropdown box (left of arrow), visible on hover when a profile is loaded
+        bool hasProfile = !string.IsNullOrEmpty(_scExportProfile.ProfileName);
+        if (hasProfile && dropdownHovered && !_scProfileDropdownOpen)
+        {
+            float editSize = 20f;
+            float editX = _scProfileDropdownBounds.Right - 28f - editSize;
+            float editY = _scProfileDropdownBounds.MidY - editSize / 2f;
+            _scProfileEditBounds = new SKRect(editX, editY, editX + editSize, editY + editSize);
+            _scProfileEditHovered = _scProfileEditBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+            // Draw pencil icon
+            var iconColor = _scProfileEditHovered ? FUIColors.Active : FUIColors.TextDim;
+            float cx = _scProfileEditBounds.MidX;
+            float cy = _scProfileEditBounds.MidY;
+            using var penPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = iconColor,
+                StrokeWidth = 1.2f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            };
+            // Pencil body (diagonal line)
+            canvas.DrawLine(cx - 4f, cy + 4f, cx + 3f, cy - 3f, penPaint);
+            // Pencil tip
+            canvas.DrawLine(cx - 4f, cy + 4f, cx - 5f, cy + 5.5f, penPaint);
+            // Pencil top
+            canvas.DrawLine(cx + 3f, cy - 3f, cx + 5f, cy - 5f, penPaint);
+        }
+        else
+        {
+            _scProfileEditBounds = SKRect.Empty;
+            _scProfileEditHovered = false;
+        }
+
         y += dropdownHeight + 6f;
 
         // Buttons row: + New, Save (aligned right)
@@ -2856,6 +2899,13 @@ public class SCBindingsTabController : ITabController
             return;
         }
 
+        // Profile edit icon click (inside dropdown box)
+        if (_scProfileEditBounds != SKRect.Empty && _scProfileEditBounds.Contains(point))
+        {
+            EditSCProfileName();
+            return;
+        }
+
         // SC Export profile dropdown toggle click
         if (_scProfileDropdownBounds.Contains(point))
         {
@@ -2988,6 +3038,8 @@ public class SCBindingsTabController : ITabController
 
                     if (col.IsKeyboard)
                         ClearStaleKeyPresses();
+                    if (col.IsMouse)
+                        ClearStaleMousePresses();
 
                     System.Diagnostics.Debug.WriteLine($"[SCBindings] ASSIGN button: started listening on cell ({_scSelectedCell.actionIndex}, {_scSelectedCell.colIndex}) - {col.Header}");
                 }
@@ -3185,11 +3237,11 @@ public class SCBindingsTabController : ITabController
             _scListeningStartTime = DateTime.Now;
             _scListeningColumn = col;
 
-            // Clear stale key presses from search box input before detecting
+            // Clear stale presses before detecting
             if (col.IsKeyboard)
-            {
                 ClearStaleKeyPresses();
-            }
+            if (col.IsMouse)
+                ClearStaleMousePresses();
 
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
         }
@@ -3472,7 +3524,7 @@ public class SCBindingsTabController : ITabController
     /// </summary>
     private string? DetectMouseInput()
     {
-        // Check mouse buttons (excluding primary which is used for clicking)
+        if (IsKeyPressed(0x01)) return "mouse1"; // VK_LBUTTON
         if (IsKeyPressed(0x02)) return "mouse2"; // VK_RBUTTON
         if (IsKeyPressed(0x04)) return "mouse3"; // VK_MBUTTON
         if (IsKeyPressed(0x05)) return "mouse4"; // VK_XBUTTON1
@@ -4027,6 +4079,19 @@ public class SCBindingsTabController : ITabController
             GetAsyncKeyState(vk);
     }
 
+    /// <summary>
+    /// Clears stale "was pressed" bits for mouse buttons.
+    /// Prevents the right-click from double-click being detected as mouse2.
+    /// </summary>
+    private static void ClearStaleMousePresses()
+    {
+        GetAsyncKeyState(0x01); // VK_LBUTTON
+        GetAsyncKeyState(0x02); // VK_RBUTTON
+        GetAsyncKeyState(0x04); // VK_MBUTTON
+        GetAsyncKeyState(0x05); // VK_XBUTTON1
+        GetAsyncKeyState(0x06); // VK_XBUTTON2
+    }
+
     #endregion
 
     #region SC Export and Dialogs
@@ -4147,14 +4212,23 @@ public class SCBindingsTabController : ITabController
 
     private void EditSCProfileName()
     {
-        var name = FUIInputDialog.Show(_ctx.OwnerForm, "Control Profile Name", "Profile Name:",
-            _scExportProfile.ProfileName);
-        if (name is not null)
+        var oldName = _scExportProfile.ProfileName;
+        var name = FUIInputDialog.Show(_ctx.OwnerForm, "Rename Profile", "Profile Name:", oldName);
+        if (name is null || name == oldName)
+            return;
+
+        // Rename on disk if the old profile was saved
+        if (!string.IsNullOrEmpty(oldName) && _scExportProfileService is not null &&
+            _scExportProfileService.ProfileExists(oldName))
         {
-            _scExportProfile.ProfileName = name;
-            _scProfileDirty = true;
-            _ctx.InvalidateCanvas();
+            _scExportProfileService.RenameProfile(oldName, name);
+            RefreshSCExportProfiles();
         }
+
+        _scExportProfile.ProfileName = name;
+        _scProfileDirty = false;
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+        _ctx.InvalidateCanvas();
     }
 
     #endregion

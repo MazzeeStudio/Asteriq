@@ -2807,8 +2807,11 @@ public partial class MainForm : Form
             new SKPoint(40, y + 22), FUIColors.TextDim, 13f);
 
         // Left-center: connection status
-        int physicalCount = _devices.Count(d => !d.IsVirtual);
-        string deviceText = physicalCount == 1 ? "1 DEVICE CONNECTED" : $"{physicalCount} DEVICES CONNECTED";
+        int connectedCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
+        int disconnectedCount = _devices.Count(d => !d.IsVirtual && !d.IsConnected);
+        string deviceText = disconnectedCount > 0
+            ? $"{connectedCount} CONNECTED, {disconnectedCount} OFFLINE"
+            : connectedCount == 1 ? "1 DEVICE CONNECTED" : $"{connectedCount} DEVICES CONNECTED";
         FUIRenderer.DrawText(canvas, deviceText,
             new SKPoint(180, y + 22), FUIColors.TextDim, 15f);
 
@@ -2837,15 +2840,29 @@ public partial class MainForm : Form
             }
             else
             {
-                // Downward triangle — amber for update available / downloading
-                const float triH = 9f;
-                using var triPath = new SKPath();
-                triPath.MoveTo(startX, midY - triH / 2f);
-                triPath.LineTo(startX + indicatorSize, midY - triH / 2f);
-                triPath.LineTo(startX + indicatorSize / 2f, midY + triH / 2f);
-                triPath.Close();
-                using var triPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
-                canvas.DrawPath(triPath, triPaint);
+                // Downward arrow — amber for update available / downloading
+                float arrowMidX = startX + indicatorSize / 2f;
+                const float stemW = 2f;
+                const float stemH = 5f;
+                const float headH = 5f;
+                float arrowTop = midY - (stemH + headH) / 2f;
+
+                using var arrowPath = new SKPath();
+                // Stem (vertical bar)
+                arrowPath.MoveTo(arrowMidX - stemW / 2f, arrowTop);
+                arrowPath.LineTo(arrowMidX + stemW / 2f, arrowTop);
+                arrowPath.LineTo(arrowMidX + stemW / 2f, arrowTop + stemH);
+                // Right wing of arrowhead
+                arrowPath.LineTo(arrowMidX + indicatorSize / 2f, arrowTop + stemH);
+                // Tip
+                arrowPath.LineTo(arrowMidX, arrowTop + stemH + headH);
+                // Left wing of arrowhead
+                arrowPath.LineTo(arrowMidX - indicatorSize / 2f, arrowTop + stemH);
+                arrowPath.LineTo(arrowMidX - stemW / 2f, arrowTop + stemH);
+                arrowPath.Close();
+
+                using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                canvas.DrawPath(arrowPath, arrowPaint);
             }
 
             FUIRenderer.DrawText(canvas, versionTime, new SKPoint(textX, y + 22), FUIColors.TextDim, 15f);

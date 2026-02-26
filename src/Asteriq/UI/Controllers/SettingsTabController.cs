@@ -41,6 +41,11 @@ public class SettingsTabController : ITabController
     private SKRect _referralCopyButtonBounds;
     private SKRect _referralLinkButtonBounds;
 
+    // Profile name edit
+    private SKRect _profileNameBounds;
+    private SKRect _profileNameEditBounds;
+    private bool _profileNameEditHovered;
+
     // Driver setup button
     private SKRect _driverSetupButtonBounds;
 
@@ -97,6 +102,13 @@ public class SettingsTabController : ITabController
         }
 
         var pt = new SKPoint(e.X, e.Y);
+
+        // Profile name box (rename on click)
+        if (_profileNameBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null)
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
 
         // Profile action buttons
         if (_newProfileButtonBounds.Contains(pt) ||
@@ -212,15 +224,49 @@ public class SettingsTabController : ITabController
             y = FUIRenderer.DrawSectionHeader(canvas, "ACTIVE PROFILE", leftMargin, y);
 
             float nameBoxHeight = 32f;
-            var nameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
-            using var nameBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30) };
-            canvas.DrawRoundRect(nameBounds, 4, 4, nameBgPaint);
+            _profileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
+            bool nameHovered = _profileNameBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-            using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
-            canvas.DrawRoundRect(nameBounds, 4, 4, nameFramePaint);
+            using var nameBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30) };
+            canvas.DrawRoundRect(_profileNameBounds, 4, 4, nameBgPaint);
+
+            var nameFrameColor = nameHovered ? FUIColors.Active : FUIColors.Active;
+            using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = nameFrameColor, StrokeWidth = 1f };
+            canvas.DrawRoundRect(_profileNameBounds, 4, 4, nameFramePaint);
 
             float nameTextY = y + (nameBoxHeight - FUIRenderer.FontBody) / 2 + FUIRenderer.FontBody - 3;
             FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, FUIRenderer.FontBody, true);
+
+            // Pencil edit icon on hover (right side of name box)
+            if (nameHovered)
+            {
+                float editSize = 20f;
+                float editX = _profileNameBounds.Right - editSize - 6f;
+                float editY = _profileNameBounds.MidY - editSize / 2f;
+                _profileNameEditBounds = new SKRect(editX, editY, editX + editSize, editY + editSize);
+                _profileNameEditHovered = _profileNameEditBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+                var iconColor = _profileNameEditHovered ? FUIColors.Active : FUIColors.TextDim;
+                float cx = _profileNameEditBounds.MidX;
+                float cy = _profileNameEditBounds.MidY;
+                using var penPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = iconColor,
+                    StrokeWidth = 1.2f,
+                    IsAntialias = true,
+                    StrokeCap = SKStrokeCap.Round
+                };
+                canvas.DrawLine(cx - 4f, cy + 4f, cx + 3f, cy - 3f, penPaint);
+                canvas.DrawLine(cx - 4f, cy + 4f, cx - 5f, cy + 5.5f, penPaint);
+                canvas.DrawLine(cx + 3f, cy - 3f, cx + 5f, cy - 5f, penPaint);
+            }
+            else
+            {
+                _profileNameEditBounds = SKRect.Empty;
+                _profileNameEditHovered = false;
+            }
+
             y += nameBoxHeight + 24f;
 
             float lineHeight = metrics.RowHeight;
@@ -911,6 +957,20 @@ public class SettingsTabController : ITabController
 
     private void HandleSettingsTabClick(SKPoint pt)
     {
+        // Profile name edit icon
+        if (_profileNameEditBounds != SKRect.Empty && _profileNameEditBounds.Contains(pt))
+        {
+            RenameActiveProfile();
+            return;
+        }
+
+        // Profile name box click (whole box)
+        if (_profileNameBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null)
+        {
+            RenameActiveProfile();
+            return;
+        }
+
         // Profile action buttons
         if (_newProfileButtonBounds.Contains(pt))
         {
@@ -1105,6 +1165,21 @@ public class SettingsTabController : ITabController
             _ = _ctx.UpdateService.ApplyUpdateAsync();
             return;
         }
+    }
+
+    private void RenameActiveProfile()
+    {
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return;
+
+        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "Rename Profile", "Profile Name:", profile.Name);
+        if (newName is null || newName == profile.Name)
+            return;
+
+        profile.Name = newName;
+        _ctx.ProfileManager.SaveActiveProfile();
+        _ctx.RefreshProfileList();
+        _ctx.InvalidateCanvas();
     }
 
     #endregion

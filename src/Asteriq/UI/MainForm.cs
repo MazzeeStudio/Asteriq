@@ -2809,7 +2809,8 @@ public partial class MainForm : Form
         string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";
         float versionWidth = FUIRenderer.MeasureText(versionTime, 15f);
         var footerUpdateStatus = _updateService.Status;
-        if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.UpdateAvailable)
+        if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.UpdateAvailable
+            or UpdateStatus.Downloading or UpdateStatus.ReadyToApply)
         {
             const float indicatorSize = 7f;
             const float indicatorGap = 6f;
@@ -2817,15 +2818,15 @@ public partial class MainForm : Form
             float startX = textX - indicatorGap - indicatorSize;
             float midY = y + 17f; // visual centre of 12 pt text row
 
-            if (footerUpdateStatus == UpdateStatus.UpToDate)
+            if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.ReadyToApply)
             {
-                // Small filled circle — mirrors the vJOY status dot style
+                // Small filled circle — green for up-to-date / ready-to-apply
                 using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                 canvas.DrawCircle(startX + indicatorSize / 2f, midY, indicatorSize / 2f, dotPaint);
             }
             else
             {
-                // Downward triangle — taller than wide so it reads as an arrow, not a blob
+                // Downward triangle — amber for update available / downloading
                 const float triH = 9f;
                 using var triPath = new SKPath();
                 triPath.MoveTo(startX, midY - triH / 2f);

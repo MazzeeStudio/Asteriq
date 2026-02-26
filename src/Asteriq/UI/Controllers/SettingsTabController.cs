@@ -42,7 +42,9 @@ public class SettingsTabController : ITabController
     private SKRect _referralLinkButtonBounds;
 
     // Version / update button bounds
-    private SKRect _updateButtonBounds;
+    private SKRect _checkButtonBounds;
+    private SKRect _downloadButtonBounds;
+    private SKRect _applyButtonBounds;
 
     public SettingsTabController(TabContext ctx)
     {
@@ -145,8 +147,16 @@ public class SettingsTabController : ITabController
         }
 
         // Support panel buttons
-        if (_bmacButtonBounds.Contains(pt) || _referralCopyButtonBounds.Contains(pt) || _referralLinkButtonBounds.Contains(pt)
-            || (!_updateButtonBounds.IsEmpty && _updateButtonBounds.Contains(pt)))
+        if (_bmacButtonBounds.Contains(pt) || _referralCopyButtonBounds.Contains(pt) || _referralLinkButtonBounds.Contains(pt))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Update section buttons
+        if ((!_checkButtonBounds.IsEmpty && _checkButtonBounds.Contains(pt))
+            || (!_downloadButtonBounds.IsEmpty && _downloadButtonBounds.Contains(pt))
+            || (!_applyButtonBounds.IsEmpty && _applyButtonBounds.Contains(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
@@ -403,17 +413,130 @@ public class SettingsTabController : ITabController
         }
         y += sectionSpacing;
 
-        // Version / update section
+        // VERSION & UPDATES section
+        FUIRenderer.DrawText(canvas, "VERSION & UPDATES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        y += sectionSpacing;
+
         string currentVersion = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "0.0.0";
 
-        // Header row: "VERSION" label left, current version right-aligned
+        // Version row: "v0.8.289" left, [Check for updates] button right
         string versionStr = $"v{currentVersion}";
-        float versionStrWidth = FUIRenderer.MeasureText(versionStr, 14f);
-        FUIRenderer.DrawText(canvas, "VERSION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        FUIRenderer.DrawText(canvas, versionStr, new SKPoint(rightMargin - versionStrWidth, y + 1f), FUIColors.TextPrimary, 14f);
-        y += sectionSpacing;
+        FUIRenderer.DrawText(canvas, versionStr, new SKPoint(leftMargin, y + 10f), FUIColors.TextPrimary, 14f);
+
+        var updateStatus = _ctx.UpdateService.Status;
+        float checkBtnWidth = 150f;
+        float checkBtnHeight = 28f;
+        bool checkBtnEnabled = updateStatus is UpdateStatus.Unknown or UpdateStatus.UpToDate or UpdateStatus.Error;
+        _checkButtonBounds = new SKRect(rightMargin - checkBtnWidth, y, rightMargin, y + checkBtnHeight);
+        bool checkHovered = checkBtnEnabled && _checkButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        string checkLabel = updateStatus == UpdateStatus.Checking ? "CHECKING\u2026" : "CHECK FOR UPDATES";
+        DrawSupportActionButton(canvas, _checkButtonBounds, checkLabel, checkHovered, false,
+            !checkBtnEnabled || updateStatus == UpdateStatus.Checking);
+        y += checkBtnHeight + 4f;
+
+        // "Last checked" timestamp
+        var lastChecked = _ctx.UpdateService.LastChecked;
+        string lastCheckedStr = lastChecked.HasValue
+            ? $"Last checked: {lastChecked.Value:dd/MM/yyyy HH:mm}"
+            : "Last checked: never";
+        FUIRenderer.DrawText(canvas, lastCheckedStr, new SKPoint(leftMargin, y + 10f), FUIColors.TextDim, 12f);
+        y += 20f;
+
+        // Status banner — contextual based on update status
+        _downloadButtonBounds = SKRect.Empty;
+        _applyButtonBounds = SKRect.Empty;
+
+        float bannerHeight = 32f;
+        float bannerRadius = 4f;
+        string latest = _ctx.UpdateService.LatestVersion ?? "?";
+
+        if (updateStatus != UpdateStatus.Unknown && updateStatus != UpdateStatus.Checking)
+        {
+            var bannerRect = new SKRect(leftMargin, y, rightMargin, y + bannerHeight);
+            float dotRadius = 4f;
+            float dotX = leftMargin + 12f;
+            float dotY = y + bannerHeight / 2f;
+            float textStartX = dotX + dotRadius + 8f;
+            float textY = y + bannerHeight / 2f + 4f;
+
+            switch (updateStatus)
+            {
+                case UpdateStatus.UpToDate:
+                {
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
+                    FUIRenderer.DrawText(canvas, "Asteriq is up to date", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
+                    break;
+                }
+
+                case UpdateStatus.UpdateAvailable:
+                {
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(25), IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                    canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
+                    string availText = $"Update available: v{latest}";
+                    FUIRenderer.DrawText(canvas, availText, new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
+
+                    // Inline "Download update" button
+                    float dlBtnWidth = 130f;
+                    _downloadButtonBounds = new SKRect(rightMargin - dlBtnWidth - 4f, y + 3f, rightMargin - 4f, y + bannerHeight - 3f);
+                    bool dlHovered = _downloadButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                    DrawSupportActionButton(canvas, _downloadButtonBounds, "DOWNLOAD UPDATE", dlHovered, true);
+                    break;
+                }
+
+                case UpdateStatus.Downloading:
+                {
+                    int pct = _ctx.UpdateService.DownloadProgress;
+                    // Progress bar fill as banner background
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(15), IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    float fillWidth = bannerRect.Width * (pct / 100f);
+                    var fillRect = new SKRect(bannerRect.Left, bannerRect.Top, bannerRect.Left + fillWidth, bannerRect.Bottom);
+                    using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(40), IsAntialias = true };
+                    canvas.Save();
+                    canvas.ClipRoundRect(new SKRoundRect(bannerRect, bannerRadius));
+                    canvas.DrawRect(fillRect, fillPaint);
+                    canvas.Restore();
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                    canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
+                    FUIRenderer.DrawText(canvas, $"Downloading update\u2026 {pct}%", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
+                    break;
+                }
+
+                case UpdateStatus.ReadyToApply:
+                {
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
+                    FUIRenderer.DrawText(canvas, "Update ready", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
+
+                    // Inline "Apply update" button
+                    float apBtnWidth = 120f;
+                    _applyButtonBounds = new SKRect(rightMargin - apBtnWidth - 4f, y + 3f, rightMargin - 4f, y + bannerHeight - 3f);
+                    bool apHovered = _applyButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                    DrawSupportActionButton(canvas, _applyButtonBounds, "APPLY UPDATE", apHovered, true);
+                    break;
+                }
+
+                case UpdateStatus.Error:
+                {
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(25), IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger, IsAntialias = true };
+                    canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
+                    FUIRenderer.DrawText(canvas, "Check failed", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
+                    break;
+                }
+            }
+            y += bannerHeight + 8f;
+        }
 
         // "Check for updates automatically" toggle
         float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
@@ -423,24 +546,6 @@ public class SettingsTabController : ITabController
         float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
         _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _ctx.AppSettings.AutoCheckUpdates, _ctx.MousePosition);
-        y += rowHeight + 8f;
-
-        // Update action button — label and state depend on current update status
-        var updateStatus = _ctx.UpdateService.Status;
-        string latest = _ctx.UpdateService.LatestVersion ?? "?";
-        string updateBtnLabel = updateStatus switch
-        {
-            UpdateStatus.Checking        => "CHECKING\u2026",
-            UpdateStatus.UpToDate        => "UP TO DATE",
-            UpdateStatus.UpdateAvailable => $"DOWNLOAD & INSTALL v{latest}",
-            UpdateStatus.Error           => "CHECK FAILED \u2014 RETRY",
-            _                            => "CHECK FOR UPDATES",
-        };
-        bool updateBtnEnabled = updateStatus is UpdateStatus.Unknown or UpdateStatus.UpdateAvailable or UpdateStatus.Error;
-        float updateBtnHeight = 32f;
-        _updateButtonBounds = new SKRect(leftMargin, y, rightMargin, y + updateBtnHeight);
-        bool updateHovered = updateBtnEnabled && _updateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        DrawSupportActionButton(canvas, _updateButtonBounds, updateBtnLabel, updateHovered, true, !updateBtnEnabled);
     }
 
     private void DrawVisualSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -909,24 +1014,34 @@ public class SettingsTabController : ITabController
             return;
         }
 
-        // Update action button click
-        if (!_updateButtonBounds.IsEmpty && _updateButtonBounds.Contains(pt))
+        // Check for updates button click
+        if (!_checkButtonBounds.IsEmpty && _checkButtonBounds.Contains(pt))
         {
             var status = _ctx.UpdateService.Status;
-            if (status == UpdateStatus.UpdateAvailable)
-            {
-                _ = _ctx.UpdateService.DownloadAndInstallAsync().ContinueWith(
-                    _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
-                    TaskContinuationOptions.ExecuteSynchronously);
-                _ctx.InvalidateCanvas();
-            }
-            else if (status is UpdateStatus.Unknown or UpdateStatus.Error)
+            if (status is UpdateStatus.Unknown or UpdateStatus.UpToDate or UpdateStatus.Error)
             {
                 _ = _ctx.UpdateService.CheckAsync().ContinueWith(
                     _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
                     TaskContinuationOptions.ExecuteSynchronously);
                 _ctx.InvalidateCanvas();
             }
+            return;
+        }
+
+        // Download update button click (inside UpdateAvailable banner)
+        if (!_downloadButtonBounds.IsEmpty && _downloadButtonBounds.Contains(pt))
+        {
+            _ = _ctx.UpdateService.DownloadAsync().ContinueWith(
+                _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
+                TaskContinuationOptions.ExecuteSynchronously);
+            _ctx.InvalidateCanvas();
+            return;
+        }
+
+        // Apply update button click (inside ReadyToApply banner)
+        if (!_applyButtonBounds.IsEmpty && _applyButtonBounds.Contains(pt))
+        {
+            _ = _ctx.UpdateService.ApplyUpdateAsync();
             return;
         }
     }

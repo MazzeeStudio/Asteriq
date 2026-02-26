@@ -157,6 +157,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public DateTime? LastUpdateCheck
+    {
+        get => _cachedSettings.LastUpdateCheck;
+        set
+        {
+            _cachedSettings.LastUpdateCheck = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public string? GetVJoySilhouetteOverride(uint vjoyId)
     {
         _cachedSettings.VJoySilhouetteOverrides.TryGetValue(vjoyId, out var key);
@@ -220,6 +230,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public Dictionary<string, string> LastSCExportProfileByEnvironment { get; set; } = new();
         public string? PreferredSCEnvironment { get; set; }
+        public DateTime? LastUpdateCheck { get; set; }
         /// <summary>Per-vJoy-slot silhouette override. Key = vJoy ID, Value = device map filename key.</summary>
         public Dictionary<uint, string> VJoySilhouetteOverrides { get; set; } = new();
     }

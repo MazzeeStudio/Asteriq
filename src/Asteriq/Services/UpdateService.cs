@@ -13,15 +13,24 @@ public sealed class UpdateService : IUpdateService
     private const string ApiUrl = $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IApplicationSettingsService _appSettings;
     private readonly ILogger<UpdateService> _logger;
+
+    private string? _downloadedTempPath;
 
     public UpdateStatus Status { get; private set; } = UpdateStatus.Unknown;
     public string? LatestVersion { get; private set; }
     public string? DownloadUrl { get; private set; }
+    public int DownloadProgress { get; private set; }
+    public DateTime? LastChecked => _appSettings.LastUpdateCheck;
 
-    public UpdateService(IHttpClientFactory httpClientFactory, ILogger<UpdateService> logger)
+    public UpdateService(
+        IHttpClientFactory httpClientFactory,
+        IApplicationSettingsService appSettings,
+        ILogger<UpdateService> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _appSettings = appSettings;
         _logger = logger;
     }
 
@@ -36,6 +45,7 @@ public sealed class UpdateService : IUpdateService
             if (release is null || string.IsNullOrWhiteSpace(release.TagName))
             {
                 Status = UpdateStatus.UpToDate;
+                _appSettings.LastUpdateCheck = DateTime.Now;
                 return;
             }
 
@@ -60,10 +70,11 @@ public sealed class UpdateService : IUpdateService
                 Status = UpdateStatus.UpToDate;
                 _logger.LogDebug("Up to date: {Current}", current);
             }
+
+            _appSettings.LastUpdateCheck = DateTime.Now;
         }
         catch (HttpRequestException ex)
         {
-            // Network unavailable or no releases — fail silently
             _logger.LogDebug("Update check failed (network): {Message}", ex.Message);
             Status = UpdateStatus.Error;
         }
@@ -74,7 +85,7 @@ public sealed class UpdateService : IUpdateService
         }
     }
 
-    public async Task DownloadAndInstallAsync(IProgress<int>? progress = null, CancellationToken ct = default)
+    public async Task DownloadAsync(CancellationToken ct = default)
     {
         if (DownloadUrl is null)
         {
@@ -82,21 +93,13 @@ public sealed class UpdateService : IUpdateService
             return;
         }
 
-        string? currentExe = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(currentExe))
-        {
-            _logger.LogError("Cannot determine current executable path for update.");
-            Status = UpdateStatus.Error;
-            return;
-        }
-
-        Status = UpdateStatus.Checking; // reuse Checking as "downloading" visual state
+        Status = UpdateStatus.Downloading;
+        DownloadProgress = 0;
 
         try
         {
             string tempPath = Path.Combine(Path.GetTempPath(), "Asteriq_update.exe");
 
-            // Download
             var client = _httpClientFactory.CreateClient("Asteriq");
             using var response = await client.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
@@ -114,14 +117,45 @@ public sealed class UpdateService : IUpdateService
                 await file.WriteAsync(buffer.AsMemory(0, read), ct);
                 downloaded += read;
                 if (total > 0)
-                    progress?.Report((int)(downloaded * 100 / total.Value));
+                    DownloadProgress = (int)(downloaded * 100 / total.Value);
             }
 
             await file.FlushAsync(ct);
             file.Close();
 
-            // Write swap script and launch it
+            _downloadedTempPath = tempPath;
+            DownloadProgress = 100;
+            Status = UpdateStatus.ReadyToApply;
+            _logger.LogInformation("Update downloaded to {TempPath}", tempPath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Update download failed.");
+            Status = UpdateStatus.Error;
+        }
+    }
+
+    public Task ApplyUpdateAsync(CancellationToken ct = default)
+    {
+        if (_downloadedTempPath is null || !File.Exists(_downloadedTempPath))
+        {
+            _logger.LogError("No downloaded update file to apply.");
+            Status = UpdateStatus.Error;
+            return Task.CompletedTask;
+        }
+
+        string? currentExe = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(currentExe))
+        {
+            _logger.LogError("Cannot determine current executable path for update.");
+            Status = UpdateStatus.Error;
+            return Task.CompletedTask;
+        }
+
+        try
+        {
             string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
+            string tempPath = _downloadedTempPath;
             string script = $$"""
                 $copied = $false
                 for ($i = 0; $i -lt 5; $i++) {
@@ -135,15 +169,14 @@ public sealed class UpdateService : IUpdateService
                     }
                 }
                 if ($copied) {
-                    Start-Process -FilePath '{{currentExe}}'
+                    Start-Process -FilePath '{{currentExe}}' -ArgumentList '--post-update'
                 }
                 Remove-Item -Path '{{tempPath}}' -ErrorAction SilentlyContinue
                 Remove-Item -Path '{{scriptPath}}' -ErrorAction SilentlyContinue
                 """;
 
-            await File.WriteAllTextAsync(scriptPath, script, ct);
+            File.WriteAllText(scriptPath, script);
 
-            // Check if the exe location is writable without elevation
             bool needsElevation = !IsDirectoryWritable(Path.GetDirectoryName(currentExe)!);
 
             var psi = new System.Diagnostics.ProcessStartInfo
@@ -159,14 +192,15 @@ public sealed class UpdateService : IUpdateService
 
             System.Diagnostics.Process.Start(psi);
 
-            // Exit from the thread pool — safe from any thread unlike Application.Exit()
             Environment.Exit(0);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Update download/install failed.");
+            _logger.LogError(ex, "Update apply failed.");
             Status = UpdateStatus.Error;
         }
+
+        return Task.CompletedTask;
     }
 
     private static bool IsDirectoryWritable(string path)

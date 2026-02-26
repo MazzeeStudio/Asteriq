@@ -186,8 +186,10 @@ static class Program
         migrationService.MigrateIfNeeded();
 
         // Check required drivers before creating MainForm
+        // Skip driver check on post-update relaunch — drivers were already present
+        bool postUpdate = args.Contains("--post-update");
         bool forceDriverSetup = args.Contains("--driver-setup");
-        if (!CheckRequiredDrivers(serviceProvider, forceDriverSetup))
+        if (!postUpdate && !CheckRequiredDrivers(serviceProvider, forceDriverSetup))
         {
             // User cancelled driver setup - exit
             serviceProvider.Dispose();

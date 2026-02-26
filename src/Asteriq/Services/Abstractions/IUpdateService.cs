@@ -6,6 +6,8 @@ public enum UpdateStatus
     Checking,
     UpToDate,
     UpdateAvailable,
+    Downloading,
+    ReadyToApply,
     Error
 }
 
@@ -14,7 +16,10 @@ public interface IUpdateService
     UpdateStatus Status { get; }
     string? LatestVersion { get; }
     string? DownloadUrl { get; }
+    int DownloadProgress { get; }
+    DateTime? LastChecked { get; }
 
     Task CheckAsync(CancellationToken ct = default);
-    Task DownloadAndInstallAsync(IProgress<int>? progress = null, CancellationToken ct = default);
+    Task DownloadAsync(CancellationToken ct = default);
+    Task ApplyUpdateAsync(CancellationToken ct = default);
 }

@@ -76,6 +76,11 @@ public interface IApplicationSettingsService
     string? PreferredSCEnvironment { get; set; }
 
     /// <summary>
+    /// Timestamp of the last successful update check
+    /// </summary>
+    DateTime? LastUpdateCheck { get; set; }
+
+    /// <summary>
     /// Get the user-specified silhouette override for a vJoy slot.
     /// Returns null if no override is set (auto-detect from physical device).
     /// The value is the device map filename key (e.g., "joystick", "throttle", "virpil_alpha_prime_r").

@@ -576,11 +576,11 @@ public class SettingsTabController : ITabController
 
                 case UpdateStatus.UpdateAvailable:
                 {
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(25), IsAntialias = true };
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Warning.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     string availText = $"Update available: v{latest}";
                     FUIRenderer.DrawText(canvas, availText, new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -597,18 +597,18 @@ public class SettingsTabController : ITabController
                 {
                     int pct = _ctx.UpdateService.DownloadProgress;
                     // Progress bar fill as banner background
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(15), IsAntialias = true };
+                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(15), IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
                     float fillWidth = bannerRect.Width * (pct / 100f);
                     var fillRect = new SKRect(bannerRect.Left, bannerRect.Top, bannerRect.Left + fillWidth, bannerRect.Bottom);
-                    using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(40), IsAntialias = true };
+                    using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
                     canvas.Save();
                     canvas.ClipRoundRect(new SKRoundRect(bannerRect, bannerRadius));
                     canvas.DrawRect(fillRect, fillPaint);
                     canvas.Restore();
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Warning.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, $"Downloading update\u2026 {pct}%", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
                     break;

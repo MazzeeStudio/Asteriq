@@ -174,7 +174,7 @@ public class FUISelectionDialog : Form
         var descLines = _description.Split('\n');
         foreach (var line in descLines)
         {
-            FUIRenderer.DrawText(canvas, line, new SKPoint(ContentPadding, descY), FUIColors.TextPrimary, 11f);
+            FUIRenderer.DrawText(canvas, line, new SKPoint(ContentPadding, descY), FUIColors.TextPrimary, 14f);
             descY += 16f;
         }
 
@@ -245,19 +245,19 @@ public class FUISelectionDialog : Form
             }
 
             FUIRenderer.DrawText(canvas, displayText, new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4),
-                textColor, 11f, false);
+                textColor, 14f, false);
 
             // Draw status with different color
             if (!string.IsNullOrEmpty(item.Status))
             {
-                using var textPaint = FUIRenderer.CreateTextPaint(textColor, 11f);
+                using var textPaint = FUIRenderer.CreateTextPaint(textColor, 14f);
                 float baseWidth = textPaint.MeasureText(item.Text + " ");
 
                 var statusColor = item.Status.Contains("OK") ? FUIColors.Active :
                                   item.Status.Contains("partial") ? FUIColors.Warning : textColor;
 
                 FUIRenderer.DrawText(canvas, item.Status, new SKPoint(itemBounds.Left + 8 + baseWidth, itemBounds.MidY + 4),
-                    statusColor, 11f, false);
+                    statusColor, 14f, false);
             }
 
             itemY += ItemHeight;

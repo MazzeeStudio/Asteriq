@@ -81,7 +81,7 @@ public class FUIMessageBox : Form
     private SKSize CalculateSize()
     {
         // Measure text to determine dialog size
-        using var textPaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 13f);
+        using var textPaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 16f);
 
         var lines = _message.Split('\n');
         float maxWidth = 200f;
@@ -146,7 +146,7 @@ public class FUIMessageBox : Form
         var lines = _message.Split('\n');
         foreach (var line in lines)
         {
-            FUIRenderer.DrawText(canvas, line, new SKPoint(20, messageY), FUIColors.TextPrimary, 13f);
+            FUIRenderer.DrawText(canvas, line, new SKPoint(20, messageY), FUIColors.TextPrimary, 16f);
             messageY += 20f;
         }
 

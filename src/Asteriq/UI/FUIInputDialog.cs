@@ -109,7 +109,7 @@ public class FUIInputDialog : Form
 
         // Field label
         FUIRenderer.DrawText(canvas, _label, new SKPoint(16, titleBar.Bottom + 20),
-            FUIColors.TextPrimary, 11f);
+            FUIColors.TextPrimary, 14f);
 
         // Text field outline (native TextBox sits here, canvas just draws the border)
         var fieldBounds = new SKRect(15, titleBar.Bottom + 34, bounds.Right - 15, titleBar.Bottom + 62);

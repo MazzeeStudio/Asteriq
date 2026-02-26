@@ -365,11 +365,11 @@ public class DeviceMapEditorForm : Form
 
         // Title
         var title = "DEVICE MAP EDITOR" + (_hasUnsavedChanges ? " *" : "");
-        FUIRenderer.DrawText(canvas, title, new SKPoint(20, 26), FUIColors.Active, 14f, true);
+        FUIRenderer.DrawText(canvas, title, new SKPoint(20, 26), FUIColors.Active, 17f, true);
 
         // Close button
         var closeRect = new SKRect(bounds.Right - 40, 8, bounds.Right - 8, 32);
-        FUIRenderer.DrawTextCentered(canvas, "X", closeRect, FUIColors.TextDim, 14f);
+        FUIRenderer.DrawTextCentered(canvas, "X", closeRect, FUIColors.TextDim, 17f);
     }
 
     private void DrawToolbar(SKCanvas canvas)
@@ -382,7 +382,7 @@ public class DeviceMapEditorForm : Form
         float x = 20;
 
         // SVG dropdown
-        FUIRenderer.DrawText(canvas, "SVG:", new SKPoint(x, y + 12), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "SVG:", new SKPoint(x, y + 12), FUIColors.TextDim, 13f);
         x += 36;
 
         _svgDropdownBounds = new SKRect(x, y, x + 180, y + 30);
@@ -390,7 +390,7 @@ public class DeviceMapEditorForm : Form
         x += 200;
 
         // JSON filename
-        FUIRenderer.DrawText(canvas, "JSON:", new SKPoint(x, y + 12), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "JSON:", new SKPoint(x, y + 12), FUIColors.TextDim, 13f);
         x += 40;
 
         _jsonTextBoxBounds = new SKRect(x, y, x + 200, y + 30);
@@ -408,7 +408,7 @@ public class DeviceMapEditorForm : Form
         x += 80;
 
         // Mirror checkbox
-        FUIRenderer.DrawText(canvas, "Mirror (L):", new SKPoint(x, y + 12), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "Mirror (L):", new SKPoint(x, y + 12), FUIColors.TextDim, 13f);
         x += 65;
         _mirrorCheckboxBounds = new SKRect(x, y + 3, x + 24, y + 27);
         DrawCheckbox(canvas, _mirrorCheckboxBounds, _deviceMap.Mirror, _mirrorCheckboxHovered);
@@ -471,7 +471,7 @@ public class DeviceMapEditorForm : Form
         }
         else
         {
-            FUIRenderer.DrawTextCentered(canvas, "No SVG loaded", _svgPanelBounds, FUIColors.TextDisabled, 14f);
+            FUIRenderer.DrawTextCentered(canvas, "No SVG loaded", _svgPanelBounds, FUIColors.TextDisabled, 17f);
         }
 
         // Draw control overlays
@@ -550,7 +550,7 @@ public class DeviceMapEditorForm : Form
 
             // Measure label text
             var labelText = control.Label ?? key;
-            var labelBounds = MeasureText(labelText, 11f);
+            var labelBounds = MeasureText(labelText, 14f);
             float padding = 6f;
             float shelfLength = 10f;
 
@@ -609,11 +609,11 @@ public class DeviceMapEditorForm : Form
             canvas.DrawRoundRect(labelRect, 3, 3, labelFramePaint);
 
             // Draw label text (baseline adjusted)
-            using var textPaint = new SKPaint { TextSize = 11f, IsAntialias = true };
+            using var textPaint = new SKPaint { TextSize = 14f, IsAntialias = true };
             var metrics = textPaint.FontMetrics;
             float textY = labelScreen.Y - metrics.Ascent; // Adjust for baseline
             FUIRenderer.DrawText(canvas, labelText, new SKPoint(labelScreen.X, textY),
-                isSelected ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+                isSelected ? FUIColors.Active : FUIColors.TextPrimary, 14f);
         }
     }
 
@@ -744,7 +744,7 @@ public class DeviceMapEditorForm : Form
             // Draw segment index number
             FUIRenderer.DrawTextCentered(canvas, (i + 1).ToString(),
                 new SKRect(handlePos.X - 10, handlePos.Y - 10, handlePos.X + 10, handlePos.Y + 10),
-                FUIColors.Background0, 9f);
+                FUIColors.Background0, 12f);
         }
     }
 
@@ -766,15 +766,15 @@ public class DeviceMapEditorForm : Form
         // Header
         float y = _propertiesPanelBounds.Top + 16;
         FUIRenderer.DrawText(canvas, "CONTROL PROPERTIES", new SKPoint(_propertiesPanelBounds.Left + 16, y),
-            FUIColors.Active, 11f, true);
+            FUIColors.Active, 14f, true);
         y += 24;
 
         if (_selectedControlKey is null)
         {
             FUIRenderer.DrawText(canvas, "Select a control or click on SVG",
-                new SKPoint(_propertiesPanelBounds.Left + 16, y), FUIColors.TextDisabled, 10f);
+                new SKPoint(_propertiesPanelBounds.Left + 16, y), FUIColors.TextDisabled, 13f);
             FUIRenderer.DrawText(canvas, "to add a new control anchor.",
-                new SKPoint(_propertiesPanelBounds.Left + 16, y + 16), FUIColors.TextDisabled, 10f);
+                new SKPoint(_propertiesPanelBounds.Left + 16, y + 16), FUIColors.TextDisabled, 13f);
             return;
         }
 
@@ -799,7 +799,7 @@ public class DeviceMapEditorForm : Form
         DrawPropertyRow(canvas, ref y, "Bindings:", bindingsText, leftMargin, labelWidth, rightMargin, false);
 
         y += 10;
-        FUIRenderer.DrawText(canvas, "POSITION", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "POSITION", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
         y += 18;
 
         // Anchor
@@ -811,29 +811,29 @@ public class DeviceMapEditorForm : Form
         DrawPropertyRow(canvas, ref y, "Offset:", offsetText, leftMargin, labelWidth, rightMargin, true);
 
         y += 10;
-        FUIRenderer.DrawText(canvas, "LEAD LINE", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "LEAD LINE", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
         y += 18;
 
         var ll = control.LeadLine;
 
         // Shelf Side with toggle button
-        FUIRenderer.DrawText(canvas, "Side:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "Side:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         _shelfSideButtonBounds = new SKRect(leftMargin + labelWidth, y - 12, leftMargin + labelWidth + 60, y + 8);
         DrawSmallButton(canvas, _shelfSideButtonBounds, ll?.ShelfSide ?? "right");
         y += 24;
 
         // Shelf Length with +/- buttons
-        FUIRenderer.DrawText(canvas, "Shelf:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "Shelf:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         float btnX = leftMargin + labelWidth;
         _shelfLengthMinusBounds = new SKRect(btnX, y - 12, btnX + 24, y + 8);
         DrawSmallButton(canvas, _shelfLengthMinusBounds, "-");
-        FUIRenderer.DrawText(canvas, (ll?.ShelfLength ?? 80).ToString("F0"), new SKPoint(btnX + 32, y), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, (ll?.ShelfLength ?? 80).ToString("F0"), new SKPoint(btnX + 32, y), FUIColors.TextPrimary, 13f);
         _shelfLengthPlusBounds = new SKRect(btnX + 60, y - 12, btnX + 84, y + 8);
         DrawSmallButton(canvas, _shelfLengthPlusBounds, "+");
         y += 24;
 
         // Segments section
-        FUIRenderer.DrawText(canvas, "Segments:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "Segments:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         _addSegmentButtonBounds = new SKRect(rightMargin - 50, y - 12, rightMargin, y + 8);
         DrawSmallButton(canvas, _addSegmentButtonBounds, "+ Add");
         y += 22;
@@ -846,23 +846,23 @@ public class DeviceMapEditorForm : Form
                 var seg = ll.Segments[i];
 
                 // Segment label
-                FUIRenderer.DrawText(canvas, $"  {i + 1}:", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+                FUIRenderer.DrawText(canvas, $"  {i + 1}:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
 
                 // Angle controls
                 float angX = leftMargin + 30;
-                FUIRenderer.DrawText(canvas, "A:", new SKPoint(angX, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, "A:", new SKPoint(angX, y), FUIColors.TextDim, 12f);
                 var angMinus = new SKRect(angX + 16, y - 10, angX + 36, y + 6);
                 DrawSmallButton(canvas, angMinus, "-");
-                FUIRenderer.DrawText(canvas, seg.Angle.ToString("F0"), new SKPoint(angX + 40, y), FUIColors.TextPrimary, 9f);
+                FUIRenderer.DrawText(canvas, seg.Angle.ToString("F0"), new SKPoint(angX + 40, y), FUIColors.TextPrimary, 12f);
                 var angPlus = new SKRect(angX + 65, y - 10, angX + 85, y + 6);
                 DrawSmallButton(canvas, angPlus, "+");
 
                 // Length controls
                 float lenX = angX + 95;
-                FUIRenderer.DrawText(canvas, "L:", new SKPoint(lenX, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, "L:", new SKPoint(lenX, y), FUIColors.TextDim, 12f);
                 var lenMinus = new SKRect(lenX + 16, y - 10, lenX + 36, y + 6);
                 DrawSmallButton(canvas, lenMinus, "-");
-                FUIRenderer.DrawText(canvas, seg.Length.ToString("F0"), new SKPoint(lenX + 40, y), FUIColors.TextPrimary, 9f);
+                FUIRenderer.DrawText(canvas, seg.Length.ToString("F0"), new SKPoint(lenX + 40, y), FUIColors.TextPrimary, 12f);
                 var lenPlus = new SKRect(lenX + 65, y - 10, lenX + 85, y + 6);
                 DrawSmallButton(canvas, lenPlus, "+");
 
@@ -877,15 +877,15 @@ public class DeviceMapEditorForm : Form
         }
         else
         {
-            FUIRenderer.DrawText(canvas, "  (none - adds straight line)", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 9f);
+            FUIRenderer.DrawText(canvas, "  (none - adds straight line)", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
             y += 20;
         }
 
         // Angle guide
         y += 5;
-        FUIRenderer.DrawText(canvas, "Angles: 0=horiz, 90=up, -90=down", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 8f);
+        FUIRenderer.DrawText(canvas, "Angles: 0=horiz, 90=up, -90=down", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
         y += 12;
-        FUIRenderer.DrawText(canvas, "        45=diag-up, -45=diag-down", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 8f);
+        FUIRenderer.DrawText(canvas, "        45=diag-up, -45=diag-down", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
     }
 
     private void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text)
@@ -896,14 +896,14 @@ public class DeviceMapEditorForm : Form
         using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
         canvas.DrawRoundRect(bounds, 3, 3, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextPrimary, 9f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextPrimary, 12f);
     }
 
 
     private void DrawPropertyRow(SKCanvas canvas, ref float y, string label, string value,
         float leftMargin, float labelWidth, float rightMargin, bool readOnly)
     {
-        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
 
         var valueBounds = new SKRect(leftMargin + labelWidth, y - 12, rightMargin, y + 8);
 
@@ -922,7 +922,7 @@ public class DeviceMapEditorForm : Form
         }
 
         FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + labelWidth + 4, y),
-            readOnly ? FUIColors.TextPrimary : FUIColors.TextPrimary, 10f);
+            readOnly ? FUIColors.TextPrimary : FUIColors.TextPrimary, 13f);
 
         y += 24;
     }
@@ -945,7 +945,7 @@ public class DeviceMapEditorForm : Form
         // Header
         float headerY = _controlsListBounds.Top + 16;
         FUIRenderer.DrawText(canvas, "CONTROLS", new SKPoint(_controlsListBounds.Left + 16, headerY),
-            FUIColors.Active, 11f, true);
+            FUIColors.Active, 14f, true);
 
         // Content area (between header and buttons)
         float contentTop = _controlsListBounds.Top + 40;
@@ -994,7 +994,7 @@ public class DeviceMapEditorForm : Form
 
                 var indicator = isSelected ? "> " : "  ";
                 FUIRenderer.DrawText(canvas, indicator + kvp.Key, new SKPoint(itemBounds.Left + 5, y + 14),
-                    isSelected ? FUIColors.Active : FUIColors.TextPrimary, 10f);
+                    isSelected ? FUIColors.Active : FUIColors.TextPrimary, 13f);
             }
 
             y += itemHeight + itemGap;
@@ -1037,20 +1037,20 @@ public class DeviceMapEditorForm : Form
 
         // Cursor position
         var cursorText = $"Cursor: ({_mouseViewBox.X:F0}, {_mouseViewBox.Y:F0})";
-        FUIRenderer.DrawText(canvas, cursorText, new SKPoint(20, _statusBarBounds.Top + 18), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, cursorText, new SKPoint(20, _statusBarBounds.Top + 18), FUIColors.TextDim, 13f);
 
         // ViewBox info
         var viewBoxText = $"ViewBox: {_deviceMap.ViewBox?.X ?? 2048}x{_deviceMap.ViewBox?.Y ?? 2048}";
-        FUIRenderer.DrawText(canvas, viewBoxText, new SKPoint(220, _statusBarBounds.Top + 18), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, viewBoxText, new SKPoint(220, _statusBarBounds.Top + 18), FUIColors.TextDim, 13f);
 
         // Control count
         var countText = $"Controls: {_deviceMap.Controls.Count}";
-        FUIRenderer.DrawText(canvas, countText, new SKPoint(420, _statusBarBounds.Top + 18), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, countText, new SKPoint(420, _statusBarBounds.Top + 18), FUIColors.TextDim, 13f);
 
         // Show save message for 3 seconds, otherwise show help hint
         if (_lastSaveMessage is not null && (DateTime.Now - _lastSaveTime).TotalSeconds < 3)
         {
-            FUIRenderer.DrawText(canvas, _lastSaveMessage, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.Active, 10f);
+            FUIRenderer.DrawText(canvas, _lastSaveMessage, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.Active, 13f);
         }
         else
         {
@@ -1076,7 +1076,7 @@ public class DeviceMapEditorForm : Form
             {
                 helpText = "Click on SVG to add control";
             }
-            FUIRenderer.DrawText(canvas, helpText, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.TextDisabled, 10f);
+            FUIRenderer.DrawText(canvas, helpText, new SKPoint(580, _statusBarBounds.Top + 18), FUIColors.TextDisabled, 13f);
         }
     }
 
@@ -1097,11 +1097,11 @@ public class DeviceMapEditorForm : Form
         };
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
 
         // Dropdown arrow
         var arrow = open ? "^" : "v";
-        FUIRenderer.DrawText(canvas, arrow, new SKPoint(bounds.Right - 18, bounds.MidY + 4), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, arrow, new SKPoint(bounds.Right - 18, bounds.MidY + 4), FUIColors.TextDim, 13f);
     }
 
     private void DrawSvgDropdownMenu(SKCanvas canvas)
@@ -1139,7 +1139,7 @@ public class DeviceMapEditorForm : Form
             }
 
             FUIRenderer.DrawText(canvas, _availableSvgFiles[i], new SKPoint(itemBounds.Left + 5, y + 16),
-                hovered ? FUIColors.TextPrimary : FUIColors.TextDim, 10f);
+                hovered ? FUIColors.TextPrimary : FUIColors.TextDim, 13f);
 
             y += itemHeight;
         }
@@ -1158,7 +1158,7 @@ public class DeviceMapEditorForm : Form
         };
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
     }
 
     private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool primary = false)
@@ -1180,7 +1180,7 @@ public class DeviceMapEditorForm : Form
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
         var textColor = primary ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 10f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
     }
 
     private SKRect MeasureText(string text, float size)

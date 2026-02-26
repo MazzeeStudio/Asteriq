@@ -1129,8 +1129,8 @@ public class MappingsTabController : ITabController
         // Header with category code
         string categoryCode = _mappingCategory == 0 ? "M1" : "M2";
         string categoryName = "VJOY MAPPINGS";
-        FUIRenderer.DrawText(canvas, categoryCode, new SKPoint(leftMargin, y + 12), FUIColors.Active, 12f);
-        FUIRenderer.DrawText(canvas, categoryName, new SKPoint(leftMargin + 30, y + 12), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, categoryCode, new SKPoint(leftMargin, y + 12), FUIColors.Active, 15f);
+        FUIRenderer.DrawText(canvas, categoryName, new SKPoint(leftMargin + 30, y + 12), FUIColors.TextBright, 17f, true);
         y += 30;
 
         // vJoy device selector: [<] vJoy Device 1 [>]
@@ -1143,7 +1143,7 @@ public class MappingsTabController : ITabController
             : "No vJoy Devices";
         // Center the device name between the two arrow buttons
         var labelBounds = new SKRect(leftMargin + arrowButtonSize, y, rightMargin - arrowButtonSize, y + arrowButtonSize);
-        FUIRenderer.DrawTextCentered(canvas, deviceName, labelBounds, FUIColors.TextBright, 12f);
+        FUIRenderer.DrawTextCentered(canvas, deviceName, labelBounds, FUIColors.TextBright, 15f);
 
         _vjoyNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
         DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1);
@@ -1440,7 +1440,7 @@ public class MappingsTabController : ITabController
         // Output name (centered vertically)
         float leftTextX = bounds.Left + 12;
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftTextX, bounds.MidY + 5),
-            isSelected ? FUIColors.Active : FUIColors.TextPrimary, 12f, true);
+            isSelected ? FUIColors.Active : FUIColors.TextPrimary, 15f, true);
 
         // Right side indicator: keyboard keycaps or binding dot
         if (hasKeyParts)
@@ -1449,7 +1449,7 @@ public class MappingsTabController : ITabController
             float keycapHeight = 16f;
             float keycapGap = 2f;
             float keycapPadding = 6f;  // Padding inside each keycap (left + right)
-            float fontSize = 8f;  // Slightly smaller font for compact display
+            float fontSize = 11f;  // Slightly smaller font for compact display
             float scaledFontSize = fontSize;
             float keycapRight = bounds.Right - 8;
             float keycapTop = bounds.MidY - keycapHeight / 2;
@@ -1548,7 +1548,7 @@ public class MappingsTabController : ITabController
         string deviceLabel = _ctx.MappingsPrimaryDeviceMap?.Device ?? "—";
         FUIRenderer.DrawTextCentered(canvas, deviceLabel,
             new SKRect(bounds.Left, bounds.Top + frameInset, bounds.Right, labelY),
-            FUIColors.TextDim, 10f);
+            FUIColors.TextDim, 13f);
 
         // Reserve space at the bottom for the auto-scroll checkbox row
         float checkboxRowHeight = 26f;
@@ -1594,7 +1594,7 @@ public class MappingsTabController : ITabController
         var labelColor = _autoScrollCheckboxHovered ? FUIColors.TextBright : FUIColors.TextDim;
         FUIRenderer.DrawText(canvas, "AUTO-SCROLL TO MAPPING",
             new SKPoint(leftMargin + checkboxSize + 7, checkboxY + checkboxSize - 1),
-            labelColor, 10f);
+            labelColor, 13f);
 
         // "No mapping" flash indicator — centered above the checkbox row, fades out
         if (_noMappingFlashText is not null)
@@ -1606,7 +1606,7 @@ public class MappingsTabController : ITabController
                 var noMapColor = FUIColors.Warning.WithAlpha((byte)(opacity * 220));
                 FUIRenderer.DrawTextCentered(canvas, _noMappingFlashText,
                     new SKRect(bounds.Left, checkboxAreaTop - 22, bounds.Right, checkboxAreaTop),
-                    noMapColor, 10f);
+                    noMapColor, 13f);
             }
             else
             {
@@ -1633,14 +1633,14 @@ public class MappingsTabController : ITabController
         float rightMargin = bounds.Right - frameInset - 16;
 
         // Title
-        FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 17f, true);
         y += 36;
 
         // Show settings for selected row
         if (_selectedMappingRow < 0)
         {
             FUIRenderer.DrawText(canvas, "Select an output to configure",
-                new SKPoint(leftMargin, y + 32), FUIColors.TextDim, 12f);
+                new SKPoint(leftMargin, y + 32), FUIColors.TextDim, 15f);
             return;
         }
 
@@ -1649,7 +1649,7 @@ public class MappingsTabController : ITabController
         bool isAxis = _mappingCategory == 1;
         string outputName = GetSelectedOutputName();
 
-        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 16), FUIColors.Active, 13f, true);
+        FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 16), FUIColors.Active, 16f, true);
         y += 36;
 
         // INPUT SOURCES section - shows mapped inputs with add/remove
@@ -1671,7 +1671,7 @@ public class MappingsTabController : ITabController
     {
         _inputSourceRemoveBounds.Clear();
 
-        FUIRenderer.DrawText(canvas, "INPUT SOURCES", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "INPUT SOURCES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += 18;
 
         // Get current mappings for selected output
@@ -1697,7 +1697,7 @@ public class MappingsTabController : ITabController
             };
             canvas.DrawRoundRect(emptyBounds, 3, 3, emptyFramePaint);
 
-            FUIRenderer.DrawText(canvas, "No input mapped", new SKPoint(leftMargin + 10, emptyBounds.MidY + 4), FUIColors.TextDisabled, 11f);
+            FUIRenderer.DrawText(canvas, "No input mapped", new SKPoint(leftMargin + 10, emptyBounds.MidY + 4), FUIColors.TextDisabled, 14f);
             y += 28 + rowGap;
         }
         else
@@ -1724,10 +1724,10 @@ public class MappingsTabController : ITabController
                 string inputTypeText = input.Type == InputType.Button
                     ? $"Button {input.Index + 1}"
                     : $"{input.Type} {input.Index}";
-                FUIRenderer.DrawText(canvas, inputTypeText, new SKPoint(leftMargin + 8, y + 16), FUIColors.TextPrimary, 11f);
+                FUIRenderer.DrawText(canvas, inputTypeText, new SKPoint(leftMargin + 8, y + 16), FUIColors.TextPrimary, 14f);
 
                 // Line 2: Device name (smaller, dimmer) - vertically centered in bottom half
-                FUIRenderer.DrawText(canvas, input.DeviceName, new SKPoint(leftMargin + 8, y + 32), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, input.DeviceName, new SKPoint(leftMargin + 8, y + 32), FUIColors.TextDim, 12f);
 
                 // Remove [×] button (full height of row)
                 var removeBounds = new SKRect(rightMargin - 26, y, rightMargin, y + rowHeight);
@@ -1801,7 +1801,7 @@ public class MappingsTabController : ITabController
                 canvas.DrawRoundRect(listenBounds, 3, 3, listenFramePaint);
 
                 FUIRenderer.DrawText(canvas, "Press input...", new SKPoint(leftMargin + 10, y + 18),
-                    FUIColors.Active.WithAlpha(alpha), 11f);
+                    FUIColors.Active.WithAlpha(alpha), 14f);
                 y += rowHeight + rowGap;
             }
         }
@@ -1829,7 +1829,7 @@ public class MappingsTabController : ITabController
 
         string addText = isListening ? "Cancel" : "+ Add Input";
         FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
-            addHovered ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+            addHovered ? FUIColors.Active : FUIColors.TextPrimary, 14f);
         y += 28 + 8;  // Button height + small gap
 
         // Merge operation selector (only for axes with 2+ inputs)
@@ -1856,7 +1856,7 @@ public class MappingsTabController : ITabController
 
         // Section header with top margin
         y += 12;  // Space before section
-        FUIRenderer.DrawText(canvas, "MERGE MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "MERGE MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += 16;
 
         // Four merge operation buttons in a row
@@ -1887,7 +1887,7 @@ public class MappingsTabController : ITabController
             using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
             canvas.DrawRoundRect(btnBounds, 3, 3, framePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 10f);
+            FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 13f);
         }
 
         y += buttonHeight + 16;  // Move well below buttons (4px aligned)
@@ -1901,7 +1901,7 @@ public class MappingsTabController : ITabController
             MergeOperation.Sum => "Adds values (clamped -1 to 1)",
             _ => ""
         };
-        FUIRenderer.DrawText(canvas, description, new SKPoint(leftMargin, y), FUIColors.TextDisabled, 9f);
+        FUIRenderer.DrawText(canvas, description, new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
         y += 16;  // Space after description before next section
 
         return y;
@@ -1988,7 +1988,7 @@ public class MappingsTabController : ITabController
 
         // Response Curve header (with top margin for section separation)
         y += 8;  // Section separation
-        FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += 16f;
 
         // Symmetrical, Centre, and Invert checkboxes on their own row
@@ -1996,7 +1996,7 @@ public class MappingsTabController : ITabController
         float checkboxSize = 12f;
         float rowHeight = 16f;
         float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
-        float fontSize = 9f;
+        float fontSize = 12f;
         float scaledFontSize = fontSize;
         float textY = y + (rowHeight / 2) + (scaledFontSize / 3); // Center text baseline
 
@@ -2066,7 +2066,7 @@ public class MappingsTabController : ITabController
             using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
             canvas.DrawRect(presetBounds, framePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 8f);
+            FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 12f);
         }
         y += buttonHeight + 6f;
 
@@ -2089,7 +2089,7 @@ public class MappingsTabController : ITabController
         if (y + 100 < bottom)
         {
             // Header row: "DEADZONE" label + preset buttons + selected handle indicator
-            FUIRenderer.DrawText(canvas, "DEADZONE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "DEADZONE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
 
             // Preset buttons - always visible, apply to selected handle
             string[] presetLabels = { "0%", "2%", "5%", "10%" };
@@ -2118,7 +2118,7 @@ public class MappingsTabController : ITabController
                 canvas.DrawRect(btnBounds, btnBg);
                 using var btnFrame = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
                 canvas.DrawRect(btnBounds, btnFrame);
-                FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 9f);
+                FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 12f);
             }
 
             // Show which handle is selected (if any)
@@ -2126,7 +2126,7 @@ public class MappingsTabController : ITabController
             {
                 string[] handleNames = { "Start", "Ctr-", "Ctr+", "End" };
                 string selectedName = handleNames[_selectedDeadzoneHandle];
-                FUIRenderer.DrawText(canvas, $"[{selectedName}]", new SKPoint(presetStartX - 45, y), FUIColors.Active, 9f);
+                FUIRenderer.DrawText(canvas, $"[{selectedName}]", new SKPoint(presetStartX - 45, y), FUIColors.Active, 12f);
             }
             y += 20f;
 
@@ -2147,16 +2147,16 @@ public class MappingsTabController : ITabController
 
                 // Min at left edge, CtrMin at right edge of left track
                 // CtrMax at left edge of right track, Max at right edge
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMin:F2}", new SKPoint(leftTrackRight - 24, y), FUIColors.TextDim, 9f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMax:F2}", new SKPoint(rightTrackLeft, y), FUIColors.TextDim, 9f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMin:F2}", new SKPoint(leftTrackRight - 24, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMax:F2}", new SKPoint(rightTrackLeft, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
             }
             else
             {
                 // Single track - just show start and end at edges
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 9f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
             }
         }
     }
@@ -2306,7 +2306,7 @@ public class MappingsTabController : ITabController
         float width = rightMargin - leftMargin;
 
         // OUTPUT TYPE section - vJoy Button vs Keyboard
-        FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += 20;
 
         // Output type tabs
@@ -2341,14 +2341,14 @@ public class MappingsTabController : ITabController
             };
             canvas.DrawRoundRect(typeBounds, 3, 3, typeFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, outputTypes[i], typeBounds, textColor, 11f);
+            FUIRenderer.DrawTextCentered(canvas, outputTypes[i], typeBounds, textColor, 14f);
         }
         y += typeButtonHeight + 16;
 
         // KEY COMBO section (only when Keyboard is selected)
         if (_outputTypeIsKeyboard)
         {
-            FUIRenderer.DrawText(canvas, "KEY COMBO", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "KEY COMBO", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 20;
 
             float keyFieldHeight = 32f;
@@ -2413,7 +2413,7 @@ public class MappingsTabController : ITabController
             if (_isCapturingKey)
             {
                 byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
-                FUIRenderer.DrawTextCentered(canvas, "Press key combo...", _keyCaptureBounds, FUIColors.Warning.WithAlpha(alpha), 11f);
+                FUIRenderer.DrawTextCentered(canvas, "Press key combo...", _keyCaptureBounds, FUIColors.Warning.WithAlpha(alpha), 14f);
             }
             else if (!string.IsNullOrEmpty(_selectedKeyName))
             {
@@ -2422,13 +2422,13 @@ public class MappingsTabController : ITabController
             }
             else
             {
-                FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyCaptureBounds, FUIColors.TextDim, 11f);
+                FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyCaptureBounds, FUIColors.TextDim, 14f);
             }
             y += keyFieldHeight + 16;
         }
 
         // Button Mode section
-        FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += 20;
 
         // Mode buttons - all on one row
@@ -2460,7 +2460,7 @@ public class MappingsTabController : ITabController
             canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
 
             FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
-                selected ? FUIColors.Active : FUIColors.TextPrimary, 9f);
+                selected ? FUIColors.Active : FUIColors.TextPrimary, 12f);
 
             _buttonModeBounds[i] = modeBounds;
         }
@@ -2469,7 +2469,7 @@ public class MappingsTabController : ITabController
         // Duration slider for Pulse mode
         if (_selectedButtonMode == ButtonMode.Pulse && y + 50 < bottom)
         {
-            FUIRenderer.DrawText(canvas, "PULSE DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "PULSE DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 18;
 
             float sliderHeight = 24f;
@@ -2481,7 +2481,7 @@ public class MappingsTabController : ITabController
 
             // Value label
             FUIRenderer.DrawText(canvas, $"{_pulseDurationMs}ms",
-                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 10f);
+                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 13f);
 
             y += sliderHeight + 12;
         }
@@ -2489,7 +2489,7 @@ public class MappingsTabController : ITabController
         // Duration slider for Hold mode
         if (_selectedButtonMode == ButtonMode.HoldToActivate && y + 50 < bottom)
         {
-            FUIRenderer.DrawText(canvas, "HOLD DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "HOLD DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 18;
 
             float sliderHeight = 24f;
@@ -2501,7 +2501,7 @@ public class MappingsTabController : ITabController
 
             // Value label
             FUIRenderer.DrawText(canvas, $"{_holdDurationMs}ms",
-                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 10f);
+                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 13f);
 
             y += sliderHeight + 12;
         }
@@ -2627,7 +2627,7 @@ public class MappingsTabController : ITabController
 
             // Label below tick
             float labelX = x - (t == 0 ? 0 : (t == 1 ? 12 : 6));
-            FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, bounds.Bottom + tickLen + labelOffset + 7), FUIColors.TextDim, 7f);
+            FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, bounds.Bottom + tickLen + labelOffset + 7), FUIColors.TextDim, 12f);
         }
 
         // Draw tick marks at 0%, 50%, 100% on left edge (OUT axis)
@@ -2642,17 +2642,17 @@ public class MappingsTabController : ITabController
             // Label left of tick
             float labelY = y + (t == 0 ? 3 : (t == 1 ? 7 : 3));
             float labelX = bounds.Left - tickLen - labelOffset - (tickLabels[i].Length > 1 ? 12 : 6);
-            FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, labelY), FUIColors.TextDim, 7f);
+            FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, labelY), FUIColors.TextDim, 12f);
         }
 
         // Axis labels
-        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 22), FUIColors.TextDim, 8f);
+        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 22), FUIColors.TextDim, 12f);
 
         // Rotated "OUT" label
         canvas.Save();
         canvas.Translate(bounds.Left - 24, bounds.MidY + 8);
         canvas.RotateDegrees(-90);
-        FUIRenderer.DrawText(canvas, "OUT", new SKPoint(0, 0), FUIColors.TextDim, 8f);
+        FUIRenderer.DrawText(canvas, "OUT", new SKPoint(0, 0), FUIColors.TextDim, 12f);
         canvas.Restore();
     }
 
@@ -2744,7 +2744,7 @@ public class MappingsTabController : ITabController
             : "LIVE INPUT: (no signal)";
 
         var headerColor = hasInput ? FUIColors.Active : FUIColors.TextDim.WithAlpha(150);
-        FUIRenderer.DrawText(canvas, headerText, new SKPoint(leftMargin, y), headerColor, 9f);
+        FUIRenderer.DrawText(canvas, headerText, new SKPoint(leftMargin, y), headerColor, 12f);
         y += 16f;
 
         if (hasInput)
@@ -2811,15 +2811,15 @@ public class MappingsTabController : ITabController
             // Labels below bar - different for centered vs end-only
             if (isCentered)
             {
-                FUIRenderer.DrawText(canvas, "-100%", new SKPoint(leftMargin, y), FUIColors.TextDim, 7f);
-                FUIRenderer.DrawText(canvas, "0%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 7f);
-                FUIRenderer.DrawText(canvas, "+100%", new SKPoint(rightMargin - 28, y), FUIColors.TextDim, 7f);
+                FUIRenderer.DrawText(canvas, "-100%", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, "0%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, "+100%", new SKPoint(rightMargin - 28, y), FUIColors.TextDim, 12f);
             }
             else
             {
-                FUIRenderer.DrawText(canvas, "0%", new SKPoint(leftMargin, y), FUIColors.TextDim, 7f);
-                FUIRenderer.DrawText(canvas, "50%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 7f);
-                FUIRenderer.DrawText(canvas, "100%", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 7f);
+                FUIRenderer.DrawText(canvas, "0%", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, "50%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, "100%", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
             }
             y += 12f;
         }
@@ -3019,7 +3019,7 @@ public class MappingsTabController : ITabController
                 if (labelY < bounds.Top + 10)
                     labelY = y + radius + 14;
 
-                FUIRenderer.DrawText(canvas, label, new SKPoint(x - 22, labelY), FUIColors.TextBright, 8f);
+                FUIRenderer.DrawText(canvas, label, new SKPoint(x - 22, labelY), FUIColors.TextBright, 12f);
             }
         }
     }
@@ -3592,7 +3592,7 @@ public class MappingsTabController : ITabController
         y += 30;
 
         // INPUT SOURCE section
-        FUIRenderer.DrawText(canvas, "INPUT SOURCE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "INPUT SOURCE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += 20;
 
         // Input field - double-click to listen for input
@@ -3617,7 +3617,7 @@ public class MappingsTabController : ITabController
         {
             // Output type selector (Button vs Keyboard)
             y += 10;
-            FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 20;
             DrawOutputTypeSelector(canvas, leftMargin, y, rightMargin - leftMargin);
             y += 38;
@@ -3625,7 +3625,7 @@ public class MappingsTabController : ITabController
             // Key capture field (only when Keyboard is selected)
             if (_outputTypeIsKeyboard)
             {
-                FUIRenderer.DrawText(canvas, "KEY", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+                FUIRenderer.DrawText(canvas, "KEY", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
                 y += 20;
                 float keyFieldHeight = 32f;
                 _keyCaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
@@ -3635,7 +3635,7 @@ public class MappingsTabController : ITabController
 
             // Button mode selector
             y += 10;
-            FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 20;
             DrawButtonModeSelector(canvas, leftMargin, y, rightMargin - leftMargin);
             y += 40;
@@ -3701,17 +3701,17 @@ public class MappingsTabController : ITabController
         {
             byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
             FUIRenderer.DrawText(canvas, "Press a button or move an axis...",
-                new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 12f);
+                new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 15f);
         }
         else if (_pendingInput is not null)
         {
             FUIRenderer.DrawText(canvas, _pendingInput.ToString(),
-                new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 12f);
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 15f);
         }
         else
         {
             FUIRenderer.DrawText(canvas, "Double-click to detect input",
-                new SKPoint(bounds.Left + 10, textY), FUIColors.TextDisabled, 12f);
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextDisabled, 15f);
         }
 
         // Clear button if there's input
@@ -3728,7 +3728,7 @@ public class MappingsTabController : ITabController
     private float DrawManualEntrySection(SKCanvas canvas, SKRect bounds, float y, float leftMargin, float rightMargin)
     {
         // Device dropdown
-        FUIRenderer.DrawText(canvas, "Device:", new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "Device:", new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 13f);
         float dropdownX = leftMargin + 55;
         _deviceDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
         string deviceText = _ctx.Devices.Count > 0 && _selectedSourceDevice < _ctx.Devices.Count
@@ -3739,7 +3739,7 @@ public class MappingsTabController : ITabController
 
         // Control dropdown
         string controlLabel = _isEditingAxis ? "Axis:" : "Button:";
-        FUIRenderer.DrawText(canvas, controlLabel, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, controlLabel, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 13f);
         _controlDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
         string controlText = GetControlDropdownText();
         DrawDropdown(canvas, _controlDropdownBounds, controlText, _controlDropdownOpen);
@@ -3815,7 +3815,7 @@ public class MappingsTabController : ITabController
             }
 
             FUIRenderer.DrawText(canvas, _ctx.Devices[i].Name, new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4),
-                hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 11f);
+                hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 14f);
             y += itemHeight;
         }
 
@@ -3865,7 +3865,7 @@ public class MappingsTabController : ITabController
 
             string name = _isEditingAxis ? $"Axis {i}" : $"Button {i + 1}";
             FUIRenderer.DrawText(canvas, name, new SKPoint(itemBounds.Left + 8, itemBounds.MidY + 4),
-                hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 11f);
+                hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 14f);
             y += itemHeight;
         }
 
@@ -3910,7 +3910,7 @@ public class MappingsTabController : ITabController
             };
             canvas.DrawRect(modeBounds, framePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 10f);
+            FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 13f);
         }
     }
 
@@ -3945,7 +3945,7 @@ public class MappingsTabController : ITabController
             };
             canvas.DrawRect(typeBounds, framePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, labels[i], typeBounds, textColor, 11f);
+            FUIRenderer.DrawTextCentered(canvas, labels[i], typeBounds, textColor, 14f);
         }
     }
 
@@ -3977,17 +3977,17 @@ public class MappingsTabController : ITabController
         {
             byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
             FUIRenderer.DrawText(canvas, "Press a key...",
-                new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 12f);
+                new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 15f);
         }
         else if (!string.IsNullOrEmpty(_selectedKeyName))
         {
             FUIRenderer.DrawText(canvas, _selectedKeyName,
-                new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 12f);
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 15f);
         }
         else
         {
             FUIRenderer.DrawText(canvas, "Click to capture key",
-                new SKPoint(bounds.Left + 10, textY), FUIColors.TextDisabled, 12f);
+                new SKPoint(bounds.Left + 10, textY), FUIColors.TextDisabled, 15f);
         }
 
         // Clear button if there's a key
@@ -4017,9 +4017,9 @@ public class MappingsTabController : ITabController
         if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count)
         {
             FUIRenderer.DrawText(canvas, "No vJoy devices available",
-                new SKPoint(bounds.Left + 20, bounds.Top + 20), FUIColors.TextDim, 12f);
+                new SKPoint(bounds.Left + 20, bounds.Top + 20), FUIColors.TextDim, 15f);
             FUIRenderer.DrawText(canvas, "Install vJoy driver to create mappings",
-                new SKPoint(bounds.Left + 20, bounds.Top + 40), FUIColors.TextDisabled, 11f);
+                new SKPoint(bounds.Left + 20, bounds.Top + 40), FUIColors.TextDisabled, 14f);
             return;
         }
 
@@ -4032,7 +4032,7 @@ public class MappingsTabController : ITabController
         int rowIndex = 0;
 
         // Section: AXES
-        FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 14), FUIColors.Active, 11f);
+        FUIRenderer.DrawText(canvas, "AXES", new SKPoint(bounds.Left + 5, y + 14), FUIColors.Active, 14f);
         y += 20;
 
         string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
@@ -4057,7 +4057,7 @@ public class MappingsTabController : ITabController
         y += 10;
         if (y + 20 < bounds.Bottom)
         {
-            FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 14), FUIColors.Active, 11f);
+            FUIRenderer.DrawText(canvas, "BUTTONS", new SKPoint(bounds.Left + 5, y + 14), FUIColors.Active, 14f);
             y += 20;
         }
 
@@ -4138,12 +4138,12 @@ public class MappingsTabController : ITabController
         // Output name (left)
         float textY = bounds.MidY + 5;
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(bounds.Left + 10, textY),
-            isEditing ? FUIColors.Active : FUIColors.TextPrimary, 12f);
+            isEditing ? FUIColors.Active : FUIColors.TextPrimary, 15f);
 
         // Binding (center)
         float bindingX = bounds.Left + 100;
         var bindColor = binding == "—" ? FUIColors.TextDisabled : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, binding, new SKPoint(bindingX, textY), bindColor, 11f);
+        FUIRenderer.DrawText(canvas, binding, new SKPoint(bindingX, textY), bindColor, 14f);
 
         // [+] button (Edit/Add)
         float buttonSize = 24f;
@@ -5848,9 +5848,9 @@ public class MappingsTabController : ITabController
         if (profile is null)
         {
             FUIRenderer.DrawText(canvas, "No profile selected",
-                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 12f);
+                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 15f);
             FUIRenderer.DrawText(canvas, "Select or create a profile to add mappings",
-                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 11f);
+                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 14f);
             return;
         }
 
@@ -5876,9 +5876,9 @@ public class MappingsTabController : ITabController
         if (allMappings.Count == 0)
         {
             FUIRenderer.DrawText(canvas, "No mappings configured",
-                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 12f);
+                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 15f);
             FUIRenderer.DrawText(canvas, "Click '+ ADD MAPPING' to create your first mapping",
-                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 11f);
+                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 14f);
             return;
         }
 

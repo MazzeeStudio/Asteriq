@@ -127,12 +127,12 @@ public class BindingConflictDialog : Form
         // Draw title
         string titleText = $"{_inputDisplayName} IS ALREADY IN USE";
         FUIRenderer.DrawText(canvas, titleText, new SKPoint(44, titleBarBounds.MidY + 5),
-            FUIColors.Active, 12f, true);
+            FUIColors.Active, 15f, true);
 
         // Description
         float y = titleBarBounds.Bottom + 20;
         string descText = $"The input \"{_inputDisplayName}\" on {_deviceName} is already bound to:";
-        FUIRenderer.DrawText(canvas, descText, new SKPoint(20, y), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawText(canvas, descText, new SKPoint(20, y), FUIColors.TextPrimary, 14f);
         y += 28;
 
         // Conflict list background
@@ -160,21 +160,21 @@ public class BindingConflictDialog : Form
         {
             var conflict = _conflicts[i];
             string displayName = FormatActionName(conflict.ActionMap, conflict.ActionName);
-            FUIRenderer.DrawText(canvas, $"  {displayName}", new SKPoint(24, itemY + 14), FUIColors.TextPrimary, 10f);
+            FUIRenderer.DrawText(canvas, $"  {displayName}", new SKPoint(24, itemY + 14), FUIColors.TextPrimary, 13f);
             itemY += 22;
         }
 
         if (_conflicts.Count > 5)
         {
             FUIRenderer.DrawText(canvas, $"  ... and {_conflicts.Count - 5} more",
-                new SKPoint(24, itemY + 14), FUIColors.TextDim, 10f);
+                new SKPoint(24, itemY + 14), FUIColors.TextDim, 13f);
         }
 
         y += listHeight + 16;
 
         // New binding info
         string newBindingText = $"You are trying to bind: {_newActionName}";
-        FUIRenderer.DrawText(canvas, newBindingText, new SKPoint(20, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, newBindingText, new SKPoint(20, y), FUIColors.TextDim, 13f);
 
         // Button panel background
         float buttonPanelTop = bounds.Bottom - 55;
@@ -254,10 +254,10 @@ public class BindingConflictDialog : Form
         canvas.DrawRect(bounds, borderPaint);
 
         // Text centered
-        float textWidth = FUIRenderer.MeasureText(text, 10f);
+        float textWidth = FUIRenderer.MeasureText(text, 13f);
         float textX = bounds.MidX - textWidth / 2;
         FUIRenderer.DrawText(canvas, text, new SKPoint(textX, bounds.MidY + 4),
-            hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(200), 10f, true);
+            hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(200), 13f, true);
     }
 
     private static string FormatActionName(string actionMap, string actionName)

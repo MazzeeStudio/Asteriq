@@ -471,9 +471,9 @@ public class DevicesTabController : ITabController
                 ? "Connect a joystick or gamepad"
                 : "Install vJoy or start a virtual device";
             FUIRenderer.DrawText(canvas, emptyMsg,
-                new SKPoint(contentBounds.Left + pad, itemY + 20), FUIColors.TextDim, 12f);
+                new SKPoint(contentBounds.Left + pad, itemY + 20), FUIColors.TextDim, 15f);
             FUIRenderer.DrawText(canvas, helpMsg,
-                new SKPoint(contentBounds.Left + pad, itemY + 38), FUIColors.TextDisabled, 10f);
+                new SKPoint(contentBounds.Left + pad, itemY + 38), FUIColors.TextDisabled, 13f);
         }
         else
         {
@@ -534,7 +534,7 @@ public class DevicesTabController : ITabController
 
         float promptY = bounds.Bottom - pad - 20;
         FUIRenderer.DrawText(canvas, "+ SCAN FOR DEVICES",
-            new SKPoint(contentBounds.Left + pad, promptY), FUIColors.TextDim, 12f);
+            new SKPoint(contentBounds.Left + pad, promptY), FUIColors.TextDim, 15f);
 
         using var bracketPaint = new SKPaint
         {
@@ -774,16 +774,16 @@ public class DevicesTabController : ITabController
             bool isDisconnected = !device.IsConnected;
 
             FUIRenderer.DrawText(canvas, isDisconnected ? "DISCONNECTED DEVICE" : "SELECTED DEVICE",
-                new SKPoint(contentBounds.Left + pad, y), isDisconnected ? FUIColors.Danger : FUIColors.TextDim, 9f);
+                new SKPoint(contentBounds.Left + pad, y), isDisconnected ? FUIColors.Danger : FUIColors.TextDim, 12f);
             y += 16f;
 
             string shortName = device.Name.Length > 22 ? device.Name.Substring(0, 20) + "..." : device.Name;
             FUIRenderer.DrawText(canvas, shortName, new SKPoint(contentBounds.Left + pad, y),
-                isDisconnected ? FUIColors.TextDim : FUIColors.TextPrimary, 11f);
+                isDisconnected ? FUIColors.TextDim : FUIColors.TextPrimary, 14f);
             y += 20f;
 
             FUIRenderer.DrawText(canvas, $"{device.AxisCount} axes  {device.ButtonCount} btns  {device.HatCount} hats",
-                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
             y += 24f;
 
             float buttonWidth = contentBounds.Width - pad * 2;
@@ -826,11 +826,11 @@ public class DevicesTabController : ITabController
 
             // Show vJoy slot header
             FUIRenderer.DrawText(canvas, "VIRTUAL DEVICE",
-                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
             y += 16f;
 
             string vjoyName = vjoyId > 0 ? $"vJoy Slot {vjoyId}" : _ctx.Devices[_ctx.SelectedDevice].Name;
-            FUIRenderer.DrawText(canvas, vjoyName, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextPrimary, 11f);
+            FUIRenderer.DrawText(canvas, vjoyName, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextPrimary, 14f);
             y += 20f;
 
             if (vjoyInfo is not null)
@@ -840,14 +840,14 @@ public class DevicesTabController : ITabController
                     vjoyInfo.HasSlider0, vjoyInfo.HasSlider1 }.Count(b => b);
                 int hatCount = vjoyInfo.DiscPovCount + vjoyInfo.ContPovCount;
                 FUIRenderer.DrawText(canvas, $"{axisCount} axes  {vjoyInfo.ButtonCount} btns  {hatCount} hats",
-                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
                 y += 20f;
             }
 
             // Show primary mapped physical device
             y += 6f;
             FUIRenderer.DrawText(canvas, "MAPPED DEVICE",
-                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
             y += 16f;
 
             var primaryDevice = GetPrimaryPhysicalDevice(vjoyId);
@@ -855,22 +855,22 @@ public class DevicesTabController : ITabController
             {
                 string devName = primaryDevice.Name.Length > 22 ? primaryDevice.Name[..20] + "..." : primaryDevice.Name;
                 FUIRenderer.DrawText(canvas, devName, new SKPoint(contentBounds.Left + pad, y),
-                    primaryDevice.IsConnected ? FUIColors.TextPrimary : FUIColors.TextDim, 11f);
+                    primaryDevice.IsConnected ? FUIColors.TextPrimary : FUIColors.TextDim, 14f);
                 y += 20f;
                 FUIRenderer.DrawText(canvas, $"{primaryDevice.AxisCount} axes  {primaryDevice.ButtonCount} btns  {primaryDevice.HatCount} hats",
-                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
                 y += 20f;
             }
             else
             {
-                FUIRenderer.DrawText(canvas, "None", new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDisabled, 11f);
+                FUIRenderer.DrawText(canvas, "None", new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDisabled, 14f);
                 y += 20f;
             }
 
             // Silhouette picker
             y += 6f;
             FUIRenderer.DrawText(canvas, "VISUAL IDENTITY",
-                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 9f);
+                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
             y += 16f;
 
             float arrowButtonSize = 24f;
@@ -883,7 +883,7 @@ public class DevicesTabController : ITabController
             FUIWidgets.DrawArrowButton(canvas, _silhouettePrevButtonBounds, "<", _silhouettePrevHovered, hasPrev);
 
             var labelBounds = new SKRect(leftMargin + arrowButtonSize, y, rightMargin - arrowButtonSize, y + arrowButtonSize);
-            FUIRenderer.DrawTextCentered(canvas, silhouetteLabel, labelBounds, FUIColors.TextBright, 10f);
+            FUIRenderer.DrawTextCentered(canvas, silhouetteLabel, labelBounds, FUIColors.TextBright, 13f);
 
             _silhouetteNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
             FUIWidgets.DrawArrowButton(canvas, _silhouetteNextButtonBounds, ">", _silhouetteNextHovered, hasNext);
@@ -897,9 +897,9 @@ public class DevicesTabController : ITabController
             _silhouetteNextButtonBounds = SKRect.Empty;
 
             FUIRenderer.DrawText(canvas, "Select a device",
-                new SKPoint(contentBounds.Left + pad, y + 20), FUIColors.TextDim, 10f);
+                new SKPoint(contentBounds.Left + pad, y + 20), FUIColors.TextDim, 13f);
             FUIRenderer.DrawText(canvas, "to see available actions",
-                new SKPoint(contentBounds.Left + pad, y + 36), FUIColors.TextDim, 10f);
+                new SKPoint(contentBounds.Left + pad, y + 36), FUIColors.TextDim, 13f);
         }
     }
 

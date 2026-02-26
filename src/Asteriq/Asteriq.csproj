@@ -18,6 +18,9 @@
 
     <!-- Application icon -->
     <ApplicationIcon>asteriq.ico</ApplicationIcon>
+
+    <!-- Bundle native DLLs (SkiaSharp, SDL2, etc.) inside the single-file exe -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <!-- Generate build number from git commit count -->

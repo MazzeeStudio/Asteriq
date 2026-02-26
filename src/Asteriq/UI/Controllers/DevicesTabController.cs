@@ -76,7 +76,7 @@ public class DevicesTabController : ITabController
         float sideTabPad = FUIRenderer.SpaceSM;
         float pad = FUIRenderer.SpaceXL;
         float contentWidth = bounds.Width - sideTabPad - pad;
-        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f);
+        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f, maxSidePanel: 500f);
 
         float leftPanelWidth = layout.LeftPanelWidth;
         float gap = layout.Gutter;
@@ -255,7 +255,7 @@ public class DevicesTabController : ITabController
         float contentPad = FUIRenderer.SpaceXL;
         float contentTop = 88;
         float contentWidth = _ctx.OwnerForm.ClientSize.Width - sideTabPad - contentPad;
-        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f);
+        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f, maxSidePanel: 500f);
         float leftPanelWidth = layout.LeftPanelWidth;
         float sideTabWidth = 28f;
 

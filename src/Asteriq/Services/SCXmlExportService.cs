@@ -114,7 +114,7 @@ public class SCXmlExportService
     }
 
     /// <summary>
-    /// Creates options elements for each joystick device
+    /// Creates options elements for each joystick device (vJoy and physical)
     /// </summary>
     private static IEnumerable<XElement> CreateOptionElements(SCExportProfile profile)
     {
@@ -132,6 +132,32 @@ public class SCXmlExportService
                 new XAttribute("type", "joystick"),
                 new XAttribute("instance", scInstance),
                 new XAttribute("Product", $"vJoy Device {{00000000-0000-0000-0000-00000000000{vjoyId}}}")
+            );
+            options.Add(optionElement);
+        }
+
+        // Create options for each mapped physical device
+        foreach (var kvp in profile.PhysicalDeviceToSCInstance.OrderBy(k => k.Value))
+        {
+            var hidPath = kvp.Key;
+            var scInstance = kvp.Value;
+
+            // Use the persisted DirectInput GUID if available
+            string productAttr;
+            if (profile.PhysicalDeviceDirectInputGuids.TryGetValue(hidPath, out var diGuid) && diGuid != Guid.Empty)
+            {
+                productAttr = $"{{{diGuid.ToString().ToUpperInvariant()}}}";
+            }
+            else
+            {
+                // Fallback — use a placeholder; SC may not match it but it won't crash
+                productAttr = $"Physical Device {{{Guid.Empty}}}";
+            }
+
+            var optionElement = new XElement("options",
+                new XAttribute("type", "joystick"),
+                new XAttribute("instance", scInstance),
+                new XAttribute("Product", productAttr)
             );
             options.Add(optionElement);
         }
@@ -230,6 +256,8 @@ public class SCXmlExportService
         {
             SCDeviceType.Keyboard => $"kb1_{modifierPrefix}{binding.InputName}",
             SCDeviceType.Mouse => $"mo1_{modifierPrefix}{binding.InputName}",
+            SCDeviceType.Joystick when binding.PhysicalDeviceId is not null =>
+                $"js{profile.GetSCInstanceForPhysical(binding.PhysicalDeviceId)}_{modifierPrefix}{binding.InputName}",
             SCDeviceType.Joystick => $"js{profile.GetSCInstance(binding.VJoyDevice)}_{modifierPrefix}{binding.InputName}",
             _ => binding.InputName
         };
@@ -264,8 +292,10 @@ public class SCXmlExportService
             result.Warnings.Add($"Duplicate binding for {dup}");
         }
 
-        // Check that all vJoy devices have SC instance mappings
-        var usedVJoyDevices = profile.Bindings.Select(b => b.VJoyDevice).Distinct();
+        // Check that all vJoy devices used by vJoy bindings have SC instance mappings
+        var usedVJoyDevices = profile.Bindings
+            .Where(b => b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null)
+            .Select(b => b.VJoyDevice).Distinct();
         foreach (var vjoy in usedVJoyDevices)
         {
             if (!profile.VJoyToSCInstance.ContainsKey(vjoy))

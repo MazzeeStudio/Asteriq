@@ -6,18 +6,26 @@ using SkiaSharp.Views.Desktop;
 namespace Asteriq.UI;
 
 /// <summary>
-/// FUI-styled dialog for assigning SC actions to vJoy inputs.
+/// FUI-styled dialog for assigning SC actions to joystick inputs.
+/// Works with both vJoy devices and physical devices.
 /// </summary>
 public class SCAssignmentDialog : Form
 {
     private readonly SCAction _action;
-    private readonly List<VJoyDeviceInfo> _availableVJoy;
+
+    /// <summary>
+    /// Generic device entry for the selector.
+    /// </summary>
+    private readonly record struct DeviceEntry(string DisplayName, uint VJoyId, int PhysicalIndex);
+
+    private readonly List<DeviceEntry> _devices;
+    private readonly bool _isPhysicalMode;
 
     private SKControl _canvas = null!;
     private System.Windows.Forms.Timer _renderTimer = null!;
 
     // Dialog state
-    private int _selectedVJoyDevice = 0;
+    private int _selectedDevice = 0;
     private int _selectedInputIndex = 0; // Index in the combined list of axes + buttons
     private bool _inverted = false;
 
@@ -28,20 +36,40 @@ public class SCAssignmentDialog : Form
 
     // Result
     public uint SelectedVJoyId { get; private set; }
+    public int SelectedPhysicalIndex { get; private set; } = -1;
     public string SelectedInputName { get; private set; } = "";
     public bool IsInverted => _inverted;
 
+    /// <summary>
+    /// Constructor for vJoy devices (existing behavior)
+    /// </summary>
     public SCAssignmentDialog(SCAction action, List<VJoyDeviceInfo> availableVJoy)
     {
         _action = action;
-        _availableVJoy = availableVJoy;
+        _isPhysicalMode = false;
+        _devices = availableVJoy.Select(v => new DeviceEntry($"vJoy {v.Id}", v.Id, -1)).ToList();
 
         InitializeForm();
         InitializeCanvas();
         InitializeTimer();
 
-        // Default to button1 for button actions, x axis for axis actions
-        _selectedInputIndex = action.InputType == SCInputType.Axis ? 0 : 9; // 8 axes + separator + button1
+        _selectedInputIndex = action.InputType == SCInputType.Axis ? 0 : 9;
+    }
+
+    /// <summary>
+    /// Constructor for physical devices (no vJoy)
+    /// </summary>
+    public SCAssignmentDialog(SCAction action, List<PhysicalDeviceInfo> physicalDevices)
+    {
+        _action = action;
+        _isPhysicalMode = true;
+        _devices = physicalDevices.Select((d, idx) => new DeviceEntry(d.Name, 0, idx)).ToList();
+
+        InitializeForm();
+        InitializeCanvas();
+        InitializeTimer();
+
+        _selectedInputIndex = action.InputType == SCInputType.Axis ? 0 : 9;
     }
 
     private void InitializeForm()
@@ -100,11 +128,11 @@ public class SCAssignmentDialog : Form
     {
         switch (_hoveredButton)
         {
-            case 0: // Previous vJoy device
-                if (_selectedVJoyDevice > 0) _selectedVJoyDevice--;
+            case 0: // Previous device
+                if (_selectedDevice > 0) _selectedDevice--;
                 break;
-            case 1: // Next vJoy device
-                if (_selectedVJoyDevice < _availableVJoy.Count - 1) _selectedVJoyDevice++;
+            case 1: // Next device
+                if (_selectedDevice < _devices.Count - 1) _selectedDevice++;
                 break;
             case 2: // Previous input
                 if (_selectedInputIndex > 0) _selectedInputIndex--;
@@ -137,7 +165,9 @@ public class SCAssignmentDialog : Form
         if (inputName == "---")
             return;
 
-        SelectedVJoyId = _availableVJoy[_selectedVJoyDevice].Id;
+        var entry = _devices[_selectedDevice];
+        SelectedVJoyId = entry.VJoyId;
+        SelectedPhysicalIndex = entry.PhysicalIndex;
         SelectedInputName = inputName;
         DialogResult = DialogResult.OK;
         Close();
@@ -253,9 +283,12 @@ public class SCAssignmentDialog : Form
         float pad = 20f;
         var buttons = new List<SKRect>();
 
-        if (_availableVJoy.Count == 0)
+        if (_devices.Count == 0)
         {
-            FUIRenderer.DrawText(canvas, "No vJoy devices available",
+            string noDeviceMsg = _isPhysicalMode
+                ? "No joystick devices connected"
+                : "No vJoy devices available";
+            FUIRenderer.DrawText(canvas, noDeviceMsg,
                 new SKPoint(pad, y), FUIColors.Warning, 15f);
 
             var noDeviceCancelBounds = new SKRect(bounds.MidX - 50, bounds.Height - 60, bounds.MidX + 50, bounds.Height - 30);
@@ -265,20 +298,37 @@ public class SCAssignmentDialog : Form
             return;
         }
 
-        var device = _availableVJoy[_selectedVJoyDevice];
+        var device = _devices[_selectedDevice];
 
-        // vJoy device selector
-        FUIRenderer.DrawText(canvas, "vJoy Device:", new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
+        // Device selector
+        string deviceLabel = _isPhysicalMode ? "Device:" : "vJoy Device:";
+        FUIRenderer.DrawText(canvas, deviceLabel, new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
 
-        var prevDeviceBtn = new SKRect(pad + 110, y, pad + 140, y + 28);
+        float labelWidth = _isPhysicalMode ? 70f : 110f;
+        var prevDeviceBtn = new SKRect(pad + labelWidth, y, pad + labelWidth + 30, y + 28);
         var nextDeviceBtn = new SKRect(pad + 280, y, pad + 310, y + 28);
         buttons.Add(prevDeviceBtn);  // 0
         buttons.Add(nextDeviceBtn);  // 1
 
-        DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == 0, _selectedVJoyDevice > 0);
-        FUIRenderer.DrawTextCentered(canvas, $"vJoy {device.Id}",
-            new SKRect(pad + 150, y, pad + 270, y + 28), FUIColors.TextBright, 15f);
-        DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == 1, _selectedVJoyDevice < _availableVJoy.Count - 1);
+        DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == 0, _selectedDevice > 0);
+
+        // Truncate device display name to fit between the < > buttons
+        float nameAreaLeft = pad + labelWidth + 38;
+        float nameAreaRight = pad + 272;
+        float nameAreaWidth = nameAreaRight - nameAreaLeft;
+        string displayName = device.DisplayName;
+        float nameWidth = FUIRenderer.MeasureText(displayName, 14f);
+        if (nameWidth > nameAreaWidth)
+        {
+            // Truncate with ".."
+            while (displayName.Length > 3 && FUIRenderer.MeasureText(displayName + "..", 14f) > nameAreaWidth)
+                displayName = displayName[..^1];
+            displayName += "..";
+        }
+
+        FUIRenderer.DrawTextCentered(canvas, displayName,
+            new SKRect(nameAreaLeft, y, nameAreaRight, y + 28), FUIColors.TextBright, 14f);
+        DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == 1, _selectedDevice < _devices.Count - 1);
 
         y += 44;
 

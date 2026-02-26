@@ -163,6 +163,16 @@ public class SCExportProfileService
             duplicate.VJoyToSCInstance[kvp.Key] = kvp.Value;
         }
 
+        // Copy physical device mappings
+        foreach (var kvp in source.PhysicalDeviceToSCInstance)
+        {
+            duplicate.PhysicalDeviceToSCInstance[kvp.Key] = kvp.Value;
+        }
+        foreach (var kvp in source.PhysicalDeviceDirectInputGuids)
+        {
+            duplicate.PhysicalDeviceDirectInputGuids[kvp.Key] = kvp.Value;
+        }
+
         // Copy bindings
         foreach (var binding in source.Bindings)
         {
@@ -170,7 +180,9 @@ public class SCExportProfileService
             {
                 ActionMap = binding.ActionMap,
                 ActionName = binding.ActionName,
+                DeviceType = binding.DeviceType,
                 VJoyDevice = binding.VJoyDevice,
+                PhysicalDeviceId = binding.PhysicalDeviceId,
                 InputName = binding.InputName,
                 InputType = binding.InputType,
                 Inverted = binding.Inverted,

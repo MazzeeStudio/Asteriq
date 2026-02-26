@@ -143,13 +143,21 @@ public sealed class UpdateService : IUpdateService
 
             await File.WriteAllTextAsync(scriptPath, script, ct);
 
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            // Check if the exe location is writable without elevation
+            bool needsElevation = !IsDirectoryWritable(Path.GetDirectoryName(currentExe)!);
+
+            var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "powershell.exe",
                 Arguments = $"-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"{scriptPath}\"",
                 UseShellExecute = true,
                 WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
-            });
+            };
+
+            if (needsElevation)
+                psi.Verb = "runas";
+
+            System.Diagnostics.Process.Start(psi);
 
             // Exit from the thread pool — safe from any thread unlike Application.Exit()
             Environment.Exit(0);
@@ -158,6 +166,25 @@ public sealed class UpdateService : IUpdateService
         {
             _logger.LogError(ex, "Update download/install failed.");
             Status = UpdateStatus.Error;
+        }
+    }
+
+    private static bool IsDirectoryWritable(string path)
+    {
+        try
+        {
+            string probe = Path.Combine(path, $".asteriq_write_test_{Guid.NewGuid():N}");
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
         }
     }
 

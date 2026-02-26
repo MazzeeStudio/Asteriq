@@ -803,14 +803,22 @@ public class DevicesTabController : ITabController
             {
                 _removeDeviceButtonBounds = SKRect.Empty;
 
-                _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                var mapState = _map1to1ButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                FUIRenderer.DrawButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", mapState);
-                y += buttonHeight + buttonGap;
+                if (_ctx.VJoyService.IsInitialized)
+                {
+                    _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                    var mapState = _map1to1ButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                    FUIRenderer.DrawButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", mapState);
+                    y += buttonHeight + buttonGap;
 
-                _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                var clearState2 = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, FUIColors.Danger);
+                    _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                    var clearState2 = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                    FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, FUIColors.Danger);
+                }
+                else
+                {
+                    _map1to1ButtonBounds = SKRect.Empty;
+                    _clearMappingsButtonBounds = SKRect.Empty;
+                }
             }
         }
         else if (hasVirtualDevice)

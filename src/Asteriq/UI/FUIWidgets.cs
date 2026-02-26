@@ -288,26 +288,32 @@ internal static class FUIWidgets
     /// <param name="mousePosition">Current mouse position for hover detection.</param>
     internal static void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, bool on, Point mousePosition)
     {
+        // Snap to whole pixels to avoid asymmetric top/bottom rounding
+        var snapped = new SKRect(
+            MathF.Round(bounds.Left), MathF.Round(bounds.Top),
+            MathF.Round(bounds.Right), MathF.Round(bounds.Bottom));
+
         bool isHovered = bounds.Contains(mousePosition.X, mousePosition.Y);
 
         SKColor trackColor = on
             ? FUIColors.Active.WithAlpha(150)
             : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = trackColor };
-        canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, trackPaint);
+        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = trackColor, IsAntialias = true };
+        canvas.DrawRoundRect(snapped, snapped.Height / 2, snapped.Height / 2, trackPaint);
 
         using var framePaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
             Color = on ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
-            StrokeWidth = 1f
+            StrokeWidth = 1f,
+            IsAntialias = true
         };
-        canvas.DrawRoundRect(bounds, bounds.Height / 2, bounds.Height / 2, framePaint);
+        canvas.DrawRoundRect(snapped, snapped.Height / 2, snapped.Height / 2, framePaint);
 
-        float knobRadius = bounds.Height / 2 - 3;
-        float knobX = on ? bounds.Right - knobRadius - 3 : bounds.Left + knobRadius + 3;
-        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
-        canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
+        float knobRadius = snapped.Height / 2 - 3;
+        float knobX = on ? snapped.Right - knobRadius - 3 : snapped.Left + knobRadius + 3;
+        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright, IsAntialias = true };
+        canvas.DrawCircle(knobX, snapped.MidY, knobRadius, knobPaint);
     }
 
     internal static void DrawSettingsSlider(SKCanvas canvas, SKRect bounds, int value, int maxValue)

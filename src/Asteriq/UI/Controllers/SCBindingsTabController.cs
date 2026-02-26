@@ -66,8 +66,6 @@ public class SCBindingsTabController : ITabController
     private bool _scResetDefaultsButtonHovered;
     private SKRect _scProfileNameBounds;
     private bool _scProfileNameHovered;
-    private List<SKRect> _scVJoyMappingBounds = new();
-    private int _hoveredVJoyMapping = -1;
 
     // SC table state
     private List<SCAction>? _scFilteredActions;
@@ -131,8 +129,7 @@ public class SCBindingsTabController : ITabController
     private HashSet<string> _scCollapsedCategories = new();
     private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();
 
-    // SC binding assignment state
-    private bool _scAssigningInput = false;
+    // SC binding assignment state (right-panel ASSIGN/CLEAR buttons)
     private SKRect _scAssignInputButtonBounds;
     private bool _scAssignInputButtonHovered;
     private SKRect _scClearBindingButtonBounds;
@@ -241,7 +238,6 @@ public class SCBindingsTabController : ITabController
         }
 
         // Reset hover states
-        _hoveredVJoyMapping = -1;
         _scHoveredActionIndex = -1;
         _scHoveredActionMapFilter = -1;
         _scHoveredCell = (-1, -1);
@@ -307,17 +303,6 @@ public class SCBindingsTabController : ITabController
                 }
 
                 currentY += rowHeight + rowGap;
-            }
-        }
-
-        // vJoy mapping rows
-        for (int i = 0; i < _scVJoyMappingBounds.Count; i++)
-        {
-            if (_scVJoyMappingBounds[i].Contains(e.X, e.Y))
-            {
-                _hoveredVJoyMapping = i;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                break;
             }
         }
 
@@ -538,14 +523,26 @@ public class SCBindingsTabController : ITabController
         _scConflictingBindings.Clear();
 
         // Track which inputs are used and by which actions
-        // Key: "js1_button5" or "kb1_w" etc., Value: list of action keys that use it
+        // Key: "js1_button5" or "phys:path_button5" etc., Value: list of binding keys that use it
         var inputUsage = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         // Check user bindings from export profile
         foreach (var binding in _scExportProfile.Bindings)
         {
-            int scInstance = _scExportProfile.GetSCInstance(binding.VJoyDevice);
-            string inputKey = $"js{scInstance}_{binding.InputName}";
+            if (binding.DeviceType != SCDeviceType.Joystick) continue;
+
+            string inputKey;
+            if (binding.PhysicalDeviceId is not null)
+            {
+                int scInstance = _scExportProfile.GetSCInstanceForPhysical(binding.PhysicalDeviceId);
+                inputKey = $"js{scInstance}_{binding.InputName}";
+            }
+            else
+            {
+                int scInstance = _scExportProfile.GetSCInstance(binding.VJoyDevice);
+                inputKey = $"js{scInstance}_{binding.InputName}";
+            }
+
             string actionKey = binding.Key;
 
             if (!inputUsage.TryGetValue(inputKey, out var actions))
@@ -582,6 +579,9 @@ public class SCBindingsTabController : ITabController
             new SCGridColumn { Id = "mouse", Header = "Mouse", DevicePrefix = "mo1", IsMouse = true }
         };
 
+        // Track all SC instances in use to avoid collisions between vJoy and physical columns
+        var usedSCInstances = new HashSet<int>();
+
         // Add a column for each vJoy device that exists and is mapped in the export profile
         var existingVJoyIds = _ctx.VJoyDevices.Where(v => v.Exists).Select(v => v.Id).ToHashSet();
         foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
@@ -596,6 +596,7 @@ public class SCBindingsTabController : ITabController
                 SCInstance = scInstance,
                 IsJoystick = true
             });
+            usedSCInstances.Add(scInstance);
         }
 
         // Add read-only columns for JS instances stored in the profile that have no backing vJoy device.
@@ -614,9 +615,73 @@ public class SCBindingsTabController : ITabController
                 IsJoystick = true,
                 IsReadOnly = true
             });
+            usedSCInstances.Add(kv.Value);
+        }
+
+        // Add physical device columns only when no vJoy devices exist.
+        // When vJoy is installed, physical devices are routed through vJoy —
+        // showing them as separate columns would create confusion and duplicate bindings.
+        if (existingVJoyIds.Count > 0)
+            return columns;
+
+        foreach (var device in _ctx.Devices)
+        {
+            if (device.IsVirtual || !device.IsConnected) continue;
+            if (string.IsNullOrEmpty(device.HidDevicePath)) continue;
+
+            // Check if this device already has a persisted SC instance
+            int scInstance = _scExportProfile.GetSCInstanceForPhysical(device.HidDevicePath);
+            if (scInstance == 0)
+            {
+                // Assign next available SC instance
+                scInstance = usedSCInstances.Count > 0 ? usedSCInstances.Max() + 1 : 1;
+                _scExportProfile.SetSCInstanceForPhysical(device.HidDevicePath, scInstance);
+                // Persist the DirectInput GUID for XML export
+                if (device.DirectInputGuid != Guid.Empty)
+                {
+                    _scExportProfile.PhysicalDeviceDirectInputGuids[device.HidDevicePath] = device.DirectInputGuid;
+                }
+                _scExportProfileService?.SaveProfile(_scExportProfile);
+            }
+
+            usedSCInstances.Add(scInstance);
+
+            // Build a truncated header from the device name
+            string shortName = TruncateDeviceName(device.Name);
+
+            columns.Add(new SCGridColumn
+            {
+                Id = $"phys:{device.HidDevicePath}",
+                Header = shortName,
+                DevicePrefix = $"js{scInstance}",
+                SCInstance = scInstance,
+                IsJoystick = true,
+                PhysicalDevice = device
+            });
         }
 
         return columns;
+    }
+
+    /// <summary>
+    /// Truncates a device name for column header display.
+    /// Strips common generic suffixes and limits length.
+    /// </summary>
+    private static string TruncateDeviceName(string name)
+    {
+        // Strip common generic suffixes
+        string[] stripSuffixes = { " USB Joystick", " USB", " HID", " Device" };
+        foreach (var suffix in stripSuffixes)
+        {
+            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) && name.Length > suffix.Length)
+                name = name[..^suffix.Length];
+        }
+
+        // Truncate to max 16 chars
+        if (name.Length > 16)
+            name = name[..14] + "..";
+
+        return name;
     }
 
     /// <summary>
@@ -637,6 +702,14 @@ public class SCBindingsTabController : ITabController
         /// The column renders stored bindings read-only; no new assignments can be made.
         /// </summary>
         public bool IsReadOnly { get; set; }
+        /// <summary>
+        /// Physical device backing this column (null for vJoy/KB/Mouse columns).
+        /// </summary>
+        public PhysicalDeviceInfo? PhysicalDevice { get; set; }
+        /// <summary>
+        /// True when this column represents a connected physical device (not vJoy).
+        /// </summary>
+        public bool IsPhysical => PhysicalDevice is not null;
     }
 
     /// <summary>
@@ -1233,9 +1306,6 @@ public class SCBindingsTabController : ITabController
         FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 17f, true);
         y += 25f;
 
-        // Clear mapping bounds since we removed the UI
-        _scVJoyMappingBounds.Clear();
-
         // Fallback: populate available profiles synchronously if load completed but list is still empty
         if (!_scLoading && _scAvailableProfiles.Count == 0 &&
             _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
@@ -1612,6 +1682,17 @@ public class SCBindingsTabController : ITabController
                     float subLabelWidth = FUIRenderer.MeasureText("NO DEVICE", 12f);
                     FUIRenderer.DrawText(canvas, "NO DEVICE", new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.TextDim.WithAlpha(120), 12f);
                 }
+                else if (col.IsPhysical)
+                {
+                    // Physical device column: device name on top, "JS{N}" sub-label below
+                    var headerColor = c == _scHighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
+                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 10f);
+                    float centeredX = colX + (colW - headerTextWidth) / 2;
+                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), headerColor, 10f, true);
+                    string jsLabel = $"JS{col.SCInstance}";
+                    float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
+                    FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.Active.WithAlpha(180), 10f);
+                }
                 else
                 {
                     // Use consistent theme colors for all column headers
@@ -1835,12 +1916,22 @@ public class SCBindingsTabController : ITabController
                             // No separate "defaults" - profile contains everything
                             SCActionBinding? binding = null;
 
-                            if (col.IsJoystick)
+                            if (col.IsPhysical)
                             {
-                                binding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
-                                // Check if this binding matches the current column's device
-                                if (binding is not null && _scExportProfile.GetSCInstance(binding.VJoyDevice) != col.SCInstance)
-                                    binding = null;
+                                // Physical device column: match by PhysicalDeviceId
+                                binding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                                    b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                                    b.DeviceType == SCDeviceType.Joystick &&
+                                    b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath);
+                            }
+                            else if (col.IsJoystick)
+                            {
+                                // vJoy column: match by VJoyDevice → SCInstance
+                                binding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                                    b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                                    b.DeviceType == SCDeviceType.Joystick &&
+                                    b.PhysicalDeviceId is null &&
+                                    _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
                             }
                             else if (col.IsKeyboard)
                             {
@@ -2155,7 +2246,6 @@ public class SCBindingsTabController : ITabController
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = 15f;
         float buttonGap = 6f;
 
         // Title
@@ -2201,10 +2291,14 @@ public class SCBindingsTabController : ITabController
             DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         }
 
-        // Selected action info
+        // Selected action info with ASSIGN/CLEAR buttons
         if (_scSelectedActionIndex >= 0 && _scFilteredActions is not null && _scSelectedActionIndex < _scFilteredActions.Count)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
+            float lineHeight = 15f;
+
+            // Whitespace separator from profile controls above
+            y += 12f;
 
             FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 12f, true);
             y += lineHeight;
@@ -2223,14 +2317,12 @@ public class SCBindingsTabController : ITabController
             _scAssignInputButtonBounds = new SKRect(leftMargin, y, leftMargin + btnWidth, y + btnHeight);
             _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-            var existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
-
-            if (_scAssigningInput)
+            if (_scIsListeningForInput)
             {
-                // Show "waiting for input" state - use Active color to match theme
+                // Show "listening" state when cell listener is active
                 using var waitBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80), IsAntialias = true };
                 canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
-                FUIRenderer.DrawTextCentered(canvas, "PRESS INPUT...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
+                FUIRenderer.DrawTextCentered(canvas, "LISTENING...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
             }
             else
             {
@@ -2240,6 +2332,37 @@ public class SCBindingsTabController : ITabController
 
             _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 8, y, rightMargin, y + btnHeight);
             _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+            // Check for existing binding on currently selected cell's column
+            SCActionBinding? existingBinding = null;
+            if (_scSelectedCell.colIndex >= 0 && _scGridColumns is not null && _scSelectedCell.colIndex < _scGridColumns.Count)
+            {
+                var selCol = _scGridColumns[_scSelectedCell.colIndex];
+                if (selCol.IsPhysical)
+                {
+                    existingBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                        b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                        b.DeviceType == SCDeviceType.Joystick &&
+                        b.PhysicalDeviceId == selCol.PhysicalDevice!.HidDevicePath);
+                }
+                else if (selCol.IsJoystick)
+                {
+                    existingBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                        b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                        b.DeviceType == SCDeviceType.Joystick &&
+                        b.PhysicalDeviceId is null &&
+                        _scExportProfile.GetSCInstance(b.VJoyDevice) == selCol.SCInstance);
+                }
+                else
+                {
+                    existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
+                }
+            }
+            else
+            {
+                existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
+            }
+
             bool hasBinding = existingBinding is not null;
 
             if (hasBinding)
@@ -2850,10 +2973,25 @@ public class SCBindingsTabController : ITabController
             return;
         }
 
-        // Assign input button
+        // Assign input button — activates the listener on the selected cell (same as double-click)
         if (_scAssignInputButtonBounds.Contains(point) && _scSelectedActionIndex >= 0)
         {
-            AssignSCBinding();
+            if (_scSelectedCell.actionIndex >= 0 && _scSelectedCell.colIndex >= 0 &&
+                _scGridColumns is not null && _scSelectedCell.colIndex < _scGridColumns.Count)
+            {
+                var col = _scGridColumns[_scSelectedCell.colIndex];
+                if (!col.IsReadOnly)
+                {
+                    _scIsListeningForInput = true;
+                    _scListeningStartTime = DateTime.Now;
+                    _scListeningColumn = col;
+
+                    if (col.IsKeyboard)
+                        ClearStaleKeyPresses();
+
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] ASSIGN button: started listening on cell ({_scSelectedCell.actionIndex}, {_scSelectedCell.colIndex}) - {col.Header}");
+                }
+            }
             return;
         }
 
@@ -2861,10 +2999,43 @@ public class SCBindingsTabController : ITabController
         if (_scClearBindingButtonBounds.Contains(point) && _scSelectedActionIndex >= 0 && _scFilteredActions is not null)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
-            _scExportProfile.RemoveBinding(selectedAction.ActionMap, selectedAction.ActionName);
+
+            // If a cell is selected, clear the binding for that specific column
+            if (_scSelectedCell.colIndex >= 0 && _scGridColumns is not null && _scSelectedCell.colIndex < _scGridColumns.Count)
+            {
+                var selCol = _scGridColumns[_scSelectedCell.colIndex];
+                if (selCol.IsPhysical)
+                {
+                    var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                        b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                        b.DeviceType == SCDeviceType.Joystick &&
+                        b.PhysicalDeviceId == selCol.PhysicalDevice!.HidDevicePath);
+                    if (binding is not null)
+                        _scExportProfile.RemoveBinding(binding);
+                }
+                else if (selCol.IsJoystick)
+                {
+                    var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                        b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                        b.DeviceType == SCDeviceType.Joystick &&
+                        b.PhysicalDeviceId is null &&
+                        _scExportProfile.GetSCInstance(b.VJoyDevice) == selCol.SCInstance);
+                    if (binding is not null)
+                        _scExportProfile.RemoveBinding(binding);
+                }
+                else
+                {
+                    _scExportProfile.RemoveBinding(selectedAction.ActionMap, selectedAction.ActionName);
+                }
+            }
+            else
+            {
+                _scExportProfile.RemoveBinding(selectedAction.ActionMap, selectedAction.ActionName);
+            }
+
             _scExportProfileService?.SaveProfile(_scExportProfile);
             UpdateConflictingBindings();
-            _scAssigningInput = false;
+
             return;
         }
 
@@ -3051,15 +3222,35 @@ public class SCBindingsTabController : ITabController
         }
 
         // Clear binding for this action on this column's device
-        if (col.IsJoystick)
+        if (col.IsPhysical)
         {
-            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
-            if (userBinding is not null && _scExportProfile.GetSCInstance(userBinding.VJoyDevice) == col.SCInstance)
+            // Physical device column: find the specific binding by PhysicalDeviceId
+            var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath);
+            if (binding is not null)
             {
-                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName, SCDeviceType.Joystick);
+                _scExportProfile.RemoveBinding(binding);
                 _scExportProfileService?.SaveProfile(_scExportProfile);
                 UpdateConflictingBindings();
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared JS binding for {action.ActionName} on {col.Header}");
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared physical JS binding for {action.ActionName} on {col.Header}");
+            }
+        }
+        else if (col.IsJoystick)
+        {
+            // vJoy column: find binding matching this column's SCInstance
+            var userBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId is null &&
+                _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
+            if (userBinding is not null)
+            {
+                _scExportProfile.RemoveBinding(userBinding);
+                _scExportProfileService?.SaveProfile(_scExportProfile);
+                UpdateConflictingBindings();
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared vJoy JS binding for {action.ActionName} on {col.Header}");
             }
         }
         else if (col.Header == "KB")
@@ -3302,8 +3493,8 @@ public class SCBindingsTabController : ITabController
     /// <summary>
     /// Detects joystick input using SDL2 with axis TYPE info for proper slider detection.
     ///
-    /// Design: SC Bindings detection accepts input from ANY physical joystick and assigns it
-    /// to the clicked column's vJoy device. Uses AxisInfo to properly identify sliders.
+    /// For physical device columns: only listens to the specific physical device.
+    /// For vJoy columns: listens to all physical devices (existing behavior).
     /// </summary>
     private string? DetectJoystickInput(SCGridColumn col)
     {
@@ -3323,6 +3514,9 @@ public class SCBindingsTabController : ITabController
                 var device = _ctx.Devices[idx];
                 if (device.IsVirtual || !device.IsConnected) continue;
 
+                // For physical columns, only baseline the matching device
+                if (col.IsPhysical && device.HidDevicePath != col.PhysicalDevice!.HidDevicePath) continue;
+
                 var state = _ctx.InputService.GetDeviceState(idx);
                 if (state is not null)
                 {
@@ -3332,7 +3526,7 @@ public class SCBindingsTabController : ITabController
                 }
             }
 
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized SDL2 input detection for {_scAxisBaseline.Count} devices");
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Initialized SDL2 input detection for {_scAxisBaseline.Count} devices (physical={col.IsPhysical})");
             return null; // First frame - just capture baseline
         }
 
@@ -3347,6 +3541,9 @@ public class SCBindingsTabController : ITabController
         {
             var device = _ctx.Devices[idx];
             if (device.IsVirtual || !device.IsConnected) continue;
+
+            // For physical columns, only listen to the matching device
+            if (col.IsPhysical && device.HidDevicePath != col.PhysicalDevice!.HidDevicePath) continue;
 
             var state = _ctx.InputService.GetDeviceState(idx);
             if (state is null) continue;
@@ -3369,7 +3566,7 @@ public class SCBindingsTabController : ITabController
                 }
             }
 
-            // Check for axis movement - look up vJoy output axis from mapping profile
+            // Check for axis movement
             for (int i = 0; i < state.Axes.Length; i++)
             {
                 float baselineValue = baselineAxes is not null && i < baselineAxes.Length ? baselineAxes[i] : 0f;
@@ -3378,10 +3575,12 @@ public class SCBindingsTabController : ITabController
 
                 if (deflection > AxisThreshold)
                 {
-                    // Look up the vJoy output axis from the mapping profile
-                    // This ensures SC Bindings exports match where the data actually goes
-                    string axisName = GetVJoyAxisNameFromMapping(device, i, col);
-                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> vJoy {axisName} on {device.Name}, deflection: {deflection:F2}");
+                    // For physical columns, use HID axis type info directly
+                    // For vJoy columns, look up the vJoy output axis from the mapping profile
+                    string axisName = col.IsPhysical
+                        ? GetSCAxisNameFromDevice(i, device)
+                        : GetVJoyAxisNameFromMapping(device, i, col);
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> {axisName} on {device.Name}, deflection: {deflection:F2}");
                     ResetJoystickDetectionState();
                     return axisName;
                 }
@@ -3506,8 +3705,7 @@ public class SCBindingsTabController : ITabController
     /// <summary>
     /// Gets the SC axis name using HID axis type info from the device.
     /// This properly identifies sliders by their HID usage ID rather than SDL index.
-    /// NOTE: This is kept for reference but GetVJoyAxisNameFromMapping should be used
-    /// for SC Bindings to ensure export matches where data actually goes.
+    /// Used for physical device columns where bindings go directly to the device.
     /// </summary>
     private static string GetSCAxisNameFromDevice(int axisIndex, PhysicalDeviceInfo? device)
     {
@@ -3561,22 +3759,6 @@ public class SCBindingsTabController : ITabController
                 sliderNumber++;
         }
         return $"slider{sliderNumber}";
-    }
-
-    private static string GetSCAxisName(int axisIndex)
-    {
-        return axisIndex switch
-        {
-            0 => "x",
-            1 => "y",
-            2 => "z",
-            3 => "rx",
-            4 => "ry",
-            5 => "rz",
-            6 => "slider1",
-            7 => "slider2",
-            _ => $"axis{axisIndex}"
-        };
     }
 
     private static string GetHatDirection(int dir)
@@ -3672,14 +3854,26 @@ public class SCBindingsTabController : ITabController
 
     private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName)
     {
-        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{inputName}");
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{inputName} (physical={col.IsPhysical})");
 
         // Check for conflicting bindings (same input already used by another action)
-        var conflicts = _scExportProfile.GetConflictingBindings(
-            col.VJoyDeviceId,
-            inputName,
-            action.ActionMap,
-            action.ActionName);
+        List<SCActionBinding> conflicts;
+        if (col.IsPhysical)
+        {
+            conflicts = _scExportProfile.GetConflictingBindings(
+                col.PhysicalDevice!.HidDevicePath,
+                inputName,
+                action.ActionMap,
+                action.ActionName);
+        }
+        else
+        {
+            conflicts = _scExportProfile.GetConflictingBindings(
+                col.VJoyDeviceId,
+                inputName,
+                action.ActionMap,
+                action.ActionName);
+        }
 
         if (conflicts.Count > 0)
         {
@@ -3702,7 +3896,7 @@ public class SCBindingsTabController : ITabController
                     // Remove all conflicting bindings first
                     foreach (var conflict in conflicts)
                     {
-                        _scExportProfile.RemoveBinding(conflict.ActionMap, conflict.ActionName);
+                        _scExportProfile.RemoveBinding(conflict);
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] Removed conflicting binding: {conflict.ActionName}");
                     }
                     break;
@@ -3717,22 +3911,38 @@ public class SCBindingsTabController : ITabController
         // Determine input type from input name
         var inputType = InferInputTypeFromName(inputName);
 
-        // Set the binding (removes any existing binding for this action first)
-        _scExportProfile.SetBinding(action.ActionMap, action.ActionName, new SCActionBinding
+        if (col.IsPhysical)
         {
-            ActionMap = action.ActionMap,
-            ActionName = action.ActionName,
-            DeviceType = SCDeviceType.Joystick,
-            VJoyDevice = col.VJoyDeviceId,
-            InputName = inputName,
-            InputType = inputType
-        });
+            // Physical device binding
+            _scExportProfile.SetBinding(action.ActionMap, action.ActionName, new SCActionBinding
+            {
+                ActionMap = action.ActionMap,
+                ActionName = action.ActionName,
+                DeviceType = SCDeviceType.Joystick,
+                PhysicalDeviceId = col.PhysicalDevice!.HidDevicePath,
+                InputName = inputName,
+                InputType = inputType
+            });
+        }
+        else
+        {
+            // vJoy binding
+            _scExportProfile.SetBinding(action.ActionMap, action.ActionName, new SCActionBinding
+            {
+                ActionMap = action.ActionMap,
+                ActionName = action.ActionName,
+                DeviceType = SCDeviceType.Joystick,
+                VJoyDevice = col.VJoyDeviceId,
+                InputName = inputName,
+                InputType = inputType
+            });
 
-        // Ensure this vJoy device has an SC instance mapping (required for export)
-        if (!_scExportProfile.VJoyToSCInstance.ContainsKey(col.VJoyDeviceId))
-        {
-            _scExportProfile.SetSCInstance(col.VJoyDeviceId, col.SCInstance);
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Set vJoy{col.VJoyDeviceId} -> js{col.SCInstance} mapping");
+            // Ensure this vJoy device has an SC instance mapping (required for export)
+            if (!_scExportProfile.VJoyToSCInstance.ContainsKey(col.VJoyDeviceId))
+            {
+                _scExportProfile.SetSCInstance(col.VJoyDeviceId, col.SCInstance);
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Set vJoy{col.VJoyDeviceId} -> js{col.SCInstance} mapping");
+            }
         }
 
         // Save the profile and update conflict detection
@@ -3829,9 +4039,10 @@ public class SCBindingsTabController : ITabController
             return;
         }
 
-        // Only require vJoy mappings if there are joystick bindings
-        var hasJoystickBindings = _scExportProfile.Bindings.Any(b => b.DeviceType == SCDeviceType.Joystick);
-        if (hasJoystickBindings && _scExportProfile.VJoyToSCInstance.Count == 0)
+        // Only require vJoy mappings if there are vJoy joystick bindings (not physical device bindings)
+        var hasVJoyBindings = _scExportProfile.Bindings.Any(b =>
+            b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null);
+        if (hasVJoyBindings && _scExportProfile.VJoyToSCInstance.Count == 0)
         {
             SetStatus("No vJoy mappings configured for joystick bindings", SCStatusKind.Warning);
             return;
@@ -3944,111 +4155,6 @@ public class SCBindingsTabController : ITabController
             _scProfileDirty = true;
             _ctx.InvalidateCanvas();
         }
-    }
-
-    private void AssignSCBinding()
-    {
-        if (_scSelectedActionIndex < 0 || _scFilteredActions is null || _scSelectedActionIndex >= _scFilteredActions.Count)
-            return;
-
-        var action = _scFilteredActions[_scSelectedActionIndex];
-        var availableVJoy = _ctx.VJoyDevices.Where(v => v.Exists).ToList();
-
-        if (availableVJoy.Count == 0)
-        {
-            using var warningDialog = new FUIConfirmDialog(
-                "No vJoy",
-                "No vJoy devices available.\nPlease configure vJoy.",
-                "OK", "Cancel");
-            warningDialog.ShowDialog(_ctx.OwnerForm);
-            return;
-        }
-
-        using var dialog = new SCAssignmentDialog(action, availableVJoy);
-
-        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.OK)
-        {
-            var vjoyId = dialog.SelectedVJoyId;
-            var inputName = dialog.SelectedInputName;
-
-            // Check for conflicts - is this input already bound to another action?
-            var conflicts = FindSCBindingConflicts(vjoyId, inputName, action.ActionMap, action.ActionName);
-
-            if (conflicts.Count > 0)
-            {
-                string actionDisplayName = SCCategoryMapper.FormatActionName(action.ActionName);
-                string inputDisplayName = FormatInputName(inputName);
-                string deviceName = $"JS{_scExportProfile.GetSCInstance(vjoyId)}";
-                using var conflictDialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
-                conflictDialog.ShowDialog(_ctx.OwnerForm);
-
-                if (conflictDialog.Result == BindingConflictResult.Cancel)
-                {
-                    _scAssigningInput = false;
-                    return;
-                }
-                else if (conflictDialog.Result == BindingConflictResult.ReplaceAll)
-                {
-                    // Remove all conflicting bindings
-                    foreach (var conflict in conflicts)
-                    {
-                        _scExportProfile.RemoveBinding(conflict.ActionMap, conflict.ActionName);
-                    }
-                }
-                // else ApplyAnyway - just add the binding, allow duplicate
-            }
-
-            // Infer input type from the selected input name (not from action's expected type)
-            var inputType = InferInputTypeFromName(inputName);
-
-            var binding = new SCActionBinding
-            {
-                ActionMap = action.ActionMap,
-                ActionName = action.ActionName,
-                DeviceType = SCDeviceType.Joystick,
-                VJoyDevice = vjoyId,
-                InputName = inputName,
-                InputType = inputType,
-                Inverted = dialog.IsInverted
-            };
-
-            _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
-
-            // Ensure this vJoy device has an SC instance mapping
-            if (!_scExportProfile.VJoyToSCInstance.ContainsKey(vjoyId))
-            {
-                _scExportProfile.SetSCInstance(vjoyId, (int)vjoyId);
-            }
-
-            // Save the profile and update conflict detection
-            _scExportProfileService?.SaveProfile(_scExportProfile);
-            UpdateConflictingBindings();
-
-            SetStatus($"Bound {action.ActionName} to js{_scExportProfile.GetSCInstance(vjoyId)}_{inputName}");
-        }
-
-        _scAssigningInput = false;
-    }
-
-    private List<SCActionBinding> FindSCBindingConflicts(uint vjoyId, string inputName, string excludeActionMap, string excludeActionName)
-    {
-        var conflicts = new List<SCActionBinding>();
-
-        foreach (var binding in _scExportProfile.Bindings)
-        {
-            // Skip the current action being assigned
-            if (binding.ActionMap == excludeActionMap && binding.ActionName == excludeActionName)
-                continue;
-
-            // Check if same vJoy device and input
-            if (binding.VJoyDevice == vjoyId &&
-                string.Equals(binding.InputName, inputName, StringComparison.OrdinalIgnoreCase))
-            {
-                conflicts.Add(binding);
-            }
-        }
-
-        return conflicts;
     }
 
     #endregion

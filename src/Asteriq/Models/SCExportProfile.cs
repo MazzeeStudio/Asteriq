@@ -2,7 +2,7 @@ namespace Asteriq.Models;
 
 /// <summary>
 /// Represents a Star Citizen export profile configuration.
-/// Maps Asteriq's vJoy outputs to SC joystick instances for export.
+/// Maps Asteriq's vJoy outputs and physical devices to SC joystick instances for export.
 /// </summary>
 public class SCExportProfile
 {
@@ -40,6 +40,18 @@ public class SCExportProfile
     public Dictionary<uint, int> VJoyToSCInstance { get; set; } = new();
 
     /// <summary>
+    /// Maps physical device HidDevicePaths to SC joystick instance numbers.
+    /// Persisted so column assignments survive across sessions.
+    /// </summary>
+    public Dictionary<string, int> PhysicalDeviceToSCInstance { get; set; } = new();
+
+    /// <summary>
+    /// Persists DirectInput GUIDs for physical devices so XML export can emit correct Product attributes.
+    /// Key: HidDevicePath, Value: DirectInput instance GUID.
+    /// </summary>
+    public Dictionary<string, Guid> PhysicalDeviceDirectInputGuids { get; set; } = new();
+
+    /// <summary>
     /// Custom bindings to export (action -> vJoy input)
     /// </summary>
     public List<SCActionBinding> Bindings { get; set; } = new();
@@ -74,11 +86,37 @@ public class SCExportProfile
     }
 
     /// <summary>
-    /// Gets the number of joystick instances to export
+    /// Gets the SC instance number for a physical device
     /// </summary>
-    public int JoystickCount => VJoyToSCInstance.Count > 0
-        ? VJoyToSCInstance.Values.Max()
-        : 0;
+    public int GetSCInstanceForPhysical(string hidDevicePath)
+    {
+        return PhysicalDeviceToSCInstance.TryGetValue(hidDevicePath, out var instance)
+            ? instance
+            : 0; // 0 = not yet assigned
+    }
+
+    /// <summary>
+    /// Sets the SC instance for a physical device
+    /// </summary>
+    public void SetSCInstanceForPhysical(string hidDevicePath, int scInstance)
+    {
+        PhysicalDeviceToSCInstance[hidDevicePath] = scInstance;
+        Modified = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Gets the number of joystick instances to export.
+    /// Includes both vJoy and physical device instances.
+    /// </summary>
+    public int JoystickCount
+    {
+        get
+        {
+            int maxVJoy = VJoyToSCInstance.Count > 0 ? VJoyToSCInstance.Values.Max() : 0;
+            int maxPhysical = PhysicalDeviceToSCInstance.Count > 0 ? PhysicalDeviceToSCInstance.Values.Max() : 0;
+            return Math.Max(maxVJoy, maxPhysical);
+        }
+    }
 
     /// <summary>
     /// Adds or updates a binding for a specific device type
@@ -86,12 +124,22 @@ public class SCExportProfile
     public void SetBinding(string actionMap, string actionName, SCActionBinding binding)
     {
         // Remove existing binding for this action AND device type
-        // For joystick bindings, also consider the vJoy device to allow multiple joystick bindings
+        // For joystick bindings, also consider the device to allow multiple joystick bindings
         // (e.g., js1_button5 and js2_button3 for the same action)
         if (binding.DeviceType == SCDeviceType.Joystick)
         {
-            Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName &&
-                b.DeviceType == SCDeviceType.Joystick && b.VJoyDevice == binding.VJoyDevice);
+            if (binding.PhysicalDeviceId is not null)
+            {
+                // Physical device binding: deduplicate by PhysicalDeviceId
+                Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName &&
+                    b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId == binding.PhysicalDeviceId);
+            }
+            else
+            {
+                // vJoy binding: deduplicate by VJoyDevice
+                Bindings.RemoveAll(b => b.ActionMap == actionMap && b.ActionName == actionName &&
+                    b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null && b.VJoyDevice == binding.VJoyDevice);
+            }
         }
         else
         {
@@ -146,6 +194,17 @@ public class SCExportProfile
     }
 
     /// <summary>
+    /// Removes a specific binding object (for multi-column right-click clear)
+    /// </summary>
+    public bool RemoveBinding(SCActionBinding binding)
+    {
+        var removed = Bindings.Remove(binding);
+        if (removed)
+            Modified = DateTime.UtcNow;
+        return removed;
+    }
+
+    /// <summary>
     /// Clears all bindings
     /// </summary>
     public void ClearBindings()
@@ -155,7 +214,7 @@ public class SCExportProfile
     }
 
     /// <summary>
-    /// Gets all joystick bindings that would conflict with the given input (same device + input).
+    /// Gets all joystick bindings that would conflict with the given input on a vJoy device.
     /// Excludes the specified action to avoid reporting self-conflicts.
     /// </summary>
     public List<SCActionBinding> GetConflictingBindings(
@@ -166,7 +225,26 @@ public class SCExportProfile
     {
         return Bindings.Where(b =>
             b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId is null &&
             b.VJoyDevice == vjoyDevice &&
+            b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
+            !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Gets all joystick bindings that would conflict with the given input on a physical device.
+    /// Excludes the specified action to avoid reporting self-conflicts.
+    /// </summary>
+    public List<SCActionBinding> GetConflictingBindings(
+        string physicalDeviceId,
+        string inputName,
+        string? excludeActionMap = null,
+        string? excludeActionName = null)
+    {
+        return Bindings.Where(b =>
+            b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId == physicalDeviceId &&
             b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
             !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
             .ToList();
@@ -214,9 +292,15 @@ public class SCActionBinding
     public SCDeviceType DeviceType { get; set; } = SCDeviceType.Joystick;
 
     /// <summary>
-    /// The vJoy device ID (1-16) - only used for Joystick type
+    /// The vJoy device ID (1-16) - only used for vJoy Joystick bindings (PhysicalDeviceId is null)
     /// </summary>
     public uint VJoyDevice { get; set; }
+
+    /// <summary>
+    /// HidDevicePath of the physical device this binding belongs to.
+    /// Null for vJoy bindings, set for physical device bindings.
+    /// </summary>
+    public string? PhysicalDeviceId { get; set; }
 
     /// <summary>
     /// The input name (e.g., "button1", "x", "hat1_up" for joystick, "w", "space" for keyboard)
@@ -257,9 +341,12 @@ public class SCActionBinding
     }
 
     /// <summary>
-    /// Unique key for this binding (includes device type to allow multiple bindings per action)
+    /// Unique key for this binding. Includes device discriminator so bindings on different
+    /// physical devices or vJoy slots don't collide.
     /// </summary>
-    public string Key => $"{ActionMap}.{ActionName}.{DeviceType}";
+    public string Key => PhysicalDeviceId is not null
+        ? $"{ActionMap}.{ActionName}.{DeviceType}.phys:{PhysicalDeviceId}"
+        : $"{ActionMap}.{ActionName}.{DeviceType}.vjoy:{VJoyDevice}";
 
     /// <summary>
     /// Simple key without device type (for backwards compatibility)
@@ -270,6 +357,7 @@ public class SCActionBinding
     {
         SCDeviceType.Keyboard => $"{ActionMap}/{ActionName} -> kb1_{InputName}",
         SCDeviceType.Mouse => $"{ActionMap}/{ActionName} -> mo1_{InputName}",
+        _ when PhysicalDeviceId is not null => $"{ActionMap}/{ActionName} -> phys:{InputName}",
         _ => $"{ActionMap}/{ActionName} -> vJoy{VJoyDevice}_{InputName}"
     };
 }

@@ -541,8 +541,8 @@ public class SCXmlExportServiceTests
             DeviceType = SCDeviceType.Joystick
         };
 
-        // Key now includes device type to allow multiple bindings per action
-        Assert.Equal("spaceship_movement.v_strafe_forward.Joystick", binding.Key);
+        // Key includes device type + device discriminator to allow multiple bindings per action
+        Assert.Equal("spaceship_movement.v_strafe_forward.Joystick.vjoy:0", binding.Key);
         // ActionKey is the old format without device type
         Assert.Equal("spaceship_movement.v_strafe_forward", binding.ActionKey);
     }

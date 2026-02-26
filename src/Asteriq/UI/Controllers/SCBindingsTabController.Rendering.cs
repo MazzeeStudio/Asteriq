@@ -13,7 +13,7 @@ public partial class SCBindingsTabController
 
         // Two-panel layout: Left (bindings table) | Right (Installation + Export stacked)
         // Table on left for more space, controls on right
-        float rightPanelWidth = 280f;
+        float rightPanelWidth = Math.Min(500f, Math.Max(280f, contentBounds.Width * 0.24f));
         float gap = 10f;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,

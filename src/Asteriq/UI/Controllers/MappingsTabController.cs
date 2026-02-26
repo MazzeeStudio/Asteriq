@@ -1068,15 +1068,14 @@ public class MappingsTabController : ITabController
         var contentBounds = new SKRect(sideTabPad, contentTop, bounds.Right - pad, contentBottom);
 
         // Three-panel layout: Left (bindings list) | Center (device view) | Right (settings)
-        float leftPanelWidth = 400f;  // Match Settings panel width
-        float rightPanelWidth = 330f;
-        float centerPanelWidth = contentBounds.Width - leftPanelWidth - rightPanelWidth - 20;
+        var layout = FUIRenderer.CalculateLayout(contentBounds.Width, minLeftPanel: 360f, minRightPanel: 280f, maxSidePanel: 500f);
+        float gap = layout.Gutter;
 
         var leftBounds = new SKRect(contentBounds.Left, contentBounds.Top,
-            contentBounds.Left + leftPanelWidth, contentBounds.Bottom);
-        var centerBounds = new SKRect(leftBounds.Right + 10, contentBounds.Top,
-            leftBounds.Right + 10 + centerPanelWidth, contentBounds.Bottom);
-        var rightBounds = new SKRect(centerBounds.Right + 10, contentBounds.Top,
+            contentBounds.Left + layout.LeftPanelWidth, contentBounds.Bottom);
+        var centerBounds = new SKRect(leftBounds.Right + gap, contentBounds.Top,
+            leftBounds.Right + gap + layout.CenterWidth, contentBounds.Bottom);
+        var rightBounds = new SKRect(centerBounds.Right + gap, contentBounds.Top,
             contentBounds.Right, contentBounds.Bottom);
 
         // Refresh vJoy devices list

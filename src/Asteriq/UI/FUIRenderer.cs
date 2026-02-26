@@ -268,7 +268,7 @@ public static class FUIRenderer
     /// <summary>
     /// Calculate responsive three-column layout based on window width
     /// </summary>
-    public static ResponsiveLayout CalculateLayout(float contentWidth, float minLeftPanel = 320f, float minRightPanel = 280f)
+    public static ResponsiveLayout CalculateLayout(float contentWidth, float minLeftPanel = 320f, float minRightPanel = 280f, float maxSidePanel = 0f)
     {
         float gutter = GetGutter(contentWidth);
         bool isSmall = IsSmallWindow(contentWidth);
@@ -294,6 +294,13 @@ public static class FUIRenderer
             float availableForPanels = contentWidth - gutter * 2;
             float leftWidth = Math.Max(minLeftPanel, availableForPanels * 0.28f);
             float rightWidth = Math.Max(minRightPanel, availableForPanels * 0.24f);
+
+            if (maxSidePanel > 0f)
+            {
+                leftWidth = Math.Min(leftWidth, maxSidePanel);
+                rightWidth = Math.Min(rightWidth, maxSidePanel);
+            }
+
             float centerWidth = availableForPanels - leftWidth - rightWidth;
 
             return new ResponsiveLayout
@@ -312,6 +319,10 @@ public static class FUIRenderer
             // Medium: Two columns - left panel + combined center/right
             float availableWidth = contentWidth - gutter;
             float leftWidth = Math.Max(minLeftPanel, availableWidth * 0.40f);
+
+            if (maxSidePanel > 0f)
+                leftWidth = Math.Min(leftWidth, maxSidePanel);
+
             float rightWidth = availableWidth - leftWidth;
 
             return new ResponsiveLayout

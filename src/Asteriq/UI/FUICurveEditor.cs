@@ -103,8 +103,10 @@ public class FUICurveEditor : UserControl
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var width = e.Info.Width;
-        var height = e.Info.Height;
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var width = e.Info.Width / scale;
+        var height = e.Info.Height / scale;
 
         canvas.Clear(FUIColors.Background1);
 
@@ -491,7 +493,8 @@ public class FUICurveEditor : UserControl
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        var pt = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / s, e.Y / s);
         bool needsInvalidate = false;
 
         // Check preset hover
@@ -563,7 +566,8 @@ public class FUICurveEditor : UserControl
     {
         if (e.Button != MouseButtons.Left) return;
 
-        var pt = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / s, e.Y / s);
 
         // Check presets
         if (_presetsBounds.Contains(pt))

@@ -114,7 +114,7 @@ internal static class FUIWidgets
         float rightEdge = x + width;
         float maxValueWidth = rightEdge - textStartX - 8;
 
-        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, FUIRenderer.ScaleFont(11f));
+        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, 11f);
         string displayValue = value;
         float textWidth = measurePaint.MeasureText(displayValue);
 
@@ -182,7 +182,7 @@ internal static class FUIWidgets
 
     internal static void DrawShiftLayersSection(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom, MappingProfile profile)
     {
-        float lineHeight = FUIRenderer.ScaleLineHeight(16f);
+        float lineHeight = 16f;
 
         FUIRenderer.DrawText(canvas, "SHIFT LAYERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight;
@@ -576,7 +576,7 @@ internal static class FUIWidgets
         float keycapGap = 4f;
         float keycapPadding = 8f;
         float fontSize = 10f;
-        float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
+        float scaledFontSize = fontSize;
 
         using var measurePaint = new SKPaint
         {

@@ -1121,11 +1121,11 @@ public class SCBindingsTabController : ITabController
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
-        float lineHeight = FUIRenderer.ScaleLineHeight(20f);
+        float lineHeight = 20f;
 
         // Title
         FUIRenderer.DrawText(canvas, "STAR CITIZEN INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(35f);
+        y += 35f;
 
         // Installation selector
         FUIRenderer.DrawText(canvas, "INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -1190,7 +1190,7 @@ public class SCBindingsTabController : ITabController
         // Export Profile Name section
         y += buttonHeight + 32f;  // 4px aligned
         FUIRenderer.DrawText(canvas, "EXPORT PROFILE", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(30f);
+        y += 30f;
 
         FUIRenderer.DrawText(canvas, "PROFILE NAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         y += lineHeight;
@@ -1227,11 +1227,11 @@ public class SCBindingsTabController : ITabController
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
-        float lineHeight = FUIRenderer.ScaleLineHeight(20f);
+        float lineHeight = 20f;
 
         // Title - Import Section
         FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(25f);
+        y += 25f;
 
         // Clear mapping bounds since we removed the UI
         _scVJoyMappingBounds.Clear();
@@ -1269,7 +1269,7 @@ public class SCBindingsTabController : ITabController
 
         // Title - Export Section
         FUIRenderer.DrawText(canvas, "EXPORT TO SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += FUIRenderer.ScaleLineHeight(25f);
+        y += 25f;
 
         // Filename input
         FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
@@ -1335,7 +1335,7 @@ public class SCBindingsTabController : ITabController
 
     private void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
     {
-        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+        float lineHeight = 18f;
         FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
         FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 10f);
         y += lineHeight;
@@ -1460,7 +1460,7 @@ public class SCBindingsTabController : ITabController
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
-        float lineHeight = FUIRenderer.ScaleLineHeight(18f);
+        float lineHeight = 18f;
 
         // Title row with action count
         FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
@@ -1488,7 +1488,7 @@ public class SCBindingsTabController : ITabController
         float countTextWidth = FUIRenderer.MeasureText(countText, 9f);
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 9f);
 
-        y += FUIRenderer.ScaleLineHeight(28f);
+        y += 28f;
 
         // Filter row: [search...] [☐] Bound only    [All Categories ▼]
         float filterRowHeight = 32f;
@@ -2157,7 +2157,7 @@ public class SCBindingsTabController : ITabController
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
-        float lineHeight = FUIRenderer.ScaleLineHeight(15f);
+        float lineHeight = 15f;
         float buttonGap = 6f;
 
         // Title

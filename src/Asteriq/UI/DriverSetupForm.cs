@@ -93,8 +93,8 @@ public class DriverSetupForm : Form
         ShowInTaskbar = true;
         KeyPreview = true;
 
-        float userScale = FUIRenderer.UserScaleMultiplier;
-        ClientSize = new Size((int)(FormW * userScale), (int)(FormH * userScale));
+        float scale = FUIRenderer.CanvasScaleFactor;
+        ClientSize = new Size((int)(FormW * scale), (int)(FormH * scale));
 
         try
         {
@@ -114,8 +114,8 @@ public class DriverSetupForm : Form
         // Progress bar (shown only during download)
         _progressBar = new ProgressBar
         {
-            Location = new Point((int)(Pad * userScale), (int)(ProgressBarY * userScale)),
-            Size = new Size((int)(ContentW * userScale), (int)(14 * userScale)),
+            Location = new Point((int)(Pad * scale), (int)(ProgressBarY * scale)),
+            Size = new Size((int)(ContentW * scale), (int)(14 * scale)),
             Style = ProgressBarStyle.Continuous,
             Visible = false,
         };
@@ -123,9 +123,9 @@ public class DriverSetupForm : Form
         // Install log — anchored to bottom section
         _logListBox = new ListBox
         {
-            Location = new Point((int)(Pad * userScale), (int)((LogBoxTop + 2) * userScale)),
-            Size = new Size((int)(ContentW * userScale), (int)((LogBoxH - 4) * userScale)),
-            Font = new Font("Consolas", 8 * userScale),
+            Location = new Point((int)(Pad * scale), (int)((LogBoxTop + 2) * scale)),
+            Size = new Size((int)(ContentW * scale), (int)((LogBoxH - 4) * scale)),
+            Font = new Font("Consolas", 8 * scale),
             BackColor = ToColor(FUIColors.Background2),
             ForeColor = ToColor(FUIColors.TextDim),
             BorderStyle = BorderStyle.None,
@@ -157,9 +157,9 @@ public class DriverSetupForm : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        float userScale = FUIRenderer.UserScaleMultiplier;
-        canvas.Scale(userScale);
-        var b = new SKRect(0, 0, e.Info.Width / userScale, e.Info.Height / userScale);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var b = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Background0);
 
@@ -217,7 +217,7 @@ public class DriverSetupForm : Form
         float linkY = _panel2Y + PanelH + 18f;
         FUIRenderer.DrawText(canvas, "MANUAL DOWNLOAD:", new SKPoint(Pad, linkY), FUIColors.TextDim, 9f, false);
 
-        using var linkPaint = FUIRenderer.CreateTextPaint(FUIColors.Active, FUIRenderer.ScaleFont(9f));
+        using var linkPaint = FUIRenderer.CreateTextPaint(FUIColors.Active, 9f);
 
         float vJoyLinkX = Pad + 142;
         float vJoyLinkW = linkPaint.MeasureText("vJoy from GitHub");
@@ -324,7 +324,7 @@ public class DriverSetupForm : Form
 
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
     {
-        float s = FUIRenderer.UserScaleMultiplier;
+        float s = FUIRenderer.CanvasScaleFactor;
         var pt = new SKPoint(e.X / s, e.Y / s);
         int newHovered = -1;
 
@@ -352,7 +352,7 @@ public class DriverSetupForm : Form
     private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
     {
         if (e.Button != MouseButtons.Left) return;
-        float s = FUIRenderer.UserScaleMultiplier;
+        float s = FUIRenderer.CanvasScaleFactor;
         if (e.Y / s < TitleBarH)
         {
             _isDragging = true;

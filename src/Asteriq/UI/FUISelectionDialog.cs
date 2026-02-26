@@ -60,7 +60,8 @@ public class FUISelectionDialog : Form
         float width = 420f;
         float listHeight = Math.Min(_items.Count, _maxVisibleItems) * ItemHeight + 8f;
         float height = TitleBarHeight + DescriptionHeight + listHeight + ButtonAreaHeight + ContentPadding * 2;
-        ClientSize = new Size((int)width, (int)height);
+        float s = FUIRenderer.CanvasScaleFactor;
+        ClientSize = new Size((int)(width * s), (int)(height * s));
 
         // Create canvas
         _canvas = new SKControl
@@ -133,7 +134,9 @@ public class FUISelectionDialog : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Background0);
 
@@ -247,7 +250,7 @@ public class FUISelectionDialog : Form
             // Draw status with different color
             if (!string.IsNullOrEmpty(item.Status))
             {
-                using var textPaint = FUIRenderer.CreateTextPaint(textColor, FUIRenderer.ScaleFont(11f));
+                using var textPaint = FUIRenderer.CreateTextPaint(textColor, 11f);
                 float baseWidth = textPaint.MeasureText(item.Text + " ");
 
                 var statusColor = item.Status.Contains("OK") ? FUIColors.Active :
@@ -327,7 +330,8 @@ public class FUISelectionDialog : Form
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        var pt = new SKPoint(e.X, e.Y);
+        float s = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / s, e.Y / s);
         int newHoveredItem = -1;
         int newHoveredButton = -1;
 
@@ -372,8 +376,9 @@ public class FUISelectionDialog : Form
     {
         if (e.Button == MouseButtons.Left)
         {
+            float s = FUIRenderer.CanvasScaleFactor;
             // Check if clicking on title bar for dragging
-            if (e.Y < TitleBarHeight && _hoveredItem < 0 && _hoveredButton < 0)
+            if (e.Y / s < TitleBarHeight && _hoveredItem < 0 && _hoveredButton < 0)
             {
                 _isDragging = true;
                 _dragStart = e.Location;

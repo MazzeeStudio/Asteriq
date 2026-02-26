@@ -40,7 +40,8 @@ public class FUIInputDialog : Form
         BackColor = Color.FromArgb(6, 8, 10);
         ShowInTaskbar = false;
         KeyPreview = true;
-        ClientSize = new Size((int)DialogWidth, (int)DialogHeight);
+        float s = FUIRenderer.CanvasScaleFactor;
+        ClientSize = new Size((int)(DialogWidth * s), (int)(DialogHeight * s));
 
         // Canvas for FUI chrome (title bar, buttons, label)
         _canvas = new SKControl
@@ -60,14 +61,14 @@ public class FUIInputDialog : Form
         _textBox = new TextBox
         {
             Text = defaultValue,
-            Left = 16,
-            Top = (int)TitleBarHeight + 38,
-            Width = (int)DialogWidth - 32,
-            Height = 24,
+            Left = (int)(16 * s),
+            Top = (int)((TitleBarHeight + 38) * s),
+            Width = (int)((DialogWidth - 32) * s),
+            Height = (int)(24 * s),
             BackColor = Color.FromArgb(18, 22, 30),
             ForeColor = Color.FromArgb(200, 220, 240),
             BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font("Consolas", 10f)
+            Font = new Font("Consolas", 10f * s)
         };
         _textBox.SelectAll();
         Controls.Add(_textBox);
@@ -84,7 +85,9 @@ public class FUIInputDialog : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Background0);
 
@@ -142,7 +145,8 @@ public class FUIInputDialog : Form
 
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
     {
-        var pt = new SKPoint(e.X, e.Y);
+        float sc = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / sc, e.Y / sc);
         int newHovered = -1;
 
         if (_confirmButtonBounds.Contains(pt)) newHovered = 0;
@@ -166,7 +170,8 @@ public class FUIInputDialog : Form
     {
         if (e.Button != MouseButtons.Left) return;
 
-        if (e.Y < TitleBarHeight)
+        float sc = FUIRenderer.CanvasScaleFactor;
+        if (e.Y / sc < TitleBarHeight)
         {
             _isDragging = true;
             _dragStart = e.Location;

@@ -1450,7 +1450,7 @@ public class MappingsTabController : ITabController
             float keycapGap = 2f;
             float keycapPadding = 6f;  // Padding inside each keycap (left + right)
             float fontSize = 8f;  // Slightly smaller font for compact display
-            float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
+            float scaledFontSize = fontSize;
             float keycapRight = bounds.Right - 8;
             float keycapTop = bounds.MidY - keycapHeight / 2;
 
@@ -1989,15 +1989,15 @@ public class MappingsTabController : ITabController
         // Response Curve header (with top margin for section separation)
         y += 8;  // Section separation
         FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        y += FUIRenderer.ScaleLineHeight(16f);
+        y += 16f;
 
         // Symmetrical, Centre, and Invert checkboxes on their own row
         // Symmetrical on left, Centre and Invert on right
-        float checkboxSize = FUIRenderer.ScaleLineHeight(12f);
-        float rowHeight = FUIRenderer.ScaleLineHeight(16f);
+        float checkboxSize = 12f;
+        float rowHeight = 16f;
         float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
         float fontSize = 9f;
-        float scaledFontSize = FUIRenderer.ScaleFont(fontSize);
+        float scaledFontSize = fontSize;
         float textY = y + (rowHeight / 2) + (scaledFontSize / 3); // Center text baseline
 
         // Measure label widths for positioning
@@ -2005,8 +2005,8 @@ public class MappingsTabController : ITabController
         float invertLabelWidth = labelPaint.MeasureText("Invert");
         float centreLabelWidth = labelPaint.MeasureText("Centre");
         float symmetricalLabelWidth = labelPaint.MeasureText("Symmetrical");
-        float labelGap = FUIRenderer.ScaleSpacing(4f);
-        float checkboxGap = FUIRenderer.ScaleSpacing(12f);
+        float labelGap = 4f;
+        float checkboxGap = 12f;
 
         // Symmetrical checkbox (leftmost) - checkbox then label
         _curveSymmetricalCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
@@ -2025,12 +2025,12 @@ public class MappingsTabController : ITabController
         DrawCheckbox(canvas, _deadzoneCenterCheckboxBounds, _deadzoneCenterEnabled);
         FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - centreLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
-        y += rowHeight + FUIRenderer.ScaleSpacing(6f);
+        y += rowHeight + 6f;
 
         // Curve preset buttons - store bounds for click handling
         string[] presets = { "LINEAR", "S-CURVE", "EXPO", "CUSTOM" };
         float buttonWidth = (width - 12) / presets.Length; // 3 gaps of 4px each
-        float buttonHeight = FUIRenderer.ScaleLineHeight(24f);  // 4px aligned minimum
+        float buttonHeight = 24f;  // 4px aligned minimum
 
         for (int i = 0; i < presets.Length; i++)
         {
@@ -2068,22 +2068,22 @@ public class MappingsTabController : ITabController
 
             FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 8f);
         }
-        y += buttonHeight + FUIRenderer.ScaleSpacing(6f);
+        y += buttonHeight + 6f;
 
         // Curve editor visualization
         float curveHeight = 140f;
         _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
         DrawCurveVisualization(canvas, _curveEditorBounds);
-        y += curveHeight + FUIRenderer.ScaleSpacing(6f);
+        y += curveHeight + 6f;
 
         // Live axis movement indicator
         var axisMapping = GetCurrentAxisMapping();
         if (axisMapping is not null)
         {
             float indicatorHeight = DrawAxisMovementIndicator(canvas, leftMargin, rightMargin, y, axisMapping);
-            y += indicatorHeight + FUIRenderer.ScaleSpacing(6f);
+            y += indicatorHeight + 6f;
         }
-        y += FUIRenderer.ScaleSpacing(4f);
+        y += 4f;
 
         // Deadzone section
         if (y + 100 < bottom)
@@ -2128,13 +2128,13 @@ public class MappingsTabController : ITabController
                 string selectedName = handleNames[_selectedDeadzoneHandle];
                 FUIRenderer.DrawText(canvas, $"[{selectedName}]", new SKPoint(presetStartX - 45, y), FUIColors.Active, 9f);
             }
-            y += FUIRenderer.ScaleLineHeight(20f);
+            y += 20f;
 
             // Dual deadzone slider (always shows min/max, optionally shows center handles)
-            float sliderHeight = FUIRenderer.ScaleLineHeight(24f);
+            float sliderHeight = 24f;
             _deadzoneSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
             DrawDualDeadzoneSlider(canvas, _deadzoneSliderBounds);
-            y += sliderHeight + FUIRenderer.ScaleSpacing(6f);
+            y += sliderHeight + 6f;
 
             // Value labels - fixed positions at track edges (prevents collision)
             if (_deadzoneCenterEnabled)
@@ -2745,12 +2745,12 @@ public class MappingsTabController : ITabController
 
         var headerColor = hasInput ? FUIColors.Active : FUIColors.TextDim.WithAlpha(150);
         FUIRenderer.DrawText(canvas, headerText, new SKPoint(leftMargin, y), headerColor, 9f);
-        y += FUIRenderer.ScaleLineHeight(16f);
+        y += 16f;
 
         if (hasInput)
         {
             // Draw a visual bar indicator for the processed output
-            float barHeight = FUIRenderer.ScaleLineHeight(8f);
+            float barHeight = 8f;
             var barBounds = new SKRect(leftMargin, y, rightMargin, y + barHeight);
 
             // Background
@@ -2806,7 +2806,7 @@ public class MappingsTabController : ITabController
             };
             canvas.DrawRect(barBounds, framePaint);
 
-            y += barHeight + FUIRenderer.ScaleSpacing(2f);
+            y += barHeight + 2f;
 
             // Labels below bar - different for centered vs end-only
             if (isCentered)
@@ -2821,7 +2821,7 @@ public class MappingsTabController : ITabController
                 FUIRenderer.DrawText(canvas, "50%", new SKPoint(barBounds.MidX - 8, y), FUIColors.TextDim, 7f);
                 FUIRenderer.DrawText(canvas, "100%", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 7f);
             }
-            y += FUIRenderer.ScaleLineHeight(12f);
+            y += 12f;
         }
 
         return y - startY;

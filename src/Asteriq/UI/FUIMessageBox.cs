@@ -47,7 +47,8 @@ public class FUIMessageBox : Form
 
         // Calculate size based on content
         var size = CalculateSize();
-        ClientSize = new Size((int)size.Width, (int)size.Height);
+        float s = FUIRenderer.CanvasScaleFactor;
+        ClientSize = new Size((int)(size.Width * s), (int)(size.Height * s));
 
         // Create canvas
         _canvas = new SKControl
@@ -80,7 +81,7 @@ public class FUIMessageBox : Form
     private SKSize CalculateSize()
     {
         // Measure text to determine dialog size
-        using var textPaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, FUIRenderer.ScaleFont(13f));
+        using var textPaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 13f);
 
         var lines = _message.Split('\n');
         float maxWidth = 200f;
@@ -99,7 +100,9 @@ public class FUIMessageBox : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Background0);
 
@@ -144,7 +147,7 @@ public class FUIMessageBox : Form
         foreach (var line in lines)
         {
             FUIRenderer.DrawText(canvas, line, new SKPoint(20, messageY), FUIColors.TextPrimary, 13f);
-            messageY += FUIRenderer.ScaleLineHeight(20f);
+            messageY += 20f;
         }
 
         // Draw buttons
@@ -245,7 +248,8 @@ public class FUIMessageBox : Form
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        var pt = new SKPoint(e.X, e.Y);
+        float sc = FUIRenderer.CanvasScaleFactor;
+        var pt = new SKPoint(e.X / sc, e.Y / sc);
         int newHovered = -1;
 
         for (int i = 0; i < _buttonBounds.Length; i++)
@@ -279,7 +283,8 @@ public class FUIMessageBox : Form
         if (e.Button == MouseButtons.Left)
         {
             // Check if clicking on title bar for dragging
-            if (e.Y < 36 && _hoveredButton < 0)
+            float sc = FUIRenderer.CanvasScaleFactor;
+            if (e.Y / sc < 36 && _hoveredButton < 0)
             {
                 _isDragging = true;
                 _dragStart = e.Location;

@@ -114,7 +114,8 @@ public class MappingDialog : Form
     private void InitializeForm()
     {
         Text = "New Mapping";
-        Size = new Size(500, 400);
+        float s = FUIRenderer.CanvasScaleFactor;
+        Size = new Size((int)(500 * s), (int)(400 * s));
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Color.FromArgb(15, 18, 25);
@@ -341,10 +342,12 @@ public class MappingDialog : Form
 
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
     {
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
         _hoveredButton = -1;
         for (int i = 0; i < _buttonBounds.Length; i++)
         {
-            if (_buttonBounds[i].Contains(e.X, e.Y))
+            if (_buttonBounds[i].Contains(mx, my))
             {
                 _hoveredButton = i;
                 Cursor = Cursors.Hand;
@@ -358,18 +361,21 @@ public class MappingDialog : Form
     {
         if (e.Button != MouseButtons.Left) return;
 
+        float s = FUIRenderer.CanvasScaleFactor;
+        float mx = e.X / s, my = e.Y / s;
+
         // Force check which button is under the click (in case hover didn't update)
         int clickedButton = -1;
         for (int i = 0; i < _buttonBounds.Length; i++)
         {
-            if (_buttonBounds[i].Contains(e.X, e.Y))
+            if (_buttonBounds[i].Contains(mx, my))
             {
                 clickedButton = i;
                 break;
             }
         }
 
-        Console.WriteLine($"[MappingDialog] MouseDown at ({e.X}, {e.Y}): state={_state}, hoveredButton={_hoveredButton}, clickedButton={clickedButton}, buttonCount={_buttonBounds.Length}");
+        Console.WriteLine($"[MappingDialog] MouseDown at ({mx}, {my}): state={_state}, hoveredButton={_hoveredButton}, clickedButton={clickedButton}, buttonCount={_buttonBounds.Length}");
         for (int i = 0; i < _buttonBounds.Length; i++)
         {
             var b = _buttonBounds[i];
@@ -487,7 +493,9 @@ public class MappingDialog : Form
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
-        var bounds = new SKRect(0, 0, e.Info.Width, e.Info.Height);
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var bounds = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
 
         canvas.Clear(FUIColors.Void);
 

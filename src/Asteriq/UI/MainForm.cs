@@ -351,7 +351,7 @@ public partial class MainForm : Form
         FUIRenderer.SetDisplayScale(DeviceDpi);
 
         // Apply user's font size preference
-        FUIRenderer.FontSizeOption = _appSettings.FontSize;
+        FUIRenderer.InterfaceScale = _appSettings.FontSize;
 
         // Apply user's font family preference
         FUIRenderer.FontFamily = _appSettings.FontFamily;
@@ -1140,11 +1140,13 @@ public partial class MainForm : Form
     private void ApplyFontScaleToWindowSize()
     {
         // The design baseline is Medium (1.3x): 1570×1000 logical pixels.
-        // Scale MinimumSize proportionally with the user's font size preference.
+        // Scale MinimumSize proportionally with the combined canvas scale factor
+        // (DPI × text scale × user preference) so the window is large enough
+        // for the canvas drawing space at any DPI.
         const float baseMinW = 1570f / 1.3f;  // ~1208 - base at VSmall (1.0x)
         const float baseMinH = 1000f / 1.3f;  // ~769
-        float userScale = FUIRenderer.UserScaleMultiplier;
-        MinimumSize = new Size((int)(baseMinW * userScale), (int)(baseMinH * userScale));
+        float scale = FUIRenderer.CanvasScaleFactor;
+        MinimumSize = new Size((int)(baseMinW * scale), (int)(baseMinH * scale));
         // Windows enforces MinimumSize automatically; if the current size is smaller it will be grown.
     }
 
@@ -1753,11 +1755,11 @@ public partial class MainForm : Form
             {
                 return HTCLIENT;
             }
-            // Exclude tab area - _tabsStartX is in scaled canvas space, convert to logical pixels
-            float userScale = FUIRenderer.UserScaleMultiplier;
+            // Exclude tab area - _tabsStartX is in scaled canvas space, convert to physical pixels
+            float canvasScale = FUIRenderer.CanvasScaleFactor;
             if (_tabsStartX > 0 &&
-                clientPoint.X >= _tabsStartX * userScale &&
-                clientPoint.Y >= 36 * userScale && clientPoint.Y <= 66 * userScale)
+                clientPoint.X >= _tabsStartX * canvasScale &&
+                clientPoint.Y >= 36 * canvasScale && clientPoint.Y <= 66 * canvasScale)
             {
                 return HTCLIENT;
             }
@@ -1772,13 +1774,13 @@ public partial class MainForm : Form
     #region Mouse Handling
 
     /// <summary>
-    /// Convert a WinForms mouse event from logical-pixel coordinates to the
-    /// scaled canvas coordinate system (canvas.Scale(UserScaleMultiplier) is active
-    /// during drawing, so all hit-test bounds are in logical/userScale space).
+    /// Convert a WinForms mouse event from physical-pixel coordinates to the
+    /// scaled canvas coordinate system (canvas.Scale(CanvasScaleFactor) is active
+    /// during drawing, so all hit-test bounds are in canvas space).
     /// </summary>
     private static MouseEventArgs ScaleMouseEvent(MouseEventArgs e)
     {
-        float s = FUIRenderer.UserScaleMultiplier;
+        float s = FUIRenderer.CanvasScaleFactor;
         if (s == 1.0f) return e;
         return new MouseEventArgs(e.Button, e.Clicks, (int)(e.X / s), (int)(e.Y / s), e.Delta);
     }
@@ -1928,7 +1930,7 @@ public partial class MainForm : Form
         float btnSize = FUIRenderer.TouchTargetCompact;
         float btnGap = FUIRenderer.SpaceSM;
         float btnTotalWidth = btnSize * 3 + btnGap * 2;
-        float windowControlsX = ClientSize.Width / FUIRenderer.UserScaleMultiplier - pad - btnTotalWidth;
+        float windowControlsX = ClientSize.Width / FUIRenderer.CanvasScaleFactor - pad - btnTotalWidth;
         float titleBarY = FUIRenderer.TitleBarPadding;
         if (se.Y >= titleBarY + 12 && se.Y <= titleBarY + FUIRenderer.TitleBarHeightExpanded)
         {
@@ -2084,11 +2086,11 @@ public partial class MainForm : Form
         // All coords in scaled canvas space (se already divided by userScale).
         float pad = FUIRenderer.SpaceLG;
         float btnTotalWidth = FUIRenderer.TouchTargetCompact * 3 + FUIRenderer.SpaceSM * 2;
-        float windowControlsX = ClientSize.Width / FUIRenderer.UserScaleMultiplier - pad - btnTotalWidth;
+        float windowControlsX = ClientSize.Width / FUIRenderer.CanvasScaleFactor - pad - btnTotalWidth;
         float tabWindowGap = FUIRenderer.Space2XL;
-        float tabGap = FUIRenderer.ScaleSpacing(16f);
+        float tabGap = 16f;
 
-        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
+        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 13f);
         var visibleTabs = GetVisibleTabIndices();
         float[] tabWidths = new float[_tabNames.Length];    // keyed by semantic index
         float totalTabsWidth = 0;
@@ -2265,13 +2267,11 @@ public partial class MainForm : Form
 
         canvas.Clear(FUIColors.Void);
 
-        // Apply user font scale as a canvas transform so that ALL drawn elements
-        // (text, boxes, spacing, SVG labels) scale uniformly without overflow.
-        // ScaleFont/ScaleSpacing/ScaleLineHeight exclude UserScaleMultiplier so
-        // this transform is the single source of that scaling.
-        float userScale = FUIRenderer.UserScaleMultiplier;
-        canvas.Scale(userScale);
-        var scaledBounds = new SKRect(0, 0, bounds.Width / userScale, bounds.Height / userScale);
+        // Apply combined DPI + text scale + user preference as a single canvas transform
+        // so that ALL drawn elements scale uniformly without overflow.
+        float scale = FUIRenderer.CanvasScaleFactor;
+        canvas.Scale(scale);
+        var scaledBounds = new SKRect(0, 0, bounds.Width / scale, bounds.Height / scale);
 
         DrawBackgroundLayer(canvas, scaledBounds);
         DrawStructureLayer(canvas, scaledBounds);
@@ -2404,7 +2404,7 @@ public partial class MainForm : Form
         float titleX = 36f;
 
         // Measure actual title width (title uses scaled font)
-        using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, FUIRenderer.ScaleFont(26f));
+        using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, 26f);
         float titleWidth = titlePaint.MeasureText("ASTERIQ");
         FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 26f, true);
 
@@ -2415,8 +2415,8 @@ public partial class MainForm : Form
 
         // Navigation tabs - positioned with gap from window controls
         float tabWindowGap = FUIRenderer.Space2XL;  // 32px - was 40f
-        float tabGap = FUIRenderer.ScaleSpacing(16f);  // 16px - was 15f
-        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(13f));
+        float tabGap = 16f;  // 16px - was 15f
+        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 13f);
 
         // Calculate total tabs width by measuring each visible tab
         var visibleTabs = GetVisibleTabIndices();
@@ -2437,11 +2437,11 @@ public partial class MainForm : Form
         float subtitleX = titleX + titleWidth + elementGap;
 
         // Measure subtitle width
-        using var subtitlePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, FUIRenderer.ScaleFont(12f));
+        using var subtitlePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 12f);
         float subtitleWidth = subtitlePaint.MeasureText("UNIFIED HOTAS MANAGEMENT SYSTEM");
 
         // Profile selector width scales slightly with font
-        float profileSelectorWidth = FUIRenderer.ScaleSpacing(140f);
+        float profileSelectorWidth = 140f;
         float profileGap = 15f;
 
         // Subtitle - show if there's room before tabs (need space for separator line too)
@@ -2524,7 +2524,7 @@ public partial class MainForm : Form
 
     private void DrawProfileSelector(SKCanvas canvas, float x, float y, float width)
     {
-        float height = FUIRenderer.ScaleLineHeight(26f);
+        float height = 26f;
         _profileSelectorBounds = new SKRect(x, y, x + width, y + height);
 
         // Get profile name
@@ -2535,7 +2535,7 @@ public partial class MainForm : Form
         // Measure text to determine truncation (reserve space for arrow on right)
         float arrowWidth = 12f;
         float maxTextWidth = width - arrowWidth - 15f; // Space for arrow and padding
-        using var measurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, FUIRenderer.ScaleFont(11f));
+        using var measurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 11f);
         float textWidth = measurePaint.MeasureText(profileName);
 
         // Truncate if too long (based on actual measurement)
@@ -3001,6 +3001,12 @@ public partial class MainForm : Form
 
         // Update the renderer's display scale factor
         FUIRenderer.SetDisplayScale(DeviceDpi);
+
+        // Recalculate minimum window size for new DPI
+        ApplyFontScaleToWindowSize();
+
+        // Invalidate background cache so it regenerates at new scale
+        _backgroundDirty = true;
 
         // Force full redraw at new DPI
         Invalidate();

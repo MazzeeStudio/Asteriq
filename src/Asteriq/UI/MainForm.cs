@@ -2090,7 +2090,7 @@ public partial class MainForm : Form
         float tabWindowGap = FUIRenderer.Space2XL;
         float tabGap = 16f;
 
-        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 13f);
+        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 16f);
         var visibleTabs = GetVisibleTabIndices();
         float[] tabWidths = new float[_tabNames.Length];    // keyed by semantic index
         float totalTabsWidth = 0;
@@ -2404,9 +2404,9 @@ public partial class MainForm : Form
         float titleX = 36f;
 
         // Measure actual title width (title uses scaled font)
-        using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, 26f);
+        using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, 29f);
         float titleWidth = titlePaint.MeasureText("ASTERIQ");
-        FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 26f, true);
+        FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 29f, true);
 
         // Window controls - always at fixed position from right edge
         // 3 buttons at 32px + 2 gaps at 8px = 112px
@@ -2416,7 +2416,7 @@ public partial class MainForm : Form
         // Navigation tabs - positioned with gap from window controls
         float tabWindowGap = FUIRenderer.Space2XL;  // 32px - was 40f
         float tabGap = 16f;  // 16px - was 15f
-        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 13f);
+        using var tabMeasurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 16f);
 
         // Calculate total tabs width by measuring each visible tab
         var visibleTabs = GetVisibleTabIndices();
@@ -2437,7 +2437,7 @@ public partial class MainForm : Form
         float subtitleX = titleX + titleWidth + elementGap;
 
         // Measure subtitle width
-        using var subtitlePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 12f);
+        using var subtitlePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 15f);
         float subtitleWidth = subtitlePaint.MeasureText("UNIFIED HOTAS MANAGEMENT SYSTEM");
 
         // Profile selector width scales slightly with font
@@ -2476,7 +2476,7 @@ public partial class MainForm : Form
                 canvas.DrawLine(subtitleX + 10, titleBarY + 18, subtitleX + 10, titleBarY + 48, sepPaint);
             }
             FUIRenderer.DrawText(canvas, "UNIFIED HOTAS MANAGEMENT SYSTEM", new SKPoint(subtitleX + separatorWidth, titleBarY + 38),
-                FUIColors.TextDim, 12f);
+                FUIColors.TextDim, 15f);
         }
 
         // Profile selector (on the left, after subtitle or title)
@@ -2493,7 +2493,7 @@ public partial class MainForm : Form
             bool isActive = i == _activeTab;
             var tabColor = isActive ? FUIColors.Active : FUIColors.TextDim;
 
-            FUIRenderer.DrawText(canvas, _tabNames[i], new SKPoint(tabX, titleBarY + 38), tabColor, 13f);
+            FUIRenderer.DrawText(canvas, _tabNames[i], new SKPoint(tabX, titleBarY + 38), tabColor, 16f);
 
             if (isActive)
             {
@@ -2535,7 +2535,7 @@ public partial class MainForm : Form
         // Measure text to determine truncation (reserve space for arrow on right)
         float arrowWidth = 12f;
         float maxTextWidth = width - arrowWidth - 15f; // Space for arrow and padding
-        using var measurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 11f);
+        using var measurePaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 14f);
         float textWidth = measurePaint.MeasureText(profileName);
 
         // Truncate if too long (based on actual measurement)
@@ -2571,7 +2571,7 @@ public partial class MainForm : Form
         // Profile name text
         float textY = y + height / 2 + 4;
         FUIRenderer.DrawText(canvas, profileName, new SKPoint(x + 8, textY),
-            _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 11f);
+            _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 14f);
 
         // Dropdown arrow on right side (custom drawn triangle)
         float arrowSize = 4f;
@@ -2689,7 +2689,7 @@ public partial class MainForm : Form
                 name = name.Substring(0, 13) + "…";
 
             var color = isActive ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-            FUIRenderer.DrawText(canvas, name, new SKPoint(x + 12, itemY + 17), color, 11f);
+            FUIRenderer.DrawText(canvas, name, new SKPoint(x + 12, itemY + 17), color, 14f);
 
             itemY += itemHeight;
         }
@@ -2793,21 +2793,21 @@ public partial class MainForm : Form
         float viewBoxY = (_mousePosition.Y - _svgOffset.Y) / _svgScale;
         string mousePos = $"VB:{viewBoxX,5:F0},{viewBoxY,5:F0}";
         FUIRenderer.DrawText(canvas, mousePos,
-            new SKPoint(40, y + 22), FUIColors.TextDim, 10f);
+            new SKPoint(40, y + 22), FUIColors.TextDim, 13f);
 
         // Left-center: connection status
         int physicalCount = _devices.Count(d => !d.IsVirtual);
         string deviceText = physicalCount == 1 ? "1 DEVICE CONNECTED" : $"{physicalCount} DEVICES CONNECTED";
         FUIRenderer.DrawText(canvas, deviceText,
-            new SKPoint(180, y + 22), FUIColors.TextDim, 12f);
+            new SKPoint(180, y + 22), FUIColors.TextDim, 15f);
 
         // Center: current status
         FUIRenderer.DrawText(canvas, "READY",
-            new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 12f);
+            new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 15f);
 
         // Right: update indicator shape + version and time
         string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";
-        float versionWidth = FUIRenderer.MeasureText(versionTime, 12f);
+        float versionWidth = FUIRenderer.MeasureText(versionTime, 15f);
         var footerUpdateStatus = _updateService.Status;
         if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.UpdateAvailable)
         {
@@ -2836,12 +2836,12 @@ public partial class MainForm : Form
                 canvas.DrawPath(triPath, triPaint);
             }
 
-            FUIRenderer.DrawText(canvas, versionTime, new SKPoint(textX, y + 22), FUIColors.TextDim, 12f);
+            FUIRenderer.DrawText(canvas, versionTime, new SKPoint(textX, y + 22), FUIColors.TextDim, 15f);
         }
         else
         {
             FUIRenderer.DrawText(canvas, versionTime,
-                new SKPoint(bounds.Right - versionWidth - 20, y + 22), FUIColors.TextDim, 12f);
+                new SKPoint(bounds.Right - versionWidth - 20, y + 22), FUIColors.TextDim, 15f);
         }
     }
 

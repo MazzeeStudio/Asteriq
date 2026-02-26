@@ -181,7 +181,7 @@ public class DriverSetupForm : Form
 
         _logListBox.Location = new Point((int)(Pad * scale), (int)((logBoxTop + 2) * scale));
         _logListBox.Size = new Size((int)(contentW * scale), (int)(116 * scale));
-        _logListBox.Font = new Font("Consolas", 8 * scale);
+        _logListBox.Font = new Font("Consolas", 9f * FUIRenderer.InterfaceScale);
     }
 
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
@@ -207,14 +207,14 @@ public class DriverSetupForm : Form
         canvas.DrawRect(titleBar, titleBgPaint);
         using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
         canvas.DrawLine(titleBar.Left, titleBar.Bottom, titleBar.Right, titleBar.Bottom, sepPaint);
-        FUIRenderer.DrawText(canvas, "DRIVER SETUP", new SKPoint(16, titleBar.MidY + 5), FUIColors.TextBright, 13f, false);
+        FUIRenderer.DrawText(canvas, "DRIVER SETUP", new SKPoint(16, titleBar.MidY + 5), FUIColors.TextBright, 16f, false);
 
         // Overall status — draw first so we know how much vertical space it needs
         var statusLines = _statusText.Split('\n');
         float statusY = TitleBarH + 18f;
         for (int i = 0; i < statusLines.Length; i++)
         {
-            FUIRenderer.DrawText(canvas, statusLines[i], new SKPoint(Pad, statusY), _statusColor, 10f);
+            FUIRenderer.DrawText(canvas, statusLines[i], new SKPoint(Pad, statusY), _statusColor, 13f);
             if (i < statusLines.Length - 1) statusY += 15f;
         }
 
@@ -247,21 +247,21 @@ public class DriverSetupForm : Form
 
         // Manual download links — anchored below panel 2
         float linkY = _panel2Y + PanelH + 18f;
-        FUIRenderer.DrawText(canvas, "MANUAL DOWNLOAD:", new SKPoint(Pad, linkY), FUIColors.TextDim, 9f, false);
+        FUIRenderer.DrawText(canvas, "MANUAL DOWNLOAD:", new SKPoint(Pad, linkY), FUIColors.TextDim, 12f, false);
 
-        using var linkPaint = FUIRenderer.CreateTextPaint(FUIColors.Active, 9f);
+        using var linkPaint = FUIRenderer.CreateTextPaint(FUIColors.Active, 12f);
 
         float vJoyLinkX = Pad + 142;
         float vJoyLinkW = linkPaint.MeasureText("vJoy from GitHub");
         _vJoyLinkBounds = new SKRect(vJoyLinkX, linkY - 12, vJoyLinkX + vJoyLinkW, linkY + 4);
         FUIRenderer.DrawText(canvas, "vJoy from GitHub", new SKPoint(vJoyLinkX, linkY),
-            _hoveredRegion == 2 ? FUIColors.Primary : FUIColors.Active, 9f);
+            _hoveredRegion == 2 ? FUIColors.Primary : FUIColors.Active, 12f);
 
         float hidHideLinkX = vJoyLinkX + vJoyLinkW + 24;
         float hidHideLinkW = linkPaint.MeasureText("HidHide from GitHub");
         _hidHideLinkBounds = new SKRect(hidHideLinkX, linkY - 12, hidHideLinkX + hidHideLinkW, linkY + 4);
         FUIRenderer.DrawText(canvas, "HidHide from GitHub", new SKPoint(hidHideLinkX, linkY),
-            _hoveredRegion == 3 ? FUIColors.Primary : FUIColors.Active, 9f);
+            _hoveredRegion == 3 ? FUIColors.Primary : FUIColors.Active, 12f);
 
         // Bottom-anchored layout — all relative to b.Bottom
         float btnW = 110f, btnH = 34f, btnSpacing = 12f;
@@ -272,7 +272,7 @@ public class DriverSetupForm : Form
         float logHeaderY = logBoxTop - 14f;
 
         // Install log header
-        FUIRenderer.DrawText(canvas, "INSTALL LOG", new SKPoint(Pad, logHeaderY), FUIColors.TextDim, 9f, false);
+        FUIRenderer.DrawText(canvas, "INSTALL LOG", new SKPoint(Pad, logHeaderY), FUIColors.TextDim, 12f, false);
 
         // Log frame
         var logFrame = new SKRect(Pad - 1, logBoxTop, Pad + contentW + 1, logBoxTop + logBoxH);
@@ -341,19 +341,19 @@ public class DriverSetupForm : Form
 
         // Title
         FUIRenderer.DrawText(canvas, title, new SKPoint(bounds.Left + 14, bounds.Top + 22),
-            FUIColors.TextBright, 12f, false);
+            FUIColors.TextBright, 15f, false);
 
         // Badge (REQUIRED / RECOMMENDED)
         var badgeColor = required ? FUIColors.Active : FUIColors.Warning;
-        FUIRenderer.DrawText(canvas, badge, new SKPoint(bounds.Left + 14, bounds.Top + 38), badgeColor, 9f, false);
+        FUIRenderer.DrawText(canvas, badge, new SKPoint(bounds.Left + 14, bounds.Top + 38), badgeColor, 12f, false);
 
         // Description
         FUIRenderer.DrawText(canvas, description, new SKPoint(bounds.Left + 14, bounds.Top + 60),
-            FUIColors.TextDim, 10f);
+            FUIColors.TextDim, 13f);
 
         // Status
         FUIRenderer.DrawText(canvas, statusText, new SKPoint(bounds.Left + 14, bounds.Top + 95),
-            statusColor, 10f);
+            statusColor, 13f);
     }
 
     private void OnCanvasMouseMove(object? sender, MouseEventArgs e)

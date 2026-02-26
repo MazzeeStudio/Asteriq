@@ -244,7 +244,7 @@ public class SCAssignmentDialog : Form
         canvas.DrawRect(new SKRect(0, 0, bounds.Width, titleHeight), titleBgPaint);
 
         string title = $"ASSIGN: {_action.ActionName.ToUpper()}";
-        FUIRenderer.DrawText(canvas, title, new SKPoint(15, 26), FUIColors.Primary, 12f, true);
+        FUIRenderer.DrawText(canvas, title, new SKPoint(15, 26), FUIColors.Primary, 15f, true);
     }
 
     private void DrawDialogContent(SKCanvas canvas, SKRect bounds)
@@ -256,7 +256,7 @@ public class SCAssignmentDialog : Form
         if (_availableVJoy.Count == 0)
         {
             FUIRenderer.DrawText(canvas, "No vJoy devices available",
-                new SKPoint(pad, y), FUIColors.Warning, 12f);
+                new SKPoint(pad, y), FUIColors.Warning, 15f);
 
             var noDeviceCancelBounds = new SKRect(bounds.MidX - 50, bounds.Height - 60, bounds.MidX + 50, bounds.Height - 30);
             buttons.Add(noDeviceCancelBounds);
@@ -268,7 +268,7 @@ public class SCAssignmentDialog : Form
         var device = _availableVJoy[_selectedVJoyDevice];
 
         // vJoy device selector
-        FUIRenderer.DrawText(canvas, "vJoy Device:", new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, "vJoy Device:", new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
 
         var prevDeviceBtn = new SKRect(pad + 110, y, pad + 140, y + 28);
         var nextDeviceBtn = new SKRect(pad + 280, y, pad + 310, y + 28);
@@ -277,14 +277,14 @@ public class SCAssignmentDialog : Form
 
         DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == 0, _selectedVJoyDevice > 0);
         FUIRenderer.DrawTextCentered(canvas, $"vJoy {device.Id}",
-            new SKRect(pad + 150, y, pad + 270, y + 28), FUIColors.TextBright, 12f);
+            new SKRect(pad + 150, y, pad + 270, y + 28), FUIColors.TextBright, 15f);
         DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == 1, _selectedVJoyDevice < _availableVJoy.Count - 1);
 
         y += 44;
 
         // Input selector
         string inputLabel = _action.InputType == SCInputType.Axis ? "Axis:" : "Button:";
-        FUIRenderer.DrawText(canvas, inputLabel, new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, inputLabel, new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
 
         var prevInputBtn = new SKRect(pad + 110, y, pad + 140, y + 28);
         var nextInputBtn = new SKRect(pad + 280, y, pad + 310, y + 28);
@@ -294,7 +294,7 @@ public class SCAssignmentDialog : Form
         DrawSmallButton(canvas, prevInputBtn, "<", _hoveredButton == 2, _selectedInputIndex > 0);
         string inputDisplay = GetInputDisplayName(_selectedInputIndex);
         FUIRenderer.DrawTextCentered(canvas, inputDisplay,
-            new SKRect(pad + 150, y, pad + 270, y + 28), FUIColors.TextBright, 12f);
+            new SKRect(pad + 150, y, pad + 270, y + 28), FUIColors.TextBright, 15f);
         DrawSmallButton(canvas, nextInputBtn, ">", _hoveredButton == 3, _selectedInputIndex < 40);
 
         y += 44;
@@ -346,7 +346,7 @@ public class SCAssignmentDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
     }
 
     private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
@@ -370,7 +370,7 @@ public class SCAssignmentDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     private void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
@@ -390,7 +390,7 @@ public class SCAssignmentDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 10f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

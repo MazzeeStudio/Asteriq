@@ -222,7 +222,7 @@ public class SettingsTabController : ITabController
         }
         else
         {
-            FUIRenderer.DrawText(canvas, "No profile active", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+            FUIRenderer.DrawText(canvas, "No profile active", new SKPoint(leftMargin, y), FUIColors.TextDim, 15f);
             y += 40f;
         }
 
@@ -255,7 +255,7 @@ public class SettingsTabController : ITabController
             using var delFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Danger.WithAlpha(150), StrokeWidth = 1f };
             canvas.DrawRoundRect(_deleteProfileButtonBounds, 4, 4, delFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, "Delete Profile", _deleteProfileButtonBounds, FUIColors.Danger, 11f);
+            FUIRenderer.DrawTextCentered(canvas, "Delete Profile", _deleteProfileButtonBounds, FUIColors.Danger, 14f);
             y += buttonHeight + 20f;
 
             if (y < bottom - 60)
@@ -309,7 +309,7 @@ public class SettingsTabController : ITabController
         float autoLoadLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float autoLoadLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Auto-load profile", new SKPoint(leftMargin, autoLoadLabelY),
-            autoLoadLabelMaxWidth, FUIColors.TextPrimary, 11f);
+            autoLoadLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float toggleY = y + (rowHeight - toggleHeight) / 2;
         _autoLoadToggleBounds = new SKRect(rightMargin - toggleWidth, toggleY, rightMargin, toggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _autoLoadToggleBounds, _ctx.AppSettings.AutoLoadLastProfile, _ctx.MousePosition);
@@ -319,7 +319,7 @@ public class SettingsTabController : ITabController
         float closeToTrayLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float closeToTrayLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Close to tray", new SKPoint(leftMargin, closeToTrayLabelY),
-            closeToTrayLabelMaxWidth, FUIColors.TextPrimary, 11f);
+            closeToTrayLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float closeToTrayToggleY = y + (rowHeight - toggleHeight) / 2;
         _closeToTrayToggleBounds = new SKRect(rightMargin - toggleWidth, closeToTrayToggleY, rightMargin, closeToTrayToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _ctx.AppSettings.CloseToTray, _ctx.MousePosition);
@@ -335,7 +335,7 @@ public class SettingsTabController : ITabController
         float iconLabelMaxWidth = contentWidth - iconBtnsWidth - minControlGap;
 
         FUIRenderer.DrawTextTruncated(canvas, "Tray icon", new SKPoint(leftMargin, y + 6),
-            iconLabelMaxWidth, FUIColors.TextPrimary, 11f);
+            iconLabelMaxWidth, FUIColors.TextPrimary, 14f);
 
         float iconBtnsStartX = rightMargin - iconBtnsWidth;
 
@@ -368,12 +368,12 @@ public class SettingsTabController : ITabController
             };
             canvas.DrawRect(iconBounds, iconBorderPaint);
 
-            FUIRenderer.DrawTextCentered(canvas, trayIconLabels[i], iconBounds, textColor, 10f);
+            FUIRenderer.DrawTextCentered(canvas, trayIconLabels[i], iconBounds, textColor, 13f);
         }
         y += iconBtnHeight + sectionSpacing;
 
         // vJoy section
-        FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing;
 
         var devices = _ctx.VJoyService.EnumerateDevices();
@@ -381,7 +381,7 @@ public class SettingsTabController : ITabController
         string vjoyStatus = vjoyEnabled ? "Driver active" : "Not available";
         var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
 
-        float statusTextSize = 11f;
+        float statusTextSize = 17f;
         float statusLineHeight = statusTextSize + 4;
         float statusDotRadius = 4f;
         float statusDotY = y + (statusLineHeight / 2);
@@ -392,13 +392,13 @@ public class SettingsTabController : ITabController
         using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
         canvas.DrawCircle(leftMargin + statusDotRadius + 1, statusDotY, statusDotRadius, statusDot);
         FUIRenderer.DrawTextTruncated(canvas, vjoyStatus, new SKPoint(statusTextX, statusTextY), statusMaxWidth,
-            vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 11f);
+            vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 14f);
         y += rowHeight;
 
         if (vjoyEnabled)
         {
             FUIRenderer.DrawTextTruncated(canvas, $"Available devices: {devices.Count}",
-                new SKPoint(leftMargin, y), contentWidth, FUIColors.TextDim, 10f);
+                new SKPoint(leftMargin, y), contentWidth, FUIColors.TextDim, 13f);
             y += rowHeight;
         }
         y += sectionSpacing;
@@ -410,16 +410,16 @@ public class SettingsTabController : ITabController
 
         // Header row: "VERSION" label left, current version right-aligned
         string versionStr = $"v{currentVersion}";
-        float versionStrWidth = FUIRenderer.MeasureText(versionStr, 11f);
-        FUIRenderer.DrawText(canvas, "VERSION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, versionStr, new SKPoint(rightMargin - versionStrWidth, y + 1f), FUIColors.TextPrimary, 11f);
+        float versionStrWidth = FUIRenderer.MeasureText(versionStr, 14f);
+        FUIRenderer.DrawText(canvas, "VERSION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        FUIRenderer.DrawText(canvas, versionStr, new SKPoint(rightMargin - versionStrWidth, y + 1f), FUIColors.TextPrimary, 14f);
         y += sectionSpacing;
 
         // "Check for updates automatically" toggle
         float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float autoCheckLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Check for updates automatically", new SKPoint(leftMargin, autoCheckLabelY),
-            autoCheckLabelMaxWidth, FUIColors.TextPrimary, 11f);
+            autoCheckLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
         _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _ctx.AppSettings.AutoCheckUpdates, _ctx.MousePosition);
@@ -473,7 +473,7 @@ public class SettingsTabController : ITabController
         float themeBtnsStartX = leftMargin + themeLabelWidth;
 
         float themeLabelY = themeBtnHeight / 2 + 3;
-        FUIRenderer.DrawTextTruncated(canvas, "Core", new SKPoint(leftMargin, y + themeLabelY), themeLabelWidth - 5, FUIColors.TextDim, 9f);
+        FUIRenderer.DrawTextTruncated(canvas, "Core", new SKPoint(leftMargin, y + themeLabelY), themeLabelWidth - 5, FUIColors.TextDim, 12f);
 
         FUITheme[] coreThemes = { FUITheme.Midnight, FUITheme.Matrix, FUITheme.Amber, FUITheme.Ice };
         string[] coreNames = { "MID", "MTX", "AMB", "ICE" };
@@ -492,7 +492,7 @@ public class SettingsTabController : ITabController
         }
         y += themeBtnHeight + 8;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Mfr", new SKPoint(leftMargin, y + themeLabelY), themeLabelWidth - 5, FUIColors.TextDim, 9f);
+        FUIRenderer.DrawTextTruncated(canvas, "Mfr", new SKPoint(leftMargin, y + themeLabelY), themeLabelWidth - 5, FUIColors.TextDim, 12f);
 
         FUITheme[] mfrThemes1 = { FUITheme.Drake, FUITheme.Aegis, FUITheme.Anvil, FUITheme.Argo };
         string[] mfrNames1 = { "DRK", "AEG", "ANV", "ARG" };
@@ -529,19 +529,19 @@ public class SettingsTabController : ITabController
         y += themeBtnHeight + sectionSpacing + 8;
 
         // Background effects section — directly below themes
-        FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing + 8;
 
         string[] sliderLabels = { "Grid", "Glow", "Noise", "Scanlines", "Vignette" };
         float maxLabelWidth = 0;
         foreach (var label in sliderLabels)
         {
-            float w = FUIRenderer.MeasureText(label, 11f);
+            float w = FUIRenderer.MeasureText(label, 14f);
             if (w > maxLabelWidth) maxLabelWidth = w;
         }
 
         float labelColumnWidth = maxLabelWidth + 10f;
-        float valueColumnWidth = FUIRenderer.MeasureText("100", 10f) + 8f;
+        float valueColumnWidth = FUIRenderer.MeasureText("100", 13f) + 8f;
         float sliderLeft = leftMargin + labelColumnWidth;
         float sliderRight = rightMargin - valueColumnWidth;
         float sliderRowHeight = 22f;
@@ -559,38 +559,38 @@ public class SettingsTabController : ITabController
 
         var bg = _ctx.Background;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Grid", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Grid", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 14f);
         _bgGridSliderBounds = new SKRect(sliderLeft, y + sliderYOff, sliderRight, y + sliderYOff + sliderHeight);
         FUIWidgets.DrawSettingsSlider(canvas, _bgGridSliderBounds, bg.GridStrength, 100);
-        FUIRenderer.DrawText(canvas, bg.GridStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, bg.GridStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
         y += sliderRowHeight + sliderRowGap;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Glow", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Glow", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 14f);
         _bgGlowSliderBounds = new SKRect(sliderLeft, y + sliderYOff, sliderRight, y + sliderYOff + sliderHeight);
         FUIWidgets.DrawSettingsSlider(canvas, _bgGlowSliderBounds, bg.GlowIntensity, 100);
-        FUIRenderer.DrawText(canvas, bg.GlowIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, bg.GlowIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
         y += sliderRowHeight + sliderRowGap;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Noise", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Noise", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 14f);
         _bgNoiseSliderBounds = new SKRect(sliderLeft, y + sliderYOff, sliderRight, y + sliderYOff + sliderHeight);
         FUIWidgets.DrawSettingsSlider(canvas, _bgNoiseSliderBounds, bg.NoiseIntensity, 100);
-        FUIRenderer.DrawText(canvas, bg.NoiseIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, bg.NoiseIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
         y += sliderRowHeight + sliderRowGap;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Scanlines", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Scanlines", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 14f);
         _bgScanlineSliderBounds = new SKRect(sliderLeft, y + sliderYOff, sliderRight, y + sliderYOff + sliderHeight);
         FUIWidgets.DrawSettingsSlider(canvas, _bgScanlineSliderBounds, bg.ScanlineIntensity, 100);
-        FUIRenderer.DrawText(canvas, bg.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, bg.ScanlineIntensity.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
         y += sliderRowHeight + sliderRowGap;
 
-        FUIRenderer.DrawTextTruncated(canvas, "Vignette", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextTruncated(canvas, "Vignette", new SKPoint(leftMargin, y + textY), labelColumnWidth - 5, FUIColors.TextPrimary, 14f);
         _bgVignetteSliderBounds = new SKRect(sliderLeft, y + sliderYOff, sliderRight, y + sliderYOff + sliderHeight);
         FUIWidgets.DrawSettingsSlider(canvas, _bgVignetteSliderBounds, bg.VignetteStrength, 100);
-        FUIRenderer.DrawText(canvas, bg.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, bg.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
         y += sliderRowHeight + sectionSpacing;
 
         // Font section — family selector + size stepper, clearly grouped
-        FUIRenderer.DrawText(canvas, "FONT", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "FONT", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing;
 
         float fontBtnGap = 4f;
@@ -614,7 +614,7 @@ public class SettingsTabController : ITabController
             canvas.DrawRect(ffBounds, ffBgPaint);
             using var ffFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = ffFrame, StrokeWidth = isActive ? 1.5f : 1f };
             canvas.DrawRect(ffBounds, ffFramePaint);
-            FUIRenderer.DrawTextCentered(canvas, fontFamilyLabels[i], ffBounds, ffText, 10f, scaleFont: false);
+            FUIRenderer.DrawTextCentered(canvas, fontFamilyLabels[i], ffBounds, ffText, 13f, scaleFont: false);
         }
         y += fontFamilyBtnHeight + sectionSpacing;
 
@@ -625,7 +625,7 @@ public class SettingsTabController : ITabController
         float fontStepperWidth = fontBtnWidth * 2 + fontBtnGap * 2 + fontValueWidth;
 
         FUIRenderer.DrawTextTruncated(canvas, "Interface Scale", new SKPoint(leftMargin, y + 6),
-            contentWidth - fontStepperWidth - FUIRenderer.SpaceSM, FUIColors.TextPrimary, 10f);
+            contentWidth - fontStepperWidth - FUIRenderer.SpaceSM, FUIColors.TextPrimary, 13f);
 
         float scale = _ctx.AppSettings.FontSize;
         float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
@@ -642,11 +642,11 @@ public class SettingsTabController : ITabController
         var minusText = !canDecrease ? FUIColors.TextDim.WithAlpha(60) : (minusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
         using (var p = new SKPaint { Style = SKPaintStyle.Fill, Color = minusBg }) canvas.DrawRect(minusBounds, p);
         using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = minusFrame, StrokeWidth = 1f }) canvas.DrawRect(minusBounds, p);
-        FUIRenderer.DrawTextCentered(canvas, "-", minusBounds, minusText, 14f, scaleFont: false);
+        FUIRenderer.DrawTextCentered(canvas, "-", minusBounds, minusText, 17f, scaleFont: false);
 
         string valueText = $"{scale:F1}x";
         var valueBounds = new SKRect(stepperX + fontBtnWidth + fontBtnGap, y, stepperX + fontBtnWidth + fontBtnGap + fontValueWidth, y + fontBtnHeight);
-        FUIRenderer.DrawTextCentered(canvas, valueText, valueBounds, FUIColors.TextBright, 11f, scaleFont: false);
+        FUIRenderer.DrawTextCentered(canvas, valueText, valueBounds, FUIColors.TextBright, 14f, scaleFont: false);
 
         var plusBounds = new SKRect(valueBounds.Right + fontBtnGap, y, valueBounds.Right + fontBtnGap + fontBtnWidth, y + fontBtnHeight);
         _fontSizeButtonBounds[1] = plusBounds;
@@ -656,7 +656,7 @@ public class SettingsTabController : ITabController
         var plusText = !canIncrease ? FUIColors.TextDim.WithAlpha(60) : (plusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
         using (var p = new SKPaint { Style = SKPaintStyle.Fill, Color = plusBg }) canvas.DrawRect(plusBounds, p);
         using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = plusFrame, StrokeWidth = 1f }) canvas.DrawRect(plusBounds, p);
-        FUIRenderer.DrawTextCentered(canvas, "+", plusBounds, plusText, 14f, scaleFont: false);
+        FUIRenderer.DrawTextCentered(canvas, "+", plusBounds, plusText, 17f, scaleFont: false);
     }
 
     private void DrawSupportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -676,10 +676,10 @@ public class SettingsTabController : ITabController
         float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
 
         // Header row: "SUPPORT" left, SC referral descriptor right-aligned
-        FUIRenderer.DrawText(canvas, "SUPPORT", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "SUPPORT", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         const string scDescriptor = "Referral Code \u00b7 50,000 Bonus aUEC";
-        float descWidth = FUIRenderer.MeasureText(scDescriptor, 9f);
-        FUIRenderer.DrawText(canvas, scDescriptor, new SKPoint(rightMargin - descWidth, y + 1f), FUIColors.TextDim, 9f);
+        float descWidth = FUIRenderer.MeasureText(scDescriptor, 12f);
+        FUIRenderer.DrawText(canvas, scDescriptor, new SKPoint(rightMargin - descWidth, y + 1f), FUIColors.TextDim, 12f);
         y += 20f;
 
         float btnHeight = 28f;
@@ -720,7 +720,7 @@ public class SettingsTabController : ITabController
             canvas.DrawRoundRect(bounds, 4, 4, dbgPaint);
             using var dfPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(60), StrokeWidth = 1f };
             canvas.DrawRoundRect(bounds, 4, 4, dfPaint);
-            FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextDim.WithAlpha(80), 11f);
+            FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextDim.WithAlpha(80), 14f);
             return;
         }
 
@@ -735,7 +735,7 @@ public class SettingsTabController : ITabController
         using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = hovered ? 1.5f : 1f };
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     private void StoreThemeButtonBounds(int index, SKRect bounds)

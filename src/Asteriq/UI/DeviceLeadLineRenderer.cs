@@ -169,7 +169,7 @@ internal static class DeviceLeadLineRenderer
         };
         canvas.DrawRect(frameBounds, framePaint);
 
-        FUIRenderer.DrawText(canvas, label, new SKPoint(x + 5, y + 14), textColor, 11f);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(x + 5, y + 14), textColor, 14f);
 
         if (input.IsAxis)
         {
@@ -183,7 +183,7 @@ internal static class DeviceLeadLineRenderer
         {
             string valueText = input.Value > 0.5f ? "PRESSED" : input.Binding.ToUpper();
             var valueColor = input.Value > 0.5f ? activeColor : dimColor;
-            FUIRenderer.DrawText(canvas, valueText, new SKPoint(x + labelWidth - 60, y + 14), valueColor, 9f);
+            FUIRenderer.DrawText(canvas, valueText, new SKPoint(x + labelWidth - 60, y + 14), valueColor, 12f);
         }
     }
 }

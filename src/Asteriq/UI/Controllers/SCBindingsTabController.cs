@@ -1124,11 +1124,11 @@ public class SCBindingsTabController : ITabController
         float lineHeight = 20f;
 
         // Title
-        FUIRenderer.DrawText(canvas, "STAR CITIZEN INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "STAR CITIZEN INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 17f, true);
         y += 35f;
 
         // Installation selector
-        FUIRenderer.DrawText(canvas, "INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += lineHeight;
 
         float selectorHeight = 36f;
@@ -1147,7 +1147,7 @@ public class SCBindingsTabController : ITabController
         {
             var installation = _scInstallations[_selectedSCInstallation];
 
-            FUIRenderer.DrawText(canvas, "DETAILS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "DETAILS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += lineHeight;
 
             DrawSCDetailRow(canvas, leftMargin, rightMargin, ref y, "Environment", installation.Environment);
@@ -1165,16 +1165,16 @@ public class SCBindingsTabController : ITabController
             }
             else
             {
-                FUIRenderer.DrawText(canvas, "Schema not loaded", new SKPoint(leftMargin, y), FUIColors.Warning, 11f);
+                FUIRenderer.DrawText(canvas, "Schema not loaded", new SKPoint(leftMargin, y), FUIColors.Warning, 14f);
                 y += lineHeight;
             }
         }
         else
         {
             y += 10f;
-            FUIRenderer.DrawText(canvas, "Star Citizen not detected.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+            FUIRenderer.DrawText(canvas, "Star Citizen not detected.", new SKPoint(leftMargin, y), FUIColors.TextDim, 14f);
             y += lineHeight;
-            FUIRenderer.DrawText(canvas, "Install SC or check the installation path.", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+            FUIRenderer.DrawText(canvas, "Install SC or check the installation path.", new SKPoint(leftMargin, y), FUIColors.TextDim, 14f);
             y += lineHeight * 2;
         }
 
@@ -1189,10 +1189,10 @@ public class SCBindingsTabController : ITabController
 
         // Export Profile Name section
         y += buttonHeight + 32f;  // 4px aligned
-        FUIRenderer.DrawText(canvas, "EXPORT PROFILE", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "EXPORT PROFILE", new SKPoint(leftMargin, y), FUIColors.TextBright, 17f, true);
         y += 30f;
 
-        FUIRenderer.DrawText(canvas, "PROFILE NAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "PROFILE NAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += lineHeight;
 
         float nameFieldHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
@@ -1205,10 +1205,10 @@ public class SCBindingsTabController : ITabController
         y += nameFieldHeight + 12f;  // 4px aligned
 
         // Export filename preview
-        FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += lineHeight;
         string exportFilenameDisplay = string.IsNullOrEmpty(_scExportProfile.ProfileName) ? "— save export to generate filename —" : _scExportProfile.GetExportFileName();
-        FUIRenderer.DrawText(canvas, exportFilenameDisplay, new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, exportFilenameDisplay, new SKPoint(leftMargin, y), FUIColors.TextDim, 14f);
     }
 
     private void DrawSCExportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1230,7 +1230,7 @@ public class SCBindingsTabController : ITabController
         float lineHeight = 20f;
 
         // Title - Import Section
-        FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 17f, true);
         y += 25f;
 
         // Clear mapping bounds since we removed the UI
@@ -1268,11 +1268,11 @@ public class SCBindingsTabController : ITabController
         y += 20f;
 
         // Title - Export Section
-        FUIRenderer.DrawText(canvas, "EXPORT TO SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        FUIRenderer.DrawText(canvas, "EXPORT TO SC", new SKPoint(leftMargin, y), FUIColors.TextBright, 17f, true);
         y += 25f;
 
         // Filename input
-        FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "FILENAME", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += lineHeight - 2f;
 
         float filenameBoxHeight = FUIRenderer.TouchTargetCompact;  // 32px for text inputs
@@ -1290,12 +1290,12 @@ public class SCBindingsTabController : ITabController
             ? _scExportProfile.GetExportFileName()
             : $"{_scExportFilename}.xml";
         var filenameColor = string.IsNullOrEmpty(_scExportFilename) ? FUIColors.TextDim : FUIColors.TextPrimary;
-        FUIRenderer.DrawText(canvas, displayFilename, new SKPoint(leftMargin + 8, y + filenameBoxHeight / 2 + 4), filenameColor, 10f);
+        FUIRenderer.DrawText(canvas, displayFilename, new SKPoint(leftMargin + 8, y + filenameBoxHeight / 2 + 4), filenameColor, 13f);
 
         // Show cursor when focused
         if (_scExportFilenameBoxFocused)
         {
-            float cursorX = leftMargin + 8 + FUIRenderer.MeasureText(_scExportFilename, 10f);
+            float cursorX = leftMargin + 8 + FUIRenderer.MeasureText(_scExportFilename, 13f);
             using var cursorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright, IsAntialias = true };
             canvas.DrawRect(cursorX, y + 5, 1.5f, filenameBoxHeight - 10, cursorPaint);
         }
@@ -1306,9 +1306,9 @@ public class SCBindingsTabController : ITabController
         if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count && _scExportService is not null)
         {
             var installation = _scInstallations[_selectedSCInstallation];
-            FUIRenderer.DrawText(canvas, "TO FOLDER", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+            FUIRenderer.DrawText(canvas, "TO FOLDER", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
             y += lineHeight - 4f;
-            FUIRenderer.DrawText(canvas, TruncatePath(installation.MappingsPath, 50), new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+            FUIRenderer.DrawText(canvas, TruncatePath(installation.MappingsPath, 50), new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
             y += lineHeight + 5f;
         }
 
@@ -1336,8 +1336,8 @@ public class SCBindingsTabController : ITabController
     private void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
     {
         float lineHeight = 18f;
-        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 13f);
         y += lineHeight;
     }
 
@@ -1405,7 +1405,7 @@ public class SCBindingsTabController : ITabController
 
             var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
             FUIRenderer.DrawText(canvas, _scInstallations[i].DisplayName,
-                new SKPoint(itemBounds.Left + 12, itemBounds.MidY + 4), textColor, 11f);
+                new SKPoint(itemBounds.Left + 12, itemBounds.MidY + 4), textColor, 14f);
 
             y += itemHeight;
         }
@@ -1429,7 +1429,7 @@ public class SCBindingsTabController : ITabController
         float rightMargin = bounds.Right - frameInset - 10;
 
         // Title
-        FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
+        FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += 18f;
 
         // Installation selector
@@ -1463,7 +1463,7 @@ public class SCBindingsTabController : ITabController
         float lineHeight = 18f;
 
         // Title row with action count
-        FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 12f, true);
+        FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 15f, true);
 
         // Action count on right of title
         int actionCount = _scFilteredActions?.Count ?? 0;
@@ -1485,8 +1485,8 @@ public class SCBindingsTabController : ITabController
             countText = $"{actionCount} of {totalBound} bound";       // "26 of 239 bound" (within current filter)
         else
             countText = $"{actionCount} of {totalCount}, {boundCount} bound"; // "55 of 1113, 26 bound"
-        float countTextWidth = FUIRenderer.MeasureText(countText, 9f);
-        FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 9f);
+        float countTextWidth = FUIRenderer.MeasureText(countText, 12f);
+        FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 12f);
 
         y += 28f;
 
@@ -1518,7 +1518,7 @@ public class SCBindingsTabController : ITabController
         // "Bound only" label after checkbox
         float labelX = checkboxX + checkboxSize + 6f;
         FUIRenderer.DrawText(canvas, "Bound only", new SKPoint(labelX, y + filterRowHeight / 2 + 4),
-            _scShowBoundOnly ? FUIColors.Active : FUIColors.TextDim, 10f);
+            _scShowBoundOnly ? FUIColors.Active : FUIColors.TextDim, 13f);
 
         y += filterRowHeight + 12f;
 
@@ -1578,7 +1578,7 @@ public class SCBindingsTabController : ITabController
         _scColumnHeadersBounds = new SKRect(deviceColsStart, y, deviceColsStart + visibleDeviceWidth, y + headerRowHeight);
 
         // Draw ACTION column header
-        FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(leftMargin + 18f, headerTextY), FUIColors.TextDim, 9f, true);
+        FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(leftMargin + 18f, headerTextY), FUIColors.TextDim, 12f, true);
 
         // Draw separator after ACTION column
         using var actionSepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(80), StrokeWidth = 1 };
@@ -1608,11 +1608,11 @@ public class SCBindingsTabController : ITabController
                 if (col.IsReadOnly)
                 {
                     // Read-only column: dimmed header + "NO DEVICE" sub-label
-                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
+                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
                     float centeredX = colX + (colW - headerTextWidth) / 2;
-                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), FUIColors.TextDim, 9f, true);
-                    float subLabelWidth = FUIRenderer.MeasureText("NO DEVICE", 7f);
-                    FUIRenderer.DrawText(canvas, "NO DEVICE", new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.TextDim.WithAlpha(120), 7f);
+                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), FUIColors.TextDim, 12f, true);
+                    float subLabelWidth = FUIRenderer.MeasureText("NO DEVICE", 12f);
+                    FUIRenderer.DrawText(canvas, "NO DEVICE", new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.TextDim.WithAlpha(120), 12f);
                 }
                 else
                 {
@@ -1621,9 +1621,9 @@ public class SCBindingsTabController : ITabController
                                       col.IsJoystick ? FUIColors.Active : FUIColors.TextPrimary;
 
                     // Center the header text in the column
-                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 9f);
+                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
                     float centeredX = colX + (colW - headerTextWidth) / 2;
-                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), headerColor, 9f, true);
+                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), headerColor, 12f, true);
                 }
 
                 // Draw column separator on left edge
@@ -1658,7 +1658,7 @@ public class SCBindingsTabController : ITabController
                 : _scActions is null ? "No SC installation found"
                 : "No actions match filter";
             FUIRenderer.DrawText(canvas, emptyMsg,
-                new SKPoint(leftMargin, scrollY + 20f), FUIColors.TextDim, 11f);
+                new SKPoint(leftMargin, scrollY + 20f), FUIColors.TextDim, 14f);
         }
         else
         {
@@ -1706,7 +1706,7 @@ public class SCBindingsTabController : ITabController
 
                         FUIRenderer.DrawText(canvas, categoryName,
                             new SKPoint(leftMargin + 18, scrollY + categoryHeaderHeight / 2 + 4),
-                            headerHovered ? FUIColors.TextBright : FUIColors.Primary, 10f, true);
+                            headerHovered ? FUIColors.TextBright : FUIColors.Primary, 13f, true);
 
                         // Action count
                         string countStr = categoryBoundCount > 0
@@ -1714,7 +1714,7 @@ public class SCBindingsTabController : ITabController
                             : $"({categoryActionCount})";
                         FUIRenderer.DrawText(canvas, countStr,
                             new SKPoint(leftMargin + actionColWidth - 60, scrollY + categoryHeaderHeight / 2 + 4),
-                            FUIColors.TextDim, 9f);
+                            FUIColors.TextDim, 12f);
                     }
                     scrollY += categoryHeaderHeight;
 
@@ -1767,7 +1767,7 @@ public class SCBindingsTabController : ITabController
                     float maxNameWidth = actionColWidth - actionIndent - 10f;
                     displayName = TruncateTextToWidth(displayName, maxNameWidth, 10f);
                     var nameColor = isSelected ? FUIColors.Active : FUIColors.TextPrimary;
-                    FUIRenderer.DrawText(canvas, displayName, new SKPoint(leftMargin + actionIndent, textY), nameColor, 10f);
+                    FUIRenderer.DrawText(canvas, displayName, new SKPoint(leftMargin + actionIndent, textY), nameColor, 13f);
 
                     // Draw device column cells (clipped)
                     canvas.Save();
@@ -1888,7 +1888,7 @@ public class SCBindingsTabController : ITabController
                             else
                             {
                                 // Draw empty indicator, centered
-                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + colW / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 11f);
+                                FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + colW / 2 - 4, textY), FUIColors.TextDim.WithAlpha(100), 14f);
                             }
 
                             // Draw column separator
@@ -2161,7 +2161,7 @@ public class SCBindingsTabController : ITabController
         float buttonGap = 6f;
 
         // Title
-        FUIRenderer.DrawText(canvas, "CONTROL PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 11f, true);
+        FUIRenderer.DrawText(canvas, "CONTROL PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
         y += 18f;
 
         // Control Profile dropdown (full width)
@@ -2208,14 +2208,14 @@ public class SCBindingsTabController : ITabController
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
 
-            FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 9f, true);
+            FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 12f, true);
             y += lineHeight;
 
             string actionDisplay = TruncateTextToWidth(selectedAction.ActionName, rightMargin - leftMargin - 10, 10f);
-            FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 10f);
+            FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 13f);
             y += lineHeight;
 
-            FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+            FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
             y += lineHeight + 6f;
 
             // Assign/Clear buttons
@@ -2232,7 +2232,7 @@ public class SCBindingsTabController : ITabController
                 // Show "waiting for input" state - use Active color to match theme
                 using var waitBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80), IsAntialias = true };
                 canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
-                FUIRenderer.DrawTextCentered(canvas, "PRESS INPUT...", _scAssignInputButtonBounds, FUIColors.Active, 9f);
+                FUIRenderer.DrawTextCentered(canvas, "PRESS INPUT...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
             }
             else
             {
@@ -2254,7 +2254,7 @@ public class SCBindingsTabController : ITabController
                 // Disabled clear button
                 using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
                 canvas.DrawRect(_scClearBindingButtonBounds, disabledPaint);
-                FUIRenderer.DrawTextCentered(canvas, "CLEAR", _scClearBindingButtonBounds, FUIColors.TextDim.WithAlpha(100), 10f);
+                FUIRenderer.DrawTextCentered(canvas, "CLEAR", _scClearBindingButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
             }
 
             y += btnHeight + 10f;
@@ -2277,7 +2277,7 @@ public class SCBindingsTabController : ITabController
         {
             using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
             canvas.DrawRect(_scClearAllButtonBounds, disabledPaint);
-            FUIRenderer.DrawTextCentered(canvas, "CLEAR ALL", _scClearAllButtonBounds, FUIColors.TextDim.WithAlpha(100), 9f);
+            FUIRenderer.DrawTextCentered(canvas, "CLEAR ALL", _scClearAllButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
         }
 
         _scResetDefaultsButtonBounds = new SKRect(leftMargin + smallBtnWidth + 5, y, rightMargin, y + smallBtnHeight);
@@ -2367,12 +2367,12 @@ public class SCBindingsTabController : ITabController
             }
 
             var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-            FUIRenderer.DrawText(canvas, profile.DisplayName, new SKPoint(leftMargin, y + itemHeight / 2 + 4), textColor, 11f);
+            FUIRenderer.DrawText(canvas, profile.DisplayName, new SKPoint(leftMargin, y + itemHeight / 2 + 4), textColor, 14f);
 
             // Show file date on right
             var dateText = profile.LastModified.ToString("MM/dd HH:mm");
-            float dateWidth = FUIRenderer.MeasureText(dateText, 9f);
-            FUIRenderer.DrawText(canvas, dateText, new SKPoint(rightMargin - dateWidth, y + itemHeight / 2 + 3), FUIColors.TextDim, 9f);
+            float dateWidth = FUIRenderer.MeasureText(dateText, 12f);
+            FUIRenderer.DrawText(canvas, dateText, new SKPoint(rightMargin - dateWidth, y + itemHeight / 2 + 3), FUIColors.TextDim, 12f);
 
             y += itemHeight;
         }
@@ -2460,7 +2460,7 @@ public class SCBindingsTabController : ITabController
 
             var allTextColor = allSelected ? FUIColors.Active : (allHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
             FUIRenderer.DrawText(canvas, "All Categories",
-                new SKPoint(allItemBounds.Left + 10, allItemBounds.MidY + 4), allTextColor, 10f);
+                new SKPoint(allItemBounds.Left + 10, allItemBounds.MidY + 4), allTextColor, 13f);
         }
         y += itemHeight;
 
@@ -2493,7 +2493,7 @@ public class SCBindingsTabController : ITabController
 
                 var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
                 FUIRenderer.DrawText(canvas, FormatActionMapName(_scActionMaps[i]),
-                    new SKPoint(itemBounds.Left + 10, itemBounds.MidY + 4), textColor, 10f);
+                    new SKPoint(itemBounds.Left + 10, itemBounds.MidY + 4), textColor, 13f);
             }
 
             y += itemHeight;
@@ -4145,20 +4145,20 @@ public class SCBindingsTabController : ITabController
                 _scDropdownDeleteProfileName = profile.ProfileName;
                 bool delHovered = _scDropdownDeleteButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 FUIRenderer.DrawText(canvas, "×", new SKPoint(_scDropdownDeleteButtonBounds.MidX - 3f, _scDropdownDeleteButtonBounds.MidY + 4f),
-                    delHovered ? FUIColors.TextBright : FUIColors.TextDim, 11f);
+                    delHovered ? FUIColors.TextBright : FUIColors.TextDim, 14f);
             }
 
             var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
             float maxTextWidth = rowBounds.Width - (isHovered ? 56f : 40f); // extra room for × on hover
             string displayName = TruncateTextToWidth(profile.ProfileName, maxTextWidth, 10f);
-            FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 10f);
+            FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);
 
             // Binding count badge
             if (profile.BindingCount > 0)
             {
                 string countStr = profile.BindingCount.ToString();
-                float badgeX = rowBounds.Right - (isHovered ? 28f : 8f) - FUIRenderer.MeasureText(countStr, 8f);
-                FUIRenderer.DrawText(canvas, countStr, new SKPoint(badgeX, rowBounds.MidY + 3f), FUIColors.TextDim, 8f);
+                float badgeX = rowBounds.Right - (isHovered ? 28f : 8f) - FUIRenderer.MeasureText(countStr, 12f);
+                FUIRenderer.DrawText(canvas, countStr, new SKPoint(badgeX, rowBounds.MidY + 3f), FUIColors.TextDim, 12f);
             }
 
             y += rowHeight;
@@ -4181,7 +4181,7 @@ public class SCBindingsTabController : ITabController
             y += 6f;
 
             // Section label: make it clear these are SC files to import from, not Asteriq profiles
-            FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 8f, true);
+            FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
             y += 16f;
 
             // SC mapping files
@@ -4205,7 +4205,7 @@ public class SCBindingsTabController : ITabController
                 float maxTextWidth = rowBounds.Width - 20f;
                 string displayName = scFile.DisplayName;
                 displayName = TruncateTextToWidth(displayName, maxTextWidth, 10f);
-                FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 10f);
+                FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);
 
                 y += rowHeight;
             }
@@ -4452,7 +4452,7 @@ public class SCBindingsTabController : ITabController
         using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(180) };
         canvas.DrawRect(new SKRect(bounds.Left, bounds.Top, bounds.Left + 3f, bounds.Bottom), accentPaint);
 
-        FUIRenderer.DrawTextCentered(canvas, _scExportStatus, bounds, color, 10f);
+        FUIRenderer.DrawTextCentered(canvas, _scExportStatus, bounds, color, 13f);
     }
 
     #endregion

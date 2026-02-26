@@ -64,7 +64,7 @@ internal static class SCBindingsRenderer
             Style = SKPaintStyle.Fill,
             Color = SKColors.White,
             IsAntialias = true,
-            TextSize = 7f
+            TextSize = 10f
         };
         canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
     }
@@ -74,7 +74,7 @@ internal static class SCBindingsRenderer
     internal static void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth,
         string text, SKColor color, bool isDefault, SCInputType? inputType = null)
     {
-        float fontSize = 9f;
+        float fontSize = 12f;
         float textWidth = FUIRenderer.MeasureText(text, fontSize);
         float indicatorWidth = inputType.HasValue ? 14f : 0f;
         float badgeWidth = Math.Min(maxWidth - 2, textWidth + indicatorWidth + 10);
@@ -117,7 +117,7 @@ internal static class SCBindingsRenderer
     internal static void DrawBindingBadgeCentered(SKCanvas canvas, SKRect cellBounds,
         string text, SKColor color, bool isDefault, SCInputType? inputType = null)
     {
-        float fontSize = 11f;
+        float fontSize = 14f;
         float textWidth = FUIRenderer.MeasureText(text, fontSize);
         float indicatorWidth = inputType.HasValue ? 14f : 0f;
         float padding = 8f;
@@ -165,7 +165,7 @@ internal static class SCBindingsRenderer
 
     internal static float MeasureMultiKeycapWidth(List<string> components, SCInputType? inputType)
     {
-        float fontSize = 10f;
+        float fontSize = 13f;
         float badgePadding = 8f;
         float gap = 3f;
         float totalWidth = 0f;
@@ -184,7 +184,7 @@ internal static class SCBindingsRenderer
     {
         if (components.Count == 0) return;
 
-        float fontSize = 10f;
+        float fontSize = 13f;
         float badgeHeight = 18f;
         float badgePadding = 8f;
         float gap = 3f;
@@ -248,7 +248,7 @@ internal static class SCBindingsRenderer
         canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
 
         string displayText = text.Length > 18 ? text.Substring(0, 15) + "..." : text;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 6, bounds.MidY + 4f), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 6, bounds.MidY + 4f), FUIColors.TextPrimary, 13f);
 
         float arrowX = bounds.Right - 14f;
         float arrowY = bounds.MidY;
@@ -273,14 +273,14 @@ internal static class SCBindingsRenderer
 
         float maxTextWidth = bounds.Width - 30f;
         string displayText = text;
-        if (FUIRenderer.MeasureText(text, 10f) > maxTextWidth)
+        if (FUIRenderer.MeasureText(text, 13f) > maxTextWidth)
         {
             int len = text.Length;
-            while (len > 0 && FUIRenderer.MeasureText(text.Substring(0, len) + "...", 10f) > maxTextWidth)
+            while (len > 0 && FUIRenderer.MeasureText(text.Substring(0, len) + "...", 13f) > maxTextWidth)
                 len--;
             displayText = len > 0 ? text.Substring(0, len) + "..." : "...";
         }
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 8, bounds.MidY + 4f), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 8, bounds.MidY + 4f), FUIColors.TextPrimary, 13f);
 
         float arrowX = bounds.Right - 14f;
         float arrowY = bounds.MidY;
@@ -339,7 +339,7 @@ internal static class SCBindingsRenderer
         }
         else
         {
-            FUIRenderer.DrawTextCentered(canvas, icon, bounds, iconColor, 12f);
+            FUIRenderer.DrawTextCentered(canvas, icon, bounds, iconColor, 15f);
         }
     }
 
@@ -358,12 +358,12 @@ internal static class SCBindingsRenderer
         }
 
         float textY = bounds.MidY + 4;
-        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 10, textY), FUIColors.TextPrimary, 11f);
-        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 80, textY), FUIColors.TextDim, 11f);
-        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 110, textY), FUIColors.Active, 11f, true);
+        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 10, textY), FUIColors.TextPrimary, 14f);
+        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 80, textY), FUIColors.TextDim, 14f);
+        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 110, textY), FUIColors.Active, 14f, true);
 
         if (isHovered)
-            FUIRenderer.DrawText(canvas, "click to change", new SKPoint(bounds.Right - 90, textY), FUIColors.TextDim, 9f);
+            FUIRenderer.DrawText(canvas, "click to change", new SKPoint(bounds.Right - 90, textY), FUIColors.TextDim, 12f);
     }
 
     internal static void DrawVJoyMappingRowCompact(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
@@ -375,8 +375,8 @@ internal static class SCBindingsRenderer
         }
 
         float textY = bounds.MidY + 4;
-        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 5, textY), FUIColors.TextPrimary, 10f);
-        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 60, textY), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 80, textY), FUIColors.Active, 10f, true);
+        FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 5, textY), FUIColors.TextPrimary, 13f);
+        FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 60, textY), FUIColors.TextDim, 13f);
+        FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 80, textY), FUIColors.Active, 13f, true);
     }
 }

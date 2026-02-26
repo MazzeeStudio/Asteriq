@@ -566,7 +566,7 @@ public class MappingDialog : Form
         };
         canvas.DrawRect(new SKRect(0, 0, bounds.Width, titleHeight), titleBgPaint);
 
-        FUIRenderer.DrawText(canvas, "NEW MAPPING", new SKPoint(15, 26), FUIColors.Primary, 14f, true);
+        FUIRenderer.DrawText(canvas, "NEW MAPPING", new SKPoint(15, 26), FUIColors.Primary, 17f, true);
 
         // Close button
         using var closePaint = new SKPaint
@@ -619,13 +619,13 @@ public class MappingDialog : Form
         FUIRenderer.DrawTextCentered(canvas,
             "on your device to map it",
             new SKRect(0, centerY + 75, bounds.Width, centerY + 95),
-            FUIColors.TextDim, 12f);
+            FUIColors.TextDim, 15f);
 
         // Timeout indicator
         FUIRenderer.DrawTextCentered(canvas,
             $"Timeout in {_timeoutRemaining}s",
             new SKRect(0, centerY + 110, bounds.Width, centerY + 130),
-            FUIColors.TextDisabled, 11f);
+            FUIColors.TextDisabled, 14f);
 
         // Cancel button
         var buttons = new List<SKRect>();
@@ -651,7 +651,7 @@ public class MappingDialog : Form
         var buttons = new List<SKRect>();
 
         // Detected input info
-        FUIRenderer.DrawText(canvas, "INPUT DETECTED", new SKPoint(pad, y), FUIColors.Active, 12f);
+        FUIRenderer.DrawText(canvas, "INPUT DETECTED", new SKPoint(pad, y), FUIColors.Active, 15f);
         y += 24;
 
         var inputFrame = new SKRect(pad, y, bounds.Width - pad, y + 50);
@@ -679,14 +679,14 @@ public class MappingDialog : Form
         string inputTypeStr = _detectedInput.Type == InputType.Button ? "BUTTON" :
                               _detectedInput.Type == InputType.Axis ? "AXIS" : "HAT";
         FUIRenderer.DrawText(canvas, inputTypeStr,
-            new SKPoint(pad + 10, y + 38), FUIColors.TextDim, 11f);
+            new SKPoint(pad + 10, y + 38), FUIColors.TextDim, 14f);
 
         y += 70;
 
         // Output mode toggle (only for buttons - axes/hats can only go to vJoy)
         bool canUseKeyboard = _detectedInput.Type == InputType.Button;
 
-        FUIRenderer.DrawText(canvas, "OUTPUT TARGET", new SKPoint(pad, y), FUIColors.Primary, 12f);
+        FUIRenderer.DrawText(canvas, "OUTPUT TARGET", new SKPoint(pad, y), FUIColors.Primary, 15f);
         y += 24;
 
         if (canUseKeyboard)
@@ -722,7 +722,7 @@ public class MappingDialog : Form
         if (_vjoyDevices.Count == 0)
         {
             FUIRenderer.DrawText(canvas, "No vJoy devices available",
-                new SKPoint(pad, y + 10), FUIColors.Warning, 12f);
+                new SKPoint(pad, y + 10), FUIColors.Warning, 15f);
 
             // Still add action buttons at the bottom
             var noDeviceCancelBounds = new SKRect(bounds.MidX - 120, bounds.Height - 60, bounds.MidX - 20, bounds.Height - 30);
@@ -734,7 +734,7 @@ public class MappingDialog : Form
         var device = _vjoyDevices[_selectedVJoyDevice];
 
         // vJoy device selector
-        FUIRenderer.DrawText(canvas, "vJoy Device:", new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, "vJoy Device:", new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
 
         var prevDeviceBtn = new SKRect(pad + 100, y, pad + 130, y + 28);
         var nextDeviceBtn = new SKRect(pad + 200, y, pad + 230, y + 28);
@@ -743,7 +743,7 @@ public class MappingDialog : Form
 
         DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == buttonOffset, _selectedVJoyDevice > 0);
         FUIRenderer.DrawText(canvas, $"vJoy {device.Id}",
-            new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 12f);
+            new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 15f);
         DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == buttonOffset + 1, _selectedVJoyDevice < _vjoyDevices.Count - 1);
 
         y += 36;
@@ -765,7 +765,7 @@ public class MappingDialog : Form
         };
         if (maxIndex < 1) maxIndex = 1;
 
-        FUIRenderer.DrawText(canvas, outputLabel, new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, outputLabel, new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
 
         var prevIndexBtn = new SKRect(pad + 100, y, pad + 130, y + 28);
         var nextIndexBtn = new SKRect(pad + 200, y, pad + 230, y + 28);
@@ -782,7 +782,7 @@ public class MappingDialog : Form
             _ => $"{_selectedOutputIndex}"
         };
         FUIRenderer.DrawText(canvas, indexText,
-            new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 12f);
+            new SKPoint(pad + 140, y + 18), FUIColors.TextBright, 15f);
 
         DrawSmallButton(canvas, nextIndexBtn, ">", _hoveredButton == buttonOffset + 3, _selectedOutputIndex < maxIndex - 1);
 
@@ -799,7 +799,7 @@ public class MappingDialog : Form
     private void DrawKeyboardOutput(SKCanvas canvas, SKRect bounds, float y, float pad, List<SKRect> buttons, int buttonOffset)
     {
         // Key capture button/field - now shows full key combo
-        FUIRenderer.DrawText(canvas, "Key Combo:", new SKPoint(pad, y + 12), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, "Key Combo:", new SKPoint(pad, y + 12), FUIColors.TextDim, 14f);
 
         var keyCaptureBtn = new SKRect(pad + 85, y, bounds.Width - pad, y + 32);
         buttons.Add(keyCaptureBtn);  // buttonOffset + 0
@@ -828,13 +828,13 @@ public class MappingDialog : Form
                          string.IsNullOrEmpty(_selectedKey) ? "Click to capture key combo" : GetKeyComboDisplayString();
         var keyColor = _waitingForKeyCapture ? FUIColors.Active :
                        string.IsNullOrEmpty(_selectedKey) ? FUIColors.TextDim : FUIColors.TextBright;
-        FUIRenderer.DrawTextCentered(canvas, keyText, keyCaptureBtn, keyColor, 12f);
+        FUIRenderer.DrawTextCentered(canvas, keyText, keyCaptureBtn, keyColor, 15f);
 
         y += 45;
 
         // Help text
         FUIRenderer.DrawText(canvas, "Hold modifiers (Ctrl, Shift, Alt) when pressing the key",
-            new SKPoint(pad, y + 10), FUIColors.TextDisabled, 10f);
+            new SKPoint(pad, y + 10), FUIColors.TextDisabled, 13f);
 
         // Action buttons
         var cancelBounds = new SKRect(bounds.MidX - 120, bounds.Height - 60, bounds.MidX - 20, bounds.Height - 30);
@@ -864,7 +864,7 @@ public class MappingDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     private void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
@@ -884,7 +884,7 @@ public class MappingDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 10f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
     }
 
     private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
@@ -908,7 +908,7 @@ public class MappingDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     private void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool enabled)
@@ -932,7 +932,7 @@ public class MappingDialog : Form
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
     }
 
     private string GetAxisName(int index)

@@ -92,7 +92,7 @@ public class FUIConfirmDialog : Form
         // Title
         float titleY = 24;
         var titleBounds = new SKRect(0, titleY, bounds.Width, titleY + 20);
-        FUIRenderer.DrawTextCentered(canvas, _title.ToUpperInvariant(), titleBounds, FUIColors.Active, 14f, true);
+        FUIRenderer.DrawTextCentered(canvas, _title.ToUpperInvariant(), titleBounds, FUIColors.Active, 17f, true);
 
         // Separator line under title
         float sepY = 50;
@@ -113,7 +113,7 @@ public class FUIConfirmDialog : Form
             if (!string.IsNullOrWhiteSpace(line))
             {
                 var lineBounds = new SKRect(0, messageY, bounds.Width, messageY + lineHeight);
-                FUIRenderer.DrawTextCentered(canvas, line, lineBounds, FUIColors.TextPrimary, 11f);
+                FUIRenderer.DrawTextCentered(canvas, line, lineBounds, FUIColors.TextPrimary, 14f);
             }
             messageY += lineHeight;
         }
@@ -158,7 +158,7 @@ public class FUIConfirmDialog : Form
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
         var textColor = isPrimary ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)

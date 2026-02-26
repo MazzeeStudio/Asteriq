@@ -176,20 +176,19 @@ public static class FUIRenderer
     public const float SectionSpacing = 24f;
     public const float FrameInset = 4f;   // Was 5f - aligned to 4px grid
 
-    // Typography - Windows Type Ramp
-    // See: https://learn.microsoft.com/en-us/windows/apps/design/style/typography
-    public const float FontCaption = 12f;     // Labels, secondary text (min readable)
-    public const float FontBody = 14f;        // Primary content text
-    public const float FontBodyLarge = 18f;   // Emphasized body, intro text
-    public const float FontSubtitle = 20f;    // Section headers
-    public const float FontTitle = 28f;       // Page/panel titles
-    public const float FontTitleLarge = 40f;  // Hero titles
+    // Typography - pixel sizes in logical canvas space (+3 shift so 12px/9pt is the floor)
+    public const float FontCaption = 15f;     // Labels, secondary text
+    public const float FontBody = 17f;        // Primary content text
+    public const float FontBodyLarge = 21f;   // Emphasized body, intro text
+    public const float FontSubtitle = 23f;    // Section headers
+    public const float FontTitle = 31f;       // Page/panel titles
+    public const float FontTitleLarge = 43f;  // Hero titles
 
-    // Sub-caption sizes for dense UI elements (below Windows Type Ramp minimum)
-    public const float FontMicro = 8f;        // Tiny labels, icon annotations
-    public const float FontSmall = 9f;        // Hints, secondary metadata
-    public const float FontNote = 10f;        // Notes, compact labels, tooltips
-    public const float FontBodyCompact = 11f; // Dense body text (tight list views, badges)
+    // Compact sizes (all at or above 12px minimum)
+    public const float FontMicro = 11f;       // Tiny labels, icon annotations
+    public const float FontSmall = 12f;       // Hints, secondary metadata (9pt floor)
+    public const float FontNote = 13f;        // Notes, compact labels, tooltips
+    public const float FontBodyCompact = 14f; // Dense body text (tight list views, badges)
 
     // Control-specific corner radius — smaller than panel CornerRadiusSmall (4f)
     // Used on small interactive controls: badges, checkboxes, inline buttons
@@ -201,11 +200,11 @@ public static class FUIRenderer
     public const float DropdownItemHeight = 28f;   // Dropdown/list item row height
 
     // Line heights for proper text spacing
-    public const float LineHeightCaption = 16f;
-    public const float LineHeightBody = 20f;
-    public const float LineHeightBodyLarge = 24f;
-    public const float LineHeightSubtitle = 28f;
-    public const float LineHeightTitle = 36f;
+    public const float LineHeightCaption = 19f;
+    public const float LineHeightBody = 23f;
+    public const float LineHeightBodyLarge = 27f;
+    public const float LineHeightSubtitle = 31f;
+    public const float LineHeightTitle = 39f;
 
     // Touch targets - Windows UX Guidelines
     // Standard: 40x40 epx for touch+pointer, Compact: 32x32 for pointer-focused
@@ -653,7 +652,7 @@ public static class FUIRenderer
 
     #region Text
 
-    public static SKPaint CreateTextPaint(SKColor color, float size = 14f,
+    public static SKPaint CreateTextPaint(SKColor color, float size = 17f,
         bool bold = false, bool withGlow = false, SKTypeface? typeface = null)
     {
         // Select font family based on user preference
@@ -680,7 +679,7 @@ public static class FUIRenderer
     }
 
     public static void DrawText(SKCanvas canvas, string text, SKPoint position,
-        SKColor color, float size = 14f, bool withGlow = false, SKTypeface? typeface = null, bool scaleFont = true)
+        SKColor color, float size = 17f, bool withGlow = false, SKTypeface? typeface = null, bool scaleFont = true)
     {
         float scaledSize = size;
 
@@ -695,7 +694,7 @@ public static class FUIRenderer
     }
 
     public static void DrawTextCentered(SKCanvas canvas, string text, SKRect bounds,
-        SKColor color, float size = 14f, bool withGlow = false, bool scaleFont = true)
+        SKColor color, float size = 17f, bool withGlow = false, bool scaleFont = true)
     {
         float scaledSize = size;
 
@@ -710,7 +709,7 @@ public static class FUIRenderer
     /// <summary>
     /// Measures the width of text at the given font size
     /// </summary>
-    public static float MeasureText(string text, float size = 14f, bool scaleFont = true)
+    public static float MeasureText(string text, float size = 17f, bool scaleFont = true)
     {
         float scaledSize = size;
         using var paint = CreateTextPaint(SKColors.White, scaledSize);
@@ -720,7 +719,7 @@ public static class FUIRenderer
     /// <summary>
     /// Truncates text with ellipsis if it exceeds the maximum width
     /// </summary>
-    public static string TruncateText(string text, float maxWidth, float size = 14f, bool scaleFont = true)
+    public static string TruncateText(string text, float maxWidth, float size = 17f, bool scaleFont = true)
     {
         if (string.IsNullOrEmpty(text)) return text;
 
@@ -762,7 +761,7 @@ public static class FUIRenderer
     /// Draws text, truncating with ellipsis if it exceeds the maximum width
     /// </summary>
     public static void DrawTextTruncated(SKCanvas canvas, string text, SKPoint position, float maxWidth,
-        SKColor color, float size = 14f, bool withGlow = false, bool scaleFont = true)
+        SKColor color, float size = 17f, bool withGlow = false, bool scaleFont = true)
     {
         string truncated = TruncateText(text, maxWidth, size, scaleFont);
         DrawText(canvas, truncated, position, color, size, withGlow, null, scaleFont);
@@ -771,7 +770,7 @@ public static class FUIRenderer
     /// <summary>
     /// Calculates the minimum width needed for a label-control row
     /// </summary>
-    public static float CalculateLabelWidth(string label, float size = 11f, float minPadding = 10f)
+    public static float CalculateLabelWidth(string label, float size = 14f, float minPadding = 10f)
     {
         return MeasureText(label, size) + minPadding;
     }
@@ -781,7 +780,7 @@ public static class FUIRenderer
     /// Returns the X position where the value ends.
     /// </summary>
     public static float DrawLabelValueRow(SKCanvas canvas, float x, float y, float rowWidth,
-        string label, string value, float fontSize = 11f,
+        string label, string value, float fontSize = 14f,
         SKColor? labelColor = null, SKColor? valueColor = null)
     {
         labelColor ??= FUIColors.TextPrimary;
@@ -976,12 +975,12 @@ public static class FUIRenderer
 
         float textY = bounds.MidY + 4f;
         float textX = bounds.Left + SpaceMD;
-        DrawText(canvas, prefixCode, new SKPoint(textX, textY), accent, 12f);
+        DrawText(canvas, prefixCode, new SKPoint(textX, textY), accent, 15f);
 
-        using var prefixPaint = CreateTextPaint(accent, 12f);
+        using var prefixPaint = CreateTextPaint(accent, 15f);
         float prefixWidth = prefixPaint.MeasureText(prefixCode);
         DrawText(canvas, title, new SKPoint(textX + prefixWidth + SpaceSM, textY),
-            FUIColors.TextBright, 14f, true);
+            FUIColors.TextBright, 17f, true);
 
         if (showCloseButton)
         {
@@ -1151,7 +1150,7 @@ public static class FUIRenderer
         };
         canvas.DrawPath(bgPath, framePaint);
 
-        DrawTextCentered(canvas, text, bounds, textColor, 11f, withGlow && state == ButtonState.Active);
+        DrawTextCentered(canvas, text, bounds, textColor, 14f, withGlow && state == ButtonState.Active);
     }
 
     public static void DrawTabButtonRow(SKCanvas canvas, float x, float y, int count, int activeIndex,
@@ -1190,7 +1189,7 @@ public static class FUIRenderer
             canvas.DrawRect(bounds, framePaint);
         }
 
-        DrawTextCentered(canvas, label, bounds, textColor, 10f);
+        DrawTextCentered(canvas, label, bounds, textColor, 13f);
     }
 
     #endregion
@@ -1210,7 +1209,7 @@ public static class FUIRenderer
         };
         canvas.DrawRect(bounds, bgPaint);
 
-        DrawTextCentered(canvas, text, bounds, textColor, 9f);
+        DrawTextCentered(canvas, text, bounds, textColor, 12f);
     }
 
     #endregion
@@ -1347,7 +1346,7 @@ public static class FUIRenderer
     /// Label sits horizontally, line goes: horizontal → vertical → horizontal to target
     /// </summary>
     public static void DrawCallout(SKCanvas canvas, string label, SKPoint labelPos, SKPoint target,
-        SKColor color, float progress = 1f, float fontSize = 10f)
+        SKColor color, float progress = 1f, float fontSize = 13f)
     {
         // Draw label
         DrawText(canvas, label, labelPos, color, fontSize);
@@ -1366,7 +1365,7 @@ public static class FUIRenderer
     /// Line goes: target → horizontal → vertical → horizontal to label
     /// </summary>
     public static void DrawCalloutFromRight(SKCanvas canvas, string label, SKPoint labelPos, SKPoint target,
-        SKColor color, float progress = 1f, float fontSize = 10f)
+        SKColor color, float progress = 1f, float fontSize = 13f)
     {
         // For right-side callouts, we draw the line first, then the label
         // The geometry is mirrored

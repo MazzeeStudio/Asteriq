@@ -43,17 +43,17 @@ internal static class FUIWidgets
         var nameColor = isDisconnected
             ? FUIColors.TextDim
             : (isSelected ? FUIColors.TextBright : FUIColors.TextPrimary);
-        FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 36, y + 24), nameColor, 13f, isSelected && !isDisconnected);
+        FUIRenderer.DrawText(canvas, displayName, new SKPoint(x + 36, y + 24), nameColor, 16f, isSelected && !isDisconnected);
 
         // Status text
         var statusTextColor = isDisconnected ? FUIColors.Danger : FUIColors.Active;
-        FUIRenderer.DrawText(canvas, status, new SKPoint(x + 36, y + 44), statusTextColor, 11f);
+        FUIRenderer.DrawText(canvas, status, new SKPoint(x + 36, y + 44), statusTextColor, 14f);
 
         // vJoy assignment indicator
         if (!isDisconnected && !string.IsNullOrEmpty(vjoyAssignment))
         {
             FUIRenderer.DrawText(canvas, vjoyAssignment, new SKPoint(x + width - 85, y + 45),
-                FUIColors.TextDim, 11f);
+                FUIColors.TextDim, 14f);
         }
 
         // Selection chevron
@@ -99,12 +99,12 @@ internal static class FUIWidgets
         canvas.DrawRect(bounds, borderPaint);
 
         var textColor = isHovered ? FUIColors.TextBright : accentColor;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f, isHovered);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f, isHovered);
     }
 
     internal static void DrawStatusItem(SKCanvas canvas, float x, float y, float width, string label, string value, SKColor valueColor)
     {
-        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y + 12), FUIColors.TextDim, 11f);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y + 12), FUIColors.TextDim, 14f);
 
         var dotColor = valueColor == FUIColors.Active ? valueColor : FUIColors.Primary.WithAlpha(100);
         float dotX = x + width - 110;
@@ -114,7 +114,7 @@ internal static class FUIWidgets
         float rightEdge = x + width;
         float maxValueWidth = rightEdge - textStartX - 8;
 
-        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, 11f);
+        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, 14f);
         string displayValue = value;
         float textWidth = measurePaint.MeasureText(displayValue);
 
@@ -127,7 +127,7 @@ internal static class FUIWidgets
             displayValue += "…";
         }
 
-        FUIRenderer.DrawText(canvas, displayValue, new SKPoint(textStartX, y + 12), valueColor, 11f);
+        FUIRenderer.DrawText(canvas, displayValue, new SKPoint(textStartX, y + 12), valueColor, 14f);
     }
 
     internal static void DrawLayerIndicator(SKCanvas canvas, float x, float y, float width, string name, bool isActive)
@@ -141,7 +141,7 @@ internal static class FUIWidgets
         FUIRenderer.DrawFrame(canvas, bounds, frameColor, 4f, 1f, isActive);
 
         var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 10f, isActive);
+        FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 13f, isActive);
     }
 
     internal static void DrawJoystickOutlineFallback(SKCanvas canvas, SKRect bounds)
@@ -184,10 +184,10 @@ internal static class FUIWidgets
     {
         float lineHeight = 16f;
 
-        FUIRenderer.DrawText(canvas, "SHIFT LAYERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 10f);
+        FUIRenderer.DrawText(canvas, "SHIFT LAYERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += lineHeight;
 
-        FUIRenderer.DrawText(canvas, "[Coming soon] Hold a button to activate alternative mappings", new SKPoint(leftMargin, y), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "[Coming soon] Hold a button to activate alternative mappings", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
         y += lineHeight + 4;
 
         float layerRowHeight = FUIRenderer.TouchTargetStandard;
@@ -202,13 +202,13 @@ internal static class FUIWidgets
             using var rowFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
             canvas.DrawRoundRect(rowBounds, 4, 4, rowFramePaint);
 
-            FUIRenderer.DrawText(canvas, layer.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextPrimary, 11f);
+            FUIRenderer.DrawText(canvas, layer.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextPrimary, 14f);
 
             string activatorText = layer.ActivatorButton is not null
                 ? $"Button {layer.ActivatorButton.Index + 1} on {layer.ActivatorButton.DeviceName}"
                 : "Not assigned";
             FUIRenderer.DrawText(canvas, activatorText, new SKPoint(leftMargin + 100, y + 11),
-                layer.ActivatorButton is not null ? FUIColors.TextDim : FUIColors.Warning.WithAlpha(150), 9f);
+                layer.ActivatorButton is not null ? FUIColors.TextDim : FUIColors.Warning.WithAlpha(150), 12f);
 
             float delSize = 20f;
             var delBounds = new SKRect(rightMargin - delSize - 8, y + (layerRowHeight - delSize) / 2 - 2,
@@ -216,7 +216,7 @@ internal static class FUIWidgets
 
             using var delPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(60) };
             canvas.DrawRoundRect(delBounds, 2, 2, delPaint);
-            FUIRenderer.DrawTextCentered(canvas, "x", delBounds, FUIColors.Danger, 12f);
+            FUIRenderer.DrawTextCentered(canvas, "x", delBounds, FUIColors.Danger, 15f);
 
             y += layerRowHeight;
         }
@@ -230,15 +230,15 @@ internal static class FUIWidgets
             using var addFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Success.WithAlpha(100), StrokeWidth = 1f };
             canvas.DrawRoundRect(addBounds, 4, 4, addFramePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, "+ Add Shift Layer", addBounds, FUIColors.Success, 11f);
+            FUIRenderer.DrawTextCentered(canvas, "+ Add Shift Layer", addBounds, FUIColors.Success, 14f);
         }
 
     }
 
     internal static void DrawProfileStat(SKCanvas canvas, float x, float y, string label, string value, float valueOffset = 130f)
     {
-        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y), FUIColors.TextDim, 10f);
-        FUIRenderer.DrawText(canvas, value, new SKPoint(x + valueOffset, y), FUIColors.TextPrimary, 10f);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y), FUIColors.TextDim, 13f);
+        FUIRenderer.DrawText(canvas, value, new SKPoint(x + valueOffset, y), FUIColors.TextPrimary, 13f);
     }
 
     internal static void DrawSettingsButton(SKCanvas canvas, SKRect bounds, string text, bool disabled)
@@ -253,7 +253,7 @@ internal static class FUIWidgets
         using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     internal static void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
@@ -264,7 +264,7 @@ internal static class FUIWidgets
         using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
         canvas.DrawRoundRect(bounds, 3, 3, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, value, bounds, FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawTextCentered(canvas, value, bounds, FUIColors.TextPrimary, 14f);
     }
 
     // ─── Mapping Editor Widgets ───────────────────────────────────────────────
@@ -451,7 +451,7 @@ internal static class FUIWidgets
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     internal static void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
@@ -469,11 +469,11 @@ internal static class FUIWidgets
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4),
-            FUIColors.TextPrimary, 11f);
+            FUIColors.TextPrimary, 14f);
 
         string arrow = open ? "▲" : "▼";
         FUIRenderer.DrawText(canvas, arrow, new SKPoint(bounds.Right - 18, bounds.MidY + 4),
-            FUIColors.TextDim, 10f);
+            FUIColors.TextDim, 13f);
     }
 
     internal static void DrawSmallIconButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, bool isDanger = false)
@@ -496,7 +496,7 @@ internal static class FUIWidgets
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, icon, bounds, textColor, 14f);
+        FUIRenderer.DrawTextCentered(canvas, icon, bounds, textColor, 17f);
     }
 
     internal static void DrawActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
@@ -519,7 +519,7 @@ internal static class FUIWidgets
         };
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
     }
 
     internal static void DrawArrowButton(SKCanvas canvas, SKRect bounds, string arrow, bool hovered, bool enabled)
@@ -575,7 +575,7 @@ internal static class FUIWidgets
         float keycapHeight = 20f;
         float keycapGap = 4f;
         float keycapPadding = 8f;
-        float fontSize = 10f;
+        float fontSize = 13f;
         float scaledFontSize = fontSize;
 
         using var measurePaint = new SKPaint
@@ -656,16 +656,16 @@ internal static class FUIWidgets
 
         var typeColor = type == "BUTTON" ? FUIColors.Active : FUIColors.Primary;
         FUIRenderer.DrawText(canvas, type, new SKPoint(bounds.Left + 10, bounds.Top + 18),
-            enabled ? typeColor : typeColor.WithAlpha(100), 10f);
+            enabled ? typeColor : typeColor.WithAlpha(100), 13f);
 
         FUIRenderer.DrawText(canvas, source, new SKPoint(bounds.Left + 80, bounds.Top + 18),
-            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 12f);
+            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 15f);
 
         FUIRenderer.DrawText(canvas, "->", new SKPoint(bounds.Left + 80, bounds.Top + 36),
-            FUIColors.TextDim, 11f);
+            FUIColors.TextDim, 14f);
 
         FUIRenderer.DrawText(canvas, target, new SKPoint(bounds.Left + 110, bounds.Top + 36),
-            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 12f);
+            enabled ? FUIColors.TextPrimary : FUIColors.TextDim, 15f);
 
         var statusColor = enabled ? FUIColors.Success : FUIColors.TextDisabled;
         FUIRenderer.DrawGlowingDot(canvas, new SKPoint(bounds.Right - 20, bounds.MidY),
@@ -703,7 +703,7 @@ internal static class FUIWidgets
 
         FUIRenderer.DrawText(canvas, "ADD MAPPING",
             new SKPoint(bounds.Left + 30, bounds.MidY + 5),
-            hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 12f);
+            hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 15f);
     }
 
     // ─── Theme Buttons ────────────────────────────────────────────────────────
@@ -727,7 +727,7 @@ internal static class FUIWidgets
         using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
         canvas.DrawRect(bounds, themeFramePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 8f);
+        FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 12f);
 
         var indicatorBounds = new SKRect(bounds.Left + 2, bounds.Bottom - 2,
             bounds.Right - 2, bounds.Bottom - 1);
@@ -772,7 +772,7 @@ internal static class FUIWidgets
         canvas.DrawPath(path, borderPaint);
 
         var textColor = isEnabled ? FUIColors.TextBright : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
     }
 
     internal static void DrawImportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
@@ -790,7 +790,7 @@ internal static class FUIWidgets
         canvas.DrawPath(path, borderPaint);
 
         var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 11f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
 
         if (isEnabled)
         {
@@ -822,11 +822,11 @@ internal static class FUIWidgets
         float textY = bounds.MidY + 4f;
         if (string.IsNullOrEmpty(text))
         {
-            FUIRenderer.DrawText(canvas, "Search actions...", new SKPoint(textX, textY), FUIColors.TextDim, 10f);
+            FUIRenderer.DrawText(canvas, "Search actions...", new SKPoint(textX, textY), FUIColors.TextDim, 13f);
         }
         else
         {
-            FUIRenderer.DrawText(canvas, text, new SKPoint(textX, textY), FUIColors.TextPrimary, 10f);
+            FUIRenderer.DrawText(canvas, text, new SKPoint(textX, textY), FUIColors.TextPrimary, 13f);
 
             if (bounds.Contains(mousePosition.X, mousePosition.Y))
             {
@@ -840,7 +840,7 @@ internal static class FUIWidgets
 
         if (focused)
         {
-            float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 10f));
+            float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 13f));
             if ((DateTime.Now.Millisecond / 500) % 2 == 0)
             {
                 using var cursorPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
@@ -937,7 +937,7 @@ internal static class FUIWidgets
         canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
 
         var textColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 9f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
     }
 
     // ─── General Navigation Widgets ───────────────────────────────────────────
@@ -959,7 +959,7 @@ internal static class FUIWidgets
         var color = !isEnabled ? FUIColors.TextDisabled
             : isHovered ? FUIColors.TextBright
             : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, text, new SKPoint(x + 12, itemY + 17), color, 11f);
+        FUIRenderer.DrawText(canvas, text, new SKPoint(x + 12, itemY + 17), color, 14f);
     }
 
     internal static void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
@@ -971,7 +971,7 @@ internal static class FUIWidgets
         using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
         canvas.DrawRect(bounds, borderPaint);
 
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), FUIColors.TextPrimary, 11f);
+        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), FUIColors.TextPrimary, 14f);
     }
 
     internal static void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
@@ -1000,7 +1000,7 @@ internal static class FUIWidgets
         using var textPaint = new SKPaint
         {
             Color = textColor,
-            TextSize = 10f,
+            TextSize = 13f,
             IsAntialias = true,
             Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright),
             TextAlign = SKTextAlign.Center
@@ -1030,7 +1030,7 @@ internal static class FUIWidgets
         string truncatedText = TruncateTextToWidth(text, maxTextWidth, 11f);
 
         var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, truncatedText, new SKPoint(bounds.Left + textPadding, bounds.MidY + 4), textColor, 11f);
+        FUIRenderer.DrawText(canvas, truncatedText, new SKPoint(bounds.Left + textPadding, bounds.MidY + 4), textColor, 14f);
 
         if (isEnabled)
         {

@@ -157,7 +157,7 @@ public class FUICurveEditor : UserControl
             using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
             canvas.DrawRect(bounds, framePaint);
 
-            FUIRenderer.DrawTextCentered(canvas, _presetNames[i], bounds, textColor, 10f);
+            FUIRenderer.DrawTextCentered(canvas, _presetNames[i], bounds, textColor, 13f);
         }
     }
 
@@ -198,13 +198,13 @@ public class FUICurveEditor : UserControl
         DrawControlPoints(canvas);
 
         // Axis labels
-        FUIRenderer.DrawText(canvas, "INPUT", new SKPoint(_graphBounds.MidX - 15, _graphBounds.Bottom + 14), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "INPUT", new SKPoint(_graphBounds.MidX - 15, _graphBounds.Bottom + 14), FUIColors.TextDim, 12f);
 
         // Vertical "OUTPUT" label
         canvas.Save();
         canvas.Translate(_graphBounds.Left - 28, _graphBounds.MidY + 20);
         canvas.RotateDegrees(-90);
-        FUIRenderer.DrawText(canvas, "OUTPUT", new SKPoint(0, 0), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, "OUTPUT", new SKPoint(0, 0), FUIColors.TextDim, 12f);
         canvas.Restore();
     }
 
@@ -387,7 +387,7 @@ public class FUICurveEditor : UserControl
                 if (labelY < _graphBounds.Top + 10)
                     labelY = pt.Y + radius + 16;
 
-                FUIRenderer.DrawText(canvas, label, new SKPoint(pt.X - 24, labelY), FUIColors.TextBright, 9f);
+                FUIRenderer.DrawText(canvas, label, new SKPoint(pt.X - 24, labelY), FUIColors.TextBright, 12f);
             }
         }
     }
@@ -401,7 +401,7 @@ public class FUICurveEditor : UserControl
     private void DrawSlider(SKCanvas canvas, SKRect bounds, string label, float value, SKColor color, bool dragging)
     {
         // Label
-        FUIRenderer.DrawText(canvas, $"{label}: {value:P0}", new SKPoint(bounds.Left, bounds.Top), FUIColors.TextDim, 9f);
+        FUIRenderer.DrawText(canvas, $"{label}: {value:P0}", new SKPoint(bounds.Left, bounds.Top), FUIColors.TextDim, 12f);
 
         // Track
         float trackY = bounds.Top + 18;

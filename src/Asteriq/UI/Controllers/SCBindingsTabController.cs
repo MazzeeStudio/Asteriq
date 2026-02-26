@@ -1115,7 +1115,7 @@ public class SCBindingsTabController : ITabController
             IsAntialias = true
         };
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
 
         float cornerPadding = 20f;
         float y = bounds.Top + frameInset + cornerPadding;
@@ -1421,7 +1421,7 @@ public class SCBindingsTabController : ITabController
             IsAntialias = true
         };
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
 
         float cornerPadding = 15f;
         float y = bounds.Top + frameInset + cornerPadding;

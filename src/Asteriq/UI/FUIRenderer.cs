@@ -1027,7 +1027,7 @@ public static class FUIRenderer
     /// </summary>
     public static PanelMetrics DrawPanelChrome(SKCanvas canvas, SKRect bounds, SKColor? frameColor = null)
     {
-        frameColor ??= FUIColors.Primary;
+        frameColor ??= FUIColors.Frame;
 
         // Panel background
         using var bgPaint = new SKPaint

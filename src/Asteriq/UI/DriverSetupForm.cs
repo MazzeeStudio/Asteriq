@@ -46,24 +46,15 @@ public class DriverSetupForm : Form
     private bool _isDragging;
     private Point _dragStart;
 
-    // Layout constants - stable structural values only
+    // Logical layout constants (all in unscaled canvas space)
     private const float TitleBarH = 36f;
-    private const float FormW = 720f;
-    private const float FormH = 600f;
+    private const float LogicalW = 560f;
+    private const float LogicalH = 600f;
     private const float Pad = 20f;
-    private const float ContentW = FormW - Pad * 2;   // 680
     private const float PanelH = 122f;
     private const float InstallBtnW = 100f;
     private const float InstallBtnH = 30f;
     private const float InstallBtnOffsetY = 78f;
-
-    // Bottom section - fixed from form bottom so the top section can breathe
-    private const float BtnAreaH = 60f;
-    private const float LogBoxH = 120f;
-    private const float LogBoxBottom = FormH - BtnAreaH;       // 540
-    private const float LogBoxTop = LogBoxBottom - LogBoxH;    // 420
-    private const float LogHeaderY = LogBoxTop - 14f;          // 406
-    private const float ProgressBarY = LogHeaderY - 20f;       // 386
 
     // Top section - computed each paint so panels flow below status text naturally
     private float _panel1Y = 90f;
@@ -93,9 +84,6 @@ public class DriverSetupForm : Form
         ShowInTaskbar = true;
         KeyPreview = true;
 
-        float scale = FUIRenderer.CanvasScaleFactor;
-        ClientSize = new Size((int)(FormW * scale), (int)(FormH * scale));
-
         try
         {
             var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "asteriq.ico");
@@ -111,21 +99,15 @@ public class DriverSetupForm : Form
         _canvas.MouseLeave += OnCanvasMouseLeave;
         Controls.Add(_canvas);
 
-        // Progress bar (shown only during download)
+        // Create native controls (positioned later in ApplyScale)
         _progressBar = new ProgressBar
         {
-            Location = new Point((int)(Pad * scale), (int)(ProgressBarY * scale)),
-            Size = new Size((int)(ContentW * scale), (int)(14 * scale)),
             Style = ProgressBarStyle.Continuous,
             Visible = false,
         };
 
-        // Install log — anchored to bottom section
         _logListBox = new ListBox
         {
-            Location = new Point((int)(Pad * scale), (int)((LogBoxTop + 2) * scale)),
-            Size = new Size((int)(ContentW * scale), (int)((LogBoxH - 4) * scale)),
-            Font = new Font("Consolas", 8 * scale),
             BackColor = ToColor(FUIColors.Background2),
             ForeColor = ToColor(FUIColors.TextDim),
             BorderStyle = BorderStyle.None,
@@ -149,9 +131,57 @@ public class DriverSetupForm : Form
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
-        // DeviceDpi is correct only after the window handle is created (during ShowDialog)
+
+        // DeviceDpi is correct only after the window handle is created
         FUIRenderer.SetDisplayScale(DeviceDpi);
+
+        // Now that DPI is known, size the form and position native controls
+        ApplyScale();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        FUIRenderer.SetDisplayScale(DeviceDpi);
+        ApplyScale();
         _canvas.Invalidate();
+    }
+
+    /// <summary>
+    /// Size the form and position native controls using the current CanvasScaleFactor.
+    /// Called from OnLoad (after DPI is known) and OnDpiChanged.
+    /// </summary>
+    private void ApplyScale()
+    {
+        float scale = FUIRenderer.CanvasScaleFactor;
+
+        ClientSize = new Size((int)(LogicalW * scale), (int)(LogicalH * scale));
+
+        // Re-center on screen after resize
+        if (StartPosition == FormStartPosition.CenterScreen)
+        {
+            var screen = Screen.FromControl(this).WorkingArea;
+            Location = new Point(
+                screen.X + (screen.Width - Width) / 2,
+                screen.Y + (screen.Height - Height) / 2);
+        }
+
+        // Bottom-anchored layout positions (logical)
+        float btnY = LogicalH - 50f;
+        float logBoxBottom = btnY - 10f;
+        float logBoxTop = logBoxBottom - 120f;
+        float logHeaderY = logBoxTop - 14f;
+        float progressBarY = logHeaderY - 20f;
+
+        // Position native controls in physical pixels
+        float contentW = LogicalW - Pad * 2;
+
+        _progressBar.Location = new Point((int)(Pad * scale), (int)(progressBarY * scale));
+        _progressBar.Size = new Size((int)(contentW * scale), (int)(14 * scale));
+
+        _logListBox.Location = new Point((int)(Pad * scale), (int)((logBoxTop + 2) * scale));
+        _logListBox.Size = new Size((int)(contentW * scale), (int)(116 * scale));
+        _logListBox.Font = new Font("Consolas", 8 * scale);
     }
 
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
@@ -160,6 +190,8 @@ public class DriverSetupForm : Form
         float scale = FUIRenderer.CanvasScaleFactor;
         canvas.Scale(scale);
         var b = new SKRect(0, 0, e.Info.Width / scale, e.Info.Height / scale);
+
+        float contentW = b.Width - Pad * 2;
 
         canvas.Clear(FUIColors.Background0);
 
@@ -191,19 +223,19 @@ public class DriverSetupForm : Form
         _panel2Y = _panel1Y + PanelH + 10f;
 
         DrawDriverPanel(canvas,
-            new SKRect(Pad, _panel1Y, Pad + ContentW, _panel1Y + PanelH),
+            new SKRect(Pad, _panel1Y, Pad + contentW, _panel1Y + PanelH),
             "vJOY VIRTUAL JOYSTICK", "REQUIRED",
             "Creates virtual joystick devices visible to Star Citizen",
             _vJoyStatusText, _vJoyStatusColor, required: true);
 
         DrawDriverPanel(canvas,
-            new SKRect(Pad, _panel2Y, Pad + ContentW, _panel2Y + PanelH),
+            new SKRect(Pad, _panel2Y, Pad + contentW, _panel2Y + PanelH),
             "HIDHIDE DEVICE HIDING", "RECOMMENDED",
             "Hides physical devices so only virtual devices are visible",
             _hidHideStatusText, _hidHideStatusColor, required: false);
 
         // Canvas-drawn install buttons (inside panels)
-        float installBtnX = Pad + ContentW - InstallBtnW - 14f;
+        float installBtnX = Pad + contentW - InstallBtnW - 14f;
 
         _vJoyInstallBounds = new SKRect(installBtnX, _panel1Y + InstallBtnOffsetY,
             installBtnX + InstallBtnW, _panel1Y + InstallBtnOffsetY + InstallBtnH);
@@ -231,18 +263,23 @@ public class DriverSetupForm : Form
         FUIRenderer.DrawText(canvas, "HidHide from GitHub", new SKPoint(hidHideLinkX, linkY),
             _hoveredRegion == 3 ? FUIColors.Primary : FUIColors.Active, 9f);
 
+        // Bottom-anchored layout — all relative to b.Bottom
+        float btnW = 110f, btnH = 34f, btnSpacing = 12f;
+        float btnY = b.Bottom - 50;
+        float logBoxBottom = btnY - 10f;
+        float logBoxH = 120f;
+        float logBoxTop = logBoxBottom - logBoxH;
+        float logHeaderY = logBoxTop - 14f;
+
         // Install log header
-        FUIRenderer.DrawText(canvas, "INSTALL LOG", new SKPoint(Pad, LogHeaderY), FUIColors.TextDim, 9f, false);
+        FUIRenderer.DrawText(canvas, "INSTALL LOG", new SKPoint(Pad, logHeaderY), FUIColors.TextDim, 9f, false);
 
         // Log frame
-        var logFrame = new SKRect(Pad - 1, LogBoxTop, Pad + ContentW + 1, LogBoxTop + LogBoxH);
+        var logFrame = new SKRect(Pad - 1, logBoxTop, Pad + contentW + 1, logBoxTop + logBoxH);
         using var logFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.FrameDim, StrokeWidth = 1f };
         canvas.DrawRect(logFrame, logFramePaint);
 
         // Bottom buttons
-        float btnW = 110f, btnH = 34f, btnSpacing = 12f;
-        float btnY = b.Bottom - 50;
-
         _exitButtonBounds = new SKRect(b.Right - Pad - btnW, btnY, b.Right - Pad, btnY + btnH);
         _continueButtonBounds = new SKRect(b.Right - Pad - btnW * 2 - btnSpacing, btnY,
             b.Right - Pad - btnW - btnSpacing, btnY + btnH);
@@ -271,7 +308,6 @@ public class DriverSetupForm : Form
     {
         if (installed)
         {
-            // ButtonState.Active uses the accent color for both border and text — shows the green tint
             FUIRenderer.DrawButton(canvas, bounds, "INSTALLED",
                 FUIRenderer.ButtonState.Active, FUIColors.Success);
         }
@@ -282,8 +318,6 @@ public class DriverSetupForm : Form
         }
         else
         {
-            // Hover state as the resting look so the accent colour is always visible;
-            // Active state on mouseover to give clear feedback.
             FUIRenderer.DrawButton(canvas, bounds, "INSTALL",
                 hovered ? FUIRenderer.ButtonState.Active : FUIRenderer.ButtonState.Hover,
                 FUIColors.Active);

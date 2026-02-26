@@ -1460,8 +1460,6 @@ public class SCBindingsTabController : ITabController
         float y = bounds.Top + frameInset + cornerPadding;
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
-        float lineHeight = 18f;
-
         // Title row with action count
         FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 15f, true);
 

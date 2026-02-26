@@ -123,12 +123,18 @@ public sealed class UpdateService : IUpdateService
             // Write swap script and launch it
             string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
             string script = $$"""
-                Start-Sleep -Seconds 2
-                try {
-                    Copy-Item -Path '{{tempPath}}' -Destination '{{currentExe}}' -Force -ErrorAction Stop
-                    Start-Process -FilePath '{{currentExe}}'
-                } catch {
-                    # Copy failed - relaunch the original so the app is not left closed
+                $copied = $false
+                for ($i = 0; $i -lt 5; $i++) {
+                    Start-Sleep -Seconds 2
+                    try {
+                        Copy-Item -Path '{{tempPath}}' -Destination '{{currentExe}}' -Force -ErrorAction Stop
+                        $copied = $true
+                        break
+                    } catch {
+                        # Exe may still be locked, retry
+                    }
+                }
+                if ($copied) {
                     Start-Process -FilePath '{{currentExe}}'
                 }
                 Remove-Item -Path '{{tempPath}}' -ErrorAction SilentlyContinue

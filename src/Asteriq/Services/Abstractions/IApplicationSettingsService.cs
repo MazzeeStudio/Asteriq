@@ -76,6 +76,11 @@ public interface IApplicationSettingsService
     string? PreferredSCEnvironment { get; set; }
 
     /// <summary>
+    /// Whether to skip the driver setup modal on startup
+    /// </summary>
+    bool SkipDriverSetup { get; set; }
+
+    /// <summary>
     /// Timestamp of the last successful update check
     /// </summary>
     DateTime? LastUpdateCheck { get; set; }

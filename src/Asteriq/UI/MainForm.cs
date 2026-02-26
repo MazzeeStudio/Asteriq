@@ -82,6 +82,7 @@ public partial class MainForm : Form
     private readonly IMappingEngine _mappingEngine;
     private readonly SystemTrayIcon _trayIcon;
     private readonly IUpdateService _updateService;
+    private readonly DriverSetupManager _driverSetupManager;
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
@@ -174,6 +175,7 @@ public partial class MainForm : Form
         IMappingEngine mappingEngine,
         SystemTrayIcon trayIcon,
         IUpdateService updateService,
+        DriverSetupManager driverSetupManager,
         ISCInstallationService scInstallationService,
         SCProfileCacheService scProfileCacheService,
         SCSchemaService scSchemaService,
@@ -191,6 +193,7 @@ public partial class MainForm : Form
         _mappingEngine = mappingEngine ?? throw new ArgumentNullException(nameof(mappingEngine));
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+        _driverSetupManager = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
         // Update tray icon tooltip
         _trayIcon.SetToolTip($"Asteriq v{s_appVersion}");
 
@@ -228,7 +231,7 @@ public partial class MainForm : Form
         _tabContext = new TabContext(
             _inputService, _profileManager, _profileRepository, _appSettings,
             _themeService, _vjoyService, _mappingEngine, _trayIcon, _updateService,
-            _activeInputTracker, _background, this,
+            _driverSetupManager, _activeInputTracker, _background, this,
             markDirty: MarkDirty,
             invalidateCanvas: () => _canvas.Invalidate(),
             refreshDevices: RefreshDevices,
@@ -263,6 +266,7 @@ public partial class MainForm : Form
         _tabContext.ApplyFontScale = ApplyFontScaleToWindowSize;
         _tabContext.GetActiveSvg = GetActiveSvg;
         _tabContext.GetSvgForDeviceMap = GetSvgForDeviceMap;
+        _tabContext.OpenDriverSetup = OpenDriverSetupDialog;
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
@@ -371,6 +375,13 @@ public partial class MainForm : Form
     private void RefreshProfileList()
     {
         _profiles = _profileRepository.ListProfiles();
+    }
+
+    private void OpenDriverSetupDialog()
+    {
+        using var setupForm = new DriverSetupForm(_driverSetupManager, _themeService, _appSettings, settingsMode: true);
+        setupForm.ShowDialog(this);
+        _canvas.Invalidate();
     }
 
     private void CreateNewProfilePrompt()

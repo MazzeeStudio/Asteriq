@@ -41,6 +41,9 @@ public class SettingsTabController : ITabController
     private SKRect _referralCopyButtonBounds;
     private SKRect _referralLinkButtonBounds;
 
+    // Driver setup button
+    private SKRect _driverSetupButtonBounds;
+
     // Version / update button bounds
     private SKRect _checkButtonBounds;
     private SKRect _downloadButtonBounds;
@@ -148,6 +151,13 @@ public class SettingsTabController : ITabController
 
         // Support panel buttons
         if (_bmacButtonBounds.Contains(pt) || _referralCopyButtonBounds.Contains(pt) || _referralLinkButtonBounds.Contains(pt))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Driver setup button
+        if (!_driverSetupButtonBounds.IsEmpty && _driverSetupButtonBounds.Contains(pt))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -382,33 +392,64 @@ public class SettingsTabController : ITabController
         }
         y += iconBtnHeight + sectionSpacing;
 
-        // vJoy section
-        FUIRenderer.DrawText(canvas, "VJOY STATUS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        // DRIVERS section
+        FUIRenderer.DrawText(canvas, "DRIVERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing;
 
-        var devices = _ctx.VJoyService.EnumerateDevices();
-        bool vjoyEnabled = devices.Count > 0;
-        string vjoyStatus = vjoyEnabled ? "Driver active" : "Not available";
-        var statusColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
+        var vjoyDevices = _ctx.VJoyService.EnumerateDevices();
+        bool vjoyEnabled = vjoyDevices.Count > 0;
+        var driverStatus = _ctx.DriverSetupManager.GetSetupStatus();
 
-        float statusTextSize = 17f;
-        float statusLineHeight = statusTextSize + 4;
         float statusDotRadius = 4f;
-        float statusDotY = y + (statusLineHeight / 2);
-        float statusTextY = y + (statusLineHeight / 2) + 4;
+        float statusLineHeight = 21f;
         float statusTextX = leftMargin + statusDotRadius * 2 + 8;
-        float statusMaxWidth = contentWidth - (statusTextX - leftMargin);
 
-        using var statusDot = new SKPaint { Style = SKPaintStyle.Fill, Color = statusColor, IsAntialias = true };
-        canvas.DrawCircle(leftMargin + statusDotRadius + 1, statusDotY, statusDotRadius, statusDot);
-        FUIRenderer.DrawTextTruncated(canvas, vjoyStatus, new SKPoint(statusTextX, statusTextY), statusMaxWidth,
-            vjoyEnabled ? FUIColors.TextPrimary : FUIColors.Danger, 14f);
-        y += rowHeight;
+        // vJoy status row
+        {
+            string vjoyStatusStr = vjoyEnabled ? "Driver active" : "Not installed";
+            var vjoyColor = vjoyEnabled ? FUIColors.Success : FUIColors.Danger;
+            float dotY = y + (statusLineHeight / 2);
+            float textY = y + (statusLineHeight / 2) + 4;
 
+            using var vjoyDot = new SKPaint { Style = SKPaintStyle.Fill, Color = vjoyColor, IsAntialias = true };
+            canvas.DrawCircle(leftMargin + statusDotRadius + 1, dotY, statusDotRadius, vjoyDot);
+            FUIRenderer.DrawText(canvas, "vJoy", new SKPoint(statusTextX, textY), FUIColors.TextPrimary, 14f);
+            float vjoyLabelW = FUIRenderer.MeasureText("vJoy", 14f);
+            FUIRenderer.DrawText(canvas, vjoyStatusStr, new SKPoint(statusTextX + vjoyLabelW + 12f, textY),
+                vjoyEnabled ? FUIColors.TextDim : FUIColors.Danger, 13f);
+            y += statusLineHeight;
+        }
+
+        // HidHide status row + DRIVER SETUP button
+        {
+            string hidHideStatusStr = driverStatus.HidHideInstalled ? "Available" : "Not installed";
+            var hidHideColor = driverStatus.HidHideInstalled ? FUIColors.Success : FUIColors.Warning;
+            float dotY = y + (statusLineHeight / 2);
+            float textY = y + (statusLineHeight / 2) + 4;
+
+            using var hidHideDot = new SKPaint { Style = SKPaintStyle.Fill, Color = hidHideColor, IsAntialias = true };
+            canvas.DrawCircle(leftMargin + statusDotRadius + 1, dotY, statusDotRadius, hidHideDot);
+            FUIRenderer.DrawText(canvas, "HidHide", new SKPoint(statusTextX, textY), FUIColors.TextPrimary, 14f);
+            float hidHideLabelW = FUIRenderer.MeasureText("HidHide", 14f);
+            FUIRenderer.DrawText(canvas, hidHideStatusStr, new SKPoint(statusTextX + hidHideLabelW + 12f, textY),
+                driverStatus.HidHideInstalled ? FUIColors.TextDim : FUIColors.Warning, 13f);
+
+            // DRIVER SETUP button — right-aligned on the HidHide row
+            float setupBtnWidth = 110f;
+            float setupBtnHeight = 22f;
+            float setupBtnY = y + (statusLineHeight - setupBtnHeight) / 2;
+            _driverSetupButtonBounds = new SKRect(rightMargin - setupBtnWidth, setupBtnY, rightMargin, setupBtnY + setupBtnHeight);
+            bool setupHovered = _driverSetupButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            DrawSupportActionButton(canvas, _driverSetupButtonBounds, "DRIVER SETUP", setupHovered, false);
+            y += statusLineHeight;
+        }
+
+        // Available devices line (only when vJoy is active)
         if (vjoyEnabled)
         {
-            FUIRenderer.DrawTextTruncated(canvas, $"Available devices: {devices.Count}",
-                new SKPoint(leftMargin, y), contentWidth, FUIColors.TextDim, 13f);
+            y += 4f; // extra spacing from the status dot rows
+            FUIRenderer.DrawTextTruncated(canvas, $"Available devices: {vjoyDevices.Count}",
+                new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
             y += rowHeight;
         }
         y += sectionSpacing;
@@ -417,13 +458,21 @@ public class SettingsTabController : ITabController
         FUIRenderer.DrawText(canvas, "VERSION & UPDATES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing;
 
+        // "Check for updates automatically" toggle — first in this section
+        float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float autoCheckLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Check for updates automatically", new SKPoint(leftMargin, autoCheckLabelY),
+            autoCheckLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
+        _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
+        FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _ctx.AppSettings.AutoCheckUpdates, _ctx.MousePosition);
+        y += rowHeight + sectionSpacing;
+
+        // Version row: "v0.8.289" left, [Check for updates] button right
         string currentVersion = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "0.0.0";
-
-        // Version row: "v0.8.289" left, [Check for updates] button right
         string versionStr = $"v{currentVersion}";
-        FUIRenderer.DrawText(canvas, versionStr, new SKPoint(leftMargin, y + 10f), FUIColors.TextPrimary, 14f);
 
         var updateStatus = _ctx.UpdateService.Status;
         float checkBtnWidth = 150f;
@@ -434,6 +483,10 @@ public class SettingsTabController : ITabController
         string checkLabel = updateStatus == UpdateStatus.Checking ? "CHECKING\u2026" : "CHECK FOR UPDATES";
         DrawSupportActionButton(canvas, _checkButtonBounds, checkLabel, checkHovered, false,
             !checkBtnEnabled || updateStatus == UpdateStatus.Checking);
+
+        // Version text — vertically aligned with the button
+        float versionTextY = y + (checkBtnHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawText(canvas, versionStr, new SKPoint(leftMargin, versionTextY), FUIColors.TextPrimary, 14f);
         y += checkBtnHeight + 4f;
 
         // "Last checked" timestamp
@@ -547,15 +600,6 @@ public class SettingsTabController : ITabController
             }
             y += bannerHeight + 8f;
         }
-
-        // "Check for updates automatically" toggle
-        float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
-        float autoCheckLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
-        FUIRenderer.DrawTextTruncated(canvas, "Check for updates automatically", new SKPoint(leftMargin, autoCheckLabelY),
-            autoCheckLabelMaxWidth, FUIColors.TextPrimary, 14f);
-        float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
-        _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _ctx.AppSettings.AutoCheckUpdates, _ctx.MousePosition);
     }
 
     private void DrawVisualSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1021,6 +1065,13 @@ public class SettingsTabController : ITabController
                 FileName = "https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG",
                 UseShellExecute = true
             });
+            return;
+        }
+
+        // Driver setup button click
+        if (!_driverSetupButtonBounds.IsEmpty && _driverSetupButtonBounds.Contains(pt))
+        {
+            _ctx.OpenDriverSetup?.Invoke();
             return;
         }
 

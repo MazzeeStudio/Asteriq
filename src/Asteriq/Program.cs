@@ -270,6 +270,7 @@ static class Program
     private static bool CheckRequiredDrivers(IServiceProvider serviceProvider, bool forceShow = false)
     {
         var driverSetup = serviceProvider.GetRequiredService<Services.DriverSetupManager>();
+        var appSettings = serviceProvider.GetRequiredService<IApplicationSettingsService>();
         var status = driverSetup.GetSetupStatus();
 
         if (status.IsComplete && !forceShow)
@@ -277,17 +278,21 @@ static class Program
             return true; // All required drivers are installed
         }
 
+        // If user previously chose "Don't show again" and this isn't a forced show, skip the modal
+        if (appSettings.SkipDriverSetup && !forceShow)
+        {
+            return true; // User opted out — configuration-only mode
+        }
+
         // Initialize font/theme scaling before showing the form (MainForm does this, but it hasn't run yet)
         UI.FUIRenderer.InitializeFontScaling();
-        var appSettings = serviceProvider.GetRequiredService<IApplicationSettingsService>();
         UI.FUIRenderer.InterfaceScale = appSettings.FontSize;
         UI.FUIRenderer.FontFamily = appSettings.FontFamily;
-        var themeService = serviceProvider.GetRequiredService<IApplicationSettingsService>();
         var uiTheme = serviceProvider.GetRequiredService<Services.Abstractions.IUIThemeService>();
         UI.FUIColors.SetTheme(uiTheme.Theme);
 
-        // Show driver setup form
-        using var setupForm = ActivatorUtilities.CreateInstance<UI.DriverSetupForm>(serviceProvider);
+        // Show driver setup form (passing appSettings so checkbox persists immediately)
+        using var setupForm = new UI.DriverSetupForm(driverSetup, uiTheme, appSettings);
         var result = setupForm.ShowDialog();
 
         if (result != DialogResult.OK || !setupForm.SetupComplete)

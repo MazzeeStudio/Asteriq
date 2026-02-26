@@ -150,6 +150,7 @@ Reference implementation: `C:\Users\mhams\source\repos\SCVirtStick\SCVirtStick\C
 - [ ] Error handling and user feedback
 - [ ] Documentation for end users
 - [ ] Performance optimization
+- [ ] Auto-download updates toggle (download in background when update detected, then prompt to apply)
 
 ---
 

@@ -467,6 +467,8 @@ public class SettingsTabController : ITabController
                 {
                     using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Asteriq is up to date", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -477,16 +479,18 @@ public class SettingsTabController : ITabController
                 {
                     using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(25), IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Warning.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     string availText = $"Update available: v{latest}";
                     FUIRenderer.DrawText(canvas, availText, new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
 
                     // Inline "Download update" button
-                    float dlBtnWidth = 130f;
-                    _downloadButtonBounds = new SKRect(rightMargin - dlBtnWidth - 4f, y + 3f, rightMargin - 4f, y + bannerHeight - 3f);
+                    float dlBtnWidth = FUIRenderer.MeasureText("DOWNLOAD", 13f) + 24f;
+                    _downloadButtonBounds = new SKRect(rightMargin - dlBtnWidth - 6f, y + 4f, rightMargin - 6f, y + bannerHeight - 4f);
                     bool dlHovered = _downloadButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                    DrawSupportActionButton(canvas, _downloadButtonBounds, "DOWNLOAD UPDATE", dlHovered, true);
+                    DrawSupportActionButton(canvas, _downloadButtonBounds, "DOWNLOAD", dlHovered, true);
                     break;
                 }
 
@@ -503,6 +507,8 @@ public class SettingsTabController : ITabController
                     canvas.ClipRoundRect(new SKRoundRect(bannerRect, bannerRadius));
                     canvas.DrawRect(fillRect, fillPaint);
                     canvas.Restore();
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Warning.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, $"Downloading update\u2026 {pct}%", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -513,15 +519,17 @@ public class SettingsTabController : ITabController
                 {
                     using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Update ready", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
 
                     // Inline "Apply update" button
-                    float apBtnWidth = 120f;
-                    _applyButtonBounds = new SKRect(rightMargin - apBtnWidth - 4f, y + 3f, rightMargin - 4f, y + bannerHeight - 3f);
+                    float apBtnWidth = FUIRenderer.MeasureText("APPLY", 13f) + 24f;
+                    _applyButtonBounds = new SKRect(rightMargin - apBtnWidth - 6f, y + 4f, rightMargin - 6f, y + bannerHeight - 4f);
                     bool apHovered = _applyButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                    DrawSupportActionButton(canvas, _applyButtonBounds, "APPLY UPDATE", apHovered, true);
+                    DrawSupportActionButton(canvas, _applyButtonBounds, "APPLY", apHovered, true);
                     break;
                 }
 
@@ -529,6 +537,8 @@ public class SettingsTabController : ITabController
                 {
                     using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(25), IsAntialias = true };
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
+                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Danger.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Check failed", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);

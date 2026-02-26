@@ -2861,7 +2861,7 @@ public partial class MainForm : Form
                 arrowPath.LineTo(arrowMidX - stemW / 2f, arrowTop + stemH);
                 arrowPath.Close();
 
-                using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
+                using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                 canvas.DrawPath(arrowPath, arrowPaint);
             }
 

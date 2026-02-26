@@ -157,6 +157,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool SkipDriverSetup
+    {
+        get => _cachedSettings.SkipDriverSetup;
+        set
+        {
+            _cachedSettings.SkipDriverSetup = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public DateTime? LastUpdateCheck
     {
         get => _cachedSettings.LastUpdateCheck;
@@ -230,6 +240,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public Dictionary<string, string> LastSCExportProfileByEnvironment { get; set; } = new();
         public string? PreferredSCEnvironment { get; set; }
+        public bool SkipDriverSetup { get; set; }
         public DateTime? LastUpdateCheck { get; set; }
         /// <summary>Per-vJoy-slot silhouette override. Key = vJoy ID, Value = device map filename key.</summary>
         public Dictionary<uint, string> VJoySilhouetteOverrides { get; set; } = new();

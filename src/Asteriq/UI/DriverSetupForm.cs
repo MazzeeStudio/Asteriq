@@ -11,6 +11,8 @@ namespace Asteriq.UI;
 public class DriverSetupForm : Form
 {
     private readonly DriverSetupManager _driverSetup;
+    private readonly IApplicationSettingsService? _appSettings;
+    private readonly bool _settingsMode;
     private readonly FUIBackground _background = new();
     private readonly SKControl _canvas;
 
@@ -40,7 +42,11 @@ public class DriverSetupForm : Form
     private SKRect _hidHideLinkBounds;
     private SKRect _vJoyInstallBounds;
     private SKRect _hidHideInstallBounds;
-    private int _hoveredRegion = -1; // 0=continue/skip, 1=exit, 2=vjoy-link, 3=hidhide-link, 4=vjoy-install, 5=hidhide-install
+    private int _hoveredRegion = -1; // 0=continue/skip, 1=exit, 2=vjoy-link, 3=hidhide-link, 4=vjoy-install, 5=hidhide-install, 6=dont-show-again
+
+    // "Don't show again" checkbox
+    private SKRect _dontShowAgainBounds;
+    private bool _dontShowAgain;
 
     // Dragging
     private bool _isDragging;
@@ -62,10 +68,15 @@ public class DriverSetupForm : Form
 
     public bool SetupComplete { get; private set; }
     public bool SkippedVJoy { get; private set; }
+    public bool DontShowAgain => _dontShowAgain;
 
-    public DriverSetupForm(DriverSetupManager driverSetupManager, IUIThemeService themeService)
+    public DriverSetupForm(DriverSetupManager driverSetupManager, IUIThemeService themeService,
+        IApplicationSettingsService? appSettings = null, bool settingsMode = false)
     {
         _driverSetup = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
+        _appSettings = appSettings;
+        _settingsMode = settingsMode;
+        _dontShowAgain = appSettings?.SkipDriverSetup ?? false;
         _statusColor = FUIColors.TextDim;
         _vJoyStatusColor = FUIColors.TextDim;
         _hidHideStatusColor = FUIColors.TextDim;
@@ -280,25 +291,49 @@ public class DriverSetupForm : Form
         canvas.DrawRect(logFrame, logFramePaint);
 
         // Bottom buttons
-        _exitButtonBounds = new SKRect(b.Right - Pad - btnW, btnY, b.Right - Pad, btnY + btnH);
-        _continueButtonBounds = new SKRect(b.Right - Pad - btnW * 2 - btnSpacing, btnY,
-            b.Right - Pad - btnW - btnSpacing, btnY + btnH);
-
-        FUIRenderer.DrawButton(canvas, _exitButtonBounds, "EXIT",
-            _hoveredRegion == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-
-        if (_continueEnabled)
+        if (_settingsMode)
         {
-            FUIRenderer.DrawButton(canvas, _continueButtonBounds, "CONTINUE",
-                _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                FUIColors.Active);
+            // Settings mode: single CLOSE button, right-aligned
+            _continueButtonBounds = SKRect.Empty;
+            _exitButtonBounds = new SKRect(b.Right - Pad - btnW, btnY, b.Right - Pad, btnY + btnH);
+            FUIRenderer.DrawButton(canvas, _exitButtonBounds, "CLOSE",
+                _hoveredRegion == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
         else
         {
-            FUIRenderer.DrawButton(canvas, _continueButtonBounds, "SKIP VJOY",
-                _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                FUIColors.Warning.WithAlpha(180));
+            // Startup mode: CONTINUE/SKIP VJOY + EXIT
+            _exitButtonBounds = new SKRect(b.Right - Pad - btnW, btnY, b.Right - Pad, btnY + btnH);
+            _continueButtonBounds = new SKRect(b.Right - Pad - btnW * 2 - btnSpacing, btnY,
+                b.Right - Pad - btnW - btnSpacing, btnY + btnH);
+
+            FUIRenderer.DrawButton(canvas, _exitButtonBounds, "EXIT",
+                _hoveredRegion == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+
+            if (_continueEnabled)
+            {
+                FUIRenderer.DrawButton(canvas, _continueButtonBounds, "CONTINUE",
+                    _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                    FUIColors.Active);
+            }
+            else
+            {
+                FUIRenderer.DrawButton(canvas, _continueButtonBounds, "SKIP VJOY",
+                    _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                    FUIColors.Warning.WithAlpha(180));
+            }
         }
+
+        // "Don't show again" checkbox — bottom-left, aligned with button row
+        float cbSize = 16f;
+        float cbY = btnY + (btnH - cbSize) / 2;
+        _dontShowAgainBounds = new SKRect(Pad, cbY, Pad + cbSize, cbY + cbSize);
+        FUIWidgets.DrawCheckbox(canvas, _dontShowAgainBounds, _dontShowAgain,
+            new System.Drawing.Point((int)(_hoveredRegion == 6 ? _dontShowAgainBounds.MidX : -1),
+                                     (int)(_hoveredRegion == 6 ? _dontShowAgainBounds.MidY : -1)));
+        float cbLabelX = Pad + cbSize + 8f;
+        float cbLabelY = btnY + btnH / 2 + 5f;
+        FUIRenderer.DrawText(canvas, "Don't show again", new SKPoint(cbLabelX, cbLabelY),
+            _hoveredRegion == 6 ? FUIColors.TextBright : FUIColors.TextDim, 13f);
 
         // L-corner decorations
         FUIRenderer.DrawLCornerFrame(canvas, b.Inset(-4, -4), FUIColors.Frame.WithAlpha(100), 20f, 6f, 1f);
@@ -368,6 +403,7 @@ public class DriverSetupForm : Form
         else if (_hidHideLinkBounds.Contains(pt)) newHovered = 3;
         else if (!_vJoyInstalled && !_vJoyInstalling && _vJoyInstallBounds.Contains(pt)) newHovered = 4;
         else if (!_hidHideInstalled && !_hidHideInstalling && _hidHideInstallBounds.Contains(pt)) newHovered = 5;
+        else if (_dontShowAgainBounds.Contains(pt) || CheckDontShowAgainLabelHit(pt)) newHovered = 6;
 
         if (newHovered != _hoveredRegion)
         {
@@ -420,6 +456,12 @@ public class DriverSetupForm : Form
         else if (_hoveredRegion == 3) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
         else if (_hoveredRegion == 4 && !_vJoyInstalled && !_vJoyInstalling) _ = VJoyInstallAsync();
         else if (_hoveredRegion == 5 && !_hidHideInstalled && !_hidHideInstalling) _ = HidHideInstallAsync();
+        else if (_hoveredRegion == 6)
+        {
+            _dontShowAgain = !_dontShowAgain;
+            if (_appSettings is not null) _appSettings.SkipDriverSetup = _dontShowAgain;
+            _canvas.Invalidate();
+        }
     }
 
     private void OnCanvasMouseLeave(object? sender, EventArgs e)
@@ -578,6 +620,15 @@ public class DriverSetupForm : Form
         _hidHideInstalling = false;
         _progressBar.Visible = false;
         _canvas.Invalidate();
+    }
+
+    private bool CheckDontShowAgainLabelHit(SKPoint pt)
+    {
+        if (_dontShowAgainBounds == default) return false;
+        float labelX = _dontShowAgainBounds.Right + 8f;
+        float labelW = FUIRenderer.MeasureText("Don't show again", 13f);
+        var labelRect = new SKRect(labelX, _dontShowAgainBounds.Top, labelX + labelW, _dontShowAgainBounds.Bottom);
+        return labelRect.Contains(pt);
     }
 
     private static void OpenUrl(string url)

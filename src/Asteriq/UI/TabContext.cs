@@ -21,6 +21,7 @@ public class TabContext
     public IMappingEngine MappingEngine { get; }
     public SystemTrayIcon TrayIcon { get; }
     public IUpdateService UpdateService { get; }
+    public DriverSetupManager DriverSetupManager { get; }
 
     // Shared mutable state
     public List<PhysicalDeviceInfo> Devices { get; set; } = new();
@@ -90,6 +91,7 @@ public class TabContext
     public Action? ApplyFontScale { get; set; }
     public Func<SKSvg?>? GetActiveSvg { get; set; }
     public Func<DeviceMap?, SKSvg?>? GetSvgForDeviceMap { get; set; }
+    public Action? OpenDriverSetup { get; set; }
 
     public TabContext(
         IInputService inputService,
@@ -101,6 +103,7 @@ public class TabContext
         IMappingEngine mappingEngine,
         SystemTrayIcon trayIcon,
         IUpdateService updateService,
+        DriverSetupManager driverSetupManager,
         ActiveInputTracker activeInputTracker,
         FUIBackground background,
         Form ownerForm,
@@ -122,6 +125,7 @@ public class TabContext
         MappingEngine = mappingEngine;
         TrayIcon = trayIcon;
         UpdateService = updateService;
+        DriverSetupManager = driverSetupManager;
         ActiveInputTracker = activeInputTracker;
         Background = background;
         OwnerForm = ownerForm;

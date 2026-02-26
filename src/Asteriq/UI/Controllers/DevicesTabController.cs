@@ -444,10 +444,8 @@ public class DevicesTabController : ITabController
         DrawDeviceCategorySideTabs(canvas, bounds.Left + frameInset, bounds.Top + frameInset,
             sideTabWidth, bounds.Height - frameInset * 2);
 
-        bool panelHovered = _hoveredDevice >= 0;
         var frameBounds = new SKRect(bounds.Left + sideTabWidth, bounds.Top, bounds.Right, bounds.Bottom);
-        FUIRenderer.DrawLCornerFrame(canvas, frameBounds,
-            panelHovered ? FUIColors.FrameBright : FUIColors.Frame, 40f, 10f, 1.5f, panelHovered);
+        FUIRenderer.DrawLCornerFrame(canvas, frameBounds, FUIColors.Frame, 40f, 10f);
 
         float titleBarHeight = 32f;
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);

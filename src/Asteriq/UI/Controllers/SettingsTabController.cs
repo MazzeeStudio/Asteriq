@@ -299,7 +299,7 @@ public class SettingsTabController : ITabController
             IsAntialias = true
         };
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
 
         float cornerPadding = FUIRenderer.SpaceXL;
         float y = bounds.Top + frameInset + cornerPadding;
@@ -567,7 +567,7 @@ public class SettingsTabController : ITabController
             IsAntialias = true
         };
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
 
         float cornerPadding = FUIRenderer.SpaceXL;
         float y = bounds.Top + frameInset + cornerPadding;
@@ -783,7 +783,7 @@ public class SettingsTabController : ITabController
             IsAntialias = true
         };
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 30f, 8f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
 
         float cornerPadding = FUIRenderer.SpaceXL;
         float y = bounds.Top + frameInset + cornerPadding;

@@ -28,10 +28,10 @@
     </header>
 
     <section class="hero">
-        <img class="carousel-slide active" src="screenshots/hero.png"              alt="Asteriq — Devices tab with two VPC sticks assigned to vJoy slots" loading="eager">
-        <img class="carousel-slide" src="screenshots/carousel-mappings.png"       alt="Asteriq — Mappings tab showing axis list and mapping settings panel" loading="lazy">
-        <img class="carousel-slide" src="screenshots/bindings.png"                alt="Asteriq — Keybindings tab listing Star Citizen actions and bound inputs" loading="lazy">
-        <img class="carousel-slide" src="screenshots/settings.png"                alt="Asteriq — Settings tab with profile management and theme selector" loading="lazy">
+        <img class="carousel-slide" id="slide-0" src="screenshots/hero.png"           alt="Asteriq — Devices tab with two VPC sticks assigned to vJoy slots" loading="eager">
+        <img class="carousel-slide" id="slide-1" src="screenshots/carousel-mappings.png" alt="Asteriq — Mappings tab showing axis list and mapping settings panel" loading="lazy" hidden>
+        <img class="carousel-slide" id="slide-2" src="screenshots/bindings.png"       alt="Asteriq — Keybindings tab listing Star Citizen actions and bound inputs" loading="lazy" hidden>
+        <img class="carousel-slide" id="slide-3" src="screenshots/settings.png"       alt="Asteriq — Settings tab with profile management and theme selector" loading="lazy" hidden>
 
         <nav class="carousel-nav" aria-label="Screenshot navigation">
             <button class="carousel-dot active" aria-label="Slide 1"></button>
@@ -173,22 +173,45 @@
 
     <script>
     (function () {
-        var slides = document.querySelectorAll('.carousel-slide');
-        var dots   = document.querySelectorAll('.carousel-dot');
-        var hero   = document.querySelector('.hero');
+        var slides  = document.querySelectorAll('.carousel-slide');
+        var dots    = document.querySelectorAll('.carousel-dot');
+        var hero    = document.querySelector('.hero');
         var current = 0;
-        var timer;
+        var timer   = null;
+        var DELAY   = 5000;
 
+        // Show slide n, hide current
         function goTo(n) {
-            slides[current].classList.remove('active');
+            var next = (n + slides.length) % slides.length;
+            // Fade out current
+            slides[current].style.opacity = '0';
             dots[current].classList.remove('active');
-            current = (n + slides.length) % slides.length;
-            slides[current].classList.add('active');
-            dots[current].classList.add('active');
+            // After fade, hide old and show new
+            (function (from, to) {
+                setTimeout(function () {
+                    slides[from].hidden = true;
+                    slides[to].hidden   = false;
+                    slides[to].style.opacity = '0';
+                    // Force reflow so transition fires
+                    void slides[to].offsetWidth;
+                    slides[to].style.opacity = '1';
+                    dots[to].classList.add('active');
+                }, 700);
+            }(current, next));
+            current = next;
         }
 
-        function start() { timer = setInterval(function () { goTo(current + 1); }, 5000); }
-        function stop()  { clearInterval(timer); }
+        function start() {
+            if (timer) return;
+            timer = setInterval(function () { goTo(current + 1); }, DELAY);
+        }
+        function stop() {
+            clearInterval(timer);
+            timer = null;
+        }
+
+        // Initialise: show slide 0 at full opacity via JS
+        slides[0].style.opacity = '1';
 
         document.querySelector('.carousel-btn--next').addEventListener('click', function () { stop(); goTo(current + 1); start(); });
         document.querySelector('.carousel-btn--prev').addEventListener('click', function () { stop(); goTo(current - 1); start(); });

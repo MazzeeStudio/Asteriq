@@ -62,7 +62,7 @@ img {
 }
 
 .dev-banner {
-    background: rgba(200, 150, 10, 0.08);
+    background: #111009;
     border-bottom: 1px solid rgba(200, 150, 10, 0.35);
     padding: 0.55rem 2rem;
     display: flex;

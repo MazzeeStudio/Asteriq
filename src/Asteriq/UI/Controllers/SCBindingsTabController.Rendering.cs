@@ -44,7 +44,7 @@ public partial class SCBindingsTabController
             && !_scGridColumns[_scHighlightedColumn].IsPhysical
             && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
 
-        float columnActionsHeight = 200f;
+        float columnActionsHeight = 235f;
         float verticalGap2 = 8f;
 
         SKRect controlProfilesBounds;

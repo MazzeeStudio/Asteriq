@@ -406,7 +406,7 @@ img {
     margin-top: 0.05rem;
 }
 
-.step-body strong {
+.step-body > strong {
     display: block;
     color: var(--white);
     font-size: 0.97rem;
@@ -435,20 +435,28 @@ code {
     border-bottom: 1px solid var(--border);
 }
 
-.support p {
-    font-size: 0.97rem;
-    color: var(--text);
+.support-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-hi);
+    border-left: 3px solid var(--accent);
+    padding: 1.75rem 2rem;
     max-width: 640px;
-    margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.support p:last-child {
-    margin-bottom: 0;
+.support-card p {
+    font-size: 0.97rem;
+    color: var(--text);
+    margin: 0;
 }
 
 .referral-line {
-    color: var(--text-dim) !important;
-    font-size: 0.9rem !important;
+    font-size: 0.9rem;
+    color: var(--text-label);
+    border-top: 1px solid var(--border);
+    padding-top: 0.9rem;
 }
 
 

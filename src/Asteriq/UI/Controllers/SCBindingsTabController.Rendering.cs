@@ -1441,12 +1441,13 @@ public partial class SCBindingsTabController
         FUIRenderer.DrawText(canvas, "IMPORT FROM", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f, true);
         y += 14f;
 
-        // Source profile selector
+        // Source profile selector — shows saved Asteriq profiles + SC XML files
         float selectorH = 28f;
-        var importableProfiles = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
-        bool hasProfiles = importableProfiles.Count > 0;
-        string profileSelectorLabel = _scColImportProfileIndex >= 0 && _scColImportProfileIndex < importableProfiles.Count
-            ? importableProfiles[_scColImportProfileIndex].ProfileName
+        var (savedProfiles, xmlFiles) = GetColImportSources();
+        int totalSources = savedProfiles.Count + xmlFiles.Count;
+        bool hasProfiles = totalSources > 0;
+        string profileSelectorLabel = _scColImportProfileIndex >= 0 && _scColImportProfileIndex < totalSources
+            ? GetColImportSourceLabel(_scColImportProfileIndex, savedProfiles, xmlFiles)
             : (hasProfiles ? "Select profile…" : "No other profiles");
         _scColImportProfileSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorH);
         bool profileSelectorHovered = _scColImportProfileSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
@@ -1492,19 +1493,40 @@ public partial class SCBindingsTabController
 
     private void DrawColImportProfileDropdown(SKCanvas canvas)
     {
-        var importableProfiles = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
-        if (importableProfiles.Count == 0) return;
+        var (savedProfiles, xmlFiles) = GetColImportSources();
+        int totalSources = savedProfiles.Count + xmlFiles.Count;
+        if (totalSources == 0) return;
 
         float itemH = 28f;
         _scColImportProfileDropdownBounds = new SKRect(
             _scColImportProfileSelectorBounds.Left,
             _scColImportProfileSelectorBounds.Bottom + 2,
             _scColImportProfileSelectorBounds.Right,
-            _scColImportProfileSelectorBounds.Bottom + 2 + Math.Min(importableProfiles.Count * itemH + 8f, 200f));
+            _scColImportProfileSelectorBounds.Bottom + 2 + Math.Min(totalSources * itemH + 8f, 200f));
 
-        var items = importableProfiles.Select(p => p.ProfileName).ToList();
+        var items = savedProfiles.Select(p => p.ProfileName)
+            .Concat(xmlFiles.Select(f => $"[SC] {f.DisplayName}"))
+            .ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _scColImportProfileDropdownBounds, items,
             _scColImportProfileIndex, _scColImportProfileHoveredIndex, itemH);
+    }
+
+    /// <summary>
+    /// Returns the two separate source collections for the Import From Profile picker.
+    /// Asteriq saved profiles first (excluding the active one), then SC XML mapping files.
+    /// </summary>
+    private (List<SCExportProfileInfo> Saved, List<SCMappingFile> Xml) GetColImportSources()
+    {
+        var saved = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
+        return (saved, _scAvailableProfiles);
+    }
+
+    private string GetColImportSourceLabel(int index, List<SCExportProfileInfo> saved, List<SCMappingFile> xml)
+    {
+        if (index < saved.Count)
+            return saved[index].ProfileName;
+        int xmlIdx = index - saved.Count;
+        return xmlIdx < xml.Count ? $"[SC] {xml[xmlIdx].DisplayName}" : "?";
     }
 
     private void DrawColImportColumnDropdown(SKCanvas canvas)

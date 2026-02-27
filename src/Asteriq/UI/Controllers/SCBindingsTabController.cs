@@ -457,8 +457,9 @@ public partial class SCBindingsTabController : ITabController
         {
             float itemH = 28f;
             int idx = (int)((e.Y - _scColImportProfileDropdownBounds.Top) / itemH);
-            var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
-            int newHovered = idx >= 0 && idx < importable.Count ? idx : -1;
+            var (savedProfiles, xmlFiles) = GetColImportSources();
+            int totalSources = savedProfiles.Count + xmlFiles.Count;
+            int newHovered = idx >= 0 && idx < totalSources ? idx : -1;
             if (newHovered != _scColImportProfileHoveredIndex)
             {
                 _scColImportProfileHoveredIndex = newHovered;

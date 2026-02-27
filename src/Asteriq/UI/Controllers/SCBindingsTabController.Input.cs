@@ -55,10 +55,11 @@ public partial class SCBindingsTabController
             {
                 if (!_scColImportProfileDropdownBounds.IsEmpty && _scColImportProfileDropdownBounds.Contains(point))
                 {
-                    var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
+                    var (savedProfiles, xmlFiles) = GetColImportSources();
+                    int totalSources = savedProfiles.Count + xmlFiles.Count;
                     float itemH = 28f;
                     int idx = (int)((point.Y - _scColImportProfileDropdownBounds.Top) / itemH);
-                    if (idx >= 0 && idx < importable.Count && idx != _scColImportProfileIndex)
+                    if (idx >= 0 && idx < totalSources && idx != _scColImportProfileIndex)
                     {
                         _scColImportProfileIndex = idx;
                         LoadColImportSourceColumns();
@@ -110,8 +111,8 @@ public partial class SCBindingsTabController
 
             if (!_scColImportProfileSelectorBounds.IsEmpty && _scColImportProfileSelectorBounds.Contains(point))
             {
-                var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
-                if (importable.Count > 0)
+                var (savedProfiles, xmlFiles) = GetColImportSources();
+                if (savedProfiles.Count + xmlFiles.Count > 0)
                 {
                     _scColImportProfileDropdownOpen = !_scColImportProfileDropdownOpen;
                     _scColImportColumnDropdownOpen = false;
@@ -1181,6 +1182,7 @@ public partial class SCBindingsTabController
     /// <summary>
     /// Called when the user selects a source profile; loads that profile and builds the
     /// list of its vJoy columns available to import from.
+    /// Supports both saved Asteriq profiles and SC XML mapping files.
     /// </summary>
     private void LoadColImportSourceColumns()
     {
@@ -1190,10 +1192,38 @@ public partial class SCBindingsTabController
 
         if (_scColImportProfileIndex < 0) return;
 
-        var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
-        if (_scColImportProfileIndex >= importable.Count) return;
+        var (savedProfiles, xmlFiles) = GetColImportSources();
+        int savedCount = savedProfiles.Count;
 
-        _scColImportLoadedProfile = _scExportProfileService.LoadProfile(importable[_scColImportProfileIndex].ProfileName);
+        if (_scColImportProfileIndex < savedCount)
+        {
+            // Load saved Asteriq JSON profile
+            _scColImportLoadedProfile = _scExportProfileService.LoadProfile(savedProfiles[_scColImportProfileIndex].ProfileName);
+        }
+        else
+        {
+            // Load from SC XML mapping file
+            int xmlIdx = _scColImportProfileIndex - savedCount;
+            if (xmlIdx < xmlFiles.Count)
+            {
+                var xmlFile = xmlFiles[xmlIdx];
+                var importResult = _scExportService.ImportFromFile(xmlFile.FilePath);
+                if (importResult.Success)
+                {
+                    _scColImportLoadedProfile = new SCExportProfile { ProfileName = xmlFile.DisplayName };
+                    foreach (var binding in importResult.Bindings)
+                        _scColImportLoadedProfile.Bindings.Add(binding);
+                    // SC XML bindings use the instance number directly as VJoyDevice
+                    var usedInstances = importResult.Bindings
+                        .Where(b => b.DeviceType == SCDeviceType.Joystick)
+                        .Select(b => b.VJoyDevice)
+                        .Distinct();
+                    foreach (var inst in usedInstances)
+                        _scColImportLoadedProfile.SetSCInstance(inst, (int)inst);
+                }
+            }
+        }
+
         if (_scColImportLoadedProfile is null) return;
 
         var vJoyIds = _scColImportLoadedProfile.Bindings
@@ -1207,7 +1237,6 @@ public partial class SCBindingsTabController
             .Select(id => ($"JS{_scColImportLoadedProfile.GetSCInstance(id)}", id))
             .ToList();
 
-        // Auto-select when only one option
         if (_scColImportSourceColumns.Count == 1)
             _scColImportColumnIndex = 0;
     }

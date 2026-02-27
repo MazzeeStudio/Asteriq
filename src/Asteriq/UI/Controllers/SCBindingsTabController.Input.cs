@@ -31,16 +31,97 @@ public partial class SCBindingsTabController
             return;
         }
 
+        // Header toggle button (JS REF / DEVICE)
+        if (!_scHeaderToggleButtonBounds.IsEmpty && _scHeaderToggleButtonBounds.Contains(point))
+        {
+            _ctx.AppSettings.SCBindingsShowPhysicalHeaders = !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // Column actions panel is only active when a vJoy (non-physical, non-readonly joystick) column is highlighted
+        bool showColumnActions = _scHighlightedColumn >= 0
+            && _scGridColumns is not null
+            && _scHighlightedColumn < _scGridColumns.Count
+            && _scGridColumns[_scHighlightedColumn].IsJoystick
+            && !_scGridColumns[_scHighlightedColumn].IsPhysical
+            && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
+
+        // Move target dropdown — close on outside click (only when column actions panel is active)
+        if (showColumnActions && _scMoveDropdownOpen)
+        {
+            if (!_scMoveDropdownBounds.IsEmpty && _scMoveDropdownBounds.Contains(point))
+            {
+                var otherCols = GetMoveTargetColumns();
+                float itemH = 26f;
+                int idx = (int)((point.Y - _scMoveDropdownBounds.Top) / itemH);
+                if (idx >= 0 && idx < otherCols.Count)
+                    _scMoveTargetVJoyIndex = idx;
+                _scMoveDropdownOpen = false;
+                _ctx.MarkDirty();
+                return;
+            }
+            else
+            {
+                _scMoveDropdownOpen = false;
+                _ctx.MarkDirty();
+                // Allow click to fall through to other handlers
+            }
+        }
+
+        // Column actions panel buttons — guard with showColumnActions to prevent stale bounds
+        // from intercepting clicks when the panel is hidden (e.g. after column deselection)
+        if (showColumnActions)
+        {
+            if (!_scDeselectButtonBounds.IsEmpty && _scDeselectButtonBounds.Contains(point))
+            {
+                _scHighlightedColumn = -1;
+                _scMoveTargetVJoyIndex = 0;
+                _scMoveDropdownOpen = false;
+                _ctx.MarkDirty();
+                return;
+            }
+
+            if (!_scMoveButtonBounds.IsEmpty && _scMoveButtonBounds.Contains(point))
+            {
+                ExecuteMoveBindings();
+                return;
+            }
+
+            if (!_scMoveSelectorBounds.IsEmpty && _scMoveSelectorBounds.Contains(point))
+            {
+                var otherCols = GetMoveTargetColumns();
+                if (otherCols.Count > 0)
+                {
+                    _scMoveDropdownOpen = !_scMoveDropdownOpen;
+                    _ctx.MarkDirty();
+                }
+                return;
+            }
+        }
+
         // Column header click - toggle column highlight
+        // Only vJoy (non-physical joystick) columns are selectable; mouse/keyboard columns are display-only.
         // Guard: skip if any dropdown is open (they render over the column header area)
         bool anyDropdownOpen = _scInstallationDropdownOpen || _scActionMapFilterDropdownOpen || _scProfileDropdownOpen;
         if (!anyDropdownOpen && _scColumnHeadersBounds.Contains(point.X, point.Y))
         {
             int clickedCol = GetClickedColumnIndex(point.X);
-            if (clickedCol >= 0 && (_scGridColumns is null || !_scGridColumns[clickedCol].IsReadOnly))
+            if (clickedCol >= 0
+                && _scGridColumns is not null
+                && _scGridColumns[clickedCol].IsJoystick
+                && !_scGridColumns[clickedCol].IsPhysical
+                && !_scGridColumns[clickedCol].IsReadOnly)
             {
+                int previousHighlight = _scHighlightedColumn;
                 // Toggle highlight: if same column clicked, unhighlight; otherwise highlight new column
                 _scHighlightedColumn = (_scHighlightedColumn == clickedCol) ? -1 : clickedCol;
+                // Reset move state when deselecting
+                if (_scHighlightedColumn == -1 && previousHighlight >= 0)
+                {
+                    _scMoveTargetVJoyIndex = 0;
+                    _scMoveDropdownOpen = false;
+                }
                 return;
             }
         }
@@ -1044,5 +1125,71 @@ public partial class SCBindingsTabController
         }
 
         return -1;
+    }
+
+    private void ExecuteMoveBindings()
+    {
+        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
+            return;
+
+        var sourceCol = _scGridColumns[_scHighlightedColumn];
+        var otherCols = GetMoveTargetColumns();
+        if (otherCols.Count == 0) return;
+
+        int targetIdx = Math.Clamp(_scMoveTargetVJoyIndex, 0, otherCols.Count - 1);
+        var targetCol = otherCols[targetIdx];
+
+        // Collect SC export profile bindings for this source column
+        var sourceBindings = _scExportProfile.Bindings
+            .Where(b =>
+                b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId is null &&
+                _scExportProfile.GetSCInstance(b.VJoyDevice) == sourceCol.SCInstance)
+            .ToList();
+
+        int bindingCount = sourceBindings.Count;
+        if (bindingCount == 0)
+        {
+            // Nothing to move — just deselect
+            _scHighlightedColumn = -1;
+            _scMoveTargetVJoyIndex = 0;
+            _scMoveDropdownOpen = false;
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // Build a breakdown by input type for the confirm dialog
+        int buttonCount = sourceBindings.Count(b => b.InputType == SCInputType.Button);
+        int axisCount = sourceBindings.Count(b => b.InputType == SCInputType.Axis);
+        int hatCount = sourceBindings.Count(b => b.InputType == SCInputType.Hat);
+
+        var detailParts = new List<string>();
+        if (buttonCount > 0) detailParts.Add($"  {buttonCount} button binding{(buttonCount == 1 ? "" : "s")}");
+        if (axisCount > 0)   detailParts.Add($"  {axisCount} axis binding{(axisCount == 1 ? "" : "s")}");
+        if (hatCount > 0)    detailParts.Add($"  {hatCount} hat binding{(hatCount == 1 ? "" : "s")}");
+
+        string message = $"Move {bindingCount} binding{(bindingCount == 1 ? "" : "s")} from JS{sourceCol.SCInstance} to JS{targetCol.SCInstance}?";
+        bool confirmed = FUIMessageBox.ShowDestructiveConfirm(
+            _ctx.OwnerForm,
+            message,
+            "Move Bindings",
+            "MOVE",
+            detailParts.Count > 0 ? detailParts.ToArray() : null);
+
+        if (!confirmed) return;
+
+        // Reassign VJoyDevice on each binding so it points to the target slot
+        foreach (var binding in sourceBindings)
+            binding.VJoyDevice = targetCol.VJoyDeviceId;
+
+        _scExportProfile.Modified = DateTime.UtcNow;
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+        UpdateConflictingBindings();
+
+        // Deselect the column
+        _scHighlightedColumn = -1;
+        _scMoveTargetVJoyIndex = 0;
+        _scMoveDropdownOpen = false;
+        _ctx.MarkDirty();
     }
 }

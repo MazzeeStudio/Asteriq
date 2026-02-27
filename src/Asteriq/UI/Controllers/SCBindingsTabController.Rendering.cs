@@ -36,8 +36,18 @@ public partial class SCBindingsTabController
         // RIGHT TOP - SC Installation (condensed)
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
-        // RIGHT BOTTOM - Export panel
-        DrawSCExportPanelCompact(canvas, exportBounds, frameInset);
+        // RIGHT BOTTOM - Column Actions panel (when vJoy column selected) or Export panel
+        bool showColumnActions = _scHighlightedColumn >= 0
+            && _scGridColumns is not null
+            && _scHighlightedColumn < _scGridColumns.Count
+            && _scGridColumns[_scHighlightedColumn].IsJoystick
+            && !_scGridColumns[_scHighlightedColumn].IsPhysical
+            && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
+
+        if (showColumnActions)
+            DrawColumnActionsPanel(canvas, exportBounds, frameInset);
+        else
+            DrawSCExportPanelCompact(canvas, exportBounds, frameInset);
 
         // Draw dropdowns last (on top)
         if (_scInstallationDropdownOpen && _scInstallations.Count > 0)
@@ -47,6 +57,11 @@ public partial class SCBindingsTabController
         if (_scActionMapFilterDropdownOpen && _scActionMaps.Count > 0)
         {
             DrawSCActionMapFilterDropdown(canvas);
+        }
+        if (_scMoveDropdownOpen && _scGridColumns is not null
+            && _scHighlightedColumn >= 0 && _scHighlightedColumn < _scGridColumns.Count)
+        {
+            DrawMoveTargetDropdown(canvas);
         }
     }
 
@@ -67,9 +82,7 @@ public partial class SCBindingsTabController
         float leftMargin = bounds.Left + frameInset + cornerPadding;
         float rightMargin = bounds.Right - frameInset - 10;
 
-        // Title
-        FUIRenderer.DrawText(canvas, "SC INSTALLATION", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += 18f;
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "SC INSTALLATION");
 
         // Installation selector
         float selectorHeight = 32f;
@@ -85,72 +98,16 @@ public partial class SCBindingsTabController
 
     private void DrawSCInstallationDropdown(SKCanvas canvas)
     {
-        float itemHeight = 28f;
-        float dropdownWidth = _scInstallationSelectorBounds.Width;
-        float dropdownHeight = Math.Min(_scInstallations.Count * itemHeight + 8, 200f);
-
+        float itemH = 28f;
         _scInstallationDropdownBounds = new SKRect(
             _scInstallationSelectorBounds.Left,
             _scInstallationSelectorBounds.Bottom + 2,
             _scInstallationSelectorBounds.Right,
-            _scInstallationSelectorBounds.Bottom + 2 + dropdownHeight);
+            _scInstallationSelectorBounds.Bottom + 2 + Math.Min(_scInstallations.Count * itemH + 8f, 200f));
 
-        // Drop shadow with glow effect (FUI style)
-        FUIRenderer.DrawPanelShadow(canvas, _scInstallationDropdownBounds, 4f, 4f, 15f);
-
-        // Outer glow (subtle)
-        using var glowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active.WithAlpha(30),
-            StrokeWidth = 3f,
-            IsAntialias = true,
-            ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
-        };
-        canvas.DrawRect(_scInstallationDropdownBounds, glowPaint);
-
-        // Solid opaque background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
-        canvas.DrawRect(_scInstallationDropdownBounds, bgPaint);
-
-        // Inner background
-        using var innerBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
-        canvas.DrawRect(_scInstallationDropdownBounds.Inset(2, 2), innerBgPaint);
-
-        // L-corner frame (FUI style)
-        FUIRenderer.DrawLCornerFrame(canvas, _scInstallationDropdownBounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
-
-        // Items
-        float y = _scInstallationDropdownBounds.Top + 4;
-        for (int i = 0; i < _scInstallations.Count; i++)
-        {
-            var itemBounds = new SKRect(_scInstallationDropdownBounds.Left + 4, y,
-                _scInstallationDropdownBounds.Right - 4, y + itemHeight);
-
-            bool isHovered = i == _hoveredSCInstallation;
-            bool isSelected = i == _selectedSCInstallation;
-
-            // FUI hover/selected style with accent bar
-            if (isHovered)
-            {
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
-                canvas.DrawRect(itemBounds, hoverPaint);
-                // Left accent bar
-                using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
-                canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentPaint);
-            }
-            else if (isSelected)
-            {
-                using var selectPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
-                canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), selectPaint);
-            }
-
-            var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-            FUIRenderer.DrawText(canvas, _scInstallations[i].DisplayName,
-                new SKPoint(itemBounds.Left + 12, itemBounds.MidY + 4), textColor, 14f);
-
-            y += itemHeight;
-        }
+        var items = _scInstallations.Select(s => s.DisplayName).ToList();
+        FUIWidgets.DrawDropdownPanel(canvas, _scInstallationDropdownBounds, items,
+            _selectedSCInstallation, _hoveredSCInstallation, itemH);
     }
 
     private void DrawSCBindingsTablePanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -194,6 +151,16 @@ public partial class SCBindingsTabController
             countText = $"{actionCount} of {totalCount}, {boundCount} bound"; // "55 of 1113, 26 bound"
         float countTextWidth = FUIRenderer.MeasureText(countText, 12f);
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 12f);
+
+        // Header toggle button (JS REF / DEVICE) — placed just left of count text
+        float toggleBtnW = 58f;
+        float toggleBtnH = 18f;
+        float toggleBtnX = rightMargin - countTextWidth - 10f - toggleBtnW;
+        float toggleBtnY = y - 9f;
+        _scHeaderToggleButtonBounds = new SKRect(toggleBtnX, toggleBtnY, toggleBtnX + toggleBtnW, toggleBtnY + toggleBtnH);
+        _scHeaderToggleButtonHovered = _scHeaderToggleButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        string toggleLabel = _ctx.AppSettings.SCBindingsShowPhysicalHeaders ? "DEVICE" : "JS REF";
+        DrawTextButton(canvas, _scHeaderToggleButtonBounds, toggleLabel, _scHeaderToggleButtonHovered);
 
         y += 28f;
 
@@ -331,6 +298,28 @@ public partial class SCBindingsTabController
                     string jsLabel = $"JS{col.SCInstance}";
                     float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
                     FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.Active.WithAlpha(180), 10f);
+                }
+                else if (col.IsJoystick && _ctx.AppSettings.SCBindingsShowPhysicalHeaders)
+                {
+                    // Physical header mode: device name on top + JS{N} sub-label
+                    var headerColor = c == _scHighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
+                    string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
+                    if (deviceName is not null)
+                    {
+                        string shortName = TruncateTextToWidth(deviceName, colW - 4f, 10f);
+                        float nameTextWidth = FUIRenderer.MeasureText(shortName, 10f);
+                        FUIRenderer.DrawText(canvas, shortName, new SKPoint(colX + (colW - nameTextWidth) / 2, headerTextY - 5f), headerColor, 10f, true);
+                        string jsLabel = $"JS{col.SCInstance}";
+                        float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
+                        FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.Active.WithAlpha(180), 10f);
+                    }
+                    else
+                    {
+                        // No physical device mapped — fall back to JS{N} single-label
+                        float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
+                        float centeredX = colX + (colW - headerTextWidth) / 2;
+                        FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), FUIColors.Active, 12f, true);
+                    }
                 }
                 else
                 {
@@ -867,9 +856,7 @@ public partial class SCBindingsTabController
         float rightMargin = bounds.Right - frameInset - 10;
         float buttonGap = 6f;
 
-        // Title
-        FUIRenderer.DrawText(canvas, "CONTROL PROFILES", new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
-        y += 18f;
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "CONTROL PROFILES");
 
         // Control Profile dropdown (full width)
         float dropdownHeight = 32f;
@@ -1096,11 +1083,7 @@ public partial class SCBindingsTabController
     private void DrawSCImportDropdown(SKCanvas canvas, SKRect buttonBounds)
     {
         float itemHeight = 28f;
-        float dropdownWidth = buttonBounds.Width;
-        int itemCount = _scAvailableProfiles.Count;
-        float totalContentHeight = itemCount * itemHeight + 4;
-        float maxDropdownHeight = 200f;
-        float dropdownHeight = Math.Min(totalContentHeight, maxDropdownHeight);
+        float dropdownHeight = Math.Min(_scAvailableProfiles.Count * itemHeight + 8f, 200f);
 
         _scImportDropdownBounds = new SKRect(
             buttonBounds.Left,
@@ -1108,76 +1091,8 @@ public partial class SCBindingsTabController
             buttonBounds.Right,
             buttonBounds.Bottom + 2 + dropdownHeight);
 
-        // Shadow
-        FUIRenderer.DrawPanelShadow(canvas, _scImportDropdownBounds, 2f, 2f, 8f);
-
-        // Background
-        using var bgPaint2 = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(245), IsAntialias = true };
-        canvas.DrawRect(_scImportDropdownBounds, bgPaint2);
-
-        // Border
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Primary.WithAlpha(150), StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRect(_scImportDropdownBounds, borderPaint);
-
-        // Items
-        float y = _scImportDropdownBounds.Top + 2;
-        float leftMargin = _scImportDropdownBounds.Left + 8;
-        float rightMargin = _scImportDropdownBounds.Right - 8;
-
-        for (int i = 0; i < _scAvailableProfiles.Count; i++)
-        {
-            var profile = _scAvailableProfiles[i];
-            var itemBounds = new SKRect(_scImportDropdownBounds.Left, y, _scImportDropdownBounds.Right, y + itemHeight);
-
-            bool isHovered = itemBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            if (isHovered)
-                _scHoveredImportProfile = i;
-
-            if (isHovered)
-            {
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(60), IsAntialias = true };
-                canvas.DrawRect(itemBounds, hoverPaint);
-            }
-
-            var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-            FUIRenderer.DrawText(canvas, profile.DisplayName, new SKPoint(leftMargin, y + itemHeight / 2 + 4), textColor, 14f);
-
-            // Show file date on right
-            var dateText = profile.LastModified.ToString("MM/dd HH:mm");
-            float dateWidth = FUIRenderer.MeasureText(dateText, 12f);
-            FUIRenderer.DrawText(canvas, dateText, new SKPoint(rightMargin - dateWidth, y + itemHeight / 2 + 3), FUIColors.TextDim, 12f);
-
-            y += itemHeight;
-        }
-    }
-
-    private void DrawSCActionMapFilterDropdown(SKCanvas canvas)
-    {
-        float itemHeight = 24f;
-        float dropdownWidth = _scActionMapFilterBounds.Width;  // Match selector width exactly
-        int itemCount = _scActionMaps.Count + 1; // +1 for "All Categories"
-        float totalContentHeight = itemCount * itemHeight + 4;
-        float maxDropdownHeight = 300f;
-        float dropdownHeight = Math.Min(totalContentHeight, maxDropdownHeight);
-        bool needsScroll = totalContentHeight > maxDropdownHeight;
-        float scrollbarWidth = needsScroll ? 8f : 0f;
-
-        // Calculate max scroll
-        _scActionMapFilterMaxScroll = Math.Max(0, totalContentHeight - dropdownHeight);
-
-        // Clamp scroll offset
-        _scActionMapFilterScrollOffset = Math.Max(0, Math.Min(_scActionMapFilterScrollOffset, _scActionMapFilterMaxScroll));
-
-        _scActionMapFilterDropdownBounds = new SKRect(
-            _scActionMapFilterBounds.Right - dropdownWidth,
-            _scActionMapFilterBounds.Bottom + 2,
-            _scActionMapFilterBounds.Right,
-            _scActionMapFilterBounds.Bottom + 2 + dropdownHeight);
-
-        // Drop shadow with glow effect (FUI style)
-        FUIRenderer.DrawPanelShadow(canvas, _scActionMapFilterDropdownBounds, 4f, 4f, 15f);
-
-        // Outer glow (subtle)
+        // Shared FUI chrome
+        FUIRenderer.DrawPanelShadow(canvas, _scImportDropdownBounds, 4f, 4f, 15f);
         using var glowPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
@@ -1186,109 +1101,88 @@ public partial class SCBindingsTabController
             IsAntialias = true,
             ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
         };
-        canvas.DrawRect(_scActionMapFilterDropdownBounds, glowPaint);
+        canvas.DrawRect(_scImportDropdownBounds, glowPaint);
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
+        canvas.DrawRect(_scImportDropdownBounds, bgPaint);
+        using var innerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
+        canvas.DrawRect(_scImportDropdownBounds.Inset(2, 2), innerPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, _scImportDropdownBounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
 
-        // Solid opaque background
-        using var bgPaint3 = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
-        canvas.DrawRect(_scActionMapFilterDropdownBounds, bgPaint3);
-
-        // Inner background
-        using var innerBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
-        canvas.DrawRect(_scActionMapFilterDropdownBounds.Inset(2, 2), innerBgPaint);
-
-        // L-corner frame (FUI style)
-        FUIRenderer.DrawLCornerFrame(canvas, _scActionMapFilterDropdownBounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
-
-        // Clip for scrolling
-        canvas.Save();
-        canvas.ClipRect(_scActionMapFilterDropdownBounds);
-
-        // Items - apply scroll offset
-        float y2 = _scActionMapFilterDropdownBounds.Top + 2 - _scActionMapFilterScrollOffset;
-
-        // "All Categories" option
-        var allItemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y2,
-            _scActionMapFilterDropdownBounds.Right - 2 - scrollbarWidth, y2 + itemHeight);
-
-        bool allHovered = _scHoveredActionMapFilter == -1 && allItemBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        bool allSelected = string.IsNullOrEmpty(_scActionMapFilter);
-
-        // Only draw if visible
-        if (allItemBounds.Bottom > _scActionMapFilterDropdownBounds.Top && allItemBounds.Top < _scActionMapFilterDropdownBounds.Bottom)
+        // Items (custom layout: name left, date right)
+        float y = _scImportDropdownBounds.Top + 4;
+        float leftMargin = _scImportDropdownBounds.Left + 10;
+        float rightMargin = _scImportDropdownBounds.Right - 8;
+        for (int i = 0; i < _scAvailableProfiles.Count; i++)
         {
-            // FUI hover/selected style with accent bar
-            if (allHovered)
+            var profile = _scAvailableProfiles[i];
+            var itemBounds = new SKRect(_scImportDropdownBounds.Left + 2, y, _scImportDropdownBounds.Right - 2, y + itemHeight);
+            bool isHovered = itemBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            if (isHovered)
             {
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
-                canvas.DrawRect(allItemBounds, hoverPaint);
-                // Left accent bar
-                using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
-                canvas.DrawRect(new SKRect(allItemBounds.Left, allItemBounds.Top + 2, allItemBounds.Left + 2, allItemBounds.Bottom - 2), accentPaint);
+                _scHoveredImportProfile = i;
+                using var hoverBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                canvas.DrawRect(itemBounds, hoverBg);
+                using var accentBar = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
             }
-            else if (allSelected)
-            {
-                using var selectPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
-                canvas.DrawRect(new SKRect(allItemBounds.Left, allItemBounds.Top + 2, allItemBounds.Left + 2, allItemBounds.Bottom - 2), selectPaint);
-            }
-
-            var allTextColor = allSelected ? FUIColors.Active : (allHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-            FUIRenderer.DrawText(canvas, "All Categories",
-                new SKPoint(allItemBounds.Left + 10, allItemBounds.MidY + 4), allTextColor, 13f);
+            var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
+            FUIRenderer.DrawText(canvas, profile.DisplayName, new SKPoint(leftMargin, y + itemHeight / 2 + 4), textColor, 13f);
+            var dateText = profile.LastModified.ToString("MM/dd HH:mm");
+            float dateWidth = FUIRenderer.MeasureText(dateText, 12f);
+            FUIRenderer.DrawText(canvas, dateText, new SKPoint(rightMargin - dateWidth, y + itemHeight / 2 + 3), FUIColors.TextDim, 12f);
+            y += itemHeight;
         }
-        y2 += itemHeight;
+    }
 
-        // Category items
-        for (int i = 0; i < _scActionMaps.Count; i++)
-        {
-            var itemBounds = new SKRect(_scActionMapFilterDropdownBounds.Left + 2, y2,
-                _scActionMapFilterDropdownBounds.Right - 2 - scrollbarWidth, y2 + itemHeight);
+    private void DrawSCActionMapFilterDropdown(SKCanvas canvas)
+    {
+        float itemHeight = 24f;
+        // items[0] = "All Categories", items[1..] = action map names
+        var items = new List<string> { "All Categories" };
+        items.AddRange(_scActionMaps.Select(FormatActionMapName));
 
-            // Only draw if visible
-            if (itemBounds.Bottom > _scActionMapFilterDropdownBounds.Top && itemBounds.Top < _scActionMapFilterDropdownBounds.Bottom)
-            {
-                bool isHovered = i == _scHoveredActionMapFilter;
-                bool isSelected = _scActionMapFilter == _scActionMaps[i];
+        float totalContentHeight = items.Count * itemHeight + 4;
+        float maxDropdownHeight = 300f;
+        float dropdownHeight = Math.Min(totalContentHeight, maxDropdownHeight);
+        bool needsScroll = totalContentHeight > maxDropdownHeight;
+        float scrollbarWidth = needsScroll ? 8f : 0f;
 
-                // FUI hover/selected style with accent bar
-                if (isHovered)
-                {
-                    using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
-                    canvas.DrawRect(itemBounds, hoverPaint);
-                    // Left accent bar
-                    using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
-                    canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentPaint);
-                }
-                else if (isSelected)
-                {
-                    using var selectPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
-                    canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), selectPaint);
-                }
+        _scActionMapFilterMaxScroll = Math.Max(0, totalContentHeight - dropdownHeight);
+        _scActionMapFilterScrollOffset = Math.Clamp(_scActionMapFilterScrollOffset, 0, _scActionMapFilterMaxScroll);
 
-                var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-                FUIRenderer.DrawText(canvas, FormatActionMapName(_scActionMaps[i]),
-                    new SKPoint(itemBounds.Left + 10, itemBounds.MidY + 4), textColor, 13f);
-            }
+        _scActionMapFilterDropdownBounds = new SKRect(
+            _scActionMapFilterBounds.Right - _scActionMapFilterBounds.Width,
+            _scActionMapFilterBounds.Bottom + 2,
+            _scActionMapFilterBounds.Right,
+            _scActionMapFilterBounds.Bottom + 2 + dropdownHeight);
 
-            y2 += itemHeight;
-        }
+        // Map hover: _scHoveredActionMapFilter == -1 means "All Categories" row OR nothing.
+        // Disambiguate using mouse position against the first item's Y range.
+        float firstItemTop = _scActionMapFilterDropdownBounds.Top + 2 - _scActionMapFilterScrollOffset;
+        bool allCatHovered = _scHoveredActionMapFilter == -1
+            && _ctx.MousePosition.Y >= firstItemTop
+            && _ctx.MousePosition.Y < firstItemTop + itemHeight;
+        int hoveredIdx = allCatHovered ? 0
+            : _scHoveredActionMapFilter >= 0 ? _scHoveredActionMapFilter + 1
+            : -1;
+        int selectedIdx = string.IsNullOrEmpty(_scActionMapFilter) ? 0
+            : _scActionMaps.IndexOf(_scActionMapFilter) + 1;
 
-        canvas.Restore();
+        FUIWidgets.DrawDropdownPanel(canvas, _scActionMapFilterDropdownBounds, items,
+            selectedIdx, hoveredIdx, itemHeight, _scActionMapFilterScrollOffset, scrollbarWidth);
 
-        // Draw scrollbar if needed
+        // Scrollbar (drawn on top of the panel)
         if (needsScroll)
         {
             float scrollTrackX = _scActionMapFilterDropdownBounds.Right - scrollbarWidth - 2;
             float scrollTrackY = _scActionMapFilterDropdownBounds.Top + 2;
             float scrollTrackHeight = dropdownHeight - 4;
 
-            // Scrollbar track
             using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
             canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, scrollTrackY, scrollTrackX + scrollbarWidth, scrollTrackY + scrollTrackHeight), 2f), trackPaint);
 
-            // Scrollbar thumb
             float thumbHeight = Math.Max(20f, scrollTrackHeight * (dropdownHeight / totalContentHeight));
             float thumbY = scrollTrackY + (_scActionMapFilterScrollOffset / _scActionMapFilterMaxScroll) * (scrollTrackHeight - thumbHeight);
-
             using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim.WithAlpha(150), IsAntialias = true };
             canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, thumbY, scrollTrackX + scrollbarWidth, thumbY + thumbHeight), 2f), thumbPaint);
         }
@@ -1472,4 +1366,150 @@ public partial class SCBindingsTabController
 
     private void DrawSCProfileButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, string tooltip, bool disabled = false)
         => SCBindingsRenderer.DrawSCProfileButton(canvas, bounds, icon, hovered, tooltip, disabled);
+
+    /// <summary>
+    /// Returns the physical device name for a vJoy column, or null if not mapped.
+    /// </summary>
+    private string? GetPhysicalDeviceNameForVJoyColumn(SCGridColumn col)
+    {
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return null;
+        if (!profile.VJoyPrimaryDevices.TryGetValue(col.VJoyDeviceId, out var guid)) return null;
+
+        var device = _ctx.Devices.Concat(_ctx.DisconnectedDevices)
+            .FirstOrDefault(d => d.InstanceGuid.ToString().Equals(guid, StringComparison.OrdinalIgnoreCase));
+        return device?.Name;
+    }
+
+    /// <summary>
+    /// Returns the list of other vJoy columns available as move targets (excludes source column).
+    /// </summary>
+    private List<SCGridColumn> GetMoveTargetColumns()
+    {
+        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
+            return new List<SCGridColumn>();
+
+        var sourceCol = _scGridColumns[_scHighlightedColumn];
+        return _scGridColumns
+            .Where(c => c.IsJoystick && !c.IsPhysical && c.VJoyDeviceId != sourceCol.VJoyDeviceId)
+            .ToList();
+    }
+
+    private void DrawColumnActionsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
+            return;
+
+        var col = _scGridColumns[_scHighlightedColumn];
+
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+
+        float cornerPadding = 15f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 10;
+
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "COLUMN ACTIONS", withDivider: true);
+
+        // Column label + device name
+        string colLabel = $"JS{col.SCInstance}";
+        FUIRenderer.DrawText(canvas, colLabel, new SKPoint(leftMargin, y), FUIColors.Active, 13f, true);
+
+        string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
+        if (deviceName is not null)
+        {
+            FUIRenderer.DrawText(canvas, " — ", new SKPoint(leftMargin + 26f, y), FUIColors.TextDim, 13f);
+            string shortName = TruncateTextToWidth(deviceName, rightMargin - leftMargin - 48f, 10f);
+            FUIRenderer.DrawText(canvas, shortName, new SKPoint(leftMargin + 44f, y), FUIColors.TextPrimary, 12f);
+        }
+        y += 17f;
+
+        // Binding count (SC export profile bindings for this vJoy column)
+        int mappingCount = _scExportProfile.Bindings.Count(b =>
+            b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId is null &&
+            _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
+        string countStr = mappingCount == 0 ? "No bindings" : $"{mappingCount} binding{(mappingCount == 1 ? "" : "s")}";
+        FUIRenderer.DrawText(canvas, countStr, new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+        y += 22f;
+
+        // MOVE TO label
+        FUIRenderer.DrawText(canvas, "MOVE TO", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f, true);
+        y += 15f;
+
+        // Move target selector
+        var otherCols = GetMoveTargetColumns();
+        float selectorH = 30f;
+        _scMoveSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorH);
+
+        bool selectorEnabled = otherCols.Count > 0;
+        string targetLabel = selectorEnabled
+            ? $"JS{otherCols[Math.Clamp(_scMoveTargetVJoyIndex, 0, otherCols.Count - 1)].SCInstance}"
+            : "No other slots";
+        bool selectorHovered = _scMoveSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSelector(canvas, _scMoveSelectorBounds, targetLabel, selectorHovered || _scMoveDropdownOpen, selectorEnabled);
+        y += selectorH + 8f;
+
+        // Action buttons (at bottom of panel)
+        float btnH = 28f;
+        float btnW = (rightMargin - leftMargin - 8f) / 2f;
+        float btnY = bounds.Bottom - frameInset - cornerPadding - btnH;
+
+        _scMoveButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnW, btnY + btnH);
+        _scMoveButtonHovered = _scMoveButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        bool canMove = selectorEnabled && mappingCount > 0;
+        if (canMove)
+        {
+            FUIRenderer.DrawButton(canvas, _scMoveButtonBounds, "MOVE BINDINGS",
+                _scMoveButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        }
+        else
+        {
+            using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+            canvas.DrawRect(_scMoveButtonBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "MOVE BINDINGS", _scMoveButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
+        }
+
+        _scDeselectButtonBounds = new SKRect(leftMargin + btnW + 8f, btnY, rightMargin, btnY + btnH);
+        _scDeselectButtonHovered = _scDeselectButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _scDeselectButtonBounds, "DESELECT",
+            _scDeselectButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+    }
+
+    private void DrawMoveTargetDropdown(SKCanvas canvas)
+    {
+        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
+            return;
+
+        var otherCols = GetMoveTargetColumns();
+        if (otherCols.Count == 0) return;
+
+        float itemH = 28f;
+        _scMoveDropdownBounds = new SKRect(
+            _scMoveSelectorBounds.Left,
+            _scMoveSelectorBounds.Bottom + 2,
+            _scMoveSelectorBounds.Right,
+            _scMoveSelectorBounds.Bottom + 2 + Math.Min(otherCols.Count * itemH + 8f, 200f));
+
+        int selectedIdx = Math.Clamp(_scMoveTargetVJoyIndex, 0, otherCols.Count - 1);
+        var items = otherCols.Select(c =>
+        {
+            string label = $"JS{c.SCInstance}";
+            string? devName = GetPhysicalDeviceNameForVJoyColumn(c);
+            if (devName is not null)
+                label += $"  —  {TruncateTextToWidth(devName, _scMoveDropdownBounds.Width - 60f, 10f)}";
+            return label;
+        }).ToList();
+
+        FUIWidgets.DrawDropdownPanel(canvas, _scMoveDropdownBounds, items,
+            selectedIdx, _scMoveDropdownHoveredIndex, itemH);
+    }
 }

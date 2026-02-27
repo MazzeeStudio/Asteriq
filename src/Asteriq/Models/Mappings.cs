@@ -678,6 +678,30 @@ public class MappingProfile
         return deviceCounts.OrderByDescending(kv => kv.Value).FirstOrDefault().Key;
     }
 
+    /// <summary>
+    /// Remap all mappings from one vJoy device to another.
+    /// Also migrates the VJoyPrimaryDevices entry.
+    /// </summary>
+    public void RemapVJoyDevice(uint fromId, uint toId)
+    {
+        foreach (var m in AxisMappings.Where(m => m.Output.VJoyDevice == fromId))
+            m.Output.VJoyDevice = toId;
+        foreach (var m in ButtonMappings.Where(m => m.Output.VJoyDevice == fromId))
+            m.Output.VJoyDevice = toId;
+        foreach (var m in HatMappings.Where(m => m.Output.VJoyDevice == fromId))
+            m.Output.VJoyDevice = toId;
+        foreach (var m in AxisToButtonMappings.Where(m => m.Output.VJoyDevice == fromId))
+            m.Output.VJoyDevice = toId;
+        foreach (var m in ButtonToAxisMappings.Where(m => m.Output.VJoyDevice == fromId))
+            m.Output.VJoyDevice = toId;
+        if (VJoyPrimaryDevices.TryGetValue(fromId, out var primary))
+        {
+            VJoyPrimaryDevices.Remove(fromId);
+            VJoyPrimaryDevices[toId] = primary;
+        }
+        ModifiedAt = DateTime.UtcNow;
+    }
+
     /// <summary>Update primary devices for all vJoy slots based on current mappings</summary>
     public void UpdateAllPrimaryDevices()
     {

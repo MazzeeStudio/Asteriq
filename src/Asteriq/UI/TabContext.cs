@@ -92,6 +92,7 @@ public class TabContext
     public Func<SKSvg?>? GetActiveSvg { get; set; }
     public Func<DeviceMap?, SKSvg?>? GetSvgForDeviceMap { get; set; }
     public Action? OpenDriverSetup { get; set; }
+    public Action? RefreshVJoyDevices { get; set; }
 
     public TabContext(
         IInputService inputService,

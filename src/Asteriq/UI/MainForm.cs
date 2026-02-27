@@ -267,6 +267,7 @@ public partial class MainForm : Form
         _tabContext.GetActiveSvg = GetActiveSvg;
         _tabContext.GetSvgForDeviceMap = GetSvgForDeviceMap;
         _tabContext.OpenDriverSetup = OpenDriverSetupDialog;
+        _tabContext.RefreshVJoyDevices = RefreshVJoyDevicesInternal;
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
@@ -1308,6 +1309,19 @@ public partial class MainForm : Form
             _canvas.Invalidate();
             _isDirty = false;
         }
+    }
+
+    private void RefreshVJoyDevicesInternal()
+    {
+        _vjoyDevices = _vjoyService.EnumerateDevices();
+        // Immediately sync to context so callers can read the updated list before the next SyncTabContext()
+        if (_tabContext is not null)
+            _tabContext.VJoyDevices = _vjoyDevices;
+        // NOTE: callers that add a device should explicitly call RefreshDevices() afterwards
+        // so the new SDL2 virtual joystick appears in the Devices tab.
+        // Callers that remove a device should NOT call RefreshDevices() immediately,
+        // because SDL2 still reports the device until the OS sends a device-removed notification.
+        _canvas.Invalidate();
     }
 
     private void RefreshDevices()

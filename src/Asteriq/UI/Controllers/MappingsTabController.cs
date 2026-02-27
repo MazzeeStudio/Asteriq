@@ -4667,6 +4667,90 @@ public class MappingsTabController : ITabController
     }
 
     /// <summary>
+    /// Programmatically create a new vJoy device using vJoyConfig.exe CLI,
+    /// configured to match the physical device's capabilities.
+    /// Returns the created device on success, or null if cancelled or failed.
+    /// </summary>
+    private VJoyDeviceInfo? CreateVJoyDeviceForPhysical(PhysicalDeviceInfo physical)
+    {
+        string? configPath = _ctx.DriverSetupManager.GetVJoyConfigPath();
+        if (configPath is null)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "vJoyConfig.exe was not found in your vJoy installation.\n\n" +
+                "Please ensure vJoy is installed correctly.",
+                "vJoy Not Found");
+            return null;
+        }
+
+        // Find the next available vJoy slot (1-16)
+        var existingIds = _ctx.VJoyDevices.Select(v => v.Id).ToHashSet();
+        uint newId = 0;
+        for (uint id = 1; id <= 16; id++)
+        {
+            if (!existingIds.Contains(id))
+            {
+                newId = id;
+                break;
+            }
+        }
+
+        if (newId == 0)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "All 16 vJoy device slots are in use.",
+                "No Slots Available");
+            return null;
+        }
+
+        // Build axis list: up to 8 axes matching physical device count
+        string[] axisNames = { "X", "Y", "Z", "RX", "RY", "RZ", "SL0", "SL1" };
+        int axisCount = Math.Min(physical.AxisCount, axisNames.Length);
+        int buttonCount = Math.Max(physical.ButtonCount, 1);
+        int povCount = physical.HatCount;
+
+        string args = $"{newId} -f";
+        if (axisCount > 0)
+            args += $" -a {string.Join(" ", axisNames.Take(axisCount))}";
+        if (buttonCount > 0)
+            args += $" -b {buttonCount}";
+        if (povCount > 0)
+            args += $" -p {povCount}";
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = configPath,
+                Arguments = args,
+                UseShellExecute = true,
+                Verb = "runas"
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            process?.WaitForExit(15000);
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // User cancelled the UAC elevation prompt
+            return null;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                $"Failed to create vJoy device:\n{ex.Message}",
+                "vJoy Creation Failed");
+            return null;
+        }
+
+        // Re-enumerate vJoy list via MainForm callback so _vjoyDevices stays in sync with SyncTabContext()
+        _ctx.RefreshVJoyDevices?.Invoke();
+        // Also rescan SDL2 so the new virtual joystick appears in the Devices tab
+        _ctx.RefreshDevices?.Invoke();
+        return _ctx.VJoyDevices.FirstOrDefault(v => v.Id == newId);
+    }
+
+    /// <summary>
     /// Show help dialog for vJoy configuration with recommended settings
     /// </summary>
     private void ShowVJoyConfigurationHelp(PhysicalDeviceInfo physical, bool noDevices)
@@ -4791,8 +4875,7 @@ public class MappingsTabController : ITabController
         // Check if user selected "Configure new vJoy device"
         if (selectedIndex == _ctx.VJoyDevices.Count)
         {
-            ShowVJoyConfigurationHelp(physicalDevice, noDevices: false);
-            return null;
+            return CreateVJoyDeviceForPhysical(physicalDevice);
         }
 
         if (selectedIndex >= 0 && selectedIndex < _ctx.VJoyDevices.Count)

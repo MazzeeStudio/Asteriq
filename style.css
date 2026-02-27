@@ -158,19 +158,81 @@ img {
 }
 
 
-/* ===== Hero ===== */
+/* ===== Hero / Carousel ===== */
 
 .hero {
+    position: relative;
     background: #000;
     border-bottom: 1px solid var(--border);
-    line-height: 0;
+    height: 500px;
+    overflow: hidden;
 }
 
-.hero img {
+.carousel-slide {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    display: block;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    opacity: 0;
+    transition: opacity 0.7s ease;
+}
+
+.carousel-slide.active {
     opacity: 0.95;
 }
+
+.carousel-nav {
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.5rem;
+    z-index: 10;
+}
+
+.carousel-dot {
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s;
+}
+
+.carousel-dot.active {
+    background: var(--accent);
+}
+
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--border-hi);
+    color: var(--text);
+    width: 2.75rem;
+    height: 2.75rem;
+    cursor: pointer;
+    font-size: 1.4rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+
+.hero:hover .carousel-btn {
+    opacity: 1;
+}
+
+.carousel-btn--prev { left: 1rem; }
+.carousel-btn--next { right: 1rem; }
 
 
 /* ===== Section Labels ===== */
@@ -215,12 +277,21 @@ img {
 
 .feature {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 3fr 2fr;
     gap: 3.5rem;
     align-items: center;
     margin-bottom: 4rem;
     padding-bottom: 4rem;
     border-bottom: 1px solid var(--border);
+}
+
+/* Detail screenshots are cropped panels — keep them small */
+.feature--detail {
+    grid-template-columns: 3fr 1fr;
+}
+
+.feature--detail .feature-image {
+    max-width: 340px;
 }
 
 .feature:last-child {
@@ -402,10 +473,16 @@ footer {
     }
 
     .feature,
-    .feature--reverse {
+    .feature--reverse,
+    .feature--detail,
+    .feature--detail.feature--reverse {
         grid-template-columns: 1fr;
         direction: ltr;
         gap: 1.75rem;
+    }
+
+    .feature--detail .feature-image {
+        max-width: 100%;
     }
 
     .feature--reverse .feature-image {
@@ -421,6 +498,10 @@ footer {
     .header-inner,
     .requirements {
         padding: 0 1.25rem;
+    }
+
+    .hero {
+        height: 260px;
     }
 
     .overview,

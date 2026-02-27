@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asteriq — HOTAS Management for Star Citizen</title>
-    <meta name="description" content="Asteriq is a unified HOTAS management application for Star Citizen. Replaces vJoy, HidHide, and JoystickGremlin with a single application.">
+    <meta name="description" content="Asteriq replaces vJoy, HidHide, and JoystickGremlin with a single application for Star Citizen HOTAS setups.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
         <div class="header-inner">
             <div class="brand">
                 <h1 class="logo">ASTERIQ</h1>
-                <p class="tagline">Unified HOTAS Management for Star Citizen</p>
+                <p class="tagline">HOTAS management for Star Citizen</p>
             </div>
             <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.exe" class="btn-download">
                 Download Latest Release
@@ -28,7 +28,19 @@
     </header>
 
     <section class="hero">
-        <img src="screenshots/hero.png" alt="Asteriq — Devices tab showing a joystick silhouette alongside the device list and status panel" loading="eager">
+        <img class="carousel-slide active" src="screenshots/hero.png"              alt="Asteriq — Devices tab with two VPC sticks assigned to vJoy slots" loading="eager">
+        <img class="carousel-slide" src="screenshots/carousel-mappings.png"       alt="Asteriq — Mappings tab showing axis list and mapping settings panel" loading="lazy">
+        <img class="carousel-slide" src="screenshots/bindings.png"                alt="Asteriq — Keybindings tab listing Star Citizen actions and bound inputs" loading="lazy">
+        <img class="carousel-slide" src="screenshots/settings.png"                alt="Asteriq — Settings tab with profile management and theme selector" loading="lazy">
+
+        <nav class="carousel-nav" aria-label="Screenshot navigation">
+            <button class="carousel-dot active" aria-label="Slide 1"></button>
+            <button class="carousel-dot" aria-label="Slide 2"></button>
+            <button class="carousel-dot" aria-label="Slide 3"></button>
+            <button class="carousel-dot" aria-label="Slide 4"></button>
+        </nav>
+        <button class="carousel-btn carousel-btn--prev" aria-label="Previous">&#8249;</button>
+        <button class="carousel-btn carousel-btn--next" aria-label="Next">&#8250;</button>
     </section>
 
     <main>
@@ -36,8 +48,8 @@
         <section class="overview">
             <div class="container">
                 <h2 class="section-label">What is Asteriq?</h2>
-                <p>Asteriq is a single application for managing HOTAS controllers in Star Citizen. It replaces the separate tools you would typically need — a vJoy configurator, HidHide, and JoystickGremlin — by bringing device assignment, input mapping, and Star Citizen binding export together in one place.</p>
-                <p>It uses SDL2 for input, which is the same approach used by JoystickGremlin and is more reliable for this purpose than DirectInput. Physical devices are assigned to specific vJoy virtual joystick slots by you, explicitly, and those assignments persist across sessions so your configuration stays stable.</p>
+                <p>Running a dual-stick or full HOTAS setup in Star Citizen usually means having vJoy, HidHide, and JoystickGremlin open alongside the game. Asteriq replaces all three with a single application.</p>
+                <p>Input is handled via SDL2, the same foundation JoystickGremlin uses, which tends to be more reliable than DirectInput for this kind of work. Device-to-vJoy assignments are tracked by hardware identity rather than port order, so the configuration stays consistent regardless of how things are plugged in.</p>
             </div>
         </section>
 
@@ -45,47 +57,45 @@
             <div class="container">
                 <h2 class="section-label">Features</h2>
 
-                <div class="feature">
+                <div class="feature feature--detail">
                     <div class="feature-text">
                         <h3>Device Management</h3>
-                        <p>Assign your physical HOTAS devices to specific vJoy virtual joystick slots. Asteriq maintains stable device identity across sessions, so your configuration does not shift when controllers are connected in a different order. Online and offline status is shown in real time.</p>
-                        <p>HidHide integration hides your physical devices from other applications whilst Asteriq forwards their input through the virtual devices, preventing Star Citizen from seeing duplicate joysticks.</p>
+                        <p>Each physical controller gets assigned to a specific vJoy slot — that slot is what Star Citizen sees. Assignments are tied to the device's hardware identity, so nothing shifts if you replug cables in a different order.</p>
+                        <p>If HidHide is installed, Asteriq can hide your physical devices from other applications whilst forwarding. This stops SC from seeing both the real hardware and the virtual devices at the same time.</p>
                     </div>
                     <div class="feature-image">
-                        <img src="screenshots/devices.png" alt="Device list panel showing two VPC Stick WarBRD controllers assigned to vJoy slots, both shown as Online" loading="lazy">
+                        <img src="screenshots/devices.png" alt="Device list showing two VPC Stick WarBRD controllers, both online and assigned to vJoy slots" loading="lazy">
                     </div>
                 </div>
 
-                <div class="feature feature--reverse">
+                <div class="feature feature--reverse feature--detail">
                     <div class="feature-text">
                         <h3>Input Mapping</h3>
-                        <p>Map axes, buttons, and hats from any physical device to virtual outputs. Axes support four response curve modes — linear, S-curve, exponential, and fully custom with draggable control points — with a live input/output preview as you adjust.</p>
-                        <p>Multiple physical inputs can be merged onto a single virtual axis, useful for combining a twist grip and a separate rudder pedal. Buttons support normal, toggle, pulse, and hold modes.</p>
+                        <p>Axes support linear, S-curve, exponential, and custom response curves. In custom mode you place control points manually and get a live input vs output readout as you move the stick.</p>
+                        <p>You can merge two physical axes onto a single virtual output, which is useful if rudder input is split between a twist grip and separate pedals. Buttons have four modes: normal, toggle, pulse, and hold.</p>
                     </div>
                     <div class="feature-image">
-                        <img src="screenshots/mappings.png" alt="Axis response curve editor showing a custom curve with live input and output percentage readout" loading="lazy">
+                        <img src="screenshots/mappings.png" alt="Axis curve editor with a custom curve and live input/output percentage display" loading="lazy">
                     </div>
                 </div>
 
                 <div class="feature">
                     <div class="feature-text">
                         <h3>Star Citizen Bindings</h3>
-                        <p>Browse your Star Citizen keybindings directly in Asteriq and export them to actionmaps.xml format. Asteriq never modifies your existing Star Citizen configuration — it is export only, so your bindings remain entirely under your control.</p>
-                        <p>Actions are grouped by category and display the current binding for each input, which is useful for confirming your vJoy slot assignments match what Star Citizen expects.</p>
+                        <p>The Keybindings tab reads your current SC profile and shows every action alongside its bound input. You can export from there to actionmaps.xml. Asteriq reads your SC config but never writes to it, so existing bindings are not at risk.</p>
                     </div>
                     <div class="feature-image">
-                        <img src="screenshots/bindings.png" alt="Star Citizen Bindings tab showing a categorised list of SC actions with their current keybindings" loading="lazy">
+                        <img src="screenshots/bindings.png" alt="Keybindings tab listing Star Citizen actions and their currently bound inputs" loading="lazy">
                     </div>
                 </div>
 
                 <div class="feature feature--reverse">
                     <div class="feature-text">
                         <h3>Profiles and Themes</h3>
-                        <p>Save and switch between multiple configuration profiles. Asteriq uses a dark, futuristic interface with several manufacturer-inspired colour themes — Drake, Aegis, Anvil, Origin, and others — that change the accent colour throughout the application.</p>
-                        <p>Automatic update checking notifies you when a new release is available. Updates can be downloaded and applied with a single click.</p>
+                        <p>Save different device and mapping setups as named profiles and switch between them from within the app. The interface has a handful of manufacturer-themed colour schemes (Drake, Aegis, Anvil, Origin and others). There is also a built-in update checker that handles the download and exe swap in one click.</p>
                     </div>
                     <div class="feature-image">
-                        <img src="screenshots/settings.png" alt="Settings tab showing profile management, visual theme selector, and update notification" loading="lazy">
+                        <img src="screenshots/settings.png" alt="Settings tab showing profile management, theme selector, and update options" loading="lazy">
                     </div>
                 </div>
 
@@ -100,35 +110,35 @@
                         <span class="step-num">1</span>
                         <div class="step-body">
                             <strong>Download and run Asteriq</strong>
-                            <p>Download <code>Asteriq.exe</code> using the button above and run it directly. No installation required — the application is self-contained.</p>
+                            <p>Grab <code>Asteriq.exe</code> from the button above and run it. No install needed, no separate runtime — the exe is self-contained.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">2</span>
                         <div class="step-body">
-                            <strong>Install optional drivers if needed</strong>
-                            <p>Virtual joystick forwarding requires the <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> driver. If you want to hide your physical controllers from Star Citizen (to prevent duplicate device detection), also install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a>. Both are free and open-source. Asteriq will run without them, but these features will be unavailable.</p>
+                            <strong>Install drivers if you need them</strong>
+                            <p>Virtual joystick forwarding requires <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a>. If you also want SC to only see the virtual devices rather than your physical hardware as well, install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> on top of that. Asteriq runs without either, but most people will want at least vJoy.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">3</span>
                         <div class="step-body">
-                            <strong>Assign your physical controllers</strong>
-                            <p>In the <strong>Devices</strong> tab, assign each physical HOTAS controller to a vJoy virtual joystick slot. This determines which virtual devices Star Citizen will see when you play.</p>
+                            <strong>Assign your devices</strong>
+                            <p>Open the <strong>Devices</strong> tab and assign each physical controller to a vJoy slot. That slot number is what Star Citizen will see as a joystick.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">4</span>
                         <div class="step-body">
-                            <strong>Configure your input mappings</strong>
-                            <p>In the <strong>Mappings</strong> tab, set up axis response curves, combine physical inputs onto a single virtual axis, and configure button behaviour (normal, toggle, pulse, or hold).</p>
+                            <strong>Set up your mappings</strong>
+                            <p>In the <strong>Mappings</strong> tab, dial in your axis curves and set button modes as needed.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">5</span>
                         <div class="step-body">
-                            <strong>Start forwarding and launch Star Citizen</strong>
-                            <p>Click <strong>Start Forwarding</strong>. Asteriq will begin routing your physical inputs through the virtual joystick devices. Launch Star Citizen as normal.</p>
+                            <strong>Start forwarding, then launch the game</strong>
+                            <p>Click <strong>Start Forwarding</strong> and launch Star Citizen. Asteriq runs in the background and routes input through the virtual devices.</p>
                         </div>
                     </li>
                 </ol>
@@ -138,8 +148,8 @@
         <section class="support">
             <div class="container">
                 <h2 class="section-label">Support</h2>
-                <p>Asteriq is free for personal use. If it has been useful to you, you can <a href="https://buymeacoffee.com/nerosilentr" target="_blank" rel="noopener">buy me a coffee</a>.</p>
-                <p class="referral-line">New to Star Citizen? Use referral code <strong>STAR-RBDQ-Z4JG</strong> when you <a href="https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG" target="_blank" rel="noopener">enlist</a> and receive 50,000 bonus aUEC.</p>
+                <p>Asteriq is free for personal use. If it has saved you time, you can <a href="https://buymeacoffee.com/nerosilentr" target="_blank" rel="noopener">buy me a coffee</a>.</p>
+                <p class="referral-line">New to Star Citizen? Use referral code <strong>STAR-RBDQ-Z4JG</strong> when you <a href="https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG" target="_blank" rel="noopener">enlist</a> and you'll get 50,000 bonus aUEC to start with.</p>
             </div>
         </section>
 
@@ -161,5 +171,37 @@
         </div>
     </footer>
 
+    <script>
+    (function () {
+        var slides = document.querySelectorAll('.carousel-slide');
+        var dots   = document.querySelectorAll('.carousel-dot');
+        var hero   = document.querySelector('.hero');
+        var current = 0;
+        var timer;
+
+        function goTo(n) {
+            slides[current].classList.remove('active');
+            dots[current].classList.remove('active');
+            current = (n + slides.length) % slides.length;
+            slides[current].classList.add('active');
+            dots[current].classList.add('active');
+        }
+
+        function start() { timer = setInterval(function () { goTo(current + 1); }, 5000); }
+        function stop()  { clearInterval(timer); }
+
+        document.querySelector('.carousel-btn--next').addEventListener('click', function () { stop(); goTo(current + 1); start(); });
+        document.querySelector('.carousel-btn--prev').addEventListener('click', function () { stop(); goTo(current - 1); start(); });
+
+        dots.forEach(function (dot, i) {
+            dot.addEventListener('click', function () { stop(); goTo(i); start(); });
+        });
+
+        hero.addEventListener('mouseenter', stop);
+        hero.addEventListener('mouseleave', start);
+
+        start();
+    }());
+    </script>
 </body>
 </html>

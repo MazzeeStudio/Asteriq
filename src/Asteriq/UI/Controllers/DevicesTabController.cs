@@ -1122,7 +1122,8 @@ public class DevicesTabController : ITabController
                 FileName = configPath,
                 Arguments = $"-d {vjoyId}",
                 UseShellExecute = true,
-                Verb = "runas"
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
             };
             using var process = System.Diagnostics.Process.Start(psi);
             process?.WaitForExit(10000);

@@ -4724,7 +4724,8 @@ public class MappingsTabController : ITabController
                 FileName = configPath,
                 Arguments = args,
                 UseShellExecute = true,
-                Verb = "runas"
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
             };
 
             using var process = System.Diagnostics.Process.Start(psi);

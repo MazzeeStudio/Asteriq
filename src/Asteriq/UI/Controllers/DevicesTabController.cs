@@ -50,6 +50,10 @@ public class DevicesTabController : ITabController
     private bool _silhouettePrevHovered;
     private bool _silhouetteNextHovered;
 
+    // Remove vJoy device button (D3 panel, virtual device selected)
+    private SKRect _removeVJoyButtonBounds;
+    private bool _removeVJoyButtonHovered;
+
     /// <summary>
     /// The active device category (0 = physical, 1 = virtual/vJoy).
     /// </summary>
@@ -164,6 +168,14 @@ public class DevicesTabController : ITabController
         // Silhouette picker clicks (D3 panel, virtual device selected)
         if (_silhouettePrevHovered) { StepSilhouette(-1); return; }
         if (_silhouetteNextHovered) { StepSilhouette(+1); return; }
+
+        // Remove vJoy device
+        if (_removeVJoyButtonHovered && !_removeVJoyButtonBounds.IsEmpty)
+        {
+            uint vjoyId = GetSelectedVJoyId();
+            if (vjoyId > 0) RemoveVJoyDevice(vjoyId);
+            return;
+        }
 
         // Forwarding button clicks
         if (_startForwardingButtonHovered && !_startForwardingButtonBounds.IsEmpty)
@@ -291,8 +303,9 @@ public class DevicesTabController : ITabController
         _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
         _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
         _removeDeviceButtonHovered = !_removeDeviceButtonBounds.IsEmpty && _removeDeviceButtonBounds.Contains(e.X, e.Y);
+        _removeVJoyButtonHovered = !_removeVJoyButtonBounds.IsEmpty && _removeVJoyButtonBounds.Contains(e.X, e.Y);
 
-        if (_map1to1ButtonHovered || _clearMappingsButtonHovered || _removeDeviceButtonHovered)
+        if (_map1to1ButtonHovered || _clearMappingsButtonHovered || _removeDeviceButtonHovered || _removeVJoyButtonHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Forwarding button hover detection
@@ -406,6 +419,7 @@ public class DevicesTabController : ITabController
         _hoveredDeviceCategory = -1;
         _silhouettePrevHovered = false;
         _silhouetteNextHovered = false;
+        _removeVJoyButtonHovered = false;
         _ctx.HoveredControlId = null;
     }
 
@@ -826,6 +840,7 @@ public class DevicesTabController : ITabController
             _map1to1ButtonBounds = SKRect.Empty;
             _clearMappingsButtonBounds = SKRect.Empty;
             _removeDeviceButtonBounds = SKRect.Empty;
+            _removeVJoyButtonBounds = SKRect.Empty;
 
             uint vjoyId = GetSelectedVJoyId();
             var vjoyInfo = vjoyId > 0 ? _ctx.VJoyDevices.FirstOrDefault(v => v.Id == vjoyId) : null;
@@ -893,12 +908,20 @@ public class DevicesTabController : ITabController
 
             _silhouetteNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
             FUIWidgets.DrawArrowButton(canvas, _silhouetteNextButtonBounds, ">", _silhouetteNextHovered, hasNext);
+            y += arrowButtonSize + buttonGap * 2;
+
+            // Remove vJoy device button
+            float removeWidth = contentBounds.Width - pad * 2;
+            _removeVJoyButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + removeWidth, y + buttonHeight);
+            var removeVJoyState = _removeVJoyButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+            FUIRenderer.DrawButton(canvas, _removeVJoyButtonBounds, "REMOVE VJOY DEVICE", removeVJoyState, FUIColors.Danger);
         }
         else
         {
             _map1to1ButtonBounds = SKRect.Empty;
             _clearMappingsButtonBounds = SKRect.Empty;
             _removeDeviceButtonBounds = SKRect.Empty;
+            _removeVJoyButtonBounds = SKRect.Empty;
             _silhouettePrevButtonBounds = SKRect.Empty;
             _silhouetteNextButtonBounds = SKRect.Empty;
 
@@ -1062,6 +1085,75 @@ public class DevicesTabController : ITabController
         _ctx.TrayIcon.SetActive(false);
         _ctx.UpdateTrayMenu?.Invoke();
         System.Diagnostics.Debug.WriteLine("Stopped forwarding");
+    }
+
+    #endregion
+
+    #region vJoy Device Management
+
+    /// <summary>
+    /// Removes a vJoy device using vJoyConfig.exe CLI, then refreshes the device lists.
+    /// </summary>
+    private void RemoveVJoyDevice(uint vjoyId)
+    {
+        bool confirmed = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
+            $"Remove vJoy Slot {vjoyId}?\n\nThis will delete the virtual device from the driver.\n" +
+            "Any mappings targeting it will be lost.\n\nAn admin prompt will appear.",
+            "Remove vJoy Device");
+        if (!confirmed) return;
+
+        string? configPath = _ctx.DriverSetupManager.GetVJoyConfigPath();
+        if (configPath is null)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "vJoyConfig.exe was not found in your vJoy installation.",
+                "vJoy Not Found");
+            return;
+        }
+
+        // Release the device if our process has it acquired (prevents driver refusing deletion)
+        _ctx.VJoyService.ReleaseDevice(vjoyId);
+
+        int exitCode;
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = configPath,
+                Arguments = $"-d {vjoyId}",
+                UseShellExecute = true,
+                Verb = "runas"
+            };
+            using var process = System.Diagnostics.Process.Start(psi);
+            process?.WaitForExit(10000);
+            exitCode = process?.ExitCode ?? -1;
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            return; // User cancelled UAC
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                $"Failed to remove vJoy device:\n{ex.Message}",
+                "Removal Failed");
+            return;
+        }
+
+        if (exitCode != 0)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                $"vJoyConfig.exe reported failure (exit code {exitCode}).\n\n" +
+                "The device may still exist. Try using the vJoy Configuration tool directly.",
+                "Removal Failed");
+            return;
+        }
+
+        // Update vJoy list — do NOT call RefreshDevices() here because SDL2 still reports
+        // the device until the OS sends a device-removed notification
+        _ctx.RefreshVJoyDevices?.Invoke();
+        _ctx.SelectedDevice = -1;
+        _ctx.MarkDirty();
     }
 
     #endregion

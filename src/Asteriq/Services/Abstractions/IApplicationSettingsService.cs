@@ -59,6 +59,11 @@ public interface IApplicationSettingsService
     bool AutoLoadLastSCExportProfile { get; set; }
 
     /// <summary>
+    /// Get or set whether SC Bindings column headers show physical device names instead of JS slot references
+    /// </summary>
+    bool SCBindingsShowPhysicalHeaders { get; set; }
+
+    /// <summary>
     /// Get the last used SC export profile name for a specific SC environment (LIVE, TECH-PREVIEW, etc.)
     /// Returns null if no profile has been remembered for that environment.
     /// </summary>

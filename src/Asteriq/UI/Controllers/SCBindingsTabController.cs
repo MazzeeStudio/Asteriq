@@ -96,6 +96,21 @@ public partial class SCBindingsTabController : ITabController
     private HashSet<string> _scConflictingBindings = new();
     private int _scHighlightedColumn = -1;
 
+    // Header toggle button (JS REF / DEVICE)
+    private SKRect _scHeaderToggleButtonBounds;
+    private bool _scHeaderToggleButtonHovered;
+
+    // Column actions panel (shown when a vJoy column is highlighted)
+    private int _scMoveTargetVJoyIndex;
+    private bool _scMoveDropdownOpen;
+    private SKRect _scMoveSelectorBounds;
+    private SKRect _scMoveDropdownBounds;
+    private int _scMoveDropdownHoveredIndex = -1;
+    private SKRect _scMoveButtonBounds;
+    private SKRect _scDeselectButtonBounds;
+    private bool _scMoveButtonHovered;
+    private bool _scDeselectButtonHovered;
+
     // SC scrollbar state
     private bool _scIsDraggingVScroll = false;
     private bool _scIsDraggingHScroll = false;
@@ -411,9 +426,31 @@ public partial class SCBindingsTabController : ITabController
             _scResetDefaultsButtonBounds.Contains(e.X, e.Y) ||
             _scShowBoundOnlyBounds.Contains(e.X, e.Y) ||
             (!_scVScrollbarBounds.IsEmpty && _scVScrollbarBounds.Contains(e.X, e.Y)) ||
-            (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)))
+            (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)) ||
+            (!_scHeaderToggleButtonBounds.IsEmpty && _scHeaderToggleButtonBounds.Contains(e.X, e.Y)) ||
+            (!_scMoveButtonBounds.IsEmpty && _scMoveButtonBounds.Contains(e.X, e.Y)) ||
+            (!_scDeselectButtonBounds.IsEmpty && _scDeselectButtonBounds.Contains(e.X, e.Y)) ||
+            (!_scMoveSelectorBounds.IsEmpty && _scMoveSelectorBounds.Contains(e.X, e.Y)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+
+        // Move dropdown hover index
+        if (_scMoveDropdownOpen && !_scMoveDropdownBounds.IsEmpty && _scMoveDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemH = 26f;
+            int idx = (int)((e.Y - _scMoveDropdownBounds.Top) / itemH);
+            if (idx != _scMoveDropdownHoveredIndex)
+            {
+                _scMoveDropdownHoveredIndex = idx;
+                _ctx.MarkDirty();
+            }
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+        else if (_scMoveDropdownHoveredIndex >= 0)
+        {
+            _scMoveDropdownHoveredIndex = -1;
+            _ctx.MarkDirty();
         }
 
         // Category collapse headers

@@ -1015,6 +1015,31 @@ internal static class FUIWidgets
         canvas.Restore();
     }
 
+    /// <summary>
+    /// Draws a standard FUI panel title with consistent spacing.
+    /// Advances <paramref name="y"/> past the title (and optional divider) so the
+    /// caller can start drawing content immediately.
+    /// </summary>
+    /// <param name="withDivider">When true, draws a horizontal rule below the title with extra breathing room.</param>
+    internal static void DrawPanelTitle(
+        SKCanvas canvas,
+        float leftMargin,
+        float rightMargin,
+        ref float y,
+        string title,
+        bool withDivider = false)
+    {
+        FUIRenderer.DrawText(canvas, title, new SKPoint(leftMargin, y), FUIColors.TextBright, 14f, true);
+        y += 18f;
+
+        if (withDivider)
+        {
+            using var sep = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+            canvas.DrawLine(leftMargin, y, rightMargin, y, sep);
+            y += 14f;
+        }
+    }
+
     internal static void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
     {
         var bgColor = isEnabled
@@ -1050,5 +1075,80 @@ internal static class FUIWidgets
             arrowPath.Close();
             canvas.DrawPath(arrowPath, arrowPaint);
         }
+    }
+
+    /// <summary>
+    /// Draws a FUI-styled open dropdown panel: shadow, glow, background, L-corner frame, and
+    /// a uniform list of string items with hover / selection highlighting.
+    /// The caller is responsible for positioning <paramref name="bounds"/> and, when scrolling
+    /// is needed, for drawing the scrollbar track on top after this call.
+    /// </summary>
+    /// <param name="selectedIndex">0-based index of the selected item, or -1 for none.</param>
+    /// <param name="hoveredIndex">0-based index of the hovered item, or -1 for none.</param>
+    /// <param name="itemHeight">Height of each row in pixels (default 28).</param>
+    /// <param name="scrollOffset">Vertical pixel offset applied to the item list (default 0).</param>
+    /// <param name="scrollbarWidth">Width reserved on the right edge for the caller's scrollbar (default 0).</param>
+    internal static void DrawDropdownPanel(
+        SKCanvas canvas,
+        SKRect bounds,
+        IReadOnlyList<string> items,
+        int selectedIndex,
+        int hoveredIndex,
+        float itemHeight = 28f,
+        float scrollOffset = 0f,
+        float scrollbarWidth = 0f)
+    {
+        // Shadow + outer glow
+        FUIRenderer.DrawPanelShadow(canvas, bounds, 4f, 4f, 15f);
+        using var glowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Active.WithAlpha(30),
+            StrokeWidth = 3f,
+            IsAntialias = true,
+            ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
+        };
+        canvas.DrawRect(bounds, glowPaint);
+
+        // Opaque backgrounds
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
+        canvas.DrawRect(bounds, bgPaint);
+        using var innerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
+        canvas.DrawRect(bounds.Inset(2, 2), innerPaint);
+
+        // L-corner frame
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
+
+        // Items (clipped for scroll)
+        canvas.Save();
+        canvas.ClipRect(bounds);
+        float y = bounds.Top + 2f - scrollOffset;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var itemBounds = new SKRect(bounds.Left + 2, y, bounds.Right - 2 - scrollbarWidth, y + itemHeight);
+            if (itemBounds.Bottom > bounds.Top && itemBounds.Top < bounds.Bottom)
+            {
+                bool isHovered = i == hoveredIndex;
+                bool isSelected = i == selectedIndex;
+
+                if (isHovered)
+                {
+                    using var hoverBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                    canvas.DrawRect(itemBounds, hoverBg);
+                    using var accentBar = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
+                }
+                else if (isSelected)
+                {
+                    using var selAccent = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
+                    canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), selAccent);
+                }
+
+                var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+                FUIRenderer.DrawText(canvas, items[i], new SKPoint(itemBounds.Left + 10, itemBounds.MidY + 4), textColor, 13f);
+            }
+            y += itemHeight;
+        }
+        canvas.Restore();
     }
 }

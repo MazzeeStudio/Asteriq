@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteriq — HOTAS Management for Star Citizen</title>
+    <meta name="description" content="Asteriq is a unified HOTAS management application for Star Citizen. Replaces vJoy, HidHide, and JoystickGremlin with a single application.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="header-inner">
+            <div class="brand">
+                <h1 class="logo">ASTERIQ</h1>
+                <p class="tagline">Unified HOTAS Management for Star Citizen</p>
+            </div>
+            <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest" class="btn-download">
+                Download Latest Release
+            </a>
+        </div>
+        <div class="requirements">
+            <span class="req-label">REQUIRES</span>
+            <span class="req-chip">Windows 10/11 (64-bit)</span>
+            <span class="req-chip"><a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">.NET 8 Runtime</a></span>
+            <span class="req-chip"><a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a></span>
+            <span class="req-chip"><a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a></span>
+        </div>
+    </header>
+
+    <section class="hero">
+        <img src="screenshots/hero.png" alt="Asteriq — Devices tab showing a joystick silhouette alongside the device list and status panel" loading="eager">
+    </section>
+
+    <main>
+
+        <section class="overview">
+            <div class="container">
+                <h2 class="section-label">What is Asteriq?</h2>
+                <p>Asteriq is a single application for managing HOTAS controllers in Star Citizen. It replaces the separate tools you would typically need — a vJoy configurator, HidHide, and JoystickGremlin — by bringing device assignment, input mapping, and Star Citizen binding export together in one place.</p>
+                <p>It uses SDL2 for input, which is the same approach used by JoystickGremlin and is more reliable for this purpose than DirectInput. Physical devices are assigned to specific vJoy virtual joystick slots by you, explicitly, and those assignments persist across sessions so your configuration stays stable.</p>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h2 class="section-label">Features</h2>
+
+                <div class="feature">
+                    <div class="feature-text">
+                        <h3>Device Management</h3>
+                        <p>Assign your physical HOTAS devices to specific vJoy virtual joystick slots. Asteriq maintains stable device identity across sessions, so your configuration does not shift when controllers are connected in a different order. Online and offline status is shown in real time.</p>
+                        <p>HidHide integration hides your physical devices from other applications whilst Asteriq forwards their input through the virtual devices, preventing Star Citizen from seeing duplicate joysticks.</p>
+                    </div>
+                    <div class="feature-image">
+                        <img src="screenshots/devices.png" alt="Device list panel showing two VPC Stick WarBRD controllers assigned to vJoy slots, both shown as Online" loading="lazy">
+                    </div>
+                </div>
+
+                <div class="feature feature--reverse">
+                    <div class="feature-text">
+                        <h3>Input Mapping</h3>
+                        <p>Map axes, buttons, and hats from any physical device to virtual outputs. Axes support four response curve modes — linear, S-curve, exponential, and fully custom with draggable control points — with a live input/output preview as you adjust.</p>
+                        <p>Multiple physical inputs can be merged onto a single virtual axis, useful for combining a twist grip and a separate rudder pedal. Buttons support normal, toggle, pulse, and hold modes.</p>
+                    </div>
+                    <div class="feature-image">
+                        <img src="screenshots/mappings.png" alt="Axis response curve editor showing a custom curve with live input and output percentage readout" loading="lazy">
+                    </div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-text">
+                        <h3>Star Citizen Bindings</h3>
+                        <p>Browse your Star Citizen keybindings directly in Asteriq and export them to actionmaps.xml format. Asteriq never modifies your existing Star Citizen configuration — it is export only, so your bindings remain entirely under your control.</p>
+                        <p>Actions are grouped by category and display the current binding for each input, which is useful for confirming your vJoy slot assignments match what Star Citizen expects.</p>
+                    </div>
+                    <div class="feature-image">
+                        <img src="screenshots/bindings.png" alt="Star Citizen Bindings tab showing a categorised list of SC actions with their current keybindings" loading="lazy">
+                    </div>
+                </div>
+
+                <div class="feature feature--reverse">
+                    <div class="feature-text">
+                        <h3>Profiles and Themes</h3>
+                        <p>Save and switch between multiple configuration profiles. Asteriq uses a dark, futuristic interface with several manufacturer-inspired colour themes — Drake, Aegis, Anvil, Origin, and others — that change the accent colour throughout the application.</p>
+                        <p>Automatic update checking notifies you when a new release is available. Updates can be downloaded and applied with a single click.</p>
+                    </div>
+                    <div class="feature-image">
+                        <img src="screenshots/settings.png" alt="Settings tab showing profile management, visual theme selector, and update notification" loading="lazy">
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="getting-started">
+            <div class="container">
+                <h2 class="section-label">Getting Started</h2>
+                <ol class="steps">
+                    <li>
+                        <span class="step-num">1</span>
+                        <div class="step-body">
+                            <strong>Install the prerequisites</strong>
+                            <p>You will need the <a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">.NET 8 Runtime</a>, <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a>, and <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> installed before running Asteriq.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">2</span>
+                        <div class="step-body">
+                            <strong>Download and run Asteriq</strong>
+                            <p>Grab the latest <code>Asteriq.exe</code> from the <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest" target="_blank" rel="noopener">Releases page</a> and run it. No installation required.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">3</span>
+                        <div class="step-body">
+                            <strong>Assign your devices</strong>
+                            <p>Go to the <strong>Devices</strong> tab and assign each physical controller to a vJoy slot. This determines how Star Citizen sees your devices.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">4</span>
+                        <div class="step-body">
+                            <strong>Configure mappings and start forwarding</strong>
+                            <p>Set up axis curves and button modes in the <strong>Mappings</strong> tab, then click <strong>Start Forwarding</strong> to begin routing input through the virtual devices.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="support">
+            <div class="container">
+                <h2 class="section-label">Support</h2>
+                <p>Asteriq is free for personal use. If it has been useful to you:</p>
+                <div class="support-links">
+                    <a href="https://buymeacoffee.com/nerosilentr" class="btn-support" target="_blank" rel="noopener">Buy Me a Coffee</a>
+                    <div class="referral">
+                        <p>New to Star Citizen? Use referral code <strong>STAR-RBDQ-Z4JG</strong> when you enlist and receive 50,000 bonus aUEC.</p>
+                        <a href="https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG" class="btn-referral" target="_blank" rel="noopener">Enlist with Referral</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <nav class="footer-links">
+                <a href="https://github.com/MazzeeStudio/Asteriq" target="_blank" rel="noopener">GitHub</a>
+                <span class="sep">&middot;</span>
+                <a href="https://github.com/MazzeeStudio/Asteriq/releases" target="_blank" rel="noopener">Releases</a>
+                <span class="sep">&middot;</span>
+                <a href="https://github.com/MazzeeStudio/Asteriq/blob/master/LICENSE" target="_blank" rel="noopener">Licence</a>
+            </nav>
+            <p class="licence-note">
+                <a href="https://polyformproject.org/licenses/noncommercial/1.0.0/" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a>
+                — free for personal and non-commercial use. Copyright &copy; 2025 MazzeeStudio.
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>

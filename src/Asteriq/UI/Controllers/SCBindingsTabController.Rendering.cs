@@ -36,7 +36,7 @@ public partial class SCBindingsTabController
         // RIGHT TOP - SC Installation (condensed)
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
-        // RIGHT BOTTOM - Column Actions panel (when vJoy column selected) or Export panel
+        // RIGHT BOTTOM - Export panel always visible; Column Actions panel stacked below when a vJoy column is selected
         bool showColumnActions = _scHighlightedColumn >= 0
             && _scGridColumns is not null
             && _scHighlightedColumn < _scGridColumns.Count
@@ -44,25 +44,38 @@ public partial class SCBindingsTabController
             && !_scGridColumns[_scHighlightedColumn].IsPhysical
             && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
 
-        if (showColumnActions)
-            DrawColumnActionsPanel(canvas, exportBounds, frameInset);
-        else
-            DrawSCExportPanelCompact(canvas, exportBounds, frameInset);
+        float columnActionsHeight = 235f;
+        float verticalGap2 = 8f;
 
-        // Draw dropdowns last (on top)
+        SKRect controlProfilesBounds;
+        SKRect columnActionsBounds = SKRect.Empty;
+        if (showColumnActions)
+        {
+            controlProfilesBounds = new SKRect(exportBounds.Left, exportBounds.Top,
+                exportBounds.Right, exportBounds.Bottom - columnActionsHeight - verticalGap2);
+            columnActionsBounds = new SKRect(exportBounds.Left, controlProfilesBounds.Bottom + verticalGap2,
+                exportBounds.Right, exportBounds.Bottom);
+        }
+        else
+        {
+            controlProfilesBounds = exportBounds;
+        }
+
+        DrawSCExportPanelCompact(canvas, controlProfilesBounds, frameInset, suppressActionInfo: showColumnActions);
+        if (showColumnActions)
+            DrawColumnActionsPanel(canvas, columnActionsBounds, frameInset);
+
+        // Draw dropdowns last (on top) so they render over all panels
+        if (_scProfileDropdownOpen && !_scProfileDropdownListBounds.IsEmpty)
+            DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         if (_scInstallationDropdownOpen && _scInstallations.Count > 0)
-        {
             DrawSCInstallationDropdown(canvas);
-        }
         if (_scActionMapFilterDropdownOpen && _scActionMaps.Count > 0)
-        {
             DrawSCActionMapFilterDropdown(canvas);
-        }
-        if (_scMoveDropdownOpen && _scGridColumns is not null
-            && _scHighlightedColumn >= 0 && _scHighlightedColumn < _scGridColumns.Count)
-        {
-            DrawMoveTargetDropdown(canvas);
-        }
+        if (showColumnActions && _scColImportProfileDropdownOpen)
+            DrawColImportProfileDropdown(canvas);
+        if (showColumnActions && _scColImportColumnDropdownOpen && _scColImportSourceColumns.Count > 0)
+            DrawColImportColumnDropdown(canvas);
     }
 
     private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -838,7 +851,7 @@ public partial class SCBindingsTabController
     private string TruncateTextToWidth(string text, float maxWidth, float fontSize)
         => FUIWidgets.TruncateTextToWidth(text, maxWidth, fontSize);
 
-    private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset, bool suppressActionInfo = false)
     {
         // Panel background
         using var bgPaint = new SKPaint
@@ -921,20 +934,18 @@ public partial class SCBindingsTabController
 
         y += textBtnHeight + 10f;
 
-        // Draw profile dropdown list if open (shows both Asteriq profiles and SC mapping files)
+        // Compute profile dropdown list bounds so the draw-last pass can render it on top of all panels
         if (_scProfileDropdownOpen)
         {
-            // Active profile is shown in the header, not in the list
             int asteriqCount = _scExportProfiles.Count(p => p.ProfileName != _scExportProfile.ProfileName);
             int scFileCount = _scAvailableProfiles.Count;
             int totalItems = asteriqCount + (scFileCount > 0 ? scFileCount + 1 : 0); // +1 for separator
-            float listHeight = Math.Min(totalItems * 24f + (scFileCount > 0 ? 16f : 0f) + 8f, 240f); // +16 for "IMPORT FROM SC" label
+            float listHeight = Math.Min(totalItems * 24f + (scFileCount > 0 ? 16f : 0f) + 8f, 240f);
             _scProfileDropdownListBounds = new SKRect(leftMargin, _scProfileDropdownBounds.Bottom + 2, rightMargin, _scProfileDropdownBounds.Bottom + 2 + listHeight);
-            DrawSCProfileDropdownList(canvas, _scProfileDropdownListBounds);
         }
 
-        // Selected action info with ASSIGN/CLEAR buttons
-        if (_scSelectedActionIndex >= 0 && _scFilteredActions is not null && _scSelectedActionIndex < _scFilteredActions.Count)
+        // Selected action info with ASSIGN/CLEAR buttons (hidden when column actions panel is active)
+        if (!suppressActionInfo && _scSelectedActionIndex >= 0 && _scFilteredActions is not null && _scSelectedActionIndex < _scFilteredActions.Count)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
             float lineHeight = 15f;
@@ -1381,20 +1392,6 @@ public partial class SCBindingsTabController
         return device?.Name;
     }
 
-    /// <summary>
-    /// Returns the list of other vJoy columns available as move targets (excludes source column).
-    /// </summary>
-    private List<SCGridColumn> GetMoveTargetColumns()
-    {
-        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
-            return new List<SCGridColumn>();
-
-        var sourceCol = _scGridColumns[_scHighlightedColumn];
-        return _scGridColumns
-            .Where(c => c.IsJoystick && !c.IsPhysical && c.VJoyDeviceId != sourceCol.VJoyDeviceId)
-            .ToList();
-    }
-
     private void DrawColumnActionsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
@@ -1422,7 +1419,6 @@ public partial class SCBindingsTabController
         // Column label + device name
         string colLabel = $"JS{col.SCInstance}";
         FUIRenderer.DrawText(canvas, colLabel, new SKPoint(leftMargin, y), FUIColors.Active, 13f, true);
-
         string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
         if (deviceName is not null)
         {
@@ -1432,50 +1428,61 @@ public partial class SCBindingsTabController
         }
         y += 17f;
 
-        // Binding count (SC export profile bindings for this vJoy column)
-        int mappingCount = _scExportProfile.Bindings.Count(b =>
+        // Binding count for this column
+        int bindingCount = _scExportProfile.Bindings.Count(b =>
             b.DeviceType == SCDeviceType.Joystick &&
             b.PhysicalDeviceId is null &&
             _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
-        string countStr = mappingCount == 0 ? "No bindings" : $"{mappingCount} binding{(mappingCount == 1 ? "" : "s")}";
+        string countStr = bindingCount == 0 ? "No bindings" : $"{bindingCount} binding{(bindingCount == 1 ? "" : "s")}";
         FUIRenderer.DrawText(canvas, countStr, new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-        y += 22f;
+        y += 20f;
 
-        // MOVE TO label
-        FUIRenderer.DrawText(canvas, "MOVE TO", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f, true);
-        y += 15f;
+        // IMPORT FROM section
+        FUIRenderer.DrawText(canvas, "IMPORT FROM", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f, true);
+        y += 14f;
 
-        // Move target selector
-        var otherCols = GetMoveTargetColumns();
-        float selectorH = 30f;
-        _scMoveSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorH);
+        // Source profile selector — shows saved Asteriq profiles + SC XML files
+        float selectorH = 28f;
+        var (savedProfiles, xmlFiles) = GetColImportSources();
+        int totalSources = savedProfiles.Count + xmlFiles.Count;
+        bool hasProfiles = totalSources > 0;
+        string profileSelectorLabel = _scColImportProfileIndex >= 0 && _scColImportProfileIndex < totalSources
+            ? GetColImportSourceLabel(_scColImportProfileIndex, savedProfiles, xmlFiles)
+            : (hasProfiles ? "Select profile…" : "No other profiles");
+        _scColImportProfileSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorH);
+        bool profileSelectorHovered = _scColImportProfileSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSelector(canvas, _scColImportProfileSelectorBounds, profileSelectorLabel,
+            profileSelectorHovered || _scColImportProfileDropdownOpen, hasProfiles);
+        y += selectorH + 4f;
 
-        bool selectorEnabled = otherCols.Count > 0;
-        string targetLabel = selectorEnabled
-            ? $"JS{otherCols[Math.Clamp(_scMoveTargetVJoyIndex, 0, otherCols.Count - 1)].SCInstance}"
-            : "No other slots";
-        bool selectorHovered = _scMoveSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawSelector(canvas, _scMoveSelectorBounds, targetLabel, selectorHovered || _scMoveDropdownOpen, selectorEnabled);
-        y += selectorH + 8f;
+        // Source column selector
+        bool hasSourceColumns = _scColImportSourceColumns.Count > 0;
+        string columnSelectorLabel = _scColImportColumnIndex >= 0 && _scColImportColumnIndex < _scColImportSourceColumns.Count
+            ? _scColImportSourceColumns[_scColImportColumnIndex].Label
+            : (_scColImportProfileIndex >= 0 && !hasSourceColumns ? "No columns found" : "Select column…");
+        _scColImportColumnSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorH);
+        bool columnSelectorHovered = _scColImportColumnSelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSelector(canvas, _scColImportColumnSelectorBounds, columnSelectorLabel,
+            columnSelectorHovered || _scColImportColumnDropdownOpen, hasSourceColumns);
 
-        // Action buttons (at bottom of panel)
+        // Action buttons anchored to panel bottom
         float btnH = 28f;
         float btnW = (rightMargin - leftMargin - 8f) / 2f;
         float btnY = bounds.Bottom - frameInset - cornerPadding - btnH;
 
-        _scMoveButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnW, btnY + btnH);
-        _scMoveButtonHovered = _scMoveButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        bool canMove = selectorEnabled && mappingCount > 0;
-        if (canMove)
+        bool canImport = _scColImportProfileIndex >= 0 && _scColImportColumnIndex >= 0;
+        _scColImportButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnW, btnY + btnH);
+        _scColImportButtonHovered = _scColImportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        if (canImport)
         {
-            FUIRenderer.DrawButton(canvas, _scMoveButtonBounds, "MOVE BINDINGS",
-                _scMoveButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            FUIRenderer.DrawButton(canvas, _scColImportButtonBounds, "IMPORT",
+                _scColImportButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
         else
         {
             using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
-            canvas.DrawRect(_scMoveButtonBounds, disabledPaint);
-            FUIRenderer.DrawTextCentered(canvas, "MOVE BINDINGS", _scMoveButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
+            canvas.DrawRect(_scColImportButtonBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "IMPORT", _scColImportButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
         }
 
         _scDeselectButtonBounds = new SKRect(leftMargin + btnW + 8f, btnY, rightMargin, btnY + btnH);
@@ -1484,32 +1491,57 @@ public partial class SCBindingsTabController
             _scDeselectButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
-    private void DrawMoveTargetDropdown(SKCanvas canvas)
+    private void DrawColImportProfileDropdown(SKCanvas canvas)
     {
-        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
-            return;
-
-        var otherCols = GetMoveTargetColumns();
-        if (otherCols.Count == 0) return;
+        var (savedProfiles, xmlFiles) = GetColImportSources();
+        int totalSources = savedProfiles.Count + xmlFiles.Count;
+        if (totalSources == 0) return;
 
         float itemH = 28f;
-        _scMoveDropdownBounds = new SKRect(
-            _scMoveSelectorBounds.Left,
-            _scMoveSelectorBounds.Bottom + 2,
-            _scMoveSelectorBounds.Right,
-            _scMoveSelectorBounds.Bottom + 2 + Math.Min(otherCols.Count * itemH + 8f, 200f));
+        _scColImportProfileDropdownBounds = new SKRect(
+            _scColImportProfileSelectorBounds.Left,
+            _scColImportProfileSelectorBounds.Bottom + 2,
+            _scColImportProfileSelectorBounds.Right,
+            _scColImportProfileSelectorBounds.Bottom + 2 + Math.Min(totalSources * itemH + 8f, 200f));
 
-        int selectedIdx = Math.Clamp(_scMoveTargetVJoyIndex, 0, otherCols.Count - 1);
-        var items = otherCols.Select(c =>
-        {
-            string label = $"JS{c.SCInstance}";
-            string? devName = GetPhysicalDeviceNameForVJoyColumn(c);
-            if (devName is not null)
-                label += $"  —  {TruncateTextToWidth(devName, _scMoveDropdownBounds.Width - 60f, 10f)}";
-            return label;
-        }).ToList();
+        var items = savedProfiles.Select(p => p.ProfileName)
+            .Concat(xmlFiles.Select(f => $"[SC] {f.DisplayName}"))
+            .ToList();
+        FUIWidgets.DrawDropdownPanel(canvas, _scColImportProfileDropdownBounds, items,
+            _scColImportProfileIndex, _scColImportProfileHoveredIndex, itemH);
+    }
 
-        FUIWidgets.DrawDropdownPanel(canvas, _scMoveDropdownBounds, items,
-            selectedIdx, _scMoveDropdownHoveredIndex, itemH);
+    /// <summary>
+    /// Returns the two separate source collections for the Import From Profile picker.
+    /// Asteriq saved profiles first (excluding the active one), then SC XML mapping files.
+    /// </summary>
+    private (List<SCExportProfileInfo> Saved, List<SCMappingFile> Xml) GetColImportSources()
+    {
+        var saved = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
+        return (saved, _scAvailableProfiles);
+    }
+
+    private string GetColImportSourceLabel(int index, List<SCExportProfileInfo> saved, List<SCMappingFile> xml)
+    {
+        if (index < saved.Count)
+            return saved[index].ProfileName;
+        int xmlIdx = index - saved.Count;
+        return xmlIdx < xml.Count ? $"[SC] {xml[xmlIdx].DisplayName}" : "?";
+    }
+
+    private void DrawColImportColumnDropdown(SKCanvas canvas)
+    {
+        if (_scColImportSourceColumns.Count == 0) return;
+
+        float itemH = 28f;
+        _scColImportColumnDropdownBounds = new SKRect(
+            _scColImportColumnSelectorBounds.Left,
+            _scColImportColumnSelectorBounds.Bottom + 2,
+            _scColImportColumnSelectorBounds.Right,
+            _scColImportColumnSelectorBounds.Bottom + 2 + Math.Min(_scColImportSourceColumns.Count * itemH + 8f, 200f));
+
+        var items = _scColImportSourceColumns.Select(c => c.Label).ToList();
+        FUIWidgets.DrawDropdownPanel(canvas, _scColImportColumnDropdownBounds, items,
+            _scColImportColumnIndex, _scColImportColumnHoveredIndex, itemH);
     }
 }

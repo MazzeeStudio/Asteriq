@@ -47,53 +47,85 @@ public partial class SCBindingsTabController
             && !_scGridColumns[_scHighlightedColumn].IsPhysical
             && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
 
-        // Move target dropdown — close on outside click (only when column actions panel is active)
-        if (showColumnActions && _scMoveDropdownOpen)
-        {
-            if (!_scMoveDropdownBounds.IsEmpty && _scMoveDropdownBounds.Contains(point))
-            {
-                var otherCols = GetMoveTargetColumns();
-                float itemH = 26f;
-                int idx = (int)((point.Y - _scMoveDropdownBounds.Top) / itemH);
-                if (idx >= 0 && idx < otherCols.Count)
-                    _scMoveTargetVJoyIndex = idx;
-                _scMoveDropdownOpen = false;
-                _ctx.MarkDirty();
-                return;
-            }
-            else
-            {
-                _scMoveDropdownOpen = false;
-                _ctx.MarkDirty();
-                // Allow click to fall through to other handlers
-            }
-        }
-
-        // Column actions panel buttons — guard with showColumnActions to prevent stale bounds
-        // from intercepting clicks when the panel is hidden (e.g. after column deselection)
+        // Column actions panel interactions — all guarded so stale bounds never intercept other panel clicks
         if (showColumnActions)
         {
+            // Profile dropdown — close on outside click
+            if (_scColImportProfileDropdownOpen)
+            {
+                if (!_scColImportProfileDropdownBounds.IsEmpty && _scColImportProfileDropdownBounds.Contains(point))
+                {
+                    var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
+                    float itemH = 28f;
+                    int idx = (int)((point.Y - _scColImportProfileDropdownBounds.Top) / itemH);
+                    if (idx >= 0 && idx < importable.Count && idx != _scColImportProfileIndex)
+                    {
+                        _scColImportProfileIndex = idx;
+                        LoadColImportSourceColumns();
+                    }
+                    _scColImportProfileDropdownOpen = false;
+                    _ctx.MarkDirty();
+                    return;
+                }
+                else
+                {
+                    _scColImportProfileDropdownOpen = false;
+                    _ctx.MarkDirty();
+                    // Allow click to fall through
+                }
+            }
+
+            // Column dropdown — close on outside click
+            if (_scColImportColumnDropdownOpen)
+            {
+                if (!_scColImportColumnDropdownBounds.IsEmpty && _scColImportColumnDropdownBounds.Contains(point))
+                {
+                    float itemH = 28f;
+                    int idx = (int)((point.Y - _scColImportColumnDropdownBounds.Top) / itemH);
+                    if (idx >= 0 && idx < _scColImportSourceColumns.Count)
+                        _scColImportColumnIndex = idx;
+                    _scColImportColumnDropdownOpen = false;
+                    _ctx.MarkDirty();
+                    return;
+                }
+                else
+                {
+                    _scColImportColumnDropdownOpen = false;
+                    _ctx.MarkDirty();
+                    // Allow click to fall through
+                }
+            }
+
             if (!_scDeselectButtonBounds.IsEmpty && _scDeselectButtonBounds.Contains(point))
             {
-                _scHighlightedColumn = -1;
-                _scMoveTargetVJoyIndex = 0;
-                _scMoveDropdownOpen = false;
-                _ctx.MarkDirty();
+                DeselectColumn();
                 return;
             }
 
-            if (!_scMoveButtonBounds.IsEmpty && _scMoveButtonBounds.Contains(point))
+            if (!_scColImportButtonBounds.IsEmpty && _scColImportButtonBounds.Contains(point))
             {
-                ExecuteMoveBindings();
+                ExecuteImportFromProfile();
                 return;
             }
 
-            if (!_scMoveSelectorBounds.IsEmpty && _scMoveSelectorBounds.Contains(point))
+            if (!_scColImportProfileSelectorBounds.IsEmpty && _scColImportProfileSelectorBounds.Contains(point))
             {
-                var otherCols = GetMoveTargetColumns();
-                if (otherCols.Count > 0)
+                var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
+                if (importable.Count > 0)
                 {
-                    _scMoveDropdownOpen = !_scMoveDropdownOpen;
+                    _scColImportProfileDropdownOpen = !_scColImportProfileDropdownOpen;
+                    _scColImportColumnDropdownOpen = false;
+                    _ctx.MarkDirty();
+                }
+                return;
+            }
+
+            if (!_scColImportColumnSelectorBounds.IsEmpty && _scColImportColumnSelectorBounds.Contains(point))
+            {
+                if (_scColImportSourceColumns.Count > 0)
+                {
+                    _scColImportColumnDropdownOpen = !_scColImportColumnDropdownOpen;
+                    _scColImportProfileDropdownOpen = false;
                     _ctx.MarkDirty();
                 }
                 return;
@@ -113,14 +145,21 @@ public partial class SCBindingsTabController
                 && !_scGridColumns[clickedCol].IsPhysical
                 && !_scGridColumns[clickedCol].IsReadOnly)
             {
-                int previousHighlight = _scHighlightedColumn;
-                // Toggle highlight: if same column clicked, unhighlight; otherwise highlight new column
-                _scHighlightedColumn = (_scHighlightedColumn == clickedCol) ? -1 : clickedCol;
-                // Reset move state when deselecting
-                if (_scHighlightedColumn == -1 && previousHighlight >= 0)
+                if (_scHighlightedColumn == clickedCol)
                 {
-                    _scMoveTargetVJoyIndex = 0;
-                    _scMoveDropdownOpen = false;
+                    DeselectColumn();
+                }
+                else
+                {
+                    _scHighlightedColumn = clickedCol;
+                    // Reset import state for the newly selected column
+                    _scColImportProfileIndex = -1;
+                    _scColImportColumnIndex = -1;
+                    _scColImportLoadedProfile = null;
+                    _scColImportSourceColumns.Clear();
+                    _scColImportProfileDropdownOpen = false;
+                    _scColImportColumnDropdownOpen = false;
+                    _ctx.MarkDirty();
                 }
                 return;
             }
@@ -1127,69 +1166,126 @@ public partial class SCBindingsTabController
         return -1;
     }
 
-    private void ExecuteMoveBindings()
+    private void DeselectColumn()
+    {
+        _scHighlightedColumn = -1;
+        _scColImportProfileIndex = -1;
+        _scColImportColumnIndex = -1;
+        _scColImportLoadedProfile = null;
+        _scColImportSourceColumns.Clear();
+        _scColImportProfileDropdownOpen = false;
+        _scColImportColumnDropdownOpen = false;
+        _ctx.MarkDirty();
+    }
+
+    /// <summary>
+    /// Called when the user selects a source profile; loads that profile and builds the
+    /// list of its vJoy columns available to import from.
+    /// </summary>
+    private void LoadColImportSourceColumns()
+    {
+        _scColImportLoadedProfile = null;
+        _scColImportSourceColumns.Clear();
+        _scColImportColumnIndex = -1;
+
+        if (_scColImportProfileIndex < 0) return;
+
+        var importable = _scExportProfiles.Where(p => p.ProfileName != _scExportProfile.ProfileName).ToList();
+        if (_scColImportProfileIndex >= importable.Count) return;
+
+        _scColImportLoadedProfile = _scExportProfileService.LoadProfile(importable[_scColImportProfileIndex].ProfileName);
+        if (_scColImportLoadedProfile is null) return;
+
+        var vJoyIds = _scColImportLoadedProfile.Bindings
+            .Where(b => b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null)
+            .Select(b => b.VJoyDevice)
+            .Distinct()
+            .OrderBy(id => _scColImportLoadedProfile.GetSCInstance(id))
+            .ToList();
+
+        _scColImportSourceColumns = vJoyIds
+            .Select(id => ($"JS{_scColImportLoadedProfile.GetSCInstance(id)}", id))
+            .ToList();
+
+        // Auto-select when only one option
+        if (_scColImportSourceColumns.Count == 1)
+            _scColImportColumnIndex = 0;
+    }
+
+    private void ExecuteImportFromProfile()
     {
         if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
             return;
+        if (_scColImportLoadedProfile is null || _scColImportColumnIndex < 0 || _scColImportColumnIndex >= _scColImportSourceColumns.Count)
+            return;
 
-        var sourceCol = _scGridColumns[_scHighlightedColumn];
-        var otherCols = GetMoveTargetColumns();
-        if (otherCols.Count == 0) return;
+        var targetCol = _scGridColumns[_scHighlightedColumn];
+        var (sourceLabel, sourceVJoyId) = _scColImportSourceColumns[_scColImportColumnIndex];
+        string sourceName = _scColImportLoadedProfile.ProfileName;
 
-        int targetIdx = Math.Clamp(_scMoveTargetVJoyIndex, 0, otherCols.Count - 1);
-        var targetCol = otherCols[targetIdx];
-
-        // Collect SC export profile bindings for this source column
-        var sourceBindings = _scExportProfile.Bindings
-            .Where(b =>
-                b.DeviceType == SCDeviceType.Joystick &&
-                b.PhysicalDeviceId is null &&
-                _scExportProfile.GetSCInstance(b.VJoyDevice) == sourceCol.SCInstance)
+        var sourceBindings = _scColImportLoadedProfile.Bindings
+            .Where(b => b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null && b.VJoyDevice == sourceVJoyId)
             .ToList();
 
-        int bindingCount = sourceBindings.Count;
-        if (bindingCount == 0)
+        if (sourceBindings.Count == 0)
         {
-            // Nothing to move — just deselect
-            _scHighlightedColumn = -1;
-            _scMoveTargetVJoyIndex = 0;
-            _scMoveDropdownOpen = false;
-            _ctx.MarkDirty();
+            DeselectColumn();
             return;
         }
 
-        // Build a breakdown by input type for the confirm dialog
-        int buttonCount = sourceBindings.Count(b => b.InputType == SCInputType.Button);
+        int existingCount = _scExportProfile.Bindings.Count(b =>
+            b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId is null &&
+            _scExportProfile.GetSCInstance(b.VJoyDevice) == targetCol.SCInstance);
+
+        string replaceNote = existingCount > 0
+            ? $"\n\nThis will replace {existingCount} existing binding{(existingCount == 1 ? "" : "s")} on JS{targetCol.SCInstance}."
+            : string.Empty;
+
+        int btnCount = sourceBindings.Count(b => b.InputType == SCInputType.Button);
         int axisCount = sourceBindings.Count(b => b.InputType == SCInputType.Axis);
         int hatCount = sourceBindings.Count(b => b.InputType == SCInputType.Hat);
-
         var detailParts = new List<string>();
-        if (buttonCount > 0) detailParts.Add($"  {buttonCount} button binding{(buttonCount == 1 ? "" : "s")}");
-        if (axisCount > 0)   detailParts.Add($"  {axisCount} axis binding{(axisCount == 1 ? "" : "s")}");
-        if (hatCount > 0)    detailParts.Add($"  {hatCount} hat binding{(hatCount == 1 ? "" : "s")}");
+        if (btnCount > 0)  detailParts.Add($"  {btnCount} button binding{(btnCount == 1 ? "" : "s")}");
+        if (axisCount > 0) detailParts.Add($"  {axisCount} axis binding{(axisCount == 1 ? "" : "s")}");
+        if (hatCount > 0)  detailParts.Add($"  {hatCount} hat binding{(hatCount == 1 ? "" : "s")}");
 
-        string message = $"Move {bindingCount} binding{(bindingCount == 1 ? "" : "s")} from JS{sourceCol.SCInstance} to JS{targetCol.SCInstance}?";
+        string message = $"Import {sourceBindings.Count} binding{(sourceBindings.Count == 1 ? "" : "s")} from '{sourceName}' ({sourceLabel}) into JS{targetCol.SCInstance}?{replaceNote}";
         bool confirmed = FUIMessageBox.ShowDestructiveConfirm(
             _ctx.OwnerForm,
             message,
-            "Move Bindings",
-            "MOVE",
+            "Import Bindings",
+            "IMPORT",
             detailParts.Count > 0 ? detailParts.ToArray() : null);
 
         if (!confirmed) return;
 
-        // Reassign VJoyDevice on each binding so it points to the target slot
-        foreach (var binding in sourceBindings)
-            binding.VJoyDevice = targetCol.VJoyDeviceId;
+        // Replace: remove existing bindings on target column
+        _scExportProfile.Bindings.RemoveAll(b =>
+            b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId is null &&
+            _scExportProfile.GetSCInstance(b.VJoyDevice) == targetCol.SCInstance);
+
+        // Copy source bindings, reassigned to target vJoy device
+        foreach (var b in sourceBindings)
+        {
+            _scExportProfile.Bindings.Add(new SCActionBinding
+            {
+                ActionMap = b.ActionMap,
+                ActionName = b.ActionName,
+                DeviceType = b.DeviceType,
+                VJoyDevice = targetCol.VJoyDeviceId,
+                InputName = b.InputName,
+                InputType = b.InputType,
+                Inverted = b.Inverted,
+                ActivationMode = b.ActivationMode,
+                Modifiers = new List<string>(b.Modifiers)
+            });
+        }
 
         _scExportProfile.Modified = DateTime.UtcNow;
-        _scExportProfileService?.SaveProfile(_scExportProfile);
+        _scExportProfileService.SaveProfile(_scExportProfile);
         UpdateConflictingBindings();
-
-        // Deselect the column
-        _scHighlightedColumn = -1;
-        _scMoveTargetVJoyIndex = 0;
-        _scMoveDropdownOpen = false;
-        _ctx.MarkDirty();
+        DeselectColumn();
     }
 }

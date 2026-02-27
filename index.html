@@ -15,16 +15,15 @@
                 <h1 class="logo">ASTERIQ</h1>
                 <p class="tagline">Unified HOTAS Management for Star Citizen</p>
             </div>
-            <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest" class="btn-download">
+            <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.exe" class="btn-download">
                 Download Latest Release
             </a>
         </div>
         <div class="requirements">
             <span class="req-label">REQUIRES</span>
             <span class="req-chip">Windows 10/11 (64-bit)</span>
-            <span class="req-chip"><a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">.NET 8 Runtime</a></span>
-            <span class="req-chip"><a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a></span>
-            <span class="req-chip"><a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a></span>
+            <span class="req-chip req-chip--opt"><a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> <em>optional</em></span>
+            <span class="req-chip req-chip--opt"><a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> <em>optional</em></span>
         </div>
     </header>
 
@@ -100,29 +99,36 @@
                     <li>
                         <span class="step-num">1</span>
                         <div class="step-body">
-                            <strong>Install the prerequisites</strong>
-                            <p>You will need the <a href="https://dotnet.microsoft.com/en-us/download/dotnet/8.0" target="_blank" rel="noopener">.NET 8 Runtime</a>, <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a>, and <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> installed before running Asteriq.</p>
+                            <strong>Download and run Asteriq</strong>
+                            <p>Download <code>Asteriq.exe</code> using the button above and run it directly. No installation required — the application is self-contained.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">2</span>
                         <div class="step-body">
-                            <strong>Download and run Asteriq</strong>
-                            <p>Grab the latest <code>Asteriq.exe</code> from the <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest" target="_blank" rel="noopener">Releases page</a> and run it. No installation required.</p>
+                            <strong>Install optional drivers if needed</strong>
+                            <p>Virtual joystick forwarding requires the <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> driver. If you want to hide your physical controllers from Star Citizen (to prevent duplicate device detection), also install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a>. Both are free and open-source. Asteriq will run without them, but these features will be unavailable.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">3</span>
                         <div class="step-body">
-                            <strong>Assign your devices</strong>
-                            <p>Go to the <strong>Devices</strong> tab and assign each physical controller to a vJoy slot. This determines how Star Citizen sees your devices.</p>
+                            <strong>Assign your physical controllers</strong>
+                            <p>In the <strong>Devices</strong> tab, assign each physical HOTAS controller to a vJoy virtual joystick slot. This determines which virtual devices Star Citizen will see when you play.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">4</span>
                         <div class="step-body">
-                            <strong>Configure mappings and start forwarding</strong>
-                            <p>Set up axis curves and button modes in the <strong>Mappings</strong> tab, then click <strong>Start Forwarding</strong> to begin routing input through the virtual devices.</p>
+                            <strong>Configure your input mappings</strong>
+                            <p>In the <strong>Mappings</strong> tab, set up axis response curves, combine physical inputs onto a single virtual axis, and configure button behaviour (normal, toggle, pulse, or hold).</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">5</span>
+                        <div class="step-body">
+                            <strong>Start forwarding and launch Star Citizen</strong>
+                            <p>Click <strong>Start Forwarding</strong>. Asteriq will begin routing your physical inputs through the virtual joystick devices. Launch Star Citizen as normal.</p>
                         </div>
                     </li>
                 </ol>
@@ -132,14 +138,8 @@
         <section class="support">
             <div class="container">
                 <h2 class="section-label">Support</h2>
-                <p>Asteriq is free for personal use. If it has been useful to you:</p>
-                <div class="support-links">
-                    <a href="https://buymeacoffee.com/nerosilentr" class="btn-support" target="_blank" rel="noopener">Buy Me a Coffee</a>
-                    <div class="referral">
-                        <p>New to Star Citizen? Use referral code <strong>STAR-RBDQ-Z4JG</strong> when you enlist and receive 50,000 bonus aUEC.</p>
-                        <a href="https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG" class="btn-referral" target="_blank" rel="noopener">Enlist with Referral</a>
-                    </div>
-                </div>
+                <p>Asteriq is free for personal use. If it has been useful to you, you can <a href="https://buymeacoffee.com/nerosilentr" target="_blank" rel="noopener">buy me a coffee</a>.</p>
+                <p class="referral-line">New to Star Citizen? Use referral code <strong>STAR-RBDQ-Z4JG</strong> when you <a href="https://www.robertsspaceindustries.com/enlist?referral=STAR-RBDQ-Z4JG" target="_blank" rel="noopener">enlist</a> and receive 50,000 bonus aUEC.</p>
             </div>
         </section>
 

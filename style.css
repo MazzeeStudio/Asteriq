@@ -146,23 +146,30 @@ img {
     text-decoration: none;
 }
 
+.req-chip--opt {
+    opacity: 0.65;
+}
+
+.req-chip--opt em {
+    font-style: normal;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    opacity: 0.8;
+}
+
 
 /* ===== Hero ===== */
 
 .hero {
     background: #000;
     border-bottom: 1px solid var(--border);
-    overflow: hidden;
-    max-height: 480px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    line-height: 0;
 }
 
 .hero img {
     width: 100%;
-    max-width: 1280px;
-    opacity: 0.92;
+    display: block;
+    opacity: 0.95;
 }
 
 
@@ -319,60 +326,20 @@ code {
     border-bottom: 1px solid var(--border);
 }
 
-.support > .container > p {
-    margin-bottom: 1.75rem;
+.support p {
     font-size: 0.97rem;
-}
-
-.support-links {
-    display: flex;
-    align-items: flex-start;
-    gap: 3rem;
-    flex-wrap: wrap;
-}
-
-.btn-support {
-    display: inline-block;
-    padding: 0.65rem 1.75rem;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-weight: 600;
-    font-size: 0.82rem;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-
-.btn-support:hover {
-    background: var(--accent);
-    color: #fff;
-    text-decoration: none;
-}
-
-.referral {
-    max-width: 420px;
-}
-
-.referral p {
-    font-size: 0.9rem;
     color: var(--text);
-    margin-bottom: 0.85rem;
+    max-width: 640px;
+    margin-bottom: 0.75rem;
 }
 
-.btn-referral {
-    display: inline-block;
-    padding: 0.45rem 1.1rem;
-    border: 1px solid var(--border-hi);
-    color: var(--text-dim);
-    font-size: 0.82rem;
-    transition: color 0.15s, border-color 0.15s;
+.support p:last-child {
+    margin-bottom: 0;
 }
 
-.btn-referral:hover {
-    color: var(--accent-hi);
-    border-color: var(--accent);
-    text-decoration: none;
+.referral-line {
+    color: var(--text-dim) !important;
+    font-size: 0.9rem !important;
 }
 
 
@@ -444,11 +411,6 @@ footer {
     .feature--reverse .feature-image {
         order: -1;
     }
-
-    .support-links {
-        flex-direction: column;
-        gap: 1.5rem;
-    }
 }
 
 @media (max-width: 500px) {
@@ -459,10 +421,6 @@ footer {
     .header-inner,
     .requirements {
         padding: 0 1.25rem;
-    }
-
-    .hero {
-        max-height: 220px;
     }
 
     .overview,

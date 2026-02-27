@@ -55,13 +55,21 @@ img {
 
 /* ===== Dev Banner ===== */
 
+.top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
 .dev-banner {
     background: rgba(200, 150, 10, 0.08);
     border-bottom: 1px solid rgba(200, 150, 10, 0.35);
-    padding: 0.6rem 2rem;
+    padding: 0.55rem 2rem;
     display: flex;
     align-items: baseline;
+    justify-content: center;
     gap: 0.65rem;
+    text-align: center;
 }
 
 .dev-banner__icon {
@@ -84,9 +92,6 @@ img {
 /* ===== Header ===== */
 
 .site-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
     background: rgba(7, 11, 15, 0.96);
     border-bottom: 1px solid var(--border);
     backdrop-filter: blur(10px);

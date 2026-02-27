@@ -162,76 +162,110 @@ img {
 
 .hero {
     position: relative;
-    background: #000;
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
-    height: 500px;
     overflow: hidden;
+    padding: 2rem 0 3.5rem;
 }
 
-/* Slides hidden/shown via JS (hidden attr + inline opacity).
-   CSS provides sizing and transition only. */
+/* Flex track — JS translates this to centre the active slide */
+.carousel-track {
+    display: flex;
+    gap: 20px; /* must match GAP constant in JS */
+    align-items: stretch;
+    will-change: transform;
+    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
 .carousel-slide {
-    position: absolute;
-    top: 0;
-    left: 0;
+    flex-shrink: 0;
+    width: clamp(360px, 68vw, 960px);
+    position: relative;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    opacity: 0.4;
+    transform: scale(0.96);
+    transition: opacity 0.45s ease, transform 0.45s ease, border-color 0.45s ease;
+    cursor: pointer;
+}
+
+.carousel-slide.active {
+    opacity: 1;
+    transform: scale(1);
+    border-color: var(--border-hi);
+    cursor: default;
+}
+
+.carousel-slide img {
     width: 100%;
-    height: 100%;
+    display: block;
+    max-width: none;
     object-fit: cover;
     object-position: top;
-    max-width: none; /* override global img max-width */
-    transition: opacity 0.7s ease;
 }
 
+/* Tab label at bottom of each slide */
+.slide-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2.5rem 1rem 0.6rem;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: color 0.45s ease;
+}
+
+.carousel-slide.active .slide-label {
+    color: var(--accent);
+}
+
+/* Navigation row — centred below the track */
 .carousel-nav {
     position: absolute;
-    bottom: 1rem;
+    bottom: 1.1rem;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.6rem;
     z-index: 10;
 }
 
 .carousel-dot {
-    width: 8px;
-    height: 8px;
-    border: 1px solid var(--accent);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--text-dim);
     background: transparent;
     cursor: pointer;
     padding: 0;
-    transition: background 0.15s;
+    transition: background 0.2s, border-color 0.2s;
 }
 
 .carousel-dot.active {
     background: var(--accent);
+    border-color: var(--accent);
 }
 
 .carousel-btn {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid var(--border-hi);
-    color: var(--text);
-    width: 2.75rem;
-    height: 2.75rem;
-    cursor: pointer;
-    font-size: 1.4rem;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.3rem;
     line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
-    z-index: 10;
+    cursor: pointer;
+    padding: 0 0.2rem;
+    transition: color 0.15s;
 }
 
-.hero:hover .carousel-btn {
-    opacity: 1;
+.carousel-btn:hover {
+    color: var(--accent-hi);
 }
-
-.carousel-btn--prev { left: 1rem; }
-.carousel-btn--next { right: 1rem; }
 
 
 /* ===== Section Labels ===== */
@@ -497,10 +531,6 @@ footer {
     .header-inner,
     .requirements {
         padding: 0 1.25rem;
-    }
-
-    .hero {
-        height: 260px;
     }
 
     .overview,

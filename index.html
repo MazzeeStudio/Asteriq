@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asteriq — HOTAS Management for Star Citizen</title>
-    <meta name="description" content="Asteriq replaces vJoy, HidHide, and JoystickGremlin with a single application for Star Citizen HOTAS setups.">
+    <meta name="description" content="Asteriq replaces JoystickGremlin and separate vJoy/HidHide GUI tools with a single application for Star Citizen HOTAS setups.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
                 <h1 class="logo">ASTERIQ</h1>
                 <p class="tagline">HOTAS management for Star Citizen</p>
             </div>
-            <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.exe" class="btn-download">
+            <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.zip" class="btn-download">
                 Download Latest Release
             </a>
         </div>
@@ -28,19 +28,33 @@
     </header>
 
     <section class="hero">
-        <img class="carousel-slide" id="slide-0" src="screenshots/hero.png"           alt="Asteriq — Devices tab with two VPC sticks assigned to vJoy slots" loading="eager">
-        <img class="carousel-slide" id="slide-1" src="screenshots/carousel-mappings.png" alt="Asteriq — Mappings tab showing axis list and mapping settings panel" loading="lazy" hidden>
-        <img class="carousel-slide" id="slide-2" src="screenshots/bindings.png"       alt="Asteriq — Keybindings tab listing Star Citizen actions and bound inputs" loading="lazy" hidden>
-        <img class="carousel-slide" id="slide-3" src="screenshots/settings.png"       alt="Asteriq — Settings tab with profile management and theme selector" loading="lazy" hidden>
+        <div class="carousel-track" id="carouselTrack">
+            <div class="carousel-slide active">
+                <img src="screenshots/hero.png" alt="Asteriq — Devices tab" loading="eager">
+                <span class="slide-label">Devices</span>
+            </div>
+            <div class="carousel-slide">
+                <img src="screenshots/carousel-mappings.png" alt="Asteriq — Mappings tab" loading="lazy">
+                <span class="slide-label">Mappings</span>
+            </div>
+            <div class="carousel-slide">
+                <img src="screenshots/bindings.png" alt="Asteriq — Keybindings tab" loading="lazy">
+                <span class="slide-label">Keybindings</span>
+            </div>
+            <div class="carousel-slide">
+                <img src="screenshots/settings.png" alt="Asteriq — Settings tab" loading="lazy">
+                <span class="slide-label">Settings</span>
+            </div>
+        </div>
 
         <nav class="carousel-nav" aria-label="Screenshot navigation">
+            <button class="carousel-btn carousel-btn--prev" aria-label="Previous">&#8249;</button>
             <button class="carousel-dot active" aria-label="Slide 1"></button>
             <button class="carousel-dot" aria-label="Slide 2"></button>
             <button class="carousel-dot" aria-label="Slide 3"></button>
             <button class="carousel-dot" aria-label="Slide 4"></button>
+            <button class="carousel-btn carousel-btn--next" aria-label="Next">&#8250;</button>
         </nav>
-        <button class="carousel-btn carousel-btn--prev" aria-label="Previous">&#8249;</button>
-        <button class="carousel-btn carousel-btn--next" aria-label="Next">&#8250;</button>
     </section>
 
     <main>
@@ -48,8 +62,8 @@
         <section class="overview">
             <div class="container">
                 <h2 class="section-label">What is Asteriq?</h2>
-                <p>Running a dual-stick or full HOTAS setup in Star Citizen usually means having vJoy, HidHide, and JoystickGremlin open alongside the game. Asteriq replaces all three with a single application.</p>
-                <p>Input is handled via SDL2, the same foundation JoystickGremlin uses, which tends to be more reliable than DirectInput for this kind of work. Device-to-vJoy assignments are tracked by hardware identity rather than port order, so the configuration stays consistent regardless of how things are plugged in.</p>
+                <p>Running HOTAS in Star Citizen typically involves juggling JoystickGremlin for input mapping, a separate vJoy configuration tool, and HidHide's own GUI. Asteriq replaces all of those separate applications with one. The vJoy and HidHide <em>drivers</em> are still installed, but you manage everything from Asteriq instead.</p>
+                <p>Input is handled via SDL2, the same foundation JoystickGremlin uses, which tends to be more reliable than DirectInput for this kind of work. Device assignments are tracked by hardware identity rather than port order, so the configuration stays consistent regardless of how things are plugged in.</p>
             </div>
         </section>
 
@@ -109,15 +123,15 @@
                     <li>
                         <span class="step-num">1</span>
                         <div class="step-body">
-                            <strong>Download and run Asteriq</strong>
-                            <p>Grab <code>Asteriq.exe</code> from the button above and run it. No install needed, no separate runtime — the exe is self-contained.</p>
+                            <strong>Download and extract</strong>
+                            <p>Download <code>Asteriq.zip</code> using the button above and extract it to a permanent folder (for example <code>C:\Tools\Asteriq\</code>). Run <code>Asteriq.exe</code> from there. Windows may show an unknown publisher warning — click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
                         </div>
                     </li>
                     <li>
                         <span class="step-num">2</span>
                         <div class="step-body">
                             <strong>Install drivers if you need them</strong>
-                            <p>Virtual joystick forwarding requires <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a>. If you also want SC to only see the virtual devices rather than your physical hardware as well, install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> on top of that. Asteriq runs without either, but most people will want at least vJoy.</p>
+                            <p>Virtual joystick forwarding requires the <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> driver. If you also want SC to only see the virtual devices and not your physical hardware, install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> as well. Asteriq runs without either, but most people will want at least vJoy.</p>
                         </div>
                     </li>
                     <li>
@@ -173,45 +187,40 @@
 
     <script>
     (function () {
+        var track   = document.getElementById('carouselTrack');
         var slides  = document.querySelectorAll('.carousel-slide');
         var dots    = document.querySelectorAll('.carousel-dot');
         var hero    = document.querySelector('.hero');
         var current = 0;
         var timer   = null;
         var DELAY   = 5000;
+        var GAP     = 20; // px — matches gap: 20px in CSS
 
-        // Show slide n, hide current
+        function reposition() {
+            var heroW  = hero.offsetWidth;
+            var slideW = slides[0].offsetWidth;
+            var offset = (heroW / 2) - (slideW / 2) - current * (slideW + GAP);
+            track.style.transform = 'translateX(' + offset + 'px)';
+        }
+
         function goTo(n) {
-            var next = (n + slides.length) % slides.length;
-            // Fade out current
-            slides[current].style.opacity = '0';
+            slides[current].classList.remove('active');
             dots[current].classList.remove('active');
-            // After fade, hide old and show new
-            (function (from, to) {
-                setTimeout(function () {
-                    slides[from].hidden = true;
-                    slides[to].hidden   = false;
-                    slides[to].style.opacity = '0';
-                    // Force reflow so transition fires
-                    void slides[to].offsetWidth;
-                    slides[to].style.opacity = '1';
-                    dots[to].classList.add('active');
-                }, 700);
-            }(current, next));
-            current = next;
+            current = (n + slides.length) % slides.length;
+            slides[current].classList.add('active');
+            dots[current].classList.add('active');
+            reposition();
         }
 
-        function start() {
-            if (timer) return;
-            timer = setInterval(function () { goTo(current + 1); }, DELAY);
-        }
-        function stop() {
-            clearInterval(timer);
-            timer = null;
-        }
+        function start() { if (timer) return; timer = setInterval(function () { goTo(current + 1); }, DELAY); }
+        function stop()  { clearInterval(timer); timer = null; }
 
-        // Initialise: show slide 0 at full opacity via JS
-        slides[0].style.opacity = '1';
+        // Click a non-active slide to jump to it
+        slides.forEach(function (slide, i) {
+            slide.addEventListener('click', function () {
+                if (i !== current) { stop(); goTo(i); start(); }
+            });
+        });
 
         document.querySelector('.carousel-btn--next').addEventListener('click', function () { stop(); goTo(current + 1); start(); });
         document.querySelector('.carousel-btn--prev').addEventListener('click', function () { stop(); goTo(current - 1); start(); });
@@ -222,9 +231,12 @@
 
         hero.addEventListener('mouseenter', stop);
         hero.addEventListener('mouseleave', start);
+        window.addEventListener('resize', reposition);
 
+        reposition();
         start();
     }());
     </script>
+
 </body>
 </html>

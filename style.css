@@ -92,23 +92,25 @@ img {
 
 .btn-download {
     display: inline-block;
-    background: var(--accent);
-    color: #fff;
+    background: rgba(0, 144, 204, 0.12);
+    color: var(--accent-hi);
     padding: 0.65rem 1.75rem;
     font-weight: 600;
     font-size: 0.82rem;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    border: 1px solid rgba(0, 180, 240, 0.5);
+    border: 1px solid rgba(0, 180, 240, 0.45);
     white-space: nowrap;
-    transition: background 0.15s, border-color 0.15s;
+    box-shadow: 0 0 12px rgba(0, 180, 240, 0.2), inset 0 0 8px rgba(0, 180, 240, 0.05);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
 }
 
 .btn-download:hover {
-    background: var(--accent-hi);
-    border-color: var(--accent-hi);
+    background: rgba(0, 180, 240, 0.2);
+    border-color: rgba(0, 180, 240, 0.85);
     color: #fff;
     text-decoration: none;
+    box-shadow: 0 0 22px rgba(0, 180, 240, 0.45), inset 0 0 14px rgba(0, 180, 240, 0.1);
 }
 
 .requirements {

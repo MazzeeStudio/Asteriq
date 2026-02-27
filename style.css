@@ -166,6 +166,8 @@ img {
     border-bottom: 1px solid var(--border);
     overflow: hidden;
     padding: 2rem 0 3.5rem;
+    max-width: 1080px;
+    margin: 0 auto;
 }
 
 /* Flex track — JS translates this to centre the active slide */

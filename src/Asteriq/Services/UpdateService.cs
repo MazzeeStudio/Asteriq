@@ -9,7 +9,7 @@ public sealed class UpdateService : IUpdateService
 {
     private const string Owner = "MazzeeStudio";
     private const string Repo = "Asteriq";
-    private const string AssetName = "Asteriq.exe";
+    private const string AssetName = "Asteriq.zip";
     private const string ApiUrl = $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
 
     private readonly IHttpClientFactory _httpClientFactory;
@@ -98,7 +98,7 @@ public sealed class UpdateService : IUpdateService
 
         try
         {
-            string tempPath = Path.Combine(Path.GetTempPath(), "Asteriq_update.exe");
+            string tempPath = Path.Combine(Path.GetTempPath(), "Asteriq_update.zip");
 
             var client = _httpClientFactory.CreateClient("Asteriq");
             using var response = await client.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -156,19 +156,20 @@ public sealed class UpdateService : IUpdateService
         {
             string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
             string tempPath = _downloadedTempPath;
+            string installDir = Path.GetDirectoryName(currentExe)!;
             string script = $$"""
-                $copied = $false
+                $success = $false
                 for ($i = 0; $i -lt 5; $i++) {
                     Start-Sleep -Seconds 2
                     try {
-                        Copy-Item -Path '{{tempPath}}' -Destination '{{currentExe}}' -Force -ErrorAction Stop
-                        $copied = $true
+                        Expand-Archive -Path '{{tempPath}}' -DestinationPath '{{installDir}}' -Force -ErrorAction Stop
+                        $success = $true
                         break
                     } catch {
                         # Exe may still be locked, retry
                     }
                 }
-                if ($copied) {
+                if ($success) {
                     Start-Process -FilePath '{{currentExe}}' -ArgumentList '--post-update'
                 }
                 Remove-Item -Path '{{tempPath}}' -ErrorAction SilentlyContinue

@@ -1096,10 +1096,68 @@ public class DevicesTabController : ITabController
     /// </summary>
     private void RemoveVJoyDevice(uint vjoyId)
     {
-        bool confirmed = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
-            $"Remove vJoy Slot {vjoyId}?\n\nThis will delete the virtual device from the driver.\n" +
-            "Any mappings targeting it will be lost.\n\nAn admin prompt will appear.",
-            "Remove vJoy Device");
+        // Build per-device mapping breakdown for the warning dialog
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        int mappingCount = 0;
+        string[]? detailLines = null;
+
+        if (profile is not null)
+        {
+            // Count total affected mappings
+            mappingCount =
+                profile.AxisMappings.Count(m => m.Output.VJoyDevice == vjoyId) +
+                profile.ButtonMappings.Count(m => m.Output.VJoyDevice == vjoyId) +
+                profile.HatMappings.Count(m => m.Output.VJoyDevice == vjoyId) +
+                profile.AxisToButtonMappings.Count(m => m.Output.VJoyDevice == vjoyId) +
+                profile.ButtonToAxisMappings.Count(m => m.Output.VJoyDevice == vjoyId);
+
+            if (mappingCount > 0)
+            {
+                // Tally how many affected mappings reference each physical device
+                var deviceCounts = new Dictionary<string, int>();
+                void Tally(IEnumerable<string> deviceIds)
+                {
+                    foreach (var id in deviceIds)
+                    {
+                        deviceCounts.TryGetValue(id, out int c);
+                        deviceCounts[id] = c + 1;
+                    }
+                }
+
+                foreach (var m in profile.AxisMappings.Where(m => m.Output.VJoyDevice == vjoyId))
+                    Tally(m.Inputs.Select(i => i.DeviceId).Distinct());
+                foreach (var m in profile.ButtonMappings.Where(m => m.Output.VJoyDevice == vjoyId))
+                    Tally(m.Inputs.Select(i => i.DeviceId).Distinct());
+                foreach (var m in profile.HatMappings.Where(m => m.Output.VJoyDevice == vjoyId))
+                    Tally(m.Inputs.Select(i => i.DeviceId).Distinct());
+                foreach (var m in profile.AxisToButtonMappings.Where(m => m.Output.VJoyDevice == vjoyId))
+                    Tally(m.Inputs.Select(i => i.DeviceId).Distinct());
+                foreach (var m in profile.ButtonToAxisMappings.Where(m => m.Output.VJoyDevice == vjoyId))
+                    Tally(m.Inputs.Select(i => i.DeviceId).Distinct());
+
+                var deviceLookup = _ctx.Devices.Concat(_ctx.DisconnectedDevices)
+                    .DistinctBy(d => d.InstanceGuid)
+                    .ToDictionary(d => d.InstanceGuid.ToString(), d => d.Name);
+
+                detailLines = deviceCounts
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv =>
+                    {
+                        string name = deviceLookup.TryGetValue(kv.Key, out var n) ? n : "Unknown device";
+                        int c = kv.Value;
+                        return $"{name}  \u2014  {c} mapping{(c == 1 ? "" : "s")}";
+                    })
+                    .ToArray();
+            }
+        }
+
+        string message = mappingCount > 0
+            ? $"Remove vJoy Slot {vjoyId}?\n\nThis will delete the virtual device from the driver.\n" +
+              $"{mappingCount} mapping{(mappingCount == 1 ? "" : "s")} targeting this device will also be removed.\n\n" +
+              "An admin prompt will appear."
+            : $"Remove vJoy Slot {vjoyId}?\n\nThis will delete the virtual device from the driver.\n\nAn admin prompt will appear.";
+
+        bool confirmed = FUIMessageBox.ShowDestructiveConfirm(_ctx.OwnerForm, message, "Remove vJoy Device", "Remove", detailLines);
         if (!confirmed) return;
 
         string? configPath = _ctx.DriverSetupManager.GetVJoyConfigPath();
@@ -1109,6 +1167,18 @@ public class DevicesTabController : ITabController
                 "vJoyConfig.exe was not found in your vJoy installation.",
                 "vJoy Not Found");
             return;
+        }
+
+        // Clean up mappings before deleting the device so stale references never persist
+        if (profile is not null && mappingCount > 0)
+        {
+            profile.AxisMappings.RemoveAll(m => m.Output.VJoyDevice == vjoyId);
+            profile.ButtonMappings.RemoveAll(m => m.Output.VJoyDevice == vjoyId);
+            profile.HatMappings.RemoveAll(m => m.Output.VJoyDevice == vjoyId);
+            profile.AxisToButtonMappings.RemoveAll(m => m.Output.VJoyDevice == vjoyId);
+            profile.ButtonToAxisMappings.RemoveAll(m => m.Output.VJoyDevice == vjoyId);
+            _ctx.ProfileManager.SaveActiveProfile();
+            _ctx.OnMappingsChanged();
         }
 
         // Release the device if our process has it acquired (prevents driver refusing deletion)
@@ -1131,7 +1201,7 @@ public class DevicesTabController : ITabController
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            return; // User cancelled UAC
+            return; // User cancelled UAC — mappings already cleaned, that's fine
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {

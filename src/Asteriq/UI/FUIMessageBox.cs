@@ -21,6 +21,8 @@ public class FUIMessageBox : Form
     private readonly string _title;
     private readonly MessageBoxType _type;
     private readonly string[] _buttonLabels;
+    private readonly string[]? _detailLines;
+    private readonly SKColor? _primaryButtonColor;
     private readonly SKControl _canvas;
     private int _hoveredButton = -1;
     private readonly SKRect[] _buttonBounds;
@@ -30,12 +32,15 @@ public class FUIMessageBox : Form
     private bool _isDragging;
     private Point _dragStart;
 
-    private FUIMessageBox(string message, string title, MessageBoxType type, string[] buttonLabels)
+    private FUIMessageBox(string message, string title, MessageBoxType type, string[] buttonLabels,
+        string[]? detailLines = null, SKColor? primaryButtonColor = null)
     {
         _message = message;
         _title = title;
         _type = type;
         _buttonLabels = buttonLabels;
+        _detailLines = detailLines;
+        _primaryButtonColor = primaryButtonColor;
         _buttonBounds = new SKRect[buttonLabels.Length];
 
         // Form setup
@@ -80,19 +85,23 @@ public class FUIMessageBox : Form
 
     private SKSize CalculateSize()
     {
-        // Measure text to determine dialog size
         using var textPaint = FUIRenderer.CreateTextPaint(FUIColors.TextPrimary, 16f);
+        using var detailPaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 13f);
 
         var lines = _message.Split('\n');
         float maxWidth = 200f;
         foreach (var line in lines)
-        {
-            float lineWidth = textPaint.MeasureText(line);
-            maxWidth = Math.Max(maxWidth, lineWidth);
-        }
+            maxWidth = Math.Max(maxWidth, textPaint.MeasureText(line));
 
-        float width = Math.Max(320f, maxWidth + 80f);
-        float height = 120f + lines.Length * 22f + 50f; // Title bar + message + buttons
+        if (_detailLines is not null)
+            foreach (var line in _detailLines)
+                maxWidth = Math.Max(maxWidth, detailPaint.MeasureText(line) + 40f); // 20px box padding each side
+
+        float width = Math.Max(340f, maxWidth + 80f);
+        float height = 120f + lines.Length * 22f + 50f; // title bar + message + buttons
+
+        if (_detailLines is { Length: > 0 })
+            height += _detailLines.Length * 18f + 44f; // 12px gap + 10px pad top + lines + 10px pad bottom + 12px gap
 
         return new SKSize(width, height);
     }
@@ -150,6 +159,38 @@ public class FUIMessageBox : Form
             messageY += 20f;
         }
 
+        // Draw detail box (if provided)
+        if (_detailLines is { Length: > 0 })
+        {
+            const float boxPad = 10f;
+            const float lineH = 18f;
+            float boxTop = messageY + 12f;
+            float boxHeight = _detailLines.Length * lineH + boxPad * 2;
+            var detailBounds = new SKRect(16f, boxTop, bounds.Right - 16f, boxTop + boxHeight);
+
+            // Use primary button colour (e.g. Danger red) for the box so it always pops
+            var boxColor = _primaryButtonColor ?? iconColor;
+
+            using var boxBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = boxColor.WithAlpha(55) };
+            canvas.DrawRect(detailBounds, boxBgPaint);
+
+            using var boxBorderPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = boxColor,
+                StrokeWidth = 1.5f
+            };
+            canvas.DrawRect(detailBounds, boxBorderPaint);
+
+            float detailY = boxTop + boxPad + lineH * 0.8f;
+            foreach (var line in _detailLines)
+            {
+                FUIRenderer.DrawText(canvas, line, new SKPoint(detailBounds.Left + boxPad, detailY),
+                    FUIColors.TextPrimary, 13f);
+                detailY += lineH;
+            }
+        }
+
         // Draw buttons
         float buttonWidth = 80f;
         float buttonHeight = 32f;
@@ -169,7 +210,7 @@ public class FUIMessageBox : Form
             _buttonBounds[i] = btnBounds;
 
             var state = _hoveredButton == i ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            SKColor? accent = i == 0 ? FUIColors.Active : null; // Primary button gets accent
+            SKColor? accent = i == 0 ? (_primaryButtonColor ?? FUIColors.Active) : null;
             FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state, accent);
         }
 
@@ -346,6 +387,20 @@ public class FUIMessageBox : Form
     public static bool ShowQuestion(IWin32Window? owner, string message, string title = "Confirm")
     {
         using var dialog = new FUIMessageBox(message, title, MessageBoxType.Question, new[] { "Yes", "No" });
+        dialog.ShowDialog(owner);
+        return dialog._result == 0;
+    }
+
+    /// <summary>
+    /// Show a destructive confirmation dialog with a framed detail section.
+    /// Primary button uses danger (red) accent.
+    /// </summary>
+    /// <returns>True if the confirm button was clicked, false otherwise</returns>
+    public static bool ShowDestructiveConfirm(IWin32Window? owner, string message, string title,
+        string confirmLabel, string[]? detailLines = null)
+    {
+        using var dialog = new FUIMessageBox(message, title, MessageBoxType.Warning,
+            new[] { confirmLabel, "Cancel" }, detailLines, FUIColors.Danger);
         dialog.ShowDialog(owner);
         return dialog._result == 0;
     }

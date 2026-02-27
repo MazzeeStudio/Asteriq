@@ -100,15 +100,22 @@ public partial class SCBindingsTabController : ITabController
     private SKRect _scHeaderToggleButtonBounds;
     private bool _scHeaderToggleButtonHovered;
 
-    // Column actions panel (shown when a vJoy column is highlighted)
-    private int _scMoveTargetVJoyIndex;
-    private bool _scMoveDropdownOpen;
-    private SKRect _scMoveSelectorBounds;
-    private SKRect _scMoveDropdownBounds;
-    private int _scMoveDropdownHoveredIndex = -1;
-    private SKRect _scMoveButtonBounds;
+    // Column actions panel — Import From Profile
+    private int _scColImportProfileIndex = -1;
+    private bool _scColImportProfileDropdownOpen;
+    private SKRect _scColImportProfileSelectorBounds;
+    private SKRect _scColImportProfileDropdownBounds;
+    private int _scColImportProfileHoveredIndex = -1;
+    private SCExportProfile? _scColImportLoadedProfile;
+    private List<(string Label, uint VJoyDeviceId)> _scColImportSourceColumns = new();
+    private int _scColImportColumnIndex = -1;
+    private bool _scColImportColumnDropdownOpen;
+    private SKRect _scColImportColumnSelectorBounds;
+    private SKRect _scColImportColumnDropdownBounds;
+    private int _scColImportColumnHoveredIndex = -1;
+    private SKRect _scColImportButtonBounds;
+    private bool _scColImportButtonHovered;
     private SKRect _scDeselectButtonBounds;
-    private bool _scMoveButtonHovered;
     private bool _scDeselectButtonHovered;
 
     // SC scrollbar state
@@ -428,28 +435,62 @@ public partial class SCBindingsTabController : ITabController
             (!_scVScrollbarBounds.IsEmpty && _scVScrollbarBounds.Contains(e.X, e.Y)) ||
             (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)) ||
             (!_scHeaderToggleButtonBounds.IsEmpty && _scHeaderToggleButtonBounds.Contains(e.X, e.Y)) ||
-            (!_scMoveButtonBounds.IsEmpty && _scMoveButtonBounds.Contains(e.X, e.Y)) ||
+            (!_scColImportButtonBounds.IsEmpty && _scColImportButtonBounds.Contains(e.X, e.Y)) ||
             (!_scDeselectButtonBounds.IsEmpty && _scDeselectButtonBounds.Contains(e.X, e.Y)) ||
-            (!_scMoveSelectorBounds.IsEmpty && _scMoveSelectorBounds.Contains(e.X, e.Y)))
+            (!_scColImportProfileSelectorBounds.IsEmpty && _scColImportProfileSelectorBounds.Contains(e.X, e.Y)) ||
+            (!_scColImportColumnSelectorBounds.IsEmpty && _scColImportColumnSelectorBounds.Contains(e.X, e.Y)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
-        // Move dropdown hover index
-        if (_scMoveDropdownOpen && !_scMoveDropdownBounds.IsEmpty && _scMoveDropdownBounds.Contains(e.X, e.Y))
+        bool showColumnActions = _scHighlightedColumn >= 0
+            && _scGridColumns is not null
+            && _scHighlightedColumn < _scGridColumns.Count
+            && _scGridColumns[_scHighlightedColumn].IsJoystick
+            && !_scGridColumns[_scHighlightedColumn].IsPhysical
+            && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
+
+        // Import profile dropdown hover
+        if (showColumnActions && _scColImportProfileDropdownOpen
+            && !_scColImportProfileDropdownBounds.IsEmpty
+            && _scColImportProfileDropdownBounds.Contains(e.X, e.Y))
         {
-            float itemH = 26f;
-            int idx = (int)((e.Y - _scMoveDropdownBounds.Top) / itemH);
-            if (idx != _scMoveDropdownHoveredIndex)
+            float itemH = 28f;
+            int idx = (int)((e.Y - _scColImportProfileDropdownBounds.Top) / itemH);
+            var (savedProfiles, xmlFiles) = GetColImportSources();
+            int totalSources = savedProfiles.Count + xmlFiles.Count;
+            int newHovered = idx >= 0 && idx < totalSources ? idx : -1;
+            if (newHovered != _scColImportProfileHoveredIndex)
             {
-                _scMoveDropdownHoveredIndex = idx;
+                _scColImportProfileHoveredIndex = newHovered;
                 _ctx.MarkDirty();
             }
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-        else if (_scMoveDropdownHoveredIndex >= 0)
+        else if (_scColImportProfileHoveredIndex >= 0)
         {
-            _scMoveDropdownHoveredIndex = -1;
+            _scColImportProfileHoveredIndex = -1;
+            _ctx.MarkDirty();
+        }
+
+        // Import column dropdown hover
+        if (showColumnActions && _scColImportColumnDropdownOpen
+            && !_scColImportColumnDropdownBounds.IsEmpty
+            && _scColImportColumnDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemH = 28f;
+            int idx = (int)((e.Y - _scColImportColumnDropdownBounds.Top) / itemH);
+            int newHovered = idx >= 0 && idx < _scColImportSourceColumns.Count ? idx : -1;
+            if (newHovered != _scColImportColumnHoveredIndex)
+            {
+                _scColImportColumnHoveredIndex = newHovered;
+                _ctx.MarkDirty();
+            }
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+        else if (_scColImportColumnHoveredIndex >= 0)
+        {
+            _scColImportColumnHoveredIndex = -1;
             _ctx.MarkDirty();
         }
 

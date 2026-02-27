@@ -177,6 +177,7 @@ img {
     display: flex;
     gap: 20px; /* must match GAP constant in JS */
     align-items: stretch;
+    margin: 0 auto;
     will-change: transform;
     transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }

@@ -53,6 +53,34 @@ img {
 }
 
 
+/* ===== Dev Banner ===== */
+
+.dev-banner {
+    background: rgba(200, 150, 10, 0.08);
+    border-bottom: 1px solid rgba(200, 150, 10, 0.35);
+    padding: 0.6rem 2rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+}
+
+.dev-banner__icon {
+    color: #c8960a;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    line-height: 1;
+    position: relative;
+    top: -0.05em;
+}
+
+.dev-banner__text {
+    font-size: 0.82rem;
+    color: #a08840;
+    line-height: 1.5;
+    max-width: 1080px;
+}
+
+
 /* ===== Header ===== */
 
 .site-header {

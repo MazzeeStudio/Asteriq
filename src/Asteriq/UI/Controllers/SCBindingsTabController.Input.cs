@@ -351,15 +351,37 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Device Order panel — auto-detect button
-        if (!_scDeviceOrderAutoDetectBounds.IsEmpty && _scDeviceOrderAutoDetectBounds.Contains(point)
+        // Panel header clicks — Device Order / Control Profiles mutual-exclusive expand
+        if (!_scDeviceOrderHeaderBounds.IsEmpty && _scDeviceOrderHeaderBounds.Contains(point))
+        {
+            if (!_scDeviceOrderExpanded)
+            {
+                _scDeviceOrderExpanded = true;
+                _scDeviceOrderOpenRow = -1;
+                _ctx.MarkDirty();
+            }
+            return;
+        }
+        if (!_scControlProfilesHeaderBounds.IsEmpty && _scControlProfilesHeaderBounds.Contains(point))
+        {
+            if (_scDeviceOrderExpanded)
+            {
+                _scDeviceOrderExpanded = false;
+                _ctx.MarkDirty();
+            }
+            return;
+        }
+
+        // Device Order panel — auto-detect button (only when expanded)
+        if (_scDeviceOrderExpanded && !_scDeviceOrderAutoDetectBounds.IsEmpty && _scDeviceOrderAutoDetectBounds.Contains(point)
             && _directInputService is not null)
         {
             RunDeviceOrderAutoDetect();
             return;
         }
 
-        // Device Order panel — row selector clicks
+        // Device Order panel — row selector clicks (only when expanded)
+        if (_scDeviceOrderExpanded)
         for (int row = 0; row < _scDeviceOrderSelectorBounds.Length; row++)
         {
             if (!_scDeviceOrderSelectorBounds[row].IsEmpty && _scDeviceOrderSelectorBounds[row].Contains(point))

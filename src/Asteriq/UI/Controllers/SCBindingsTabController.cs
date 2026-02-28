@@ -176,6 +176,10 @@ public partial class SCBindingsTabController : ITabController
     private int _scDeviceOrderHoveredIndex = -1; // hovered item in the open dropdown
     private SKRect _scDeviceOrderAutoDetectBounds = SKRect.Empty;
     private bool _scDeviceOrderAutoDetectHovered;
+    // Mutual-exclusive expand state: true = Device Order expanded, false = Control Profiles expanded
+    private bool _scDeviceOrderExpanded = false;
+    private SKRect _scDeviceOrderHeaderBounds;
+    private SKRect _scControlProfilesHeaderBounds;
 
     // SC binding assignment state (right-panel ASSIGN/CLEAR buttons)
     private SKRect _scAssignInputButtonBounds;
@@ -453,6 +457,19 @@ public partial class SCBindingsTabController : ITabController
         if (_scSearchBoxBounds.Contains(e.X, e.Y))
         {
             _ctx.OwnerForm.Cursor = Cursors.IBeam;
+        }
+
+        // Panel header hover (collapsed panel expand buttons)
+        bool overDevOrderHeader = !_scDeviceOrderExpanded
+            && !_scDeviceOrderHeaderBounds.IsEmpty
+            && _scDeviceOrderHeaderBounds.Contains(e.X, e.Y);
+        bool overCPHeader = _scDeviceOrderExpanded
+            && !_scControlProfilesHeaderBounds.IsEmpty
+            && _scControlProfilesHeaderBounds.Contains(e.X, e.Y);
+        if (overDevOrderHeader || overCPHeader)
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            _ctx.MarkDirty();
         }
 
         // Device Order auto-detect button hover

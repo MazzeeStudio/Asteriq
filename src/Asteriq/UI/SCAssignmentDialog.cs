@@ -9,7 +9,7 @@ namespace Asteriq.UI;
 /// FUI-styled dialog for assigning SC actions to joystick inputs.
 /// Works with both vJoy devices and physical devices.
 /// </summary>
-public class SCAssignmentDialog : Form
+public class SCAssignmentDialog : FUIBaseDialog
 {
     private readonly SCAction _action;
 

@@ -2433,7 +2433,7 @@ public partial class MappingsTabController
             _mappingRemoveButtonBounds.Add(removeBounds);
 
             bool removeHovered = rowIndex == _hoveredRemoveButton;
-            FUIWidgets.DrawSmallIconButton(canvas, removeBounds, "├ù", removeHovered, true);
+            FUIWidgets.DrawSmallIconButton(canvas, removeBounds, "X", removeHovered, true);
         }
         else
         {

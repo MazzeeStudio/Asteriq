@@ -6,7 +6,7 @@ namespace Asteriq.UI;
 /// <summary>
 /// FUI-themed confirmation dialog with Yes/No style buttons.
 /// </summary>
-public class FUIConfirmDialog : Form
+public class FUIConfirmDialog : FUIBaseDialog
 {
     private SKControl _canvas = null!;
     private readonly string _title;

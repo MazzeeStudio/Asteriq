@@ -7,7 +7,7 @@ namespace Asteriq.UI;
 /// FUI-styled selection dialog for choosing from a list of items.
 /// Matches the dark sci-fi aesthetic of the main application.
 /// </summary>
-public class FUISelectionDialog : Form
+public class FUISelectionDialog : FUIBaseDialog
 {
     private readonly string _title;
     private readonly string _description;

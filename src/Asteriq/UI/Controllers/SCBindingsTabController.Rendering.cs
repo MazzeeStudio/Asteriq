@@ -497,12 +497,12 @@ public partial class SCBindingsTabController
                         canvas.DrawRect(rowBounds, altPaint);
                     }
 
-                    // Amber highlight pulse when navigated to from a conflict link
+                    // Primary highlight pulse when navigated to from a conflict link
                     if (isConflictHighlight)
                     {
                         float t = (float)(DateTime.Now - _scConflictHighlightStartTime).TotalSeconds / 1.5f;
                         byte alpha = (byte)(Math.Max(0, 1f - t) * 120);
-                        using var highlightPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(alpha));
+                        using var highlightPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(alpha));
                         canvas.DrawRect(rowBounds, highlightPaint);
                         _ctx.MarkDirty(); // keep redrawing while animating
                     }
@@ -1485,11 +1485,12 @@ public partial class SCBindingsTabController
         if (totalSources == 0) return;
 
         float itemH = 28f;
+        float dropdownH = Math.Min(totalSources * itemH + 8f, 200f);
         _scColImportProfileDropdownBounds = new SKRect(
             _scColImportProfileSelectorBounds.Left,
-            _scColImportProfileSelectorBounds.Bottom + 2,
+            _scColImportProfileSelectorBounds.Top - 2 - dropdownH,
             _scColImportProfileSelectorBounds.Right,
-            _scColImportProfileSelectorBounds.Bottom + 2 + Math.Min(totalSources * itemH + 8f, 200f));
+            _scColImportProfileSelectorBounds.Top - 2);
 
         var items = savedProfiles.Select(p => p.ProfileName)
             .Concat(xmlFiles.Select(f => $"[SC] {f.DisplayName}"))
@@ -1521,11 +1522,12 @@ public partial class SCBindingsTabController
         if (_scColImportSourceColumns.Count == 0) return;
 
         float itemH = 28f;
+        float dropdownH = Math.Min(_scColImportSourceColumns.Count * itemH + 8f, 200f);
         _scColImportColumnDropdownBounds = new SKRect(
             _scColImportColumnSelectorBounds.Left,
-            _scColImportColumnSelectorBounds.Bottom + 2,
+            _scColImportColumnSelectorBounds.Top - 2 - dropdownH,
             _scColImportColumnSelectorBounds.Right,
-            _scColImportColumnSelectorBounds.Bottom + 2 + Math.Min(_scColImportSourceColumns.Count * itemH + 8f, 200f));
+            _scColImportColumnSelectorBounds.Top - 2);
 
         var items = _scColImportSourceColumns.Select(c => c.Label).ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _scColImportColumnDropdownBounds, items,

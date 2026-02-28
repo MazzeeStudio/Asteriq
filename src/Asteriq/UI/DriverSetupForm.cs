@@ -8,7 +8,7 @@ namespace Asteriq.UI;
 /// <summary>
 /// FUI-styled form for checking and installing required drivers (vJoy, HidHide).
 /// </summary>
-public class DriverSetupForm : Form
+public class DriverSetupForm : FUIBaseDialog
 {
     private readonly DriverSetupManager _driverSetup;
     private readonly IApplicationSettingsService? _appSettings;

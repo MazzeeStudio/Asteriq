@@ -7,7 +7,7 @@ namespace Asteriq.UI;
 /// FUI-styled message box to replace Windows MessageBox.
 /// Matches the dark sci-fi aesthetic of the main application.
 /// </summary>
-public class FUIMessageBox : Form
+public class FUIMessageBox : FUIBaseDialog
 {
     public enum MessageBoxType
     {

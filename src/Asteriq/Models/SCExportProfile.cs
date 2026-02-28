@@ -215,39 +215,60 @@ public class SCExportProfile
 
     /// <summary>
     /// Gets all joystick bindings that would conflict with the given input on a vJoy device.
+    /// Two bindings conflict only if they share both the same input name AND the same modifier set —
+    /// e.g. "rctrl+button13" and "button13" are different bindings and do NOT conflict.
     /// Excludes the specified action to avoid reporting self-conflicts.
     /// </summary>
     public List<SCActionBinding> GetConflictingBindings(
         uint vjoyDevice,
         string inputName,
         string? excludeActionMap = null,
-        string? excludeActionName = null)
+        string? excludeActionName = null,
+        List<string>? modifiers = null)
     {
         return Bindings.Where(b =>
             b.DeviceType == SCDeviceType.Joystick &&
             b.PhysicalDeviceId is null &&
             b.VJoyDevice == vjoyDevice &&
             b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
+            ModifierSetsMatch(b.Modifiers, modifiers) &&
             !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
             .ToList();
     }
 
     /// <summary>
     /// Gets all joystick bindings that would conflict with the given input on a physical device.
+    /// Two bindings conflict only if they share both the same input name AND the same modifier set.
     /// Excludes the specified action to avoid reporting self-conflicts.
     /// </summary>
     public List<SCActionBinding> GetConflictingBindings(
         string physicalDeviceId,
         string inputName,
         string? excludeActionMap = null,
-        string? excludeActionName = null)
+        string? excludeActionName = null,
+        List<string>? modifiers = null)
     {
         return Bindings.Where(b =>
             b.DeviceType == SCDeviceType.Joystick &&
             b.PhysicalDeviceId == physicalDeviceId &&
             b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
+            ModifierSetsMatch(b.Modifiers, modifiers) &&
             !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
             .ToList();
+    }
+
+    /// <summary>
+    /// Returns true if two modifier lists represent the same set of modifiers (order-insensitive).
+    /// Null and empty are treated as equivalent (no modifier).
+    /// </summary>
+    private static bool ModifierSetsMatch(List<string>? a, List<string>? b)
+    {
+        bool aEmpty = a is null || a.Count == 0;
+        bool bEmpty = b is null || b.Count == 0;
+        if (aEmpty && bEmpty) return true;
+        if (aEmpty != bEmpty) return false;
+        return a!.Select(m => m.ToLowerInvariant()).OrderBy(m => m)
+            .SequenceEqual(b!.Select(m => m.ToLowerInvariant()).OrderBy(m => m));
     }
 
     /// <summary>

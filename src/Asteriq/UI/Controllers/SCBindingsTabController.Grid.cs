@@ -315,16 +315,21 @@ public partial class SCBindingsTabController
         {
             if (binding.DeviceType != SCDeviceType.Joystick) continue;
 
+            // Include modifiers in the key so rctrl+button13 and button13 are separate slots
+            string modPrefix = binding.Modifiers is { Count: > 0 }
+                ? string.Join("+", binding.Modifiers.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)) + "+"
+                : "";
+
             string inputKey;
             if (binding.PhysicalDeviceId is not null)
             {
                 int scInstance = _scExportProfile.GetSCInstanceForPhysical(binding.PhysicalDeviceId);
-                inputKey = $"js{scInstance}_{binding.InputName}";
+                inputKey = $"js{scInstance}_{modPrefix}{binding.InputName}";
             }
             else
             {
                 int scInstance = _scExportProfile.GetSCInstance(binding.VJoyDevice);
-                inputKey = $"js{scInstance}_{binding.InputName}";
+                inputKey = $"js{scInstance}_{modPrefix}{binding.InputName}";
             }
 
             string actionKey = binding.Key;
@@ -469,7 +474,8 @@ public partial class SCBindingsTabController
         string modifierPrefix = modifiers is { Count: > 0 } ? string.Join("+", modifiers) + "+" : "";
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{modifierPrefix}{inputName} (physical={col.IsPhysical})");
 
-        // Check for conflicting bindings (same input already used by another action)
+        // Check for conflicting bindings (same input + same modifier set used by another action).
+        // rctrl+button13 and button13 are DIFFERENT bindings; only flag when both match.
         List<SCActionBinding> conflicts;
         if (col.IsPhysical)
         {
@@ -477,7 +483,8 @@ public partial class SCBindingsTabController
                 col.PhysicalDevice!.HidDevicePath,
                 inputName,
                 action.ActionMap,
-                action.ActionName);
+                action.ActionName,
+                modifiers);
         }
         else
         {
@@ -485,7 +492,8 @@ public partial class SCBindingsTabController
                 col.VJoyDeviceId,
                 inputName,
                 action.ActionMap,
-                action.ActionName);
+                action.ActionName,
+                modifiers);
         }
 
         if (conflicts.Count > 0)
@@ -995,6 +1003,8 @@ public partial class SCBindingsTabController
     private void UpdateModifierKeys()
     {
         _scModifierKeys.Clear();
+        _scModifierPhysicalButtonNames.Clear();
+        _scModifierButtonToModifiers.Clear();
 
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null) return;
@@ -1004,11 +1014,31 @@ public partial class SCBindingsTabController
             if (mapping.Output.Type != OutputType.Keyboard) continue;
             var keyName = mapping.Output.KeyName;
             if (keyName is null) continue;
+            if (!s_modifierNameToVK.TryGetValue(keyName, out int vkCode)) continue;
 
-            if (s_modifierNameToVK.TryGetValue(keyName, out int vkCode))
-                _scModifierKeys.TryAdd(vkCode, keyName.ToLowerInvariant());
+            string modName = keyName.ToLowerInvariant();
+            _scModifierKeys.TryAdd(vkCode, modName);
+
+            // Record which physical buttons trigger this modifier key so they can be
+            // identified during joystick listen mode — pressing one skips it as the
+            // binding target and waits for the actual target button instead.
+            foreach (var input in mapping.Inputs)
+            {
+                if (input.Type != InputType.Button) continue;
+                string btnName = $"button{input.Index + 1}";
+                _scModifierPhysicalButtonNames.Add(btnName);
+                if (!_scModifierButtonToModifiers.TryGetValue(btnName, out var mods))
+                {
+                    mods = new List<string>();
+                    _scModifierButtonToModifiers[btnName] = mods;
+                }
+                if (!mods.Contains(modName))
+                    mods.Add(modName);
+            }
         }
 
-        System.Diagnostics.Debug.WriteLine($"[SCBindings] UpdateModifierKeys: {_scModifierKeys.Count} modifier(s) found ({string.Join(", ", _scModifierKeys.Values)})");
+        System.Diagnostics.Debug.WriteLine(
+            $"[SCBindings] UpdateModifierKeys: {_scModifierKeys.Count} modifier(s), " +
+            $"{_scModifierPhysicalButtonNames.Count} modifier button(s): {string.Join(", ", _scModifierPhysicalButtonNames)}");
     }
 }

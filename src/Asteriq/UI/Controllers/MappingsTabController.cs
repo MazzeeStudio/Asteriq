@@ -2487,13 +2487,13 @@ public class MappingsTabController : ITabController
             if (isModifierKey)
             {
                 // Disabled appearance — clear bounds so hover and click don't fire
-                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40) };
+                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100) };
                 canvas.DrawRoundRect(modeBounds, 3, 3, disabledBgPaint);
 
-                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1f };
+                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(100), StrokeWidth = 1f };
                 canvas.DrawRoundRect(modeBounds, 3, 3, disabledFramePaint);
 
-                FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDim.WithAlpha(40), 12f);
+                FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 12f);
                 _buttonModeBounds[i] = SKRect.Empty;
             }
             else
@@ -3952,13 +3952,13 @@ public class MappingsTabController : ITabController
             if (isModifier)
             {
                 // Disabled appearance — clear bounds so hover and click don't fire
-                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40) };
+                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100) };
                 canvas.DrawRect(modeBounds, disabledBgPaint);
 
-                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1f };
+                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(100), StrokeWidth = 1f };
                 canvas.DrawRect(modeBounds, disabledFramePaint);
 
-                FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDim.WithAlpha(40), 13f);
+                FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 13f);
                 _buttonModeBounds[i] = SKRect.Empty;
             }
             else

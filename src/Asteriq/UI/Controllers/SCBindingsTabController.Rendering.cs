@@ -1194,12 +1194,6 @@ public partial class SCBindingsTabController
         }
     }
 
-    private void DrawVJoyMappingRow(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
-        => SCBindingsRenderer.DrawVJoyMappingRow(canvas, bounds, vjoyId, scInstance, isHovered);
-
-    private void DrawVJoyMappingRowCompact(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
-        => SCBindingsRenderer.DrawVJoyMappingRowCompact(canvas, bounds, vjoyId, scInstance, isHovered);
-
     private void DrawExportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
         => FUIWidgets.DrawExportButton(canvas, bounds, text, isHovered, isEnabled);
 

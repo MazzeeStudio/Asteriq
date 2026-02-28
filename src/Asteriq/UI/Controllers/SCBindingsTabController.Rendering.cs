@@ -201,7 +201,7 @@ public partial class SCBindingsTabController
         // Category filter dropdown on the right
         float filterX = rightMargin - filterWidth;
         _scActionMapFilterBounds = new SKRect(filterX, y, rightMargin, y + filterRowHeight);
-        string filterText = string.IsNullOrEmpty(_scActionMapFilter) ? "All Categories" : FormatActionMapName(_scActionMapFilter);
+        string filterText = string.IsNullOrEmpty(_scActionMapFilter) ? "All Categories" : _scActionMapFilter;
         bool filterHovered = _scActionMapFilterBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIWidgets.DrawSelector(canvas, _scActionMapFilterBounds, filterText, filterHovered || _scActionMapFilterDropdownOpen, _scActionMaps.Count > 0);
 
@@ -621,7 +621,7 @@ public partial class SCBindingsTabController
 
                             if (binding is not null)
                             {
-                                bindingComponents = GetBindingComponents(binding.InputName, binding.Modifiers);
+                                bindingComponents = SCBindingsRenderer.GetBindingComponents(binding.InputName, binding.Modifiers);
                                 inputType = binding.InputType;
                                 // Check for conflicts and cross-column action duplicates (joystick only)
                                 if (col.IsJoystick && !isCellShared)
@@ -635,7 +635,7 @@ public partial class SCBindingsTabController
                             if (binding is null && isCellShared)
                             {
                                 var (_, _, secondaryInputName) = _scSharedCells[sharedCellKey];
-                                bindingComponents = GetBindingComponents(secondaryInputName, new List<string>());
+                                bindingComponents = SCBindingsRenderer.GetBindingComponents(secondaryInputName, new List<string>());
                                 inputType = InferInputTypeFromName(secondaryInputName);
                                 textColor = FUIColors.Primary.WithAlpha(180);
                             }
@@ -745,141 +745,6 @@ public partial class SCBindingsTabController
             using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = hScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180), IsAntialias = true };
             canvas.DrawRoundRect(_scHScrollThumbBounds, 4f, 4f, thumbPaint);
         }
-    }
-
-    private string FormatBindingForCell(string input, List<string>? modifiers)
-    {
-        // For single string display (tooltips, width calculation, etc.)
-        var components = GetBindingComponents(input, modifiers);
-        return string.Join(" + ", components);
-    }
-
-    private List<string> GetBindingComponents(string input, List<string>? modifiers)
-    {
-        var components = new List<string>();
-
-        if (modifiers is not null)
-        {
-            foreach (var mod in modifiers)
-            {
-                var formatted = FormatModifierName(mod);
-                if (!string.IsNullOrEmpty(formatted))
-                    components.Add(formatted);
-            }
-        }
-
-        components.Add(FormatInputName(input));
-        return components;
-    }
-
-    private string FormatModifierName(string modifier)
-    {
-        if (string.IsNullOrEmpty(modifier))
-            return "";
-
-        var lower = modifier.ToLowerInvariant();
-
-        // Map common modifiers to short display names
-        if (lower.Contains("shift")) return "SHFT";
-        if (lower.Contains("ctrl") || lower.Contains("control")) return "CTRL";
-        if (lower.Contains("alt")) return "ALT";
-
-        // Generic cleanup for unknown modifiers
-        var cleaned = lower.TrimStart('l', 'r').ToUpperInvariant();
-        if (cleaned.Length > 4)
-            cleaned = cleaned.Substring(0, 4);
-
-        return cleaned;
-    }
-
-    private string FormatInputName(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return input;
-
-        // Handle button inputs
-        if (input.StartsWith("button", StringComparison.OrdinalIgnoreCase))
-        {
-            var num = input.Substring(6);
-            return $"Btn{num}";
-        }
-
-        // Handle mouse wheel inputs (mwheel_up, mwheel_down)
-        if (input.StartsWith("mwheel_", StringComparison.OrdinalIgnoreCase))
-        {
-            var dir = input.Substring(7);
-            return dir.ToLower() switch
-            {
-                "up" => "WhlUp",
-                "down" => "WhlDn",
-                _ => $"Whl{char.ToUpper(dir[0])}"
-            };
-        }
-
-        // Handle mouse axis inputs (maxis_x, maxis_y)
-        if (input.StartsWith("maxis_", StringComparison.OrdinalIgnoreCase))
-        {
-            var axis = input.Substring(6).ToUpper();
-            return $"M{axis}";
-        }
-
-        // Handle mouse button inputs (mouse1, mouse2, etc.)
-        if (input.StartsWith("mouse", StringComparison.OrdinalIgnoreCase))
-        {
-            var num = input.Substring(5);
-            return $"M{num}";
-        }
-
-        // Handle single letter axis inputs (x, y, z, etc.)
-        if (input.Length == 1)
-            return input.ToUpper();
-
-        // Handle hat inputs (hat1_up -> H1UP)
-        if (input.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
-        {
-            return input.ToUpper().Replace("HAT", "H").Replace("_", "");
-        }
-
-        // Handle rotational axes (rx, ry, rz -> RX, RY, RZ)
-        if (input.Length == 2 && input[0] == 'r' && char.IsLetter(input[1]))
-        {
-            return input.ToUpper();
-        }
-
-        // Handle slider inputs
-        if (input.StartsWith("slider", StringComparison.OrdinalIgnoreCase))
-        {
-            var num = input.Substring(6);
-            return $"Sl{num}";
-        }
-
-        // Default: capitalize and truncate if too long
-        var result = char.ToUpper(input[0]) + (input.Length > 1 ? input.Substring(1) : "");
-        if (result.Length > 8)
-            result = result.Substring(0, 8);
-        return result;
-    }
-
-    private static SCInputType DetectInputTypeFromName(string inputName)
-    {
-        if (string.IsNullOrEmpty(inputName))
-            return SCInputType.Button;
-
-        var lower = inputName.ToLowerInvariant();
-
-        // Hat/POV inputs
-        if (lower.Contains("hat") || lower.Contains("pov"))
-            return SCInputType.Hat;
-
-        // Axis inputs (x, y, z, rx, ry, rz, slider, throttle, etc.)
-        if (lower is "x" or "y" or "z" or "rx" or "ry" or "rz" or "rotx" or "roty" or "rotz")
-            return SCInputType.Axis;
-
-        if (lower.StartsWith("slider") || lower.StartsWith("throttle"))
-            return SCInputType.Axis;
-
-        // Default to button
-        return SCInputType.Button;
     }
 
     private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset,
@@ -1026,7 +891,7 @@ public partial class SCBindingsTabController
             if (isCellSharedInPanel)
             {
                 int panelPrimaryInstance = _scExportProfile.GetSCInstance(panelSharedPrimaryVJoy);
-                string panelPrimaryFormatted = FormatInputName(panelSharedPrimaryInput);
+                string panelPrimaryFormatted = SCBindingsRenderer.FormatInputName(panelSharedPrimaryInput);
                 FUIRenderer.DrawText(canvas, $"Routed to JS{panelPrimaryInstance} / {panelPrimaryFormatted}",
                     new SKPoint(leftMargin, y), FUIColors.Primary.WithAlpha(200), 11f, true);
                 y += lineHeight;
@@ -1235,7 +1100,7 @@ public partial class SCBindingsTabController
         float itemHeight = 24f;
         // items[0] = "All Categories", items[1..] = action map names
         var items = new List<string> { "All Categories" };
-        items.AddRange(_scActionMaps.Select(FormatActionMapName));
+        items.AddRange(_scActionMaps);
 
         float totalContentHeight = items.Count * itemHeight + 4;
         float maxDropdownHeight = 300f;
@@ -1282,12 +1147,6 @@ public partial class SCBindingsTabController
             using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim.WithAlpha(150), IsAntialias = true };
             canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, thumbY, scrollTrackX + scrollbarWidth, thumbY + thumbHeight), 2f), thumbPaint);
         }
-    }
-
-    private static string FormatActionMapName(string categoryName)
-    {
-        // _scActionMaps already contains formatted category names, just return as-is
-        return categoryName;
     }
 
     private void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)

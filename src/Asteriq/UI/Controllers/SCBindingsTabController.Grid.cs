@@ -152,7 +152,7 @@ public partial class SCBindingsTabController
 
                     if (binding is not null && !string.IsNullOrEmpty(binding.InputName))
                     {
-                        var components = GetBindingComponents(binding.InputName, binding.Modifiers);
+                        var components = SCBindingsRenderer.GetBindingComponents(binding.InputName, binding.Modifiers);
                         float badgesWidth = SCBindingsRenderer.MeasureMultiKeycapWidth(components, binding.InputType) + padding;
                         maxWidth = Math.Max(maxWidth, badgesWidth);
                     }
@@ -164,7 +164,7 @@ public partial class SCBindingsTabController
                 if (defaultBinding is not null && !string.IsNullOrEmpty(defaultBinding.Input))
                 {
                     var modifiers = defaultBinding.Modifiers?.Where(m => !string.IsNullOrEmpty(m)).ToList();
-                    var components = GetBindingComponents(defaultBinding.Input, modifiers);
+                    var components = SCBindingsRenderer.GetBindingComponents(defaultBinding.Input, modifiers);
                     // Default bindings don't have input type info
                     float badgesWidth = SCBindingsRenderer.MeasureMultiKeycapWidth(components, null) + padding;
                     maxWidth = Math.Max(maxWidth, badgesWidth);
@@ -507,7 +507,7 @@ public partial class SCBindingsTabController
         {
             // Show conflict dialog
             string actionDisplayName = SCCategoryMapper.FormatActionName(action.ActionName);
-            string inputDisplayName = FormatInputName(inputName);
+            string inputDisplayName = SCBindingsRenderer.FormatInputName(inputName);
             string deviceName = $"JS{col.SCInstance}";
 
             var dialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
@@ -548,8 +548,8 @@ public partial class SCBindingsTabController
             if (existingOnOtherDevice is not null)
             {
                 int primaryInstance = _scExportProfile.GetSCInstance(existingOnOtherDevice.VJoyDevice);
-                string primaryInputDisplay = FormatInputName(existingOnOtherDevice.InputName);
-                string secondaryInputDisplay = FormatInputName(inputName);
+                string primaryInputDisplay = SCBindingsRenderer.FormatInputName(existingOnOtherDevice.InputName);
+                string secondaryInputDisplay = SCBindingsRenderer.FormatInputName(inputName);
 
                 using var sharedDialog = new SCSharedBindingDialog(
                     SCCategoryMapper.FormatActionName(action.ActionName),
@@ -599,8 +599,8 @@ public partial class SCBindingsTabController
             if (existingOnOtherPhysical is not null)
             {
                 int existingInstance = _scExportProfile.GetSCInstanceForPhysical(existingOnOtherPhysical.PhysicalDeviceId!);
-                string existingInputDisplay = FormatInputName(existingOnOtherPhysical.InputName);
-                string newInputDisplay = FormatInputName(inputName);
+                string existingInputDisplay = SCBindingsRenderer.FormatInputName(existingOnOtherPhysical.InputName);
+                string newInputDisplay = SCBindingsRenderer.FormatInputName(inputName);
 
                 using var replaceDialog = new FUIConfirmDialog(
                     "Action Already Bound",
@@ -733,8 +733,8 @@ public partial class SCBindingsTabController
         if (sharedEntry is null) return;
 
         int primaryInstance = _scExportProfile.GetSCInstance(primaryBinding.VJoyDevice);
-        string primaryInputDisplay = FormatInputName(primaryBinding.InputName);
-        string secondaryInputDisplay = FormatInputName(sharedEntry.InputName);
+        string primaryInputDisplay = SCBindingsRenderer.FormatInputName(primaryBinding.InputName);
+        string secondaryInputDisplay = SCBindingsRenderer.FormatInputName(sharedEntry.InputName);
 
         using var dialog = new FUIConfirmDialog(
             "Shared Binding",

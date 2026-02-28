@@ -381,4 +381,84 @@ internal static class SCBindingsRenderer
         FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 60, textY), FUIColors.TextDim, 13f);
         FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 80, textY), FUIColors.Active, 13f, true);
     }
+
+    // ── Text formatting helpers ──────────────────────────────────────────────
+
+    internal static List<string> GetBindingComponents(string input, List<string>? modifiers)
+    {
+        var components = new List<string>();
+        if (modifiers is not null)
+        {
+            foreach (var mod in modifiers)
+            {
+                var formatted = FormatModifierName(mod);
+                if (!string.IsNullOrEmpty(formatted))
+                    components.Add(formatted);
+            }
+        }
+        components.Add(FormatInputName(input));
+        return components;
+    }
+
+    internal static string FormatModifierName(string modifier)
+    {
+        if (string.IsNullOrEmpty(modifier))
+            return "";
+
+        var lower = modifier.ToLowerInvariant();
+        if (lower.Contains("shift")) return "SHFT";
+        if (lower.Contains("ctrl") || lower.Contains("control")) return "CTRL";
+        if (lower.Contains("alt")) return "ALT";
+
+        var cleaned = lower.TrimStart('l', 'r').ToUpperInvariant();
+        if (cleaned.Length > 4)
+            cleaned = cleaned.Substring(0, 4);
+        return cleaned;
+    }
+
+    internal static string FormatInputName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        if (input.StartsWith("button", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = input.Substring(6);
+            return $"Btn{num}";
+        }
+
+        if (input.StartsWith("mwheel_", StringComparison.OrdinalIgnoreCase))
+        {
+            var dir = input.Substring(7);
+            return dir.ToLower() switch
+            {
+                "up" => "WhlUp",
+                "down" => "WhlDn",
+                _ => $"Whl{char.ToUpper(dir[0])}"
+            };
+        }
+
+        if (input.StartsWith("maxis_", StringComparison.OrdinalIgnoreCase))
+            return $"M{input.Substring(6).ToUpper()}";
+
+        if (input.StartsWith("mouse", StringComparison.OrdinalIgnoreCase))
+            return $"M{input.Substring(5)}";
+
+        if (input.Length == 1)
+            return input.ToUpper();
+
+        if (input.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
+            return input.ToUpper().Replace("HAT", "H").Replace("_", "");
+
+        if (input.Length == 2 && input[0] == 'r' && char.IsLetter(input[1]))
+            return input.ToUpper();
+
+        if (input.StartsWith("slider", StringComparison.OrdinalIgnoreCase))
+            return $"Sl{input.Substring(6)}";
+
+        var result = char.ToUpper(input[0]) + (input.Length > 1 ? input.Substring(1) : "");
+        if (result.Length > 8)
+            result = result.Substring(0, 8);
+        return result;
+    }
 }

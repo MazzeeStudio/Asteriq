@@ -96,11 +96,11 @@ public class FUIInputDialog : Form
 
         // Title bar background
         var titleBar = new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Top + TitleBarHeight);
-        using var titleBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(titleBar, titleBgPaint);
 
         // Title bar separator
-        using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawLine(titleBar.Left, titleBar.Bottom, titleBar.Right, titleBar.Bottom, sepPaint);
 
         // Title text
@@ -113,12 +113,7 @@ public class FUIInputDialog : Form
 
         // Text field outline (native TextBox sits here, canvas just draws the border)
         var fieldBounds = new SKRect(15, titleBar.Bottom + 34, bounds.Right - 15, titleBar.Bottom + 62);
-        using var fieldBorderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var fieldBorderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(fieldBounds, fieldBorderPaint);
 
         // Buttons

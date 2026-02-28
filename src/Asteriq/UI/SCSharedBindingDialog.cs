@@ -97,19 +97,10 @@ public class SCSharedBindingDialog : Form
 
         // Title bar with primary-color tint (blue/active, not amber warning)
         var titleBarBounds = new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Top + 40);
-        using var titleBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Active.WithAlpha(35)
-        };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(35));
         canvas.DrawRect(titleBarBounds, titleBgPaint);
 
-        using var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawLine(titleBarBounds.Left, titleBarBounds.Bottom, titleBarBounds.Right, titleBarBounds.Bottom, sepPaint);
 
         // Link icon (two overlapping squares)
@@ -140,7 +131,7 @@ public class SCSharedBindingDialog : Form
 
         // Button panel background
         float buttonPanelTop = bounds.Bottom - 55;
-        using var buttonPanelPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var buttonPanelPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(new SKRect(0, buttonPanelTop, bounds.Right, bounds.Bottom), buttonPanelPaint);
         canvas.DrawLine(0, buttonPanelTop, bounds.Right, buttonPanelTop, sepPaint);
 
@@ -179,19 +170,10 @@ public class SCSharedBindingDialog : Form
 
     private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool primary)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = hovered ? FUIColors.Background2.WithAlpha(220) : FUIColors.Background2.WithAlpha(120)
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Background2.WithAlpha(220) : FUIColors.Background2.WithAlpha(120));
         canvas.DrawRect(bounds, bgPaint);
 
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? FUIColors.FrameBright : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.FrameBright : FUIColors.Frame);
         canvas.DrawRect(bounds, borderPaint);
 
         float textWidth = FUIRenderer.MeasureText(text, 13f);
@@ -202,19 +184,10 @@ public class SCSharedBindingDialog : Form
 
     private static void DrawShareButton(SKCanvas canvas, SKRect bounds, string text, bool hovered)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = hovered ? FUIColors.Active.WithAlpha(70) : FUIColors.Active.WithAlpha(35)
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Active.WithAlpha(70) : FUIColors.Active.WithAlpha(35));
         canvas.DrawRect(bounds, bgPaint);
 
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(160),
-            StrokeWidth = 1f
-        };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(160));
         canvas.DrawRect(bounds, borderPaint);
 
         float textWidth = FUIRenderer.MeasureText(text, 13f);

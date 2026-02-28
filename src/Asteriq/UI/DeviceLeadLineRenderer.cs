@@ -28,13 +28,7 @@ internal static class DeviceLeadLineRenderer
 
         var pathPoints = BuildLeadLinePath(anchor, labelPos, input.Control?.LeadLine, goesRight, svgMirrored, svgScale);
 
-        using var linePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = lineColor,
-            StrokeWidth = 1.5f,
-            IsAntialias = true
-        };
+        using var linePaint = FUIRenderer.CreateStrokePaint(lineColor, 1.5f);
 
         float totalLength = 0f;
         for (int i = 1; i < pathPoints.Count; i++)
@@ -71,12 +65,7 @@ internal static class DeviceLeadLineRenderer
 
         if (progress > 0.8f)
         {
-            using var dotPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = lineColor,
-                IsAntialias = true
-            };
+            using var dotPaint = FUIRenderer.CreateFillPaint(lineColor);
             canvas.DrawCircle(anchor, 4f, dotPaint);
         }
 
@@ -152,21 +141,10 @@ internal static class DeviceLeadLineRenderer
         float y = pos.Y - labelHeight / 2;
 
         var frameBounds = new SKRect(x, y, x + labelWidth, y + labelHeight);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha((byte)(160 * alpha / 255)),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha((byte)(160 * alpha / 255)));
         canvas.DrawRect(frameBounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = activeColor,
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(activeColor);
         canvas.DrawRect(frameBounds, framePaint);
 
         FUIRenderer.DrawText(canvas, label, new SKPoint(x + 5, y + 14), textColor, 14f);

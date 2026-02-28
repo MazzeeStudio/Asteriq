@@ -151,10 +151,10 @@ public class FUICurveEditor : UserControl
             var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.Primary : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRect(bounds, bgPaint);
 
-            using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
+            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
             canvas.DrawRect(bounds, framePaint);
 
             FUIRenderer.DrawTextCentered(canvas, _presetNames[i], bounds, textColor, 13f);
@@ -164,12 +164,7 @@ public class FUICurveEditor : UserControl
     private void DrawGraph(SKCanvas canvas)
     {
         // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(_graphBounds, framePaint);
 
         // Grid
@@ -210,12 +205,7 @@ public class FUICurveEditor : UserControl
 
     private void DrawGrid(SKCanvas canvas)
     {
-        using var gridPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Grid,
-            StrokeWidth = 0.5f
-        };
+        using var gridPaint = FUIRenderer.CreateStrokePaint(FUIColors.Grid, 0.5f);
 
         // Vertical lines (every 25%)
         for (float x = 0.25f; x < 1f; x += 0.25f)
@@ -232,12 +222,7 @@ public class FUICurveEditor : UserControl
         }
 
         // Center lines (brighter)
-        using var centerPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.GridAccent,
-            StrokeWidth = 0.75f
-        };
+        using var centerPaint = FUIRenderer.CreateStrokePaint(FUIColors.GridAccent, 0.75f);
         var center = GraphToScreen(new SKPoint(0.5f, 0.5f));
         canvas.DrawLine(center.X, _graphBounds.Top, center.X, _graphBounds.Bottom, centerPaint);
         canvas.DrawLine(_graphBounds.Left, center.Y, _graphBounds.Right, center.Y, centerPaint);
@@ -250,11 +235,7 @@ public class FUICurveEditor : UserControl
         var dzEnd = GraphToScreen(new SKPoint(_curve.Deadzone, 0));
         var region = new SKRect(_graphBounds.Left, _graphBounds.Top, dzEnd.X, _graphBounds.Bottom);
 
-        using var fillPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Warning.WithAlpha(20)
-        };
+        using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(20));
         canvas.DrawRect(region, fillPaint);
 
         using var linePaint = new SKPaint
@@ -274,11 +255,7 @@ public class FUICurveEditor : UserControl
         var satStart = GraphToScreen(new SKPoint(_curve.Saturation, 0));
         var region = new SKRect(satStart.X, _graphBounds.Top, _graphBounds.Right, _graphBounds.Bottom);
 
-        using var fillPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Success.WithAlpha(20)
-        };
+        using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Success.WithAlpha(20));
         canvas.DrawRect(region, fillPaint);
 
         using var linePaint = new SKPaint
@@ -360,22 +337,11 @@ public class FUICurveEditor : UserControl
             canvas.DrawCircle(pt, radius + 4, glowPaint);
 
             // Fill
-            using var fillPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = isEndpoint ? FUIColors.Background1 : color.WithAlpha(60),
-                IsAntialias = true
-            };
+            using var fillPaint = FUIRenderer.CreateFillPaint(isEndpoint ? FUIColors.Background1 : color.WithAlpha(60));
             canvas.DrawCircle(pt, radius, fillPaint);
 
             // Stroke
-            using var strokePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = color,
-                StrokeWidth = isEndpoint ? 2f : 1.5f,
-                IsAntialias = true
-            };
+            using var strokePaint = FUIRenderer.CreateStrokePaint(color, isEndpoint ? 2f : 1.5f);
             canvas.DrawCircle(pt, radius, strokePaint);
 
             // Value label when hovered/dragged
@@ -408,37 +374,26 @@ public class FUICurveEditor : UserControl
         float trackHeight = 8f;
         var trackBounds = new SKRect(bounds.Left, trackY, bounds.Right, trackY + trackHeight);
 
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(trackBounds, trackPaint);
 
-        using var trackFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        using var trackFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(trackBounds, trackFramePaint);
 
         // Fill
         float fillWidth = (bounds.Width) * value;
         var fillBounds = new SKRect(bounds.Left + 1, trackY + 1, bounds.Left + 1 + fillWidth, trackY + trackHeight - 1);
-        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(100) };
+        using var fillPaint = FUIRenderer.CreateFillPaint(color.WithAlpha(100));
         canvas.DrawRect(fillBounds, fillPaint);
 
         // Handle
         float handleX = bounds.Left + (bounds.Width) * value;
         float handleRadius = dragging ? 7f : 5f;
 
-        using var handlePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = dragging ? color : FUIColors.TextPrimary,
-            IsAntialias = true
-        };
+        using var handlePaint = FUIRenderer.CreateFillPaint(dragging ? color : FUIColors.TextPrimary);
         canvas.DrawCircle(handleX, trackY + trackHeight / 2, handleRadius, handlePaint);
 
-        using var handleStroke = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color,
-            StrokeWidth = 1.5f,
-            IsAntialias = true
-        };
+        using var handleStroke = FUIRenderer.CreateStrokePaint(color, 1.5f);
         canvas.DrawCircle(handleX, trackY + trackHeight / 2, handleRadius, handleStroke);
     }
 

@@ -528,12 +528,7 @@ public static class FUIRenderer
         using var glowPaint = CreateGlowPaint(color.WithAlpha(100), glowRadius);
         canvas.DrawCircle(center, radius + glowRadius / 2, glowPaint);
 
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = color,
-            IsAntialias = true
-        };
+        using var paint = CreateFillPaint(color);
         canvas.DrawCircle(center, radius, paint);
     }
 
@@ -546,13 +541,7 @@ public static class FUIRenderer
     {
         float y = bounds.Top + bounds.Height * progress;
 
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = thickness,
-            Color = color.WithAlpha((byte)(color.Alpha * 0.4f)),
-            IsAntialias = true
-        };
+        using var paint = CreateStrokePaint(color.WithAlpha((byte)(color.Alpha * 0.4f)), thickness);
         canvas.DrawLine(bounds.Left, y, bounds.Right, y, paint);
 
         using var glowPaint = new SKPaint
@@ -590,12 +579,7 @@ public static class FUIRenderer
     {
         var gridColor = color ?? FUIColors.Grid;
 
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = gridColor,
-            IsAntialias = true
-        };
+        using var paint = CreateFillPaint(gridColor);
 
         for (float x = bounds.Left; x <= bounds.Right; x += spacing)
         {
@@ -610,13 +594,7 @@ public static class FUIRenderer
     {
         var gridColor = color ?? FUIColors.Grid;
 
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = gridColor,
-            StrokeWidth = 0.5f,
-            IsAntialias = true
-        };
+        using var paint = CreateStrokePaint(gridColor, 0.5f);
 
         for (float x = bounds.Left; x <= bounds.Right; x += spacing)
         {
@@ -636,13 +614,7 @@ public static class FUIRenderer
     public static void DrawDataBar(SKCanvas canvas, SKRect bounds, float value,
         SKColor fillColor, SKColor frameColor, bool horizontal = true)
     {
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = LineWeightThin,
-            IsAntialias = true
-        };
+        using var framePaint = CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         value = Math.Clamp(value, 0f, 1f);
@@ -670,12 +642,7 @@ public static class FUIRenderer
             };
             canvas.DrawRect(fillRect, glowPaint);
 
-            using var fillPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = fillColor,
-                IsAntialias = true
-            };
+            using var fillPaint = CreateFillPaint(fillColor);
             canvas.DrawRect(fillRect, fillPaint);
         }
     }
@@ -927,13 +894,7 @@ public static class FUIRenderer
         float chamfer = 4f; // Chamfer size for corner cut
 
         // Draw chamfered rectangle frame (top-right corner cut)
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
+        using var framePaint = CreateStrokePaint(frameColor);
 
         using var path = new SKPath();
         path.MoveTo(bounds.Left, bounds.Top);
@@ -978,12 +939,7 @@ public static class FUIRenderer
                     var frontRect = new SKRect(bounds.Left + iconPad, bounds.Top + iconPad + offset,
                                                bounds.Right - iconPad - offset, bounds.Bottom - iconPad);
                     // Fill area behind front square to occlude back square
-                    using var fillPaint = new SKPaint
-                    {
-                        Style = SKPaintStyle.Fill,
-                        Color = FUIColors.Background1,
-                        IsAntialias = true
-                    };
+                    using var fillPaint = CreateFillPaint(FUIColors.Background1);
                     canvas.DrawRect(frontRect, fillPaint);
                     canvas.DrawRect(frontRect, iconPaint);
                     break;
@@ -1062,12 +1018,7 @@ public static class FUIRenderer
         frameColor ??= FUIColors.Frame;
 
         // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
+        using var bgPaint = CreateFillPaint(FUIColors.Background1.WithAlpha(160));
         canvas.DrawRect(bounds.Inset(FrameInset, FrameInset), bgPaint);
         DrawLCornerFrame(canvas, bounds, frameColor.Value, cornerLength, 8f);
 
@@ -1152,12 +1103,7 @@ public static class FUIRenderer
         }
 
         using var bgPath = CreateFrame(bounds, ChamferSizeSmall);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = bgColor,
-            IsAntialias = true
-        };
+        using var bgPaint = CreateFillPaint(bgColor);
         canvas.DrawPath(bgPath, bgPaint);
 
         if (withGlow)
@@ -1173,13 +1119,7 @@ public static class FUIRenderer
             canvas.DrawPath(bgPath, glowPaint);
         }
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = LineWeight,
-            IsAntialias = true
-        };
+        using var framePaint = CreateStrokePaint(frameColor, LineWeight);
         canvas.DrawPath(bgPath, framePaint);
 
         DrawTextCentered(canvas, text, bounds, textColor, 14f, withGlow && state == ButtonState.Active);
@@ -1201,23 +1141,12 @@ public static class FUIRenderer
         var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.FrameDim);
         var textColor = isActive ? FUIColors.Void : (isHovered ? FUIColors.TextBright : FUIColors.TextDim);
 
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = bgColor,
-            IsAntialias = true
-        };
+        using var bgPaint = CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         if (!isActive)
         {
-            using var framePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = frameColor,
-                StrokeWidth = LineWeightThin,
-                IsAntialias = true
-            };
+            using var framePaint = CreateStrokePaint(frameColor, LineWeightThin);
             canvas.DrawRect(bounds, framePaint);
         }
 
@@ -1233,12 +1162,7 @@ public static class FUIRenderer
         var bgColor = isPositive ? FUIColors.Success.WithAlpha(40) : FUIColors.Danger.WithAlpha(40);
         var textColor = isPositive ? FUIColors.Success : FUIColors.Danger;
 
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = bgColor,
-            IsAntialias = true
-        };
+        using var bgPaint = CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         DrawTextCentered(canvas, text, bounds, textColor, 12f);
@@ -1354,22 +1278,11 @@ public static class FUIRenderer
         canvas.DrawCircle(position.X, position.Y, radius + 2f, glowPaint);
 
         // Outer ring
-        using var ringPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color,
-            StrokeWidth = 1.5f,
-            IsAntialias = true
-        };
+        using var ringPaint = CreateStrokePaint(color, 1.5f);
         canvas.DrawCircle(position.X, position.Y, radius, ringPaint);
 
         // Inner filled dot
-        using var dotPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = color,
-            IsAntialias = true
-        };
+        using var dotPaint = CreateFillPaint(color);
         canvas.DrawCircle(position.X, position.Y, radius * 0.35f, dotPaint);
     }
 

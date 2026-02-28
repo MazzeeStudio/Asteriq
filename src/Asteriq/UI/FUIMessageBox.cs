@@ -120,20 +120,11 @@ public class FUIMessageBox : Form
 
         // Draw title bar background
         var titleBarBounds = new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Top + 36);
-        using var titleBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background2
-        };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(titleBarBounds, titleBgPaint);
 
         // Draw title bar separator
-        using var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawLine(titleBarBounds.Left, titleBarBounds.Bottom, titleBarBounds.Right, titleBarBounds.Bottom, sepPaint);
 
         // Draw icon based on type
@@ -171,15 +162,10 @@ public class FUIMessageBox : Form
             // Use primary button colour (e.g. Danger red) for the box so it always pops
             var boxColor = _primaryButtonColor ?? iconColor;
 
-            using var boxBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = boxColor.WithAlpha(55) };
+            using var boxBgPaint = FUIRenderer.CreateFillPaint(boxColor.WithAlpha(55));
             canvas.DrawRect(detailBounds, boxBgPaint);
 
-            using var boxBorderPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = boxColor,
-                StrokeWidth = 1.5f
-            };
+            using var boxBorderPaint = FUIRenderer.CreateStrokePaint(boxColor, 1.5f);
             canvas.DrawRect(detailBounds, boxBorderPaint);
 
             float detailY = boxTop + boxPad + lineH * 0.8f;
@@ -237,7 +223,7 @@ public class FUIMessageBox : Form
                 // Circle with "i"
                 canvas.DrawCircle(center, r, paint);
                 canvas.DrawLine(center.X, center.Y - 2, center.X, center.Y + 4, paint);
-                using (var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true })
+                using (var dotPaint = FUIRenderer.CreateFillPaint(color))
                 {
                     canvas.DrawCircle(center.X, center.Y - 6, 2f, dotPaint);
                 }
@@ -254,7 +240,7 @@ public class FUIMessageBox : Form
                     path.QuadTo(center.X + 4, center.Y - 1, center.X, center.Y + 1);
                     canvas.DrawPath(path, paint);
                 }
-                using (var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true })
+                using (var dotPaint = FUIRenderer.CreateFillPaint(color))
                 {
                     canvas.DrawCircle(center.X, center.Y + 6, 2f, dotPaint);
                 }
@@ -271,7 +257,7 @@ public class FUIMessageBox : Form
                     canvas.DrawPath(path, paint);
                 }
                 canvas.DrawLine(center.X, center.Y - 3, center.X, center.Y + 2, paint);
-                using (var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true })
+                using (var dotPaint = FUIRenderer.CreateFillPaint(color))
                 {
                     canvas.DrawCircle(center.X, center.Y + 6, 2f, dotPaint);
                 }

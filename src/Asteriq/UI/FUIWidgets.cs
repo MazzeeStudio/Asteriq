@@ -196,11 +196,7 @@ internal static class FUIWidgets
             if (y + layerRowHeight > bottom - 50) break;
 
             var rowBounds = new SKRect(leftMargin, y, rightMargin, y + layerRowHeight - 4);
-            using var rowBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-            canvas.DrawRoundRect(rowBounds, 4, 4, rowBgPaint);
-
-            using var rowFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-            canvas.DrawRoundRect(rowBounds, 4, 4, rowFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, rowBounds, FUIColors.Background2, FUIColors.Frame, 4f);
 
             FUIRenderer.DrawText(canvas, layer.Name, new SKPoint(leftMargin + 10, y + 11), FUIColors.TextPrimary, 14f);
 
@@ -224,11 +220,7 @@ internal static class FUIWidgets
         if (y + 36 < bottom)
         {
             var addBounds = new SKRect(leftMargin, y, rightMargin, y + 30);
-            using var addBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Success.WithAlpha(20) };
-            canvas.DrawRoundRect(addBounds, 4, 4, addBgPaint);
-
-            using var addFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Success.WithAlpha(100), StrokeWidth = 1f };
-            canvas.DrawRoundRect(addBounds, 4, 4, addFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, addBounds, FUIColors.Success.WithAlpha(20), FUIColors.Success.WithAlpha(100), 4f);
 
             FUIRenderer.DrawTextCentered(canvas, "+ Add Shift Layer", addBounds, FUIColors.Success, 14f);
         }
@@ -247,23 +239,13 @@ internal static class FUIWidgets
         var frameColor = disabled ? FUIColors.Frame.WithAlpha(80) : FUIColors.Frame;
         var textColor = disabled ? FUIColors.TextDim.WithAlpha(100) : FUIColors.TextPrimary;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, frameColor, 4f);
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
     internal static void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
     {
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(bounds, 3, 3, bgPaint);
-
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-        canvas.DrawRoundRect(bounds, 3, 3, framePaint);
-
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background2, FUIColors.Frame);
         FUIRenderer.DrawTextCentered(canvas, value, bounds, FUIColors.TextPrimary, 14f);
     }
 
@@ -611,22 +593,7 @@ internal static class FUIWidgets
             float keycapWidth = keycapWidths[i];
             var keycapBounds = new SKRect(startX, keycapTop, startX + keycapWidth, keycapTop + keycapHeight);
 
-            using var keycapBgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.TextPrimary.WithAlpha(25),
-                IsAntialias = true
-            };
-            canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
-
-            using var keycapFramePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.TextPrimary.WithAlpha(150),
-                StrokeWidth = 1f,
-                IsAntialias = true
-            };
-            canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, keycapBounds, FUIColors.TextPrimary.WithAlpha(25), FUIColors.TextPrimary.WithAlpha(150));
 
             float textX = startX + keycapPadding;
             float textY = keycapBounds.MidY + scaledFontSize / 3;
@@ -811,12 +778,8 @@ internal static class FUIWidgets
     internal static void DrawSearchBox(SKCanvas canvas, SKRect bounds, string text, bool focused, Point mousePosition)
     {
         var bgColor = focused ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(100);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 4f, 4f, bgPaint);
-
         var borderColor = focused ? FUIColors.Active : FUIColors.Frame;
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 4f, 4f, borderPaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor, 4f);
 
         float iconX = bounds.Left + 8f;
         float iconY = bounds.MidY;

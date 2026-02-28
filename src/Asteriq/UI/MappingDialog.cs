@@ -35,7 +35,7 @@ public class MappingDialogResult
 /// FUI-styled dialog for creating a new mapping.
 /// Flow: Wait for input -> Select output -> Configure options -> Done
 /// </summary>
-public class MappingDialog : Form
+public class MappingDialog : FUIBaseDialog
 {
     private readonly IInputService _inputService;
     private readonly InputDetectionService _detectionService;
@@ -548,34 +548,18 @@ public class MappingDialog : Form
         canvas.DrawRect(bounds.Inset(2, 2), glowPaint);
 
         // Frame border
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 2f,
-            IsAntialias = true
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame, 2f);
         canvas.DrawRect(bounds.Inset(1, 1), framePaint);
 
         // Title bar
         float titleHeight = 40f;
-        using var titleBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background2.WithAlpha(200)
-        };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(200));
         canvas.DrawRect(new SKRect(0, 0, bounds.Width, titleHeight), titleBgPaint);
 
         FUIRenderer.DrawText(canvas, "NEW MAPPING", new SKPoint(15, 26), FUIColors.Primary, 17f, true);
 
         // Close button
-        using var closePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.TextDim,
-            StrokeWidth = 2f,
-            IsAntialias = true
-        };
+        using var closePaint = FUIRenderer.CreateStrokePaint(FUIColors.TextDim, 2f);
         float closeX = bounds.Width - 30;
         canvas.DrawLine(closeX, 12, closeX + 16, 28, closePaint);
         canvas.DrawLine(closeX + 16, 12, closeX, 28, closePaint);
@@ -589,13 +573,7 @@ public class MappingDialog : Form
         float radius = 60f + MathF.Sin(_pulsePhase) * 10f;
         byte alpha = (byte)(100 + MathF.Sin(_pulsePhase) * 50);
 
-        using var circlePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary.WithAlpha(alpha),
-            StrokeWidth = 3f,
-            IsAntialias = true
-        };
+        using var circlePaint = FUIRenderer.CreateStrokePaint(FUIColors.Primary.WithAlpha(alpha), 3f);
         canvas.DrawCircle(bounds.MidX, centerY - 20, radius, circlePaint);
 
         // Inner circle
@@ -655,20 +633,11 @@ public class MappingDialog : Form
         y += 24;
 
         var inputFrame = new SKRect(pad, y, bounds.Width - pad, y + 50);
-        using (var inputBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Active.WithAlpha(30)
-        })
+        using (var inputBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(30)))
         {
             canvas.DrawRect(inputFrame, inputBgPaint);
         }
-        using (var inputFramePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active,
-            StrokeWidth = 1f
-        })
+        using (var inputFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active))
         {
             canvas.DrawRect(inputFrame, inputFramePaint);
         }
@@ -805,20 +774,11 @@ public class MappingDialog : Form
         buttons.Add(keyCaptureBtn);  // buttonOffset + 0
 
         // Draw the key capture field
-        using (var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = _waitingForKeyCapture ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2
-        })
+        using (var bgPaint = FUIRenderer.CreateFillPaint(_waitingForKeyCapture ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2))
         {
             canvas.DrawRect(keyCaptureBtn, bgPaint);
         }
-        using (var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = _waitingForKeyCapture ? FUIColors.Active : (_hoveredButton == buttonOffset ? FUIColors.FrameBright : FUIColors.Frame),
-            StrokeWidth = 1f
-        })
+        using (var framePaint = FUIRenderer.CreateStrokePaint(_waitingForKeyCapture ? FUIColors.Active : (_hoveredButton == buttonOffset ? FUIColors.FrameBright : FUIColors.Frame)))
         {
             canvas.DrawRect(keyCaptureBtn, framePaint);
         }
@@ -853,15 +813,10 @@ public class MappingDialog : Form
         var frameColor = isActive ? FUIColors.Primary : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = isActive ? 2f : 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, isActive ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
@@ -873,15 +828,10 @@ public class MappingDialog : Form
         var frameColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isChecked ? FUIColors.TextBright : FUIColors.TextDim;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
@@ -897,15 +847,10 @@ public class MappingDialog : Form
             : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isPrimary ? FUIColors.TextBright : FUIColors.TextPrimary;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
@@ -921,15 +866,10 @@ public class MappingDialog : Form
             : FUIColors.FrameDim;
         var textColor = enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);

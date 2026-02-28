@@ -7,7 +7,7 @@ namespace Asteriq.UI;
 /// FUI-styled selection dialog for choosing from a list of items.
 /// Matches the dark sci-fi aesthetic of the main application.
 /// </summary>
-public class FUISelectionDialog : Form
+public class FUISelectionDialog : FUIBaseDialog
 {
     private readonly string _title;
     private readonly string _description;
@@ -145,22 +145,13 @@ public class FUISelectionDialog : Form
 
         // Draw title bar background
         var titleBarBounds = new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Top + TitleBarHeight);
-        using (var titleBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background2
-        })
+        using (var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2))
         {
             canvas.DrawRect(titleBarBounds, titleBgPaint);
         }
 
         // Draw title bar separator
-        using (var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        })
+        using (var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame))
         {
             canvas.DrawLine(titleBarBounds.Left, titleBarBounds.Bottom, titleBarBounds.Right, titleBarBounds.Bottom, sepPaint);
         }
@@ -183,22 +174,13 @@ public class FUISelectionDialog : Form
         float listHeight = Math.Min(_items.Count, _maxVisibleItems) * ItemHeight + 8f;
         var listBounds = new SKRect(ContentPadding, listTop, bounds.Width - ContentPadding, listTop + listHeight);
 
-        using (var listBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1
-        })
+        using (var listBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1))
         {
             canvas.DrawRect(listBounds, listBgPaint);
         }
 
         // Draw list border
-        using (var listBorderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        })
+        using (var listBorderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame))
         {
             canvas.DrawRect(listBounds, listBorderPaint);
         }
@@ -216,20 +198,12 @@ public class FUISelectionDialog : Form
             // Draw selection/hover background
             if (i == _selectedItem)
             {
-                using var selPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Active.WithAlpha(80)
-                };
+                using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
                 canvas.DrawRect(itemBounds, selPaint);
             }
             else if (i == _hoveredItem)
             {
-                using var hoverPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Background2
-                };
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
                 canvas.DrawRect(itemBounds, hoverPaint);
             }
 
@@ -266,12 +240,7 @@ public class FUISelectionDialog : Form
         // Draw scroll indicators if needed
         if (_items.Count > _maxVisibleItems)
         {
-            using var scrollPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.TextDim,
-                IsAntialias = true
-            };
+            using var scrollPaint = FUIRenderer.CreateFillPaint(FUIColors.TextDim);
 
             if (_scrollOffset > 0)
             {

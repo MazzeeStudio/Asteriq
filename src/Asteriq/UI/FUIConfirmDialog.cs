@@ -6,7 +6,7 @@ namespace Asteriq.UI;
 /// <summary>
 /// FUI-themed confirmation dialog with Yes/No style buttons.
 /// </summary>
-public class FUIConfirmDialog : Form
+public class FUIConfirmDialog : FUIBaseDialog
 {
     private SKControl _canvas = null!;
     private readonly string _title;
@@ -78,12 +78,7 @@ public class FUIConfirmDialog : Form
         canvas.Clear(FUIColors.Background1);
 
         // Border frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 2f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame, 2f);
         canvas.DrawRect(bounds, framePaint);
 
         // Corner accents
@@ -96,12 +91,7 @@ public class FUIConfirmDialog : Form
 
         // Separator line under title
         float sepY = 50;
-        using var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame.WithAlpha(100),
-            StrokeWidth = 1f
-        };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(100));
         canvas.DrawLine(20, sepY, bounds.Right - 20, sepY, sepPaint);
 
         // Message text (multi-line support)
@@ -142,19 +132,14 @@ public class FUIConfirmDialog : Form
             ? (hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Active.WithAlpha(40))
             : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
 
         var frameColor = isPrimary
             ? FUIColors.Active
             : (hovered ? FUIColors.Primary : FUIColors.Frame);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = hovered ? 2f : 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, hovered ? 2f : 1f);
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
         var textColor = isPrimary ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);

@@ -8,7 +8,7 @@ namespace Asteriq.UI;
 /// <summary>
 /// FUI-styled form for checking and installing required drivers (vJoy, HidHide).
 /// </summary>
-public class DriverSetupForm : Form
+public class DriverSetupForm : FUIBaseDialog
 {
     private readonly DriverSetupManager _driverSetup;
     private readonly IApplicationSettingsService? _appSettings;
@@ -214,9 +214,9 @@ public class DriverSetupForm : Form
 
         // Title bar
         var titleBar = new SKRect(b.Left + 2, b.Top + 2, b.Right - 2, b.Top + TitleBarH);
-        using var titleBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(titleBar, titleBgPaint);
-        using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawLine(titleBar.Left, titleBar.Bottom, titleBar.Right, titleBar.Bottom, sepPaint);
         FUIRenderer.DrawText(canvas, "DRIVER SETUP", new SKPoint(16, titleBar.MidY + 5), FUIColors.TextBright, 16f, false);
 
@@ -287,7 +287,7 @@ public class DriverSetupForm : Form
 
         // Log frame
         var logFrame = new SKRect(Pad - 1, logBoxTop, Pad + contentW + 1, logBoxTop + logBoxH);
-        using var logFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.FrameDim, StrokeWidth = 1f };
+        using var logFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.FrameDim);
         canvas.DrawRect(logFrame, logFramePaint);
 
         // Bottom buttons
@@ -363,7 +363,7 @@ public class DriverSetupForm : Form
         string description, string statusText, SKColor statusColor, bool required)
     {
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
@@ -371,7 +371,7 @@ public class DriverSetupForm : Form
 
         // Left accent bar
         var accentColor = required ? FUIColors.Active : FUIColors.Warning.WithAlpha(200);
-        using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = accentColor };
+        using var accentPaint = FUIRenderer.CreateFillPaint(accentColor);
         canvas.DrawRect(new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Left + 5, bounds.Bottom - 2), accentPaint);
 
         // Title

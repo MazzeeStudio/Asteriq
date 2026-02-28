@@ -14,13 +14,7 @@ internal static class SCBindingsRenderer
 
     internal static void DrawInputTypeIndicator(SKCanvas canvas, float x, float centerY, SCInputType inputType, SKColor color)
     {
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(150),
-            StrokeWidth = 1.2f,
-            IsAntialias = true
-        };
+        using var paint = FUIRenderer.CreateStrokePaint(color.WithAlpha(150), 1.2f);
 
         switch (inputType)
         {
@@ -60,23 +54,9 @@ internal static class SCBindingsRenderer
         float badgeHeight = 16f;
 
         var badgeBounds = new SKRect(x, y, x + badgeWidth, y + badgeHeight);
-
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
-
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
+        var bgColor = isDefault ? FUIColors.PanelBgHover : color.WithAlpha(FUIColors.AlphaHoverBg);
+        var borderColor = color.WithAlpha(isDefault ? (byte)100 : (byte)180);
+        FUIRenderer.DrawRoundedPanel(canvas, badgeBounds, bgColor, borderColor, radius: 3f);
 
         float textX = x + 5;
         if (inputType.HasValue)
@@ -107,22 +87,9 @@ internal static class SCBindingsRenderer
         float badgeY = cellBounds.Top + (cellBounds.Height - badgeHeight) / 2;
         var badgeBounds = new SKRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight);
 
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 4f, 4f, bgPaint);
-
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 4f, 4f, borderPaint);
+        var bgColor = isDefault ? FUIColors.PanelBgHover : color.WithAlpha(FUIColors.AlphaHoverBg);
+        var borderColor = color.WithAlpha(isDefault ? (byte)100 : (byte)180);
+        FUIRenderer.DrawRoundedPanel(canvas, badgeBounds, bgColor, borderColor, radius: 4f);
 
         float textX = badgeX + padding;
         if (inputType.HasValue)
@@ -195,12 +162,8 @@ internal static class SCBindingsRenderer
             var badgeBounds = new SKRect(currentX, badgeY, currentX + badgeWidth, badgeY + badgeHeight);
 
             byte bgAlpha = isMainKey ? (byte)50 : (byte)35;
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(bgAlpha), IsAntialias = true };
-            canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
-
             byte borderAlpha = isMainKey ? (byte)180 : (byte)120;
-            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = color.WithAlpha(borderAlpha), StrokeWidth = 1f, IsAntialias = true };
-            canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
+            FUIRenderer.DrawRoundedPanel(canvas, badgeBounds, color.WithAlpha(bgAlpha), color.WithAlpha(borderAlpha));
 
             // Conflict stripe on the last badge's right interior (amber, clipped to badge shape)
             if (isMainKey && conflict)
@@ -222,7 +185,7 @@ internal static class SCBindingsRenderer
                 canvas.DrawRect(new SKRect(badgeBounds.Right - glowW, badgeBounds.Top, badgeBounds.Right, badgeBounds.Bottom), glowPaint);
 
                 // Solid core stripe
-                using var sp = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(230), IsAntialias = true };
+                using var sp = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(230));
                 canvas.DrawRect(new SKRect(badgeBounds.Right - stripeW, badgeBounds.Top, badgeBounds.Right, badgeBounds.Bottom), sp);
 
                 canvas.Restore();
@@ -297,54 +260,23 @@ internal static class SCBindingsRenderer
 
     // ─── Profile Dropdowns ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Draws a profile selection dropdown. Text is truncated by pixel measurement to fit
+    /// within the available width (bounds.Width - 30px for arrow clearance).
+    /// </summary>
     internal static void DrawSCProfileDropdown(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
     {
-        var bgColor = open ? FUIColors.Active.WithAlpha(40) : (hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(120));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
+        var bgColor = open ? FUIColors.PanelBgActive : (hovered ? FUIColors.PanelBgHover : FUIColors.PanelBgDefault);
         var borderColor = open ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        string displayText = text.Length > 18 ? text.Substring(0, 15) + "..." : text;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 6, bounds.MidY + 4f), FUIColors.TextPrimary, 13f);
-
-        float arrowX = bounds.Right - 14f;
-        float arrowY = bounds.MidY;
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
-        using var arrowPath = new SKPath();
-        arrowPath.MoveTo(arrowX - 4, arrowY - 2);
-        arrowPath.LineTo(arrowX + 4, arrowY - 2);
-        arrowPath.LineTo(arrowX, arrowY + 3);
-        arrowPath.Close();
-        canvas.DrawPath(arrowPath, arrowPaint);
-    }
-
-    internal static void DrawSCProfileDropdownWide(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
-    {
-        var bgColor = open ? FUIColors.Active.WithAlpha(40) : (hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(120));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        var borderColor = open ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
 
         float maxTextWidth = bounds.Width - 30f;
-        string displayText = text;
-        if (FUIRenderer.MeasureText(text, 13f) > maxTextWidth)
-        {
-            int len = text.Length;
-            while (len > 0 && FUIRenderer.MeasureText(text.Substring(0, len) + "...", 13f) > maxTextWidth)
-                len--;
-            displayText = len > 0 ? text.Substring(0, len) + "..." : "...";
-        }
+        string displayText = FUIWidgets.TruncateTextToWidth(text, maxTextWidth, 13f);
         FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 8, bounds.MidY + 4f), FUIColors.TextPrimary, 13f);
 
         float arrowX = bounds.Right - 14f;
         float arrowY = bounds.MidY;
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
+        using var arrowPaint = FUIRenderer.CreateFillPaint(FUIColors.TextDim);
         using var arrowPath = new SKPath();
         arrowPath.MoveTo(arrowX - 4, arrowY - 2);
         arrowPath.LineTo(arrowX + 4, arrowY - 2);
@@ -363,12 +295,8 @@ internal static class SCBindingsRenderer
         else
             bgColor = FUIColors.Background2.WithAlpha(120);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
         var borderColor = disabled ? FUIColors.Frame.WithAlpha(80) : (hovered ? FUIColors.Active : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
 
         var iconColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
 
@@ -376,7 +304,7 @@ internal static class SCBindingsRenderer
         {
             float cx = bounds.MidX;
             float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 1.5f, IsAntialias = true };
+            using var iconPaint = FUIRenderer.CreateStrokePaint(iconColor, 1.5f);
             canvas.DrawRect(cx - 5, cy - 5, 10, 10, iconPaint);
             canvas.DrawLine(cx - 2, cy - 5, cx - 2, cy - 2, iconPaint);
             canvas.DrawLine(cx + 2, cy - 5, cx + 2, cy - 2, iconPaint);
@@ -385,7 +313,7 @@ internal static class SCBindingsRenderer
         {
             float cx = bounds.MidX;
             float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 2f, IsAntialias = true };
+            using var iconPaint = FUIRenderer.CreateStrokePaint(iconColor, 2f);
             canvas.DrawLine(cx - 5, cy, cx + 5, cy, iconPaint);
             canvas.DrawLine(cx, cy - 5, cx, cy + 5, iconPaint);
         }
@@ -393,7 +321,7 @@ internal static class SCBindingsRenderer
         {
             float cx = bounds.MidX;
             float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 2f, IsAntialias = true };
+            using var iconPaint = FUIRenderer.CreateStrokePaint(iconColor, 2f);
             canvas.DrawLine(cx - 4, cy - 4, cx + 4, cy + 4, iconPaint);
             canvas.DrawLine(cx + 4, cy - 4, cx - 4, cy + 4, iconPaint);
         }
@@ -408,12 +336,12 @@ internal static class SCBindingsRenderer
     internal static void DrawVJoyMappingRow(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
     {
         var bgColor = isHovered ? FUIColors.Background2.WithAlpha(150) : FUIColors.Background1.WithAlpha(80);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         if (isHovered)
         {
-            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(150), StrokeWidth = 1f, IsAntialias = true };
+            using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(150));
             canvas.DrawRect(bounds, borderPaint);
         }
 
@@ -430,7 +358,7 @@ internal static class SCBindingsRenderer
     {
         if (isHovered)
         {
-            using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100), IsAntialias = true };
+            using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(100));
             canvas.DrawRect(bounds, hoverPaint);
         }
 
@@ -438,5 +366,85 @@ internal static class SCBindingsRenderer
         FUIRenderer.DrawText(canvas, $"vJoy {vjoyId}", new SKPoint(bounds.Left + 5, textY), FUIColors.TextPrimary, 13f);
         FUIRenderer.DrawText(canvas, "→", new SKPoint(bounds.Left + 60, textY), FUIColors.TextDim, 13f);
         FUIRenderer.DrawText(canvas, $"js{scInstance}", new SKPoint(bounds.Left + 80, textY), FUIColors.Active, 13f, true);
+    }
+
+    // ── Text formatting helpers ──────────────────────────────────────────────
+
+    internal static List<string> GetBindingComponents(string input, List<string>? modifiers)
+    {
+        var components = new List<string>();
+        if (modifiers is not null)
+        {
+            foreach (var mod in modifiers)
+            {
+                var formatted = FormatModifierName(mod);
+                if (!string.IsNullOrEmpty(formatted))
+                    components.Add(formatted);
+            }
+        }
+        components.Add(FormatInputName(input));
+        return components;
+    }
+
+    internal static string FormatModifierName(string modifier)
+    {
+        if (string.IsNullOrEmpty(modifier))
+            return "";
+
+        var lower = modifier.ToLowerInvariant();
+        if (lower.Contains("shift")) return "SHFT";
+        if (lower.Contains("ctrl") || lower.Contains("control")) return "CTRL";
+        if (lower.Contains("alt")) return "ALT";
+
+        var cleaned = lower.TrimStart('l', 'r').ToUpperInvariant();
+        if (cleaned.Length > 4)
+            cleaned = cleaned.Substring(0, 4);
+        return cleaned;
+    }
+
+    internal static string FormatInputName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        if (input.StartsWith("button", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = input.Substring(6);
+            return $"Btn{num}";
+        }
+
+        if (input.StartsWith("mwheel_", StringComparison.OrdinalIgnoreCase))
+        {
+            var dir = input.Substring(7);
+            return dir.ToLower() switch
+            {
+                "up" => "WhlUp",
+                "down" => "WhlDn",
+                _ => $"Whl{char.ToUpper(dir[0])}"
+            };
+        }
+
+        if (input.StartsWith("maxis_", StringComparison.OrdinalIgnoreCase))
+            return $"M{input.Substring(6).ToUpper()}";
+
+        if (input.StartsWith("mouse", StringComparison.OrdinalIgnoreCase))
+            return $"M{input.Substring(5)}";
+
+        if (input.Length == 1)
+            return input.ToUpper();
+
+        if (input.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
+            return input.ToUpper().Replace("HAT", "H").Replace("_", "");
+
+        if (input.Length == 2 && input[0] == 'r' && char.IsLetter(input[1]))
+            return input.ToUpper();
+
+        if (input.StartsWith("slider", StringComparison.OrdinalIgnoreCase))
+            return $"Sl{input.Substring(6)}";
+
+        var result = char.ToUpper(input[0]) + (input.Length > 1 ? input.Substring(1) : "");
+        if (result.Length > 8)
+            result = result.Substring(0, 8);
+        return result;
     }
 }

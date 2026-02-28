@@ -713,7 +713,66 @@ public class SettingsTabController : ITabController
             StoreThemeButtonBounds(8 + i, themeBounds);
             FUIWidgets.DrawThemeButton(canvas, themeBounds, mfrNames2[i], mfrColors2[i], FUIColors.CurrentTheme == mfrThemes2[i], _ctx.MousePosition);
         }
-        y += themeBtnHeight + sectionSpacing + 8;
+        y += themeBtnHeight + 14f;
+
+        // ── Colour Palette preview ─────────────────────────────────────────
+        FUIRenderer.DrawText(canvas, "PALETTE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        y += 22f;
+
+        float swatchGap = 5f;
+        float swatchW   = (contentWidth - swatchGap * 3f) / 4f;
+        float swatchH   = 28f;
+
+        // Row 1 — accent / state colours rendered as "mini button" style (tinted bg + border + text)
+        // This matches how these colours actually appear in UI elements (e.g. the Danger Delete button).
+        (SKColor color, string label)[] row1 =
+        [
+            (FUIColors.Primary, "PRIMARY"),
+            (FUIColors.Active,  "ACTIVE"),
+            (FUIColors.Warning, "WARNING"),
+            (FUIColors.Danger,  "DANGER"),
+        ];
+        for (int i = 0; i < row1.Length; i++)
+        {
+            float sx = leftMargin + i * (swatchW + swatchGap);
+            var rect = new SKRect(sx, y, sx + swatchW, y + swatchH);
+            // Dark background tinted with the colour — mirrors Delete / Share button style
+            using var tintFill = new SKPaint { Style = SKPaintStyle.Fill, Color = row1[i].color.WithAlpha(35) };
+            canvas.DrawRect(rect, tintFill);
+            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = row1[i].color.WithAlpha(180), StrokeWidth = 1f };
+            canvas.DrawRect(rect, borderPaint);
+            float lblW = FUIRenderer.MeasureText(row1[i].label, 9f);
+            FUIRenderer.DrawText(canvas, row1[i].label,
+                new SKPoint(sx + swatchW / 2f - lblW / 2f, y + swatchH / 2f + 4f),
+                row1[i].color, 9f);
+        }
+        y += swatchH + 5f;
+
+        // Row 2 — text hierarchy + frame: solid fills showing the literal colour values
+        (SKColor color, string label)[] row2 =
+        [
+            (FUIColors.TextBright,  "BRIGHT"),
+            (FUIColors.TextPrimary, "TEXT"),
+            (FUIColors.TextDim,     "DIM"),
+            (FUIColors.Frame,       "FRAME"),
+        ];
+        for (int i = 0; i < row2.Length; i++)
+        {
+            float sx = leftMargin + i * (swatchW + swatchGap);
+            var rect = new SKRect(sx, y, sx + swatchW, y + swatchH);
+            using var fill = new SKPaint { Style = SKPaintStyle.Fill, Color = row2[i].color };
+            canvas.DrawRect(rect, fill);
+            // Dark label band at bottom
+            var band = new SKRect(rect.Left, rect.Bottom - 14f, rect.Right, rect.Bottom);
+            using var bandFill = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(0, 0, 0, 130) };
+            canvas.DrawRect(band, bandFill);
+            float lblW = FUIRenderer.MeasureText(row2[i].label, 9f);
+            FUIRenderer.DrawText(canvas, row2[i].label,
+                new SKPoint(sx + swatchW / 2f - lblW / 2f, rect.Bottom - 2f),
+                new SKColor(0xFF, 0xFF, 0xFF, 200), 9f);
+        }
+        y += swatchH + sectionSpacing;
+        // ── end palette ────────────────────────────────────────────────────
 
         // Background effects section — directly below themes
         FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);

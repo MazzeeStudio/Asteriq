@@ -931,7 +931,13 @@ public partial class SCBindingsTabController
             var detectedJoystick = DetectJoystickInput(col);
             if (detectedJoystick is not null)
             {
-                AssignJoystickBinding(action, col, detectedJoystick);
+                // Check which modifier keys (from the Mappings profile) are held at the moment
+                // the joystick input is detected so we can create a compound SC binding.
+                var heldModifiers = _scModifierKeys
+                    .Where(kv => IsKeyHeld(kv.Key))
+                    .Select(kv => kv.Value)
+                    .ToList();
+                AssignJoystickBinding(action, col, detectedJoystick, heldModifiers.Count > 0 ? heldModifiers : null);
                 CancelSCInputListening();
             }
         }

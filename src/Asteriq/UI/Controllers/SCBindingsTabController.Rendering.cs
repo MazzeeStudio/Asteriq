@@ -643,8 +643,17 @@ public partial class SCBindingsTabController
                             // Draw cell content
                             if (isCellListening)
                             {
-                                // Show "PRESS INPUT" text when listening, centered, using theme Active color
+                                // Show modifier hint if a modifier key (mapped in the Mappings profile) is held
                                 string listeningText = "PRESS INPUT";
+                                if (col.IsJoystick && _scModifierKeys.Count > 0)
+                                {
+                                    var heldMod = _scModifierKeys
+                                        .Where(kv => IsKeyHeld(kv.Key))
+                                        .Select(kv => kv.Value.ToUpperInvariant())
+                                        .FirstOrDefault();
+                                    if (heldMod is not null)
+                                        listeningText = $"{heldMod}+PRESS";
+                                }
                                 float listeningFontSize = 9f;
                                 float listeningTextWidth = FUIRenderer.MeasureText(listeningText, listeningFontSize);
                                 float listeningTextX = colX + (colW - listeningTextWidth) / 2;

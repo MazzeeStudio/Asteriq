@@ -464,9 +464,10 @@ public partial class SCBindingsTabController
         SetStatus($"Bound {action.ActionName} to mo1_{inputName}");
     }
 
-    private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName)
+    private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName, List<string>? modifiers = null)
     {
-        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{inputName} (physical={col.IsPhysical})");
+        string modifierPrefix = modifiers is { Count: > 0 } ? string.Join("+", modifiers) + "+" : "";
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning JS binding: {action.ActionName} = js{col.SCInstance}_{modifierPrefix}{inputName} (physical={col.IsPhysical})");
 
         // Check for conflicting bindings (same input already used by another action)
         List<SCActionBinding> conflicts;
@@ -607,6 +608,8 @@ public partial class SCBindingsTabController
         // Determine input type from input name
         var inputType = InferInputTypeFromName(inputName);
 
+        var modifierList = modifiers ?? new List<string>();
+
         if (col.IsPhysical)
         {
             // Physical device binding
@@ -617,7 +620,8 @@ public partial class SCBindingsTabController
                 DeviceType = SCDeviceType.Joystick,
                 PhysicalDeviceId = col.PhysicalDevice!.HidDevicePath,
                 InputName = inputName,
-                InputType = inputType
+                InputType = inputType,
+                Modifiers = modifierList
             });
         }
         else
@@ -630,7 +634,8 @@ public partial class SCBindingsTabController
                 DeviceType = SCDeviceType.Joystick,
                 VJoyDevice = col.VJoyDeviceId,
                 InputName = inputName,
-                InputType = inputType
+                InputType = inputType,
+                Modifiers = modifierList
             });
 
             // Ensure this vJoy device has an SC instance mapping (required for export)
@@ -645,7 +650,7 @@ public partial class SCBindingsTabController
         _scExportProfileService?.SaveProfile(_scExportProfile);
         UpdateConflictingBindings();
 
-        SetStatus($"Bound {action.ActionName} to js{col.SCInstance}_{inputName}");
+        SetStatus($"Bound {action.ActionName} to js{col.SCInstance}_{modifierPrefix}{inputName}");
     }
 
     /// <summary>
@@ -969,5 +974,41 @@ public partial class SCBindingsTabController
             Keys.Oemtilde or Keys.Oem3 => "grave",
             _ => key.ToString().ToLower()
         };
+    }
+
+    // Maps SC modifier key names (as stored in OutputTarget.KeyName) to Windows VK codes.
+    private static readonly Dictionary<string, int> s_modifierNameToVK = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["rctrl"]  = VK_RCONTROL,
+        ["lctrl"]  = VK_LCONTROL,
+        ["rshift"] = VK_RSHIFT,
+        ["lshift"] = VK_LSHIFT,
+        ["ralt"]   = VK_RMENU,
+        ["lalt"]   = VK_LMENU,
+    };
+
+    /// <summary>
+    /// Scans the active Mappings profile for keyboard-output buttons whose key name is a modifier
+    /// (rctrl, lctrl, rshift, lshift, ralt, lalt) and populates <see cref="_scModifierKeys"/> so
+    /// that joystick listen mode can detect compound modifier+button inputs.
+    /// </summary>
+    private void UpdateModifierKeys()
+    {
+        _scModifierKeys.Clear();
+
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return;
+
+        foreach (var mapping in profile.ButtonMappings)
+        {
+            if (mapping.Output.Type != OutputType.Keyboard) continue;
+            var keyName = mapping.Output.KeyName;
+            if (keyName is null) continue;
+
+            if (s_modifierNameToVK.TryGetValue(keyName, out int vkCode))
+                _scModifierKeys.TryAdd(vkCode, keyName.ToLowerInvariant());
+        }
+
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] UpdateModifierKeys: {_scModifierKeys.Count} modifier(s) found ({string.Join(", ", _scModifierKeys.Values)})");
     }
 }

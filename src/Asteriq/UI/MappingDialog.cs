@@ -35,7 +35,7 @@ public class MappingDialogResult
 /// FUI-styled dialog for creating a new mapping.
 /// Flow: Wait for input -> Select output -> Configure options -> Done
 /// </summary>
-public class MappingDialog : Form
+public class MappingDialog : FUIBaseDialog
 {
     private readonly IInputService _inputService;
     private readonly InputDetectionService _detectionService;

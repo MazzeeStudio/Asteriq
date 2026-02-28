@@ -72,7 +72,7 @@ public partial class SCBindingsTabController
                 {
                     _scColImportProfileDropdownOpen = false;
                     _ctx.MarkDirty();
-                    // Allow click to fall through
+                    return;
                 }
             }
 
@@ -93,7 +93,7 @@ public partial class SCBindingsTabController
                 {
                     _scColImportColumnDropdownOpen = false;
                     _ctx.MarkDirty();
-                    // Allow click to fall through
+                    return;
                 }
             }
 

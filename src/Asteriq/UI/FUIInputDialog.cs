@@ -7,7 +7,7 @@ namespace Asteriq.UI;
 /// FUI-styled single-field text input dialog.
 /// Matches the dark sci-fi aesthetic of the main application.
 /// </summary>
-public class FUIInputDialog : Form
+public class FUIInputDialog : FUIBaseDialog
 {
     private readonly string _title;
     private readonly string _label;

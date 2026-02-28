@@ -18,7 +18,7 @@ public enum SCSharedBindingResult
 /// that already has a binding on a different joystick device.
 /// Allows the user to Share (reroute), Replace, or Cancel.
 /// </summary>
-public class SCSharedBindingDialog : Form
+public class SCSharedBindingDialog : FUIBaseDialog
 {
     private readonly string _actionDisplayName;
     private readonly string _primaryDeviceLabel;

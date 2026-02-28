@@ -19,7 +19,7 @@ public enum BindingConflictResult
 /// FUI-styled dialog shown when a binding would conflict with existing bindings.
 /// Allows user to Cancel, Apply Anyway, or Replace existing bindings.
 /// </summary>
-public class BindingConflictDialog : Form
+public class BindingConflictDialog : FUIBaseDialog
 {
     private readonly List<SCActionBinding> _conflicts;
     private readonly string _newActionName;

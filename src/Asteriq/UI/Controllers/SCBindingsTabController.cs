@@ -101,6 +101,9 @@ public partial class SCBindingsTabController : ITabController
     // Shared cells: key = "{actionKey}|{secondaryVJoyDeviceId}", value = (primaryVJoyDevice, primaryInputName, secondaryInputName)
     private Dictionary<string, (uint PrimaryVJoyDevice, string PrimaryInputName, string SecondaryInputName)> _scSharedCells = new();
 
+    // Modifier keys detected from Mappings profile (vkCode → SC modifier name, e.g. {0xA3: "rctrl"})
+    private Dictionary<int, string> _scModifierKeys = new();
+
     // Header toggle button (JS REF / DEVICE)
     private SKRect _scHeaderToggleButtonBounds;
     private bool _scHeaderToggleButtonHovered;
@@ -637,6 +640,8 @@ public partial class SCBindingsTabController : ITabController
         // Defer schema load to first tab activation so BeginInvoke runs with a valid form handle.
         if (_scActions is null && !_scLoading)
             StartSchemaLoad();
+
+        UpdateModifierKeys();
     }
 
     public void OnDeactivated() { }

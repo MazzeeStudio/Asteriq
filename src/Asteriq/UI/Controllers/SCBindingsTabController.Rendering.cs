@@ -860,12 +860,6 @@ public partial class SCBindingsTabController
         return result;
     }
 
-    private void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
-        => SCBindingsRenderer.DrawBindingBadge(canvas, x, y, maxWidth, text, color, isDefault, inputType);
-
-    private void DrawBindingBadgeCentered(SKCanvas canvas, SKRect cellBounds, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
-        => SCBindingsRenderer.DrawBindingBadgeCentered(canvas, cellBounds, text, color, isDefault, inputType);
-
     private void DrawMultiKeycapBinding(SKCanvas canvas, SKRect cellBounds, List<string> components, SKColor color, SCInputType? inputType, bool conflict = false, bool duplicate = false, bool rerouted = false)
         => SCBindingsRenderer.DrawMultiKeycapBinding(canvas, cellBounds, components, color, inputType, conflict, duplicate, rerouted);
 
@@ -938,7 +932,7 @@ public partial class SCBindingsTabController
         string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName)
             ? "— No Profile Selected —"
             : _scProfileDirty ? $"{_scExportProfile.ProfileName}*" : _scExportProfile.ProfileName;
-        DrawSCProfileDropdownWide(canvas, _scProfileDropdownBounds, dropdownLabel, dropdownHovered, _scProfileDropdownOpen);
+        SCBindingsRenderer.DrawSCProfileDropdown(canvas, _scProfileDropdownBounds, dropdownLabel, dropdownHovered, _scProfileDropdownOpen);
 
         // Pencil edit icon inside dropdown box (left of arrow), visible on hover when a profile is loaded
         bool hasProfile = !string.IsNullOrEmpty(_scExportProfile.ProfileName);
@@ -1348,12 +1342,6 @@ public partial class SCBindingsTabController
 
     private void DrawSCCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool isHovered)
         => FUIWidgets.DrawSCCheckbox(canvas, bounds, isChecked, isHovered);
-
-    private void DrawSCProfileDropdown(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
-        => SCBindingsRenderer.DrawSCProfileDropdown(canvas, bounds, text, hovered, open);
-
-    private void DrawSCProfileDropdownWide(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
-        => SCBindingsRenderer.DrawSCProfileDropdownWide(canvas, bounds, text, hovered, open);
 
     private void DrawTextButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool disabled = false)
         => FUIWidgets.DrawTextButton(canvas, bounds, text, hovered, disabled);

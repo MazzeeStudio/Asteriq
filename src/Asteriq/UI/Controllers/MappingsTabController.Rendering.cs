@@ -7,10 +7,6 @@ namespace Asteriq.UI.Controllers;
 
 public partial class MappingsTabController
 {
-    private void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
-        => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
-
-
     private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
     {
         if (svg.Picture is null) return;
@@ -123,7 +119,7 @@ public partial class MappingsTabController
         // vJoy device selector: [<] vJoy Device 1 [>]
         float arrowButtonSize = 28f;
         _vjoyPrevButtonBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
-        DrawArrowButton(canvas, _vjoyPrevButtonBounds, "<", _vjoyPrevHovered, _ctx.SelectedVJoyDeviceIndex > 0);
+        FUIWidgets.DrawArrowButton(canvas, _vjoyPrevButtonBounds, "<", _vjoyPrevHovered, _ctx.SelectedVJoyDeviceIndex > 0);
 
         string deviceName = _ctx.VJoyDevices.Count > 0 && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count
             ? $"vJoy Device {_ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex].Id}"
@@ -133,7 +129,7 @@ public partial class MappingsTabController
         FUIRenderer.DrawTextCentered(canvas, deviceName, labelBounds, FUIColors.TextBright, 15f);
 
         _vjoyNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
-        DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1);
+        FUIWidgets.DrawArrowButton(canvas, _vjoyNextButtonBounds, ">", _vjoyNextHovered, _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1);
         y += arrowButtonSize + 6;
 
         // Scrollable binding rows (filtered by category)
@@ -154,12 +150,12 @@ public partial class MappingsTabController
         // M1 Buttons tab (bottom)
         var buttonsBounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
         _mappingCategoryButtonsBounds = buttonsBounds;
-        DrawVerticalSideTab(canvas, buttonsBounds, "BUTTONS_01", _mappingCategory == 0, _hoveredMappingCategory == 0);
+        FUIWidgets.DrawVerticalSideTab(canvas, buttonsBounds, "BUTTONS_01", _mappingCategory == 0, _hoveredMappingCategory == 0);
 
         // M2 Axes tab (above M1)
         var axesBounds = new SKRect(x, startY, x + width, startY + tabHeight);
         _mappingCategoryAxesBounds = axesBounds;
-        DrawVerticalSideTab(canvas, axesBounds, "AXES_02", _mappingCategory == 1, _hoveredMappingCategory == 1);
+        FUIWidgets.DrawVerticalSideTab(canvas, axesBounds, "AXES_02", _mappingCategory == 1, _hoveredMappingCategory == 1);
     }
 
     private void DrawBindingsList(SKCanvas canvas, SKRect bounds)
@@ -605,7 +601,7 @@ public partial class MappingsTabController
         float checkboxSize = 12f;
         float checkboxY = checkboxAreaTop + (checkboxRowHeight - checkboxSize) / 2f;
         _autoScrollCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
-        DrawCheckbox(canvas, _autoScrollCheckboxBounds, _autoScrollEnabled);
+        FUIWidgets.DrawCheckbox(canvas, _autoScrollCheckboxBounds, _autoScrollEnabled, _ctx.MousePosition);
 
         var labelColor = _autoScrollCheckboxHovered ? FUIColors.TextBright : FUIColors.TextDim;
         FUIRenderer.DrawText(canvas, "AUTO-SCROLL TO MAPPING",
@@ -1026,19 +1022,19 @@ public partial class MappingsTabController
 
         // Symmetrical checkbox (leftmost) - checkbox then label
         _curveSymmetricalCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
-        DrawCheckbox(canvas, _curveSymmetricalCheckboxBounds, _curveSymmetrical);
+        FUIWidgets.DrawCheckbox(canvas, _curveSymmetricalCheckboxBounds, _curveSymmetrical, _ctx.MousePosition);
         FUIRenderer.DrawText(canvas, "Symmetrical", new SKPoint(leftMargin + checkboxSize + labelGap, textY), FUIColors.TextDim, fontSize);
 
         // Invert checkbox (rightmost) - label then checkbox
         float invertCheckX = rightMargin - checkboxSize;
         _invertToggleBounds = new SKRect(invertCheckX, checkboxY, invertCheckX + checkboxSize, checkboxY + checkboxSize);
-        DrawCheckbox(canvas, _invertToggleBounds, _axisInverted);
+        FUIWidgets.DrawCheckbox(canvas, _invertToggleBounds, _axisInverted, _ctx.MousePosition);
         FUIRenderer.DrawText(canvas, "Invert", new SKPoint(invertCheckX - invertLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
         // Centre checkbox (left of Invert) - label then checkbox
         float centreCheckX = invertCheckX - invertLabelWidth - labelGap - checkboxGap - checkboxSize;
         _deadzoneCenterCheckboxBounds = new SKRect(centreCheckX, checkboxY, centreCheckX + checkboxSize, checkboxY + checkboxSize);
-        DrawCheckbox(canvas, _deadzoneCenterCheckboxBounds, _deadzoneCenterEnabled);
+        FUIWidgets.DrawCheckbox(canvas, _deadzoneCenterCheckboxBounds, _deadzoneCenterEnabled, _ctx.MousePosition);
         FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - centreLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
         y += rowHeight + 6f;
@@ -1308,15 +1304,6 @@ public partial class MappingsTabController
         canvas.DrawCircle(x, centerY, drawRadius, strokePaint);
     }
 
-    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked)
-        => FUIWidgets.DrawCheckbox(canvas, bounds, isChecked, _ctx.MousePosition);
-
-    private void DrawInteractiveSlider(SKCanvas canvas, SKRect bounds, float value, SKColor color, bool dragging)
-        => FUIWidgets.DrawInteractiveSlider(canvas, bounds, value, color, dragging);
-
-    private void DrawDurationSlider(SKCanvas canvas, SKRect bounds, float value, bool dragging)
-        => FUIWidgets.DrawDurationSlider(canvas, bounds, value, dragging);
-
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
     {
         float width = rightMargin - leftMargin;
@@ -1434,7 +1421,7 @@ public partial class MappingsTabController
             else if (!string.IsNullOrEmpty(_selectedKeyName))
             {
                 // Draw keycaps centered in the field
-                DrawKeycapsInBounds(canvas, _keyCaptureBounds, _selectedKeyName, _selectedModifiers);
+                FUIWidgets.DrawKeycapsInBounds(canvas, _keyCaptureBounds, _selectedKeyName, _selectedModifiers);
             }
             else
             {
@@ -1513,7 +1500,7 @@ public partial class MappingsTabController
 
             // Normalize value: 100-1000ms mapped to 0-1
             float normalizedPulse = (_pulseDurationMs - 100f) / 900f;
-            DrawDurationSlider(canvas, _pulseDurationSliderBounds, normalizedPulse, _draggingPulseDuration);
+            FUIWidgets.DrawDurationSlider(canvas, _pulseDurationSliderBounds, normalizedPulse, _draggingPulseDuration);
 
             // Value label
             FUIRenderer.DrawText(canvas, $"{_pulseDurationMs}ms",
@@ -1533,7 +1520,7 @@ public partial class MappingsTabController
 
             // Normalize value: 200-2000ms mapped to 0-1
             float normalizedHold = (_holdDurationMs - 200f) / 1800f;
-            DrawDurationSlider(canvas, _holdDurationSliderBounds, normalizedHold, _draggingHoldDuration);
+            FUIWidgets.DrawDurationSlider(canvas, _holdDurationSliderBounds, normalizedHold, _draggingHoldDuration);
 
             // Value label
             FUIRenderer.DrawText(canvas, $"{_holdDurationMs}ms",
@@ -1568,12 +1555,6 @@ public partial class MappingsTabController
         parts.Add(keyName);
         return string.Join("+", parts);
     }
-
-    /// <summary>
-    /// Draw keycaps centered within given bounds
-    /// </summary>
-    private void DrawKeycapsInBounds(SKCanvas canvas, SKRect bounds, string keyName, List<string>? modifiers)
-        => FUIWidgets.DrawKeycapsInBounds(canvas, bounds, keyName, modifiers);
 
     private void DrawCurveVisualization(SKCanvas canvas, SKRect bounds)
     {
@@ -2072,15 +2053,6 @@ public partial class MappingsTabController
         return new SKPoint(Math.Clamp(x, 0, 1), Math.Clamp(y, 0, 1));
     }
 
-    private void DrawSlider(SKCanvas canvas, SKRect bounds, float value)
-        => FUIWidgets.DrawSlider(canvas, bounds, value);
-
-    private void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, bool on)
-        => FUIWidgets.DrawToggleSwitch(canvas, bounds, on, _ctx.MousePosition);
-
-    private void DrawSettingsSlider(SKCanvas canvas, SKRect bounds, int value, int maxValue)
-        => FUIWidgets.DrawSettingsSlider(canvas, bounds, value, maxValue);
-
     private void DrawMappingEditorPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         // Panel background
@@ -2115,7 +2087,7 @@ public partial class MappingsTabController
 
         // Manual entry toggle button
         _manualEntryButtonBounds = new SKRect(leftMargin, y, leftMargin + 120, y + 24);
-        DrawToggleButton(canvas, _manualEntryButtonBounds, "Manual Entry", _manualEntryMode, _manualEntryButtonHovered);
+        FUIWidgets.DrawToggleButton(canvas, _manualEntryButtonBounds, "Manual Entry", _manualEntryMode, _manualEntryButtonHovered);
         y += 34;
 
         // Manual entry dropdowns (if enabled)
@@ -2165,8 +2137,8 @@ public partial class MappingsTabController
         _saveButtonBounds = new SKRect(rightMargin - buttonWidth, buttonY,
             rightMargin, buttonY + buttonHeight);
 
-        DrawActionButton(canvas, _cancelButtonBounds, "Cancel", _cancelButtonHovered, false);
-        DrawActionButton(canvas, _saveButtonBounds, "Save", _saveButtonHovered, true);
+        FUIWidgets.DrawActionButton(canvas, _cancelButtonBounds, "Cancel", _cancelButtonHovered, false);
+        FUIWidgets.DrawActionButton(canvas, _saveButtonBounds, "Save", _saveButtonHovered, true);
     }
 
     private string GetEditingOutputName()
@@ -2232,12 +2204,9 @@ public partial class MappingsTabController
         if (_pendingInput is not null && !_isListeningForInput)
         {
             var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
-            DrawSmallIconButton(canvas, clearBounds, "├ù", false, true);
+            FUIWidgets.DrawSmallIconButton(canvas, clearBounds, "├ù", false, true);
         }
     }
-
-    private void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
-        => FUIWidgets.DrawToggleButton(canvas, bounds, text, active, hovered);
 
     private float DrawManualEntrySection(SKCanvas canvas, SKRect bounds, float y, float leftMargin, float rightMargin)
     {
@@ -2248,7 +2217,7 @@ public partial class MappingsTabController
         string deviceText = _ctx.Devices.Count > 0 && _selectedSourceDevice < _ctx.Devices.Count
             ? _ctx.Devices[_selectedSourceDevice].Name
             : "No devices";
-        DrawDropdown(canvas, _deviceDropdownBounds, deviceText, _deviceDropdownOpen);
+        FUIWidgets.DrawDropdown(canvas, _deviceDropdownBounds, deviceText, _deviceDropdownOpen);
         y += 36;
 
         // Control dropdown
@@ -2256,7 +2225,7 @@ public partial class MappingsTabController
         FUIRenderer.DrawText(canvas, controlLabel, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 13f);
         _controlDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
         string controlText = GetControlDropdownText();
-        DrawDropdown(canvas, _controlDropdownBounds, controlText, _controlDropdownOpen);
+        FUIWidgets.DrawDropdown(canvas, _controlDropdownBounds, controlText, _controlDropdownOpen);
         y += 36;
 
         // Draw dropdown lists if open
@@ -2291,9 +2260,6 @@ public partial class MappingsTabController
         }
         return "ÔÇö";
     }
-
-    private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
-        => FUIWidgets.DrawDropdown(canvas, bounds, text, open);
 
     private void DrawDeviceDropdownList(SKCanvas canvas, SKRect anchorBounds)
     {
@@ -2524,19 +2490,13 @@ public partial class MappingsTabController
         if (!string.IsNullOrEmpty(_selectedKeyName) && !_isCapturingKey)
         {
             _keyClearButtonBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
-            DrawSmallIconButton(canvas, _keyClearButtonBounds, "├ù", _keyClearButtonHovered, true);
+            FUIWidgets.DrawSmallIconButton(canvas, _keyClearButtonBounds, "├ù", _keyClearButtonHovered, true);
         }
         else
         {
             _keyClearButtonBounds = SKRect.Empty;
         }
     }
-
-    private void DrawActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
-        => FUIWidgets.DrawActionButton(canvas, bounds, text, hovered, isPrimary);
-
-    private void DrawArrowButton(SKCanvas canvas, SKRect bounds, string arrow, bool hovered, bool enabled)
-        => FUIWidgets.DrawArrowButton(canvas, bounds, arrow, hovered, enabled);
 
     private void DrawOutputMappingList(SKCanvas canvas, SKRect bounds)
     {
@@ -2684,7 +2644,7 @@ public partial class MappingsTabController
 
         bool addHovered = rowIndex == _hoveredAddButton;
         string addIcon = hasBind ? "Ô£Ä" : "+";  // Pencil for edit, plus for add
-        DrawSmallIconButton(canvas, addBounds, addIcon, addHovered);
+        FUIWidgets.DrawSmallIconButton(canvas, addBounds, addIcon, addHovered);
 
         // [├ù] button (only if bound)
         if (hasBind)
@@ -2694,19 +2654,13 @@ public partial class MappingsTabController
             _mappingRemoveButtonBounds.Add(removeBounds);
 
             bool removeHovered = rowIndex == _hoveredRemoveButton;
-            DrawSmallIconButton(canvas, removeBounds, "├ù", removeHovered, true);
+            FUIWidgets.DrawSmallIconButton(canvas, removeBounds, "├ù", removeHovered, true);
         }
         else
         {
             _mappingRemoveButtonBounds.Add(SKRect.Empty);
         }
     }
-
-    private void DrawSmallIconButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, bool isDanger = false)
-        => FUIWidgets.DrawSmallIconButton(canvas, bounds, icon, hovered, isDanger);
-
-    private void DrawAddMappingButton(SKCanvas canvas, SKRect bounds, bool hovered)
-        => FUIWidgets.DrawAddMappingButton(canvas, bounds, hovered);
 
     private void DrawMappingList(SKCanvas canvas, SKRect bounds)
     {
@@ -2758,13 +2712,10 @@ public partial class MappingsTabController
             if (y + itemHeight > bounds.Bottom) break;
 
             var itemBounds = new SKRect(bounds.Left, y, bounds.Right, y + itemHeight);
-            DrawMappingItem(canvas, itemBounds, source, target, type, enabled);
+            FUIWidgets.DrawMappingItem(canvas, itemBounds, source, target, type, enabled);
             y += itemHeight + itemGap;
         }
     }
-
-    private void DrawMappingItem(SKCanvas canvas, SKRect bounds, string source, string target, string type, bool enabled)
-        => FUIWidgets.DrawMappingItem(canvas, bounds, source, target, type, enabled);
 
     private static string GetAxisBindingName(int axisIndex) => axisIndex switch
     {

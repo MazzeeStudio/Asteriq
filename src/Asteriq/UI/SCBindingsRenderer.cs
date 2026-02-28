@@ -168,12 +168,8 @@ internal static class SCBindingsRenderer
             var badgeBounds = new SKRect(currentX, badgeY, currentX + badgeWidth, badgeY + badgeHeight);
 
             byte bgAlpha = isMainKey ? (byte)50 : (byte)35;
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(bgAlpha), IsAntialias = true };
-            canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
-
             byte borderAlpha = isMainKey ? (byte)180 : (byte)120;
-            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = color.WithAlpha(borderAlpha), StrokeWidth = 1f, IsAntialias = true };
-            canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
+            FUIRenderer.DrawRoundedPanel(canvas, badgeBounds, color.WithAlpha(bgAlpha), color.WithAlpha(borderAlpha));
 
             // Conflict stripe on the last badge's right interior (amber, clipped to badge shape)
             if (isMainKey && conflict)
@@ -305,12 +301,8 @@ internal static class SCBindingsRenderer
         else
             bgColor = FUIColors.Background2.WithAlpha(120);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
         var borderColor = disabled ? FUIColors.Frame.WithAlpha(80) : (hovered ? FUIColors.Active : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
 
         var iconColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
 

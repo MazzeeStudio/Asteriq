@@ -161,6 +161,14 @@ public partial class SCBindingsTabController : ITabController
     private HashSet<string> _scCollapsedCategories = new();
     private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();
 
+    // Conflict links panel — shown below ASSIGN/CLEAR when the selected cell has conflicts
+    private List<(string ActionMap, string ActionName)> _scConflictLinks = new();
+    private List<SKRect> _scConflictLinkBounds = new();
+    private int _scConflictLinkHovered = -1;
+    // Scroll-to + highlight animation for clicked conflict link
+    private int _scConflictHighlightActionIndex = -1;
+    private DateTime _scConflictHighlightStartTime;
+
     // Device Order panel (vJoy slot ↔ SC joystick instance mapping)
     private int _scDeviceOrderOpenRow = -1;      // which row's dropdown is open (-1 = none)
     private SKRect[] _scDeviceOrderSelectorBounds = Array.Empty<SKRect>();
@@ -482,6 +490,23 @@ public partial class SCBindingsTabController : ITabController
         {
             _scDeviceOrderHoveredIndex = -1;
             _ctx.MarkDirty();
+        }
+
+        // Conflict link hover tracking
+        {
+            int prevHovered = _scConflictLinkHovered;
+            _scConflictLinkHovered = -1;
+            for (int ci = 0; ci < _scConflictLinkBounds.Count; ci++)
+            {
+                if (!_scConflictLinkBounds[ci].IsEmpty && _scConflictLinkBounds[ci].Contains(e.X, e.Y))
+                {
+                    _scConflictLinkHovered = ci;
+                    _ctx.OwnerForm.Cursor = Cursors.Hand;
+                    break;
+                }
+            }
+            if (_scConflictLinkHovered != prevHovered)
+                _ctx.MarkDirty();
         }
 
         // Buttons and selectors

@@ -483,6 +483,23 @@ public partial class SCBindingsTabController
             return;
         }
 
+        // Conflict link clicks — navigate to the conflicting action
+        for (int ci = 0; ci < _scConflictLinkBounds.Count; ci++)
+        {
+            if (!_scConflictLinkBounds[ci].IsEmpty && _scConflictLinkBounds[ci].Contains(point))
+            {
+                if (_scFilteredActions is not null && ci < _scConflictLinks.Count)
+                {
+                    var (linkMap, linkName) = _scConflictLinks[ci];
+                    int targetIdx = _scFilteredActions.FindIndex(a =>
+                        a.ActionMap == linkMap && a.ActionName == linkName);
+                    if (targetIdx >= 0)
+                        ScrollToAction(targetIdx);
+                }
+                return;
+            }
+        }
+
         // Assign input button — activates the listener on the selected cell (same as double-click)
         if (_scAssignInputButtonBounds.Contains(point) && _scSelectedActionIndex >= 0)
         {
@@ -721,6 +738,8 @@ public partial class SCBindingsTabController
             _scIsListeningForInput = true;
             _scListeningStartTime = DateTime.Now;
             _scListeningColumn = col;
+            _scConflictLinks.Clear();
+            _scConflictLinkBounds.Clear();
 
             // Clear stale presses before detecting
             if (col.IsKeyboard)
@@ -735,6 +754,8 @@ public partial class SCBindingsTabController
             // Single click: just select the cell
             _scSelectedCell = (actionIndex, colIndex);
             _scLastCellClickTime = DateTime.Now;
+            _scConflictHighlightActionIndex = -1;
+            UpdateConflictLinks();
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected cell ({actionIndex}, {colIndex}) - {col.Header}");
         }
     }

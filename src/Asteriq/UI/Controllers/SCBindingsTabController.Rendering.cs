@@ -583,13 +583,6 @@ public partial class SCBindingsTabController
                             bool isCellShared = !string.IsNullOrEmpty(sharedCellKey)
                                 && _scSharedCells.ContainsKey(sharedCellKey);
 
-                            // Shared cell gets a distinct tint background
-                            if (isCellShared && !isCellSelected && !isCellListening)
-                            {
-                                using var sharedBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(20), IsAntialias = true };
-                                canvas.DrawRect(cellBounds, sharedBgPaint);
-                            }
-
                             List<string>? bindingComponents = null;
                             SKColor textColor = FUIColors.TextPrimary;
                             SCInputType? inputType = null;
@@ -636,14 +629,6 @@ public partial class SCBindingsTabController
                                     isConflicting = _scConflictingBindings.Contains(binding.Key);
                                     isDuplicateAction = _scDuplicateActionBindings.Contains(binding.Key);
                                 }
-
-                                // Duplicate cells: danger-colour background tint + badge text colour
-                                if (isDuplicateAction && !isCellSelected && !isCellListening)
-                                {
-                                    using var dupBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(40) };
-                                    canvas.DrawRect(cellBounds, dupBgPaint);
-                                    textColor = FUIColors.Danger;
-                                }
                             }
 
                             // For shared cells with no primary binding on this column, synthesize from secondary input name
@@ -680,13 +665,9 @@ public partial class SCBindingsTabController
                             else if (bindingComponents is not null && bindingComponents.Count > 0)
                             {
                                 // Draw multiple keycap badges for binding (one per key component)
-                                DrawMultiKeycapBinding(canvas, cellBounds, bindingComponents, textColor, col.IsJoystick ? inputType : null);
-
-                                // Draw conflict indicator; duplicate actions use cell background tint (see above)
-                                if (isConflicting)
-                                {
-                                    DrawConflictIndicator(canvas, colX + colW - 12, cellBounds.MidY - 4);
-                                }
+                                SKColor badgeColor = isCellSelected ? FUIColors.TextBright : textColor;
+                                DrawMultiKeycapBinding(canvas, cellBounds, bindingComponents, badgeColor,
+                                    col.IsJoystick ? inputType : null, isConflicting, isDuplicateAction, isCellShared);
                             }
                             else
                             {
@@ -697,8 +678,6 @@ public partial class SCBindingsTabController
                             // Draw column separator
                             using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1 };
                             canvas.DrawLine(colX, scrollY, colX, scrollY + rowHeight, sepPaint);
-
-                            // Conflict indicator is drawn via DrawConflictIndicator - no background tint needed
 
                             // Draw selection border for selected cell
                             if (isCellSelected && !isCellListening)
@@ -887,20 +866,14 @@ public partial class SCBindingsTabController
     private void DrawBindingBadgeCentered(SKCanvas canvas, SKRect cellBounds, string text, SKColor color, bool isDefault, SCInputType? inputType = null)
         => SCBindingsRenderer.DrawBindingBadgeCentered(canvas, cellBounds, text, color, isDefault, inputType);
 
-    private void DrawMultiKeycapBinding(SKCanvas canvas, SKRect cellBounds, List<string> components, SKColor color, SCInputType? inputType)
-        => SCBindingsRenderer.DrawMultiKeycapBinding(canvas, cellBounds, components, color, inputType);
+    private void DrawMultiKeycapBinding(SKCanvas canvas, SKRect cellBounds, List<string> components, SKColor color, SCInputType? inputType, bool conflict = false, bool duplicate = false, bool rerouted = false)
+        => SCBindingsRenderer.DrawMultiKeycapBinding(canvas, cellBounds, components, color, inputType, conflict, duplicate, rerouted);
 
     private float MeasureMultiKeycapWidth(List<string> components, SCInputType? inputType)
         => SCBindingsRenderer.MeasureMultiKeycapWidth(components, inputType);
 
     private void DrawInputTypeIndicator(SKCanvas canvas, float x, float centerY, SCInputType inputType, SKColor color)
         => SCBindingsRenderer.DrawInputTypeIndicator(canvas, x, centerY, inputType, color);
-
-    private void DrawConflictIndicator(SKCanvas canvas, float x, float y)
-        => SCBindingsRenderer.DrawConflictIndicator(canvas, x, y);
-
-    private void DrawDuplicateActionIndicator(SKCanvas canvas, float x, float y)
-        => SCBindingsRenderer.DrawDuplicateActionIndicator(canvas, x, y);
 
     private static SCInputType DetectInputTypeFromName(string inputName)
     {

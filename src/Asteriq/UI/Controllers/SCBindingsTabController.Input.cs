@@ -848,7 +848,7 @@ public partial class SCBindingsTabController
                 UpdateSharedCells();
                 SetStatus($"Cleared JS{dupInst} binding for {SCCategoryMapper.FormatActionName(action.ActionName)}");
                 _ctx.MarkDirty();
-                break;
+                return true;
 
             case SCSharedBindingResult.Share:
                 // Keep base binding, reroute the duplicate's physical button to the base slot
@@ -860,10 +860,12 @@ public partial class SCBindingsTabController
                 UpdateConflictingBindings();
                 SetStatus($"Shared: JS{dupInst} → JS{baseInst}");
                 _ctx.MarkDirty();
-                break;
+                return true;
         }
 
-        return true;
+        // Cancel: no change was made — let the caller proceed with normal cell selection
+        // so the user can still see conflict links and binding details in the right panel.
+        return false;
     }
 
     private void HandleCellRightClick(int actionIndex, int colIndex)

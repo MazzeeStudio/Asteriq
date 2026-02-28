@@ -487,6 +487,11 @@ public partial class SCBindingsTabController
         // Export button
         if (_scExportButtonBounds.Contains(point))
         {
+            if (_scDuplicateActionBindings.Count > 0)
+            {
+                SetStatus("Resolve duplicate action bindings across joystick columns before exporting", SCStatusKind.Error);
+                return;
+            }
             ExportToSC();
             return;
         }
@@ -681,7 +686,13 @@ public partial class SCBindingsTabController
                     }
                     else
                     {
-                        // Action name area clicked - just select the row
+                        // Action name area clicked — check for cross-column duplicates first
+                        if (_scFilteredActions is not null && i < _scFilteredActions.Count)
+                        {
+                            var clickedAction = _scFilteredActions[i];
+                            if (TryShowDuplicateResolveDialog(clickedAction))
+                                return;
+                        }
                         _scSelectedCell = (-1, -1);
                         _scIsListeningForInput = false;
                     }
@@ -773,6 +784,14 @@ public partial class SCBindingsTabController
         }
         else
         {
+            // Single click — check if this row has a cross-column duplicate to resolve
+            if (col.IsJoystick && !col.IsPhysical && _scFilteredActions is not null)
+            {
+                var action = _scFilteredActions[actionIndex];
+                if (TryShowDuplicateResolveDialog(action))
+                    return;
+            }
+
             // Single click: just select the cell
             _scSelectedCell = (actionIndex, colIndex);
             _scLastCellClickTime = DateTime.Now;
@@ -780,6 +799,71 @@ public partial class SCBindingsTabController
             UpdateConflictLinks();
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected cell ({actionIndex}, {colIndex}) - {col.Header}");
         }
+    }
+
+    /// <summary>
+    /// If the given action has a cross-column duplicate binding, opens the SCSharedBindingDialog
+    /// so the user can REPLACE (clear the higher JS) or SHARE (reroute physical button).
+    /// Returns true if the dialog was shown (caller should not proceed with normal selection).
+    /// </summary>
+    private bool TryShowDuplicateResolveDialog(SCAction action)
+    {
+        // Find the duplicate (higher-JS) binding for this action
+        var dupBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+            b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+            b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
+            _scDuplicateActionBindings.Contains(b.Key));
+
+        if (dupBinding is null) return false;
+
+        // Find the base (lower-JS) binding
+        var baseBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+            b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+            b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
+            b.VJoyDevice != dupBinding.VJoyDevice &&
+            _scExportProfile.GetSCInstance(b.VJoyDevice) < _scExportProfile.GetSCInstance(dupBinding.VJoyDevice));
+
+        if (baseBinding is null) return false;
+
+        int baseInst = _scExportProfile.GetSCInstance(baseBinding.VJoyDevice);
+        int dupInst  = _scExportProfile.GetSCInstance(dupBinding.VJoyDevice);
+
+        using var dialog = new SCSharedBindingDialog(
+            SCCategoryMapper.FormatActionName(action.ActionName),
+            $"JS{baseInst}",
+            FormatInputName(baseBinding.InputName),
+            $"JS{dupInst}",
+            FormatInputName(dupBinding.InputName));
+
+        dialog.ShowDialog(_ctx.OwnerForm);
+
+        switch (dialog.Result)
+        {
+            case SCSharedBindingResult.Replace:
+                // Remove the higher-JS duplicate, keep the base
+                _scExportProfile.RemoveBinding(dupBinding);
+                _scExportProfile.Modified = DateTime.UtcNow;
+                _scExportProfileService?.SaveProfile(_scExportProfile);
+                UpdateConflictingBindings();
+                UpdateSharedCells();
+                SetStatus($"Cleared JS{dupInst} binding for {SCCategoryMapper.FormatActionName(action.ActionName)}");
+                _ctx.MarkDirty();
+                break;
+
+            case SCSharedBindingResult.Share:
+                // Keep base binding, reroute the duplicate's physical button to the base slot
+                PerformShare(baseBinding, dupBinding.VJoyDevice, dupBinding.InputName);
+                _scExportProfile.RemoveBinding(dupBinding);
+                _scExportProfile.Modified = DateTime.UtcNow;
+                _scExportProfileService?.SaveProfile(_scExportProfile);
+                UpdateSharedCells();
+                UpdateConflictingBindings();
+                SetStatus($"Shared: JS{dupInst} → JS{baseInst}");
+                _ctx.MarkDirty();
+                break;
+        }
+
+        return true;
     }
 
     private void HandleCellRightClick(int actionIndex, int colIndex)

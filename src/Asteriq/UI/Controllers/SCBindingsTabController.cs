@@ -96,6 +96,7 @@ public partial class SCBindingsTabController : ITabController
     private const int SCListeningTimeoutMs = 5000;
     private SCGridColumn? _scListeningColumn;
     private HashSet<string> _scConflictingBindings = new();
+    private HashSet<string> _scDuplicateActionBindings = new();
     private int _scHighlightedColumn = -1;
 
     // Shared cells: key = "{actionKey}|{secondaryVJoyDeviceId}", value = (primaryVJoyDevice, primaryInputName, secondaryInputName)

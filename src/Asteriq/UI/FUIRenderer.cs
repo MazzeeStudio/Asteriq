@@ -477,6 +477,27 @@ public static class FUIRenderer
         };
     }
 
+    /// <summary>Creates a standard antialiased fill paint. Caller is responsible for disposal.</summary>
+    public static SKPaint CreateFillPaint(SKColor color)
+        => new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true };
+
+    /// <summary>Creates a standard antialiased stroke paint. Caller is responsible for disposal.</summary>
+    public static SKPaint CreateStrokePaint(SKColor color, float strokeWidth = 1f)
+        => new SKPaint { Style = SKPaintStyle.Stroke, Color = color, StrokeWidth = strokeWidth, IsAntialias = true };
+
+    /// <summary>
+    /// Draws a filled rounded rectangle with a stroked border in a single call,
+    /// replacing the common 6-line fill+stroke sequence used throughout the codebase.
+    /// </summary>
+    public static void DrawRoundedPanel(SKCanvas canvas, SKRect bounds, SKColor fillColor, SKColor borderColor,
+        float radius = 3f, float strokeWidth = 1f)
+    {
+        using var bgPaint = CreateFillPaint(fillColor);
+        canvas.DrawRoundRect(bounds, radius, radius, bgPaint);
+        using var borderPaint = CreateStrokePaint(borderColor, strokeWidth);
+        canvas.DrawRoundRect(bounds, radius, radius, borderPaint);
+    }
+
     public static void DrawGlowingLine(SKCanvas canvas, SKPoint start, SKPoint end,
         SKColor color, float lineWeight = LineWeight, float glowRadius = GlowRadius)
     {

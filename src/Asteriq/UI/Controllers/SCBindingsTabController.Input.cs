@@ -72,7 +72,7 @@ public partial class SCBindingsTabController
                 {
                     _scColImportProfileDropdownOpen = false;
                     _ctx.MarkDirty();
-                    // Allow click to fall through
+                    return;
                 }
             }
 
@@ -93,7 +93,7 @@ public partial class SCBindingsTabController
                 {
                     _scColImportColumnDropdownOpen = false;
                     _ctx.MarkDirty();
-                    // Allow click to fall through
+                    return;
                 }
             }
 
@@ -831,9 +831,9 @@ public partial class SCBindingsTabController
         using var dialog = new SCSharedBindingDialog(
             SCCategoryMapper.FormatActionName(action.ActionName),
             $"JS{baseInst}",
-            FormatInputName(baseBinding.InputName),
+            SCBindingsRenderer.FormatInputName(baseBinding.InputName),
             $"JS{dupInst}",
-            FormatInputName(dupBinding.InputName));
+            SCBindingsRenderer.FormatInputName(dupBinding.InputName));
 
         dialog.ShowDialog(_ctx.OwnerForm);
 

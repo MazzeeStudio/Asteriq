@@ -447,12 +447,7 @@ public class DevicesTabController : ITabController
 
         var contentBounds = new SKRect(bounds.Left + frameInset + sideTabWidth, bounds.Top + frameInset,
                                         bounds.Right - frameInset, bounds.Bottom - frameInset);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(140),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
         canvas.DrawRect(contentBounds, bgPaint);
 
         DrawDeviceCategorySideTabs(canvas, bounds.Left + frameInset, bounds.Top + frameInset,
@@ -507,13 +502,7 @@ public class DevicesTabController : ITabController
 
                 if (_isDraggingDevice && i == _dragDropTargetIndex)
                 {
-                    using var dropPaint = new SKPaint
-                    {
-                        Style = SKPaintStyle.Stroke,
-                        Color = FUIColors.Active,
-                        StrokeWidth = 2f,
-                        IsAntialias = true
-                    };
+                    using var dropPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active, 2f);
                     canvas.DrawLine(itemBounds.Left, itemY - 2, itemBounds.Right, itemY - 2, dropPaint);
                 }
 
@@ -548,12 +537,7 @@ public class DevicesTabController : ITabController
         FUIRenderer.DrawText(canvas, "+ SCAN FOR DEVICES",
             new SKPoint(contentBounds.Left + pad, promptY), FUIColors.TextDim, 15f);
 
-        using var bracketPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.FrameDim,
-            StrokeWidth = 1f
-        };
+        using var bracketPaint = FUIRenderer.CreateStrokePaint(FUIColors.FrameDim);
         canvas.DrawLine(contentBounds.Left + pad - 20, promptY - 10, contentBounds.Left + pad - 20, promptY + 5, bracketPaint);
         canvas.DrawLine(contentBounds.Left + pad - 20, promptY - 10, contentBounds.Left + pad - 8, promptY - 10, bracketPaint);
     }
@@ -580,12 +564,7 @@ public class DevicesTabController : ITabController
         float pad = FUIRenderer.PanelPadding;
         float frameInset = 5f;
 
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(100),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(100));
         canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
             bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(150), 30f, 8f);
@@ -757,12 +736,7 @@ public class DevicesTabController : ITabController
 
         var contentBounds = new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
                                         bounds.Right - frameInset, bounds.Bottom - frameInset);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(140),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
         canvas.DrawRect(contentBounds, bgPaint);
 
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 35f, 10f);
@@ -942,12 +916,7 @@ public class DevicesTabController : ITabController
 
         var contentBounds = new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
                                         bounds.Right - frameInset, bounds.Bottom - frameInset);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(140),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
         canvas.DrawRect(contentBounds, bgPaint);
 
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 35f, 10f);

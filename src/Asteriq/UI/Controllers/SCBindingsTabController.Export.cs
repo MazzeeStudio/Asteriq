@@ -60,14 +60,19 @@ public partial class SCBindingsTabController
                 }
                 else
                 {
-                    // Only "asteriq" or no profiles exist - start blank so user names their own
+                    // Only "asteriq" or no profiles exist - start blank with auto-detected order
                     _scExportProfile = new SCExportProfile();
-                    foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
-                    {
-                        _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
-                    }
+                    ApplyAutoDetectedDeviceOrder(_scExportProfile);
                 }
             }
+
+            // Fill in any vJoy slots that are missing from the loaded profile's mapping
+            // (e.g. a new vJoy device was added since the profile was last saved)
+            var missingSlots = _ctx.VJoyDevices
+                .Where(v => v.Exists && !_scExportProfile.VJoyToSCInstance.ContainsKey(v.Id))
+                .ToList();
+            if (missingSlots.Count > 0)
+                ApplyAutoDetectedDeviceOrder(_scExportProfile);
 
             // Initial conflict detection
             UpdateConflictingBindings();
@@ -78,6 +83,36 @@ public partial class SCBindingsTabController
         {
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings init failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Runs DirectInput-based device order detection and applies the result to <paramref name="profile"/>.
+    /// Falls back to identity mapping when DirectInput is unavailable or detection fails.
+    /// </summary>
+    private void ApplyAutoDetectedDeviceOrder(SCExportProfile profile)
+    {
+        var vjoySlots = _ctx.VJoyDevices.Where(v => v.Exists);
+
+        if (_directInputService is not null)
+        {
+            try
+            {
+                var diDevices = _directInputService.EnumerateDevices();
+                var mapping = VJoyDirectInputOrderService.DetectVJoyDiOrder(vjoySlots, diDevices);
+                foreach (var (vjoyId, scInstance) in mapping)
+                    profile.SetSCInstance(vjoyId, scInstance);
+                System.Diagnostics.Debug.WriteLine("[SCBindings] Device order auto-detected via DirectInput");
+                return;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] DI auto-detect failed, using identity mapping: {ex.Message}");
+            }
+        }
+
+        // Fallback: identity mapping (slot N → instance N)
+        foreach (var v in vjoySlots)
+            profile.SetSCInstance(v.Id, (int)v.Id);
     }
 
     private void RefreshSCInstallations()

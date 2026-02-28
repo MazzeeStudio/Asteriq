@@ -11,7 +11,7 @@ public partial class SCBindingsTabController
         float frameInset = 5f;
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
-        // Two-panel layout: Left (bindings table) | Right (Installation + Export stacked)
+        // Two-panel layout: Left (bindings table) | Right (Device Order + Installation + Export stacked)
         // Table on left for more space, controls on right
         float rightPanelWidth = Math.Min(500f, Math.Max(280f, contentBounds.Width * 0.24f));
         float gap = 10f;
@@ -21,19 +21,37 @@ public partial class SCBindingsTabController
         var rightBounds = new SKRect(leftBounds.Right + gap, contentBounds.Top,
             contentBounds.Right, contentBounds.Bottom);
 
-        // Split right panel vertically: SC Installation (top) | Export (bottom)
-        float installationHeight = 150f; // Compact installation panel
+        // Device Order panel (only when vJoy devices are present)
+        int vjoyDeviceCount = _ctx.VJoyDevices.Count(v => v.Exists);
         float verticalGap = 8f;
+        float deviceOrderPanelHeight = vjoyDeviceCount > 0
+            ? 98f + vjoyDeviceCount * 28f  // title + rows + button + padding
+            : 0f;
 
-        var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
-            rightBounds.Right, rightBounds.Top + installationHeight);
+        float rightY = rightBounds.Top;
+        SKRect deviceOrderBounds = SKRect.Empty;
+        if (deviceOrderPanelHeight > 0)
+        {
+            deviceOrderBounds = new SKRect(rightBounds.Left, rightY, rightBounds.Right, rightY + deviceOrderPanelHeight);
+            rightY += deviceOrderPanelHeight + verticalGap;
+        }
+
+        // Split remaining right panel vertically: SC Installation (top) | Export (bottom)
+        float installationHeight = 150f; // Compact installation panel
+
+        var installationBounds = new SKRect(rightBounds.Left, rightY,
+            rightBounds.Right, rightY + installationHeight);
         var exportBounds = new SKRect(rightBounds.Left, installationBounds.Bottom + verticalGap,
             rightBounds.Right, rightBounds.Bottom);
 
         // LEFT PANEL - SC Action Bindings Table (wider)
         DrawSCBindingsTablePanel(canvas, leftBounds, frameInset);
 
-        // RIGHT TOP - SC Installation (condensed)
+        // RIGHT TOP - Device Order (when vJoy devices present)
+        if (!deviceOrderBounds.IsEmpty)
+            DrawDeviceOrderPanel(canvas, deviceOrderBounds, frameInset);
+
+        // RIGHT - SC Installation (condensed)
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
         // RIGHT BOTTOM - Export panel always visible; Column Actions panel stacked below when a vJoy column is selected
@@ -76,6 +94,8 @@ public partial class SCBindingsTabController
             DrawColImportProfileDropdown(canvas);
         if (showColumnActions && _scColImportColumnDropdownOpen && _scColImportSourceColumns.Count > 0)
             DrawColImportColumnDropdown(canvas);
+        if (_scDeviceOrderOpenRow >= 0 && !_scDeviceOrderDropdownBounds.IsEmpty)
+            DrawDeviceOrderDropdown(canvas);
     }
 
     private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1543,5 +1563,154 @@ public partial class SCBindingsTabController
         var items = _scColImportSourceColumns.Select(c => c.Label).ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _scColImportColumnDropdownBounds, items,
             _scColImportColumnIndex, _scColImportColumnHoveredIndex, itemH);
+    }
+
+    private void DrawDeviceOrderPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
+        if (existingSlots.Count == 0) return;
+
+        // Panel background
+        using var bgPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = FUIColors.Background1.WithAlpha(160),
+            IsAntialias = true
+        };
+        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+
+        float cornerPadding = 15f;
+        float y = bounds.Top + frameInset + cornerPadding;
+        float leftMargin = bounds.Left + frameInset + cornerPadding;
+        float rightMargin = bounds.Right - frameInset - 10f;
+
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "DEVICE ORDER");
+        y += 4f;
+
+        // Resize selector bounds array if needed
+        if (_scDeviceOrderSelectorBounds.Length != existingSlots.Count)
+            _scDeviceOrderSelectorBounds = new SKRect[existingSlots.Count];
+
+        // Build reverse mapping: SC instance → vJoy slot ID
+        var vjoyForSCInst = new Dictionary<int, uint>();
+        foreach (var slot in existingSlots)
+        {
+            int inst = _scExportProfile.GetSCInstance(slot.Id);
+            if (!vjoyForSCInst.ContainsKey(inst))
+                vjoyForSCInst[inst] = slot.Id;
+        }
+
+        float selectorH = 24f;
+        float labelW = 32f;   // "JS1 " label
+        float selectorW = rightMargin - leftMargin - labelW - 6f;
+
+        for (int row = 0; row < existingSlots.Count; row++)
+        {
+            int scInst = row + 1;
+            vjoyForSCInst.TryGetValue(scInst, out uint vjoySlotId);
+
+            // JS label
+            FUIRenderer.DrawText(canvas, $"JS{scInst}", new SKPoint(leftMargin, y + selectorH / 2f + 4f),
+                FUIColors.Active, 12f, true);
+
+            // Selector
+            var selectorBounds = new SKRect(leftMargin + labelW, y, leftMargin + labelW + selectorW, y + selectorH);
+            _scDeviceOrderSelectorBounds[row] = selectorBounds;
+
+            bool isOpen = _scDeviceOrderOpenRow == row;
+            bool isHovered = selectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || isOpen;
+            string selectorLabel = vjoySlotId > 0 ? $"vJoy {vjoySlotId}" : "—";
+            FUIWidgets.DrawSelector(canvas, selectorBounds, selectorLabel, isHovered, existingSlots.Count > 1);
+
+            // Physical device name for the assigned vJoy slot
+            if (vjoySlotId > 0)
+            {
+                string? devName = GetPhysicalDeviceNameForVJoyId(vjoySlotId);
+                if (devName is not null)
+                {
+                    float nameX = selectorBounds.Right + 6f;
+                    float maxNameW = rightMargin - nameX;
+                    if (maxNameW > 10f)
+                    {
+                        string truncated = TruncateTextToWidth(devName, maxNameW, 10f);
+                        FUIRenderer.DrawText(canvas, truncated,
+                            new SKPoint(nameX, y + selectorH / 2f + 4f),
+                            FUIColors.TextDim, 10f);
+                    }
+                }
+            }
+
+            y += selectorH + 4f;
+        }
+
+        // Auto-detect button anchored near the bottom
+        float btnH = 26f;
+        float btnY = bounds.Bottom - frameInset - cornerPadding - btnH;
+        _scDeviceOrderAutoDetectBounds = new SKRect(leftMargin, btnY, rightMargin, btnY + btnH);
+        _scDeviceOrderAutoDetectHovered = _scDeviceOrderAutoDetectBounds.Contains(
+            _ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+        bool canAutoDetect = _directInputService is not null;
+        if (canAutoDetect)
+        {
+            FUIRenderer.DrawButton(canvas, _scDeviceOrderAutoDetectBounds, "AUTO-DETECT",
+                _scDeviceOrderAutoDetectHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        }
+        else
+        {
+            using var disabledPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                Color = FUIColors.Background2.WithAlpha(60),
+                IsAntialias = true
+            };
+            canvas.DrawRect(_scDeviceOrderAutoDetectBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "AUTO-DETECT", _scDeviceOrderAutoDetectBounds,
+                FUIColors.TextDim.WithAlpha(100), 12f);
+        }
+    }
+
+    private void DrawDeviceOrderDropdown(SKCanvas canvas)
+    {
+        if (_scDeviceOrderOpenRow < 0) return;
+
+        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
+        if (existingSlots.Count == 0 || _scDeviceOrderOpenRow >= _scDeviceOrderSelectorBounds.Length) return;
+
+        // Determine currently selected vJoy slot for this row's SC instance
+        int scInst = _scDeviceOrderOpenRow + 1;
+        var vjoyForSCInst = new Dictionary<int, uint>();
+        foreach (var slot in existingSlots)
+        {
+            int inst = _scExportProfile.GetSCInstance(slot.Id);
+            if (!vjoyForSCInst.ContainsKey(inst))
+                vjoyForSCInst[inst] = slot.Id;
+        }
+        vjoyForSCInst.TryGetValue(scInst, out uint selectedVJoyId);
+        int selectedIdx = existingSlots.FindIndex(s => s.Id == selectedVJoyId);
+
+        float itemH = 28f;
+        var selectorBounds = _scDeviceOrderSelectorBounds[_scDeviceOrderOpenRow];
+        _scDeviceOrderDropdownBounds = new SKRect(
+            selectorBounds.Left,
+            selectorBounds.Bottom + 2,
+            selectorBounds.Right,
+            selectorBounds.Bottom + 2 + existingSlots.Count * itemH + 8f);
+
+        var items = existingSlots.Select(s => $"vJoy {s.Id}").ToList();
+        FUIWidgets.DrawDropdownPanel(canvas, _scDeviceOrderDropdownBounds, items,
+            selectedIdx, _scDeviceOrderHoveredIndex, itemH);
+    }
+
+    private string? GetPhysicalDeviceNameForVJoyId(uint vjoySlotId)
+    {
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return null;
+        if (!profile.VJoyPrimaryDevices.TryGetValue(vjoySlotId, out var guid)) return null;
+
+        var device = _ctx.Devices.Concat(_ctx.DisconnectedDevices)
+            .FirstOrDefault(d => d.InstanceGuid.ToString().Equals(guid, StringComparison.OrdinalIgnoreCase));
+        return device?.Name;
     }
 }

@@ -83,6 +83,7 @@ public partial class MainForm : Form
     private readonly SystemTrayIcon _trayIcon;
     private readonly IUpdateService _updateService;
     private readonly DriverSetupManager _driverSetupManager;
+    private readonly DirectInput.DirectInputService? _directInputService;
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
@@ -180,7 +181,8 @@ public partial class MainForm : Form
         SCProfileCacheService scProfileCacheService,
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
-        SCExportProfileService scExportProfileService)
+        SCExportProfileService scExportProfileService,
+        DirectInput.DirectInputService? directInputService = null)
     {
         // Assign injected services
         _inputService = inputService ?? throw new ArgumentNullException(nameof(inputService));
@@ -194,6 +196,7 @@ public partial class MainForm : Form
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         _driverSetupManager = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
+        _directInputService = directInputService; // nullable — unavailable in tests or headless environments
         // Update tray icon tooltip
         _trayIcon.SetToolTip($"Asteriq v{s_appVersion}");
 
@@ -210,7 +213,8 @@ public partial class MainForm : Form
             scProfileCacheService ?? throw new ArgumentNullException(nameof(scProfileCacheService)),
             scSchemaService ?? throw new ArgumentNullException(nameof(scSchemaService)),
             scExportService ?? throw new ArgumentNullException(nameof(scExportService)),
-            scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService)));
+            scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService)),
+            _directInputService);
 
         // Apply correct MinimumSize now that font settings are loaded
         ApplyFontScaleToWindowSize();
@@ -226,7 +230,8 @@ public partial class MainForm : Form
         SCProfileCacheService scProfileCacheService,
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
-        SCExportProfileService scExportProfileService)
+        SCExportProfileService scExportProfileService,
+        DirectInput.DirectInputService? directInputService = null)
     {
         _tabContext = new TabContext(
             _inputService, _profileManager, _profileRepository, _appSettings,
@@ -274,7 +279,8 @@ public partial class MainForm : Form
         _mappingsController = new MappingsTabController(_tabContext);
         _scBindingsController = new SCBindingsTabController(
             _tabContext, scInstallationService, scProfileCacheService,
-            scSchemaService, scExportService, scExportProfileService);
+            scSchemaService, scExportService, scExportProfileService,
+            directInputService);
         _scBindingsController.Initialize();
 
         // Wire up mapping-related callbacks (now delegated to MappingsTabController)

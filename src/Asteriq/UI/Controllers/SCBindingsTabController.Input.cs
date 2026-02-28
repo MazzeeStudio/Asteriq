@@ -318,6 +318,56 @@ public partial class SCBindingsTabController
             }
         }
 
+        // Device Order panel — dropdown open/close
+        if (_scDeviceOrderOpenRow >= 0)
+        {
+            if (!_scDeviceOrderDropdownBounds.IsEmpty && _scDeviceOrderDropdownBounds.Contains(point))
+            {
+                // Click inside open dropdown: select a vJoy slot for this row's SC instance
+                float itemH = 28f;
+                int idx = (int)((point.Y - _scDeviceOrderDropdownBounds.Top) / itemH);
+                var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
+                if (idx >= 0 && idx < existingSlots.Count)
+                    AssignDeviceOrderSlot(_scDeviceOrderOpenRow + 1, existingSlots[idx].Id);
+                _scDeviceOrderOpenRow = -1;
+                _scDeviceOrderHoveredIndex = -1;
+                _ctx.MarkDirty();
+                return;
+            }
+            else
+            {
+                // Click outside dropdown — close it
+                _scDeviceOrderOpenRow = -1;
+                _scDeviceOrderHoveredIndex = -1;
+                _ctx.MarkDirty();
+                // Fall through so other panel clicks still work
+            }
+        }
+
+        // Device Order panel — auto-detect button
+        if (!_scDeviceOrderAutoDetectBounds.IsEmpty && _scDeviceOrderAutoDetectBounds.Contains(point)
+            && _directInputService is not null)
+        {
+            RunDeviceOrderAutoDetect();
+            return;
+        }
+
+        // Device Order panel — row selector clicks
+        for (int row = 0; row < _scDeviceOrderSelectorBounds.Length; row++)
+        {
+            if (!_scDeviceOrderSelectorBounds[row].IsEmpty && _scDeviceOrderSelectorBounds[row].Contains(point))
+            {
+                int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
+                if (vjoyCount > 1) // no point opening a single-item dropdown
+                {
+                    _scDeviceOrderOpenRow = _scDeviceOrderOpenRow == row ? -1 : row;
+                    _scDeviceOrderHoveredIndex = -1;
+                    _ctx.MarkDirty();
+                }
+                return;
+            }
+        }
+
         // SC Installation selector click (toggle dropdown)
         if (_scInstallationSelectorBounds.Contains(point) && _scInstallations.Count > 0)
         {
@@ -1316,5 +1366,71 @@ public partial class SCBindingsTabController
         _scExportProfileService.SaveProfile(_scExportProfile);
         UpdateConflictingBindings();
         DeselectColumn();
+    }
+
+    /// <summary>
+    /// Assigns a vJoy slot to a specific SC joystick instance, swapping the displaced slot
+    /// to take the previous instance of the selected slot.
+    /// </summary>
+    private void AssignDeviceOrderSlot(int scInst, uint newVJoySlotId)
+    {
+        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).ToList();
+        if (existingSlots.Count == 0) return;
+
+        // Find the vJoy slot that currently owns scInst
+        uint? prevSlotId = null;
+        foreach (var slot in existingSlots)
+        {
+            if (_scExportProfile.GetSCInstance(slot.Id) == scInst)
+            {
+                prevSlotId = slot.Id;
+                break;
+            }
+        }
+
+        if (prevSlotId == newVJoySlotId) return; // No change
+
+        // The displaced slot gets the SC instance that newVJoySlot currently has
+        int newSlotCurrentInst = _scExportProfile.GetSCInstance(newVJoySlotId);
+
+        _scExportProfile.SetSCInstance(newVJoySlotId, scInst);
+        if (prevSlotId.HasValue)
+            _scExportProfile.SetSCInstance(prevSlotId.Value, newSlotCurrentInst);
+
+        SaveAndRefreshAfterDeviceOrderChange();
+    }
+
+    /// <summary>
+    /// Runs DirectInput-based auto-detection and updates VJoyToSCInstance in the active profile.
+    /// </summary>
+    private void RunDeviceOrderAutoDetect()
+    {
+        if (_directInputService is null) return;
+
+        try
+        {
+            var diDevices = _directInputService.EnumerateDevices();
+            var vjoySlots = _ctx.VJoyDevices.Where(v => v.Exists);
+            var mapping = VJoyDirectInputOrderService.DetectVJoyDiOrder(vjoySlots, diDevices);
+
+            foreach (var (vjoyId, scInstance) in mapping)
+                _scExportProfile.SetSCInstance(vjoyId, scInstance);
+
+            SaveAndRefreshAfterDeviceOrderChange();
+            SetStatus("Device order auto-detected");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            SetStatus("Auto-detect failed: DirectInput unavailable", SCStatusKind.Error);
+        }
+    }
+
+    private void SaveAndRefreshAfterDeviceOrderChange()
+    {
+        if (!string.IsNullOrEmpty(_scExportProfile.ProfileName))
+            _scExportProfileService.SaveProfile(_scExportProfile);
+
+        UpdateConflictingBindings();
+        _ctx.MarkDirty();
     }
 }

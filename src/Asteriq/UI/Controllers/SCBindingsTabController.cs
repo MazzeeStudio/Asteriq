@@ -1,3 +1,4 @@
+using Asteriq.DirectInput;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
@@ -18,6 +19,7 @@ public partial class SCBindingsTabController : ITabController
     private readonly SCSchemaService _scSchemaService;
     private readonly SCXmlExportService _scExportService;
     private readonly SCExportProfileService _scExportProfileService;
+    private readonly DirectInputService? _directInputService;
 
     // SC state
     private List<SCInstallation> _scInstallations = new();
@@ -142,6 +144,14 @@ public partial class SCBindingsTabController : ITabController
     private HashSet<string> _scCollapsedCategories = new();
     private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();
 
+    // Device Order panel (vJoy slot ↔ SC joystick instance mapping)
+    private int _scDeviceOrderOpenRow = -1;      // which row's dropdown is open (-1 = none)
+    private SKRect[] _scDeviceOrderSelectorBounds = Array.Empty<SKRect>();
+    private SKRect _scDeviceOrderDropdownBounds = SKRect.Empty;
+    private int _scDeviceOrderHoveredIndex = -1; // hovered item in the open dropdown
+    private SKRect _scDeviceOrderAutoDetectBounds = SKRect.Empty;
+    private bool _scDeviceOrderAutoDetectHovered;
+
     // SC binding assignment state (right-panel ASSIGN/CLEAR buttons)
     private SKRect _scAssignInputButtonBounds;
     private bool _scAssignInputButtonHovered;
@@ -177,7 +187,8 @@ public partial class SCBindingsTabController : ITabController
         SCProfileCacheService scProfileCacheService,
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
-        SCExportProfileService scExportProfileService)
+        SCExportProfileService scExportProfileService,
+        DirectInputService? directInputService = null)
     {
         _ctx = ctx;
         _scInstallationService = scInstallationService;
@@ -185,6 +196,7 @@ public partial class SCBindingsTabController : ITabController
         _scSchemaService = scSchemaService;
         _scExportService = scExportService;
         _scExportProfileService = scExportProfileService;
+        _directInputService = directInputService;
     }
 
     /// <summary>
@@ -416,6 +428,43 @@ public partial class SCBindingsTabController : ITabController
         if (_scSearchBoxBounds.Contains(e.X, e.Y))
         {
             _ctx.OwnerForm.Cursor = Cursors.IBeam;
+        }
+
+        // Device Order auto-detect button hover
+        _scDeviceOrderAutoDetectHovered = !_scDeviceOrderAutoDetectBounds.IsEmpty
+            && _scDeviceOrderAutoDetectBounds.Contains(e.X, e.Y);
+        if (_scDeviceOrderAutoDetectHovered)
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+
+        // Device Order row selector hover
+        for (int i = 0; i < _scDeviceOrderSelectorBounds.Length; i++)
+        {
+            if (!_scDeviceOrderSelectorBounds[i].IsEmpty && _scDeviceOrderSelectorBounds[i].Contains(e.X, e.Y))
+            {
+                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                break;
+            }
+        }
+
+        // Device Order open dropdown hover
+        if (_scDeviceOrderOpenRow >= 0 && !_scDeviceOrderDropdownBounds.IsEmpty
+            && _scDeviceOrderDropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemH = 28f;
+            int idx = (int)((e.Y - _scDeviceOrderDropdownBounds.Top) / itemH);
+            int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
+            int newHovered = idx >= 0 && idx < vjoyCount ? idx : -1;
+            if (newHovered != _scDeviceOrderHoveredIndex)
+            {
+                _scDeviceOrderHoveredIndex = newHovered;
+                _ctx.MarkDirty();
+            }
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
+        else if (_scDeviceOrderOpenRow >= 0 && _scDeviceOrderHoveredIndex >= 0)
+        {
+            _scDeviceOrderHoveredIndex = -1;
+            _ctx.MarkDirty();
         }
 
         // Buttons and selectors

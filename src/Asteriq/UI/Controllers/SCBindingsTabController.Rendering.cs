@@ -273,7 +273,7 @@ public partial class SCBindingsTabController
         float headerTextY = y + headerRowHeight / 2 + 4f;  // Vertically centered
 
         // Table header background
-        using var headerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(120), IsAntialias = true };
+        using var headerPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(120));
         canvas.DrawRect(new SKRect(leftMargin - 5, y, rightMargin + 5, y + headerRowHeight), headerPaint);
 
         // Store column headers bounds for click detection
@@ -283,7 +283,7 @@ public partial class SCBindingsTabController
         FUIRenderer.DrawText(canvas, "ACTION", new SKPoint(leftMargin + 18f, headerTextY), FUIColors.TextDim, 12f, true);
 
         // Draw separator after ACTION column
-        using var actionSepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(80), StrokeWidth = 1 };
+        using var actionSepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(80));
         canvas.DrawLine(deviceColsStart - 3, y, deviceColsStart - 3, y + headerRowHeight, actionSepPaint);
 
         // Clip device columns to available area
@@ -303,7 +303,7 @@ public partial class SCBindingsTabController
                 // Highlight background if this column is selected (read-only columns cannot be highlighted)
                 if (c == _scHighlightedColumn && !col.IsReadOnly)
                 {
-                    using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                    using var highlightPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                     canvas.DrawRect(new SKRect(colX, y, colX + colW, y + headerRowHeight), highlightPaint);
                 }
 
@@ -362,7 +362,7 @@ public partial class SCBindingsTabController
                 }
 
                 // Draw column separator on left edge
-                using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(50), StrokeWidth = 1 };
+                using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(50));
                 canvas.DrawLine(colX, y, colX, y + headerRowHeight, sepPaint);
             }
         }
@@ -424,7 +424,7 @@ public partial class SCBindingsTabController
 
                         // Background
                         var bgColor = headerHovered ? FUIColors.Primary.WithAlpha(50) : FUIColors.Primary.WithAlpha(30);
-                        using var groupBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+                        using var groupBgPaint = FUIRenderer.CreateFillPaint(bgColor);
                         canvas.DrawRect(headerBounds, groupBgPaint);
 
                         // Collapse/expand indicator
@@ -482,18 +482,18 @@ public partial class SCBindingsTabController
 
                     if (isSelected)
                     {
-                        using var selPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
+                        using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(60));
                         canvas.DrawRect(rowBounds, selPaint);
                     }
                     else if (isHovered)
                     {
-                        using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(120), IsAntialias = true };
+                        using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(120));
                         canvas.DrawRect(rowBounds, hoverPaint);
                     }
                     else if (isEvenRow)
                     {
                         // Subtle alternating row background
-                        using var altPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40), IsAntialias = true };
+                        using var altPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(40));
                         canvas.DrawRect(rowBounds, altPaint);
                     }
 
@@ -502,7 +502,7 @@ public partial class SCBindingsTabController
                     {
                         float t = (float)(DateTime.Now - _scConflictHighlightStartTime).TotalSeconds / 1.5f;
                         byte alpha = (byte)(Math.Max(0, 1f - t) * 120);
-                        using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(alpha), IsAntialias = true };
+                        using var highlightPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(alpha));
                         canvas.DrawRect(rowBounds, highlightPaint);
                         _ctx.MarkDirty(); // keep redrawing while animating
                     }
@@ -539,7 +539,7 @@ public partial class SCBindingsTabController
                             // Draw column highlight background
                             if (isColumnHighlighted && !isCellSelected && !isCellListening)
                             {
-                                using var colHighlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(20), IsAntialias = true };
+                                using var colHighlightPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(20));
                                 canvas.DrawRect(cellBounds, colHighlightPaint);
                             }
 
@@ -547,7 +547,7 @@ public partial class SCBindingsTabController
                             if (isCellListening)
                             {
                                 // Listening state - use Active color to match theme
-                                using var listeningBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                                using var listeningBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                                 canvas.DrawRect(cellBounds, listeningBgPaint);
 
                                 // Draw countdown progress bar at bottom of cell
@@ -557,22 +557,22 @@ public partial class SCBindingsTabController
                                 float barWidth = (cellBounds.Width - 4) * progress;
                                 var progressBounds = new SKRect(cellBounds.Left + 2, cellBounds.Bottom - barHeight - 2,
                                                                 cellBounds.Left + 2 + barWidth, cellBounds.Bottom - 2);
-                                using var progressPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                                using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                                 canvas.DrawRoundRect(progressBounds, 1.5f, 1.5f, progressPaint);
 
                                 // Pulsing border
                                 float pulse = (float)(0.6 + 0.4 * Math.Sin((DateTime.Now - _scListeningStartTime).TotalMilliseconds / 150.0));
-                                using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha((byte)(200 * pulse)), StrokeWidth = 2f, IsAntialias = true };
+                                using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha((byte)(200 * pulse)), 2f);
                                 canvas.DrawRect(cellBounds.Inset(1, 1), borderPaint);
                             }
                             else if (isCellSelected)
                             {
-                                using var selectedPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(50), IsAntialias = true };
+                                using var selectedPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(50));
                                 canvas.DrawRect(cellBounds, selectedPaint);
                             }
                             else if (isCellHovered)
                             {
-                                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(30), IsAntialias = true };
+                                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(30));
                                 canvas.DrawRect(cellBounds, hoverPaint);
                             }
 
@@ -676,13 +676,13 @@ public partial class SCBindingsTabController
                             }
 
                             // Draw column separator
-                            using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1 };
+                            using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(40));
                             canvas.DrawLine(colX, scrollY, colX, scrollY + rowHeight, sepPaint);
 
                             // Draw selection border for selected cell
                             if (isCellSelected && !isCellListening)
                             {
-                                using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1.5f, IsAntialias = true };
+                                using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active, 1.5f);
                                 canvas.DrawRect(cellBounds.Inset(1, 1), borderPaint);
                             }
                         }
@@ -715,10 +715,10 @@ public partial class SCBindingsTabController
 
             bool vScrollHovered = _scVScrollbarBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || _scIsDraggingVScroll;
 
-            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(vScrollHovered ? (byte)120 : (byte)80), IsAntialias = true };
+            using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(vScrollHovered ? (byte)120 : (byte)80));
             canvas.DrawRoundRect(_scVScrollbarBounds, 4f, 4f, trackPaint);
 
-            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = vScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180), IsAntialias = true };
+            using var thumbPaint = FUIRenderer.CreateFillPaint(vScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180));
             canvas.DrawRoundRect(_scVScrollThumbBounds, 4f, 4f, thumbPaint);
         }
 
@@ -739,10 +739,10 @@ public partial class SCBindingsTabController
 
             bool hScrollHovered = _scHScrollbarBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || _scIsDraggingHScroll;
 
-            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(hScrollHovered ? (byte)120 : (byte)80), IsAntialias = true };
+            using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(hScrollHovered ? (byte)120 : (byte)80));
             canvas.DrawRoundRect(_scHScrollbarBounds, 4f, 4f, trackPaint);
 
-            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = hScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180), IsAntialias = true };
+            using var thumbPaint = FUIRenderer.CreateFillPaint(hScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180));
             canvas.DrawRoundRect(_scHScrollThumbBounds, 4f, 4f, thumbPaint);
         }
     }
@@ -909,14 +909,14 @@ public partial class SCBindingsTabController
             if (_scIsListeningForInput)
             {
                 // Show "listening" state when cell listener is active
-                using var waitBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80), IsAntialias = true };
+                using var waitBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
                 canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
                 FUIRenderer.DrawTextCentered(canvas, "LISTENING...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
             }
             else if (isCellSharedInPanel)
             {
                 // Shared cell — ASSIGN is disabled; user must unshare first
-                using var disabledAssignPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+                using var disabledAssignPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
                 canvas.DrawRect(_scAssignInputButtonBounds, disabledAssignPaint);
                 FUIRenderer.DrawTextCentered(canvas, "ASSIGN", _scAssignInputButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
             }
@@ -977,7 +977,7 @@ public partial class SCBindingsTabController
                 else
                 {
                     // Disabled clear button
-                    using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+                    using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
                     canvas.DrawRect(_scClearBindingButtonBounds, disabledPaint);
                     FUIRenderer.DrawTextCentered(canvas, "CLEAR", _scClearBindingButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
                 }
@@ -1008,7 +1008,7 @@ public partial class SCBindingsTabController
         }
         else
         {
-            using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
             canvas.DrawRect(_scClearAllButtonBounds, disabledPaint);
             FUIRenderer.DrawTextCentered(canvas, "CLEAR ALL", _scClearAllButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
         }
@@ -1063,9 +1063,9 @@ public partial class SCBindingsTabController
             ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
         };
         canvas.DrawRect(_scImportDropdownBounds, glowPaint);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Void);
         canvas.DrawRect(_scImportDropdownBounds, bgPaint);
-        using var innerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
+        using var innerPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRect(_scImportDropdownBounds.Inset(2, 2), innerPaint);
         FUIRenderer.DrawLCornerFrame(canvas, _scImportDropdownBounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
 
@@ -1081,9 +1081,9 @@ public partial class SCBindingsTabController
             if (isHovered)
             {
                 _scHoveredImportProfile = i;
-                using var hoverBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                using var hoverBg = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                 canvas.DrawRect(itemBounds, hoverBg);
-                using var accentBar = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                using var accentBar = FUIRenderer.CreateFillPaint(FUIColors.Active);
                 canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
             }
             var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
@@ -1139,12 +1139,12 @@ public partial class SCBindingsTabController
             float scrollTrackY = _scActionMapFilterDropdownBounds.Top + 2;
             float scrollTrackHeight = dropdownHeight - 4;
 
-            using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(80), IsAntialias = true };
+            using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(80));
             canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, scrollTrackY, scrollTrackX + scrollbarWidth, scrollTrackY + scrollTrackHeight), 2f), trackPaint);
 
             float thumbHeight = Math.Max(20f, scrollTrackHeight * (dropdownHeight / totalContentHeight));
             float thumbY = scrollTrackY + (_scActionMapFilterScrollOffset / _scActionMapFilterMaxScroll) * (scrollTrackHeight - thumbHeight);
-            using var thumbPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim.WithAlpha(150), IsAntialias = true };
+            using var thumbPaint = FUIRenderer.CreateFillPaint(FUIColors.TextDim.WithAlpha(150));
             canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, thumbY, scrollTrackX + scrollbarWidth, thumbY + thumbHeight), 2f), thumbPaint);
         }
     }
@@ -1169,10 +1169,10 @@ public partial class SCBindingsTabController
             _                    => FUIColors.TextDim,
         };
 
-        using var bgPaint4 = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(25), IsAntialias = true };
+        using var bgPaint4 = FUIRenderer.CreateFillPaint(color.WithAlpha(25));
         canvas.DrawRoundRect(bounds, 2f, 2f, bgPaint4);
 
-        using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(180) };
+        using var accentPaint = FUIRenderer.CreateFillPaint(color.WithAlpha(180));
         canvas.DrawRect(new SKRect(bounds.Left, bounds.Top, bounds.Left + 3f, bounds.Bottom), accentPaint);
 
         FUIRenderer.DrawTextCentered(canvas, _scExportStatus, bounds, color, 13f);
@@ -1195,11 +1195,11 @@ public partial class SCBindingsTabController
         canvas.DrawRect(bounds, glowPaint);
 
         // Solid opaque background
-        using var bgPaint5 = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
+        using var bgPaint5 = FUIRenderer.CreateFillPaint(FUIColors.Void);
         canvas.DrawRect(bounds, bgPaint5);
 
         // Inner background
-        using var innerBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
+        using var innerBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRect(bounds.Inset(2, 2), innerBgPaint);
 
         // L-corner frame (FUI style)
@@ -1224,9 +1224,9 @@ public partial class SCBindingsTabController
             if (isHovered)
             {
                 _scHoveredProfileIndex = i;
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                 canvas.DrawRect(rowBounds, hoverPaint);
-                using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                 canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
 
                 // Delete (×) button — only shown on hover
@@ -1259,11 +1259,11 @@ public partial class SCBindingsTabController
             // Separator line (FUI style)
             y += 4f;
             float sepY = y;
-            using var sepPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
+            using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
             canvas.DrawLine(bounds.Left + 12, sepY, bounds.Right - 12, sepY, sepPaint);
 
             // Corner accents on separator
-            using var accentLinePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(120), StrokeWidth = 1f, IsAntialias = true };
+            using var accentLinePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(120));
             canvas.DrawLine(bounds.Left + 8, sepY, bounds.Left + 12, sepY, accentLinePaint);
             canvas.DrawLine(bounds.Right - 12, sepY, bounds.Right - 8, sepY, accentLinePaint);
 
@@ -1284,9 +1284,9 @@ public partial class SCBindingsTabController
                 if (isHovered)
                 {
                     _scHoveredProfileIndex = scFileIndexOffset + i;
-                    using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                    using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                     canvas.DrawRect(rowBounds, hoverPaint);
-                    using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
                 }
 
@@ -1370,7 +1370,7 @@ public partial class SCBindingsTabController
             bool hovered = i == _scConflictLinkHovered;
             if (hovered)
             {
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(40) };
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(40));
                 canvas.DrawRoundRect(rowBounds, 2, 2, hoverPaint);
             }
 
@@ -1467,7 +1467,7 @@ public partial class SCBindingsTabController
         }
         else
         {
-            using var disabledPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(60), IsAntialias = true };
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
             canvas.DrawRect(_scColImportButtonBounds, disabledPaint);
             FUIRenderer.DrawTextCentered(canvas, "IMPORT", _scColImportButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
         }
@@ -1631,12 +1631,7 @@ public partial class SCBindingsTabController
         }
         else
         {
-            using var disabledPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Background2.WithAlpha(60),
-                IsAntialias = true
-            };
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
             canvas.DrawRect(_scDeviceOrderAutoDetectBounds, disabledPaint);
             FUIRenderer.DrawTextCentered(canvas, "AUTO-DETECT", _scDeviceOrderAutoDetectBounds,
                 FUIColors.TextDim.WithAlpha(100), 12f);

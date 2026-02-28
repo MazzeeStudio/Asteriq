@@ -80,22 +80,11 @@ internal static class FUIWidgets
         var bgColor = isHovered
             ? accentColor.WithAlpha(50)
             : (isStop ? FUIColors.Danger.WithAlpha(20) : FUIColors.Active.WithAlpha(20));
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = bgColor,
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         var borderColor = isHovered ? accentColor : accentColor.WithAlpha(150);
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = borderColor,
-            StrokeWidth = isHovered ? 2f : 1f,
-            IsAntialias = true
-        };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor, isHovered ? 2f : 1f);
         canvas.DrawRect(bounds, borderPaint);
 
         var textColor = isHovered ? FUIColors.TextBright : accentColor;
@@ -146,13 +135,7 @@ internal static class FUIWidgets
 
     internal static void DrawJoystickOutlineFallback(SKCanvas canvas, SKRect bounds)
     {
-        using var outlinePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary.WithAlpha(60),
-            StrokeWidth = 1.5f,
-            IsAntialias = true
-        };
+        using var outlinePaint = FUIRenderer.CreateStrokePaint(FUIColors.Primary.WithAlpha(60), 1.5f);
 
         float centerX = bounds.MidX;
         float stickWidth = 36f;
@@ -210,7 +193,7 @@ internal static class FUIWidgets
             var delBounds = new SKRect(rightMargin - delSize - 8, y + (layerRowHeight - delSize) / 2 - 2,
                 rightMargin - 8, y + (layerRowHeight + delSize) / 2 - 2);
 
-            using var delPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(60) };
+            using var delPaint = FUIRenderer.CreateFillPaint(FUIColors.Danger.WithAlpha(60));
             canvas.DrawRoundRect(delBounds, 2, 2, delPaint);
             FUIRenderer.DrawTextCentered(canvas, "x", delBounds, FUIColors.Danger, 15f);
 
@@ -253,17 +236,17 @@ internal static class FUIWidgets
 
     internal static void DrawSlider(SKCanvas canvas, SKRect bounds, float value)
     {
-        using var trackPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
+        using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRoundRect(bounds, 4, 4, trackPaint);
 
         float fillWidth = bounds.Width * Math.Clamp(value, 0, 1);
         var fillBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + fillWidth, bounds.Bottom);
-        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active };
+        using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
         canvas.DrawRoundRect(fillBounds, 4, 4, fillPaint);
 
         float handleX = bounds.Left + fillWidth;
         float handleRadius = bounds.Height;
-        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright };
+        using var handlePaint = FUIRenderer.CreateFillPaint(FUIColors.TextBright);
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
     }
 
@@ -285,7 +268,7 @@ internal static class FUIWidgets
 
         float knobRadius = snapped.Height / 2 - 3;
         float knobX = on ? snapped.Right - knobRadius - 3 : snapped.Left + knobRadius + 3;
-        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright, IsAntialias = true };
+        using var knobPaint = FUIRenderer.CreateFillPaint(FUIColors.TextBright);
         canvas.DrawCircle(knobX, snapped.MidY, knobRadius, knobPaint);
     }
 
@@ -301,16 +284,16 @@ internal static class FUIWidgets
         if (fillWidth > 0)
         {
             var fillRect = new SKRect(bounds.Left + 2, trackY + 1, bounds.Left + 2 + fillWidth, trackY + trackHeight - 1);
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
+            using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
             canvas.DrawRoundRect(fillRect, 1, 1, fillPaint);
         }
 
         float knobX = bounds.Left + 3 + (bounds.Width - 6) * (value / (float)maxValue);
         float knobRadius = 6f;
-        using var knobPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextBright, IsAntialias = true };
+        using var knobPaint = FUIRenderer.CreateFillPaint(FUIColors.TextBright);
         canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobPaint);
 
-        using var knobFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f, IsAntialias = true };
+        using var knobFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active);
         canvas.DrawCircle(knobX, bounds.MidY, knobRadius, knobFramePaint);
     }
 
@@ -322,16 +305,16 @@ internal static class FUIWidgets
         if (fillWidth > 2)
         {
             var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = color.WithAlpha(100) };
+            using var fillPaint = FUIRenderer.CreateFillPaint(color.WithAlpha(100));
             canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
         }
 
         float handleX = bounds.Left + fillWidth;
         float handleRadius = dragging ? 8f : 6f;
-        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = dragging ? color : FUIColors.TextPrimary, IsAntialias = true };
+        using var handlePaint = FUIRenderer.CreateFillPaint(dragging ? color : FUIColors.TextPrimary);
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
 
-        using var handleStroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = color, StrokeWidth = 1.5f, IsAntialias = true };
+        using var handleStroke = FUIRenderer.CreateStrokePaint(color, 1.5f);
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
     }
 
@@ -345,16 +328,16 @@ internal static class FUIWidgets
         if (fillWidth > 2)
         {
             var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
-            using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(80) };
+            using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
             canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
         }
 
         float handleX = bounds.Left + fillWidth;
         float handleRadius = dragging ? 8f : 6f;
-        using var handlePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = dragging ? FUIColors.Active : FUIColors.TextPrimary, IsAntialias = true };
+        using var handlePaint = FUIRenderer.CreateFillPaint(dragging ? FUIColors.Active : FUIColors.TextPrimary);
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
 
-        using var handleStroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1.5f, IsAntialias = true };
+        using var handleStroke = FUIRenderer.CreateStrokePaint(FUIColors.Active, 1.5f);
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
     }
 
@@ -396,15 +379,10 @@ internal static class FUIWidgets
             : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
         var textColor = active ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = active ? FUIColors.Active : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(active ? FUIColors.Active : FUIColors.Frame);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
@@ -413,15 +391,10 @@ internal static class FUIWidgets
     internal static void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
     {
         var bgColor = open ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = open ? FUIColors.Primary : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(open ? FUIColors.Primary : FUIColors.Frame);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4),
@@ -441,15 +414,10 @@ internal static class FUIWidgets
             ? (isDanger ? FUIColors.Warning : FUIColors.Active)
             : FUIColors.TextDim;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? (isDanger ? FUIColors.Warning : FUIColors.Active) : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(hovered ? (isDanger ? FUIColors.Warning : FUIColors.Active) : FUIColors.Frame);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, icon, bounds, textColor, 17f);
@@ -464,15 +432,10 @@ internal static class FUIWidgets
             ? FUIColors.Background1
             : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = isPrimary ? FUIColors.Active : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(isPrimary ? FUIColors.Active : FUIColors.Frame);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
@@ -487,22 +450,17 @@ internal static class FUIWidgets
             ? (hovered ? FUIColors.TextBright : FUIColors.TextPrimary)
             : FUIColors.TextDisabled;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = enabled ? FUIColors.Frame : FUIColors.FrameDim,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(enabled ? FUIColors.Frame : FUIColors.FrameDim);
         canvas.DrawRect(bounds, framePaint);
 
         float centerX = bounds.MidX;
         float centerY = bounds.MidY;
         float arrowSize = 8f;
 
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = arrowColor, IsAntialias = true };
+        using var arrowPaint = FUIRenderer.CreateFillPaint(arrowColor);
         using var path = new SKPath();
         if (arrow == "<")
         {
@@ -580,19 +538,10 @@ internal static class FUIWidgets
 
     internal static void DrawMappingItem(SKCanvas canvas, SKRect bounds, string source, string target, string type, bool enabled)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = enabled ? FUIColors.Background2.WithAlpha(100) : FUIColors.Background1.WithAlpha(80)
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(enabled ? FUIColors.Background2.WithAlpha(100) : FUIColors.Background1.WithAlpha(80));
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = enabled ? FUIColors.Frame : FUIColors.FrameDim,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(enabled ? FUIColors.Frame : FUIColors.FrameDim);
         canvas.DrawRect(bounds, framePaint);
 
         var typeColor = type == "BUTTON" ? FUIColors.Active : FUIColors.Primary;
@@ -618,27 +567,15 @@ internal static class FUIWidgets
         var bgColor = hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Primary.WithAlpha(30);
         var frameColor = hovered ? FUIColors.Active : FUIColors.Primary;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = hovered ? 2f : 1f,
-            IsAntialias = true
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, hovered ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
         float iconX = bounds.Left + 16;
         float iconY = bounds.MidY;
-        using var iconPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? FUIColors.TextBright : FUIColors.TextPrimary,
-            StrokeWidth = 2f,
-            IsAntialias = true
-        };
+        using var iconPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 2f);
         canvas.DrawLine(iconX - 6, iconY, iconX + 6, iconY, iconPaint);
         canvas.DrawLine(iconX, iconY - 6, iconX, iconY + 6, iconPaint);
 
@@ -662,17 +599,17 @@ internal static class FUIWidgets
             : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
-        using var themeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var themeBgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, themeBgPaint);
 
-        using var themeFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 1.5f : 1f };
+        using var themeFramePaint = FUIRenderer.CreateStrokePaint(frameColor, isActive ? 1.5f : 1f);
         canvas.DrawRect(bounds, themeFramePaint);
 
         FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 12f);
 
         var indicatorBounds = new SKRect(bounds.Left + 2, bounds.Bottom - 2,
             bounds.Right - 2, bounds.Bottom - 1);
-        using var indicatorPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = previewColor.WithAlpha((byte)(isActive ? 200 : 100)) };
+        using var indicatorPaint = FUIRenderer.CreateFillPaint(previewColor.WithAlpha((byte)(isActive ? 200 : 100)));
         canvas.DrawRect(indicatorBounds, indicatorPaint);
     }
 
@@ -704,12 +641,12 @@ internal static class FUIWidgets
             ? (isHovered ? FUIColors.Active.WithAlpha(180) : FUIColors.Active.WithAlpha(120))
             : FUIColors.Background2.WithAlpha(100);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         using var path = FUIRenderer.CreateFrame(bounds, 4f);
         canvas.DrawPath(path, bgPaint);
 
         var borderColor = isEnabled ? FUIColors.Active : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1.5f, IsAntialias = true };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor, 1.5f);
         canvas.DrawPath(path, borderPaint);
 
         var textColor = isEnabled ? FUIColors.TextBright : FUIColors.TextDim;
@@ -722,12 +659,12 @@ internal static class FUIWidgets
             ? (isHovered ? FUIColors.Primary.WithAlpha(150) : FUIColors.Primary.WithAlpha(80))
             : FUIColors.Background2.WithAlpha(100);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         using var path = FUIRenderer.CreateFrame(bounds, 4f);
         canvas.DrawPath(path, bgPaint);
 
         var borderColor = isEnabled ? FUIColors.Primary : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1.5f, IsAntialias = true };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor, 1.5f);
         canvas.DrawPath(path, borderPaint);
 
         var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
@@ -737,7 +674,7 @@ internal static class FUIWidgets
         {
             float arrowX = bounds.Right - 16;
             float arrowY = bounds.MidY;
-            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = textColor, StrokeWidth = 1.5f, IsAntialias = true };
+            using var arrowPaint = FUIRenderer.CreateStrokePaint(textColor, 1.5f);
             canvas.DrawLine(arrowX - 4, arrowY - 2, arrowX, arrowY + 2, arrowPaint);
             canvas.DrawLine(arrowX, arrowY + 2, arrowX + 4, arrowY - 2, arrowPaint);
         }
@@ -751,7 +688,7 @@ internal static class FUIWidgets
 
         float iconX = bounds.Left + 8f;
         float iconY = bounds.MidY;
-        using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.TextDim, StrokeWidth = 1.5f, IsAntialias = true };
+        using var iconPaint = FUIRenderer.CreateStrokePaint(FUIColors.TextDim, 1.5f);
         canvas.DrawCircle(iconX + 5, iconY - 1, 5f, iconPaint);
         canvas.DrawLine(iconX + 9, iconY + 3, iconX + 13, iconY + 7, iconPaint);
 
@@ -769,7 +706,7 @@ internal static class FUIWidgets
             {
                 float clearX = bounds.Right - 18f;
                 float clearY = bounds.MidY;
-                using var clearPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.TextDim, StrokeWidth = 1.5f, IsAntialias = true };
+                using var clearPaint = FUIRenderer.CreateStrokePaint(FUIColors.TextDim, 1.5f);
                 canvas.DrawLine(clearX - 4, clearY - 4, clearX + 4, clearY + 4, clearPaint);
                 canvas.DrawLine(clearX + 4, clearY - 4, clearX - 4, clearY + 4, clearPaint);
             }
@@ -780,7 +717,7 @@ internal static class FUIWidgets
             float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 13f));
             if ((DateTime.Now.Millisecond / 500) % 2 == 0)
             {
-                using var cursorPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 1f };
+                using var cursorPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active);
                 canvas.DrawLine(cursorX, bounds.Top + 5, cursorX, bounds.Bottom - 5, cursorPaint);
             }
         }
@@ -789,7 +726,7 @@ internal static class FUIWidgets
     internal static void DrawCollapseIndicator(SKCanvas canvas, float x, float y, bool isCollapsed, bool isHovered)
     {
         var color = isHovered ? FUIColors.TextBright : FUIColors.Primary;
-        using var paint = new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true };
+        using var paint = FUIRenderer.CreateFillPaint(color);
 
         var path = new SKPath();
         if (isCollapsed)
@@ -874,10 +811,10 @@ internal static class FUIWidgets
 
         if (isHovered && isEnabled)
         {
-            using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+            using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
             canvas.DrawRect(itemBounds, hoverPaint);
 
-            using var accentPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+            using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
             canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), accentPaint);
         }
 
@@ -890,10 +827,10 @@ internal static class FUIWidgets
     internal static void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
     {
         var bgColor = isHovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background1.WithAlpha(140);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f, IsAntialias = true };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(bounds, borderPaint);
 
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 10, bounds.MidY + 4), FUIColors.TextPrimary, 14f);
@@ -903,7 +840,7 @@ internal static class FUIWidgets
     {
         if (isSelected)
         {
-            using var accentPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active, StrokeWidth = 3f, IsAntialias = true };
+            using var accentPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active, 3f);
             canvas.DrawLine(bounds.Right - 1, bounds.Top + 5, bounds.Right - 1, bounds.Bottom - 5, accentPaint);
 
             using var glowPaint = new SKPaint
@@ -953,7 +890,7 @@ internal static class FUIWidgets
 
         if (withDivider)
         {
-            using var sep = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
+            using var sep = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
             canvas.DrawLine(leftMargin, y, rightMargin, y, sep);
             y += 14f;
         }
@@ -965,13 +902,13 @@ internal static class FUIWidgets
             ? (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150))
             : FUIColors.Background1.WithAlpha(100);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         var borderColor = isEnabled
             ? (isHovered ? FUIColors.FrameBright : FUIColors.Frame)
             : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor);
         canvas.DrawRect(bounds, borderPaint);
 
         float textPadding = 8f;
@@ -986,7 +923,7 @@ internal static class FUIWidgets
         {
             float arrowX = bounds.Right - 12f;
             float arrowY = bounds.MidY;
-            using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
+            using var arrowPaint = FUIRenderer.CreateFillPaint(FUIColors.TextDim);
             using var arrowPath = new SKPath();
             arrowPath.MoveTo(arrowX - 4, arrowY - 2);
             arrowPath.LineTo(arrowX + 4, arrowY - 2);
@@ -1030,9 +967,9 @@ internal static class FUIWidgets
         canvas.DrawRect(bounds, glowPaint);
 
         // Opaque backgrounds
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Void, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Void);
         canvas.DrawRect(bounds, bgPaint);
-        using var innerPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0, IsAntialias = true };
+        using var innerPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRect(bounds.Inset(2, 2), innerPaint);
 
         // L-corner frame
@@ -1052,14 +989,14 @@ internal static class FUIWidgets
 
                 if (isHovered)
                 {
-                    using var hoverBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                    using var hoverBg = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                     canvas.DrawRect(itemBounds, hoverBg);
-                    using var accentBar = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    using var accentBar = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
                 }
                 else if (isSelected)
                 {
-                    using var selAccent = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
+                    using var selAccent = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(60));
                     canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), selAccent);
                 }
 

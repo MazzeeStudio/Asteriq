@@ -98,6 +98,9 @@ public partial class SCBindingsTabController : ITabController
     private HashSet<string> _scConflictingBindings = new();
     private int _scHighlightedColumn = -1;
 
+    // Shared cells: key = "{actionKey}|{secondaryVJoyDeviceId}", value = (primaryVJoyDevice, primaryInputName, secondaryInputName)
+    private Dictionary<string, (uint PrimaryVJoyDevice, string PrimaryInputName, string SecondaryInputName)> _scSharedCells = new();
+
     // Header toggle button (JS REF / DEVICE)
     private SKRect _scHeaderToggleButtonBounds;
     private bool _scHeaderToggleButtonHovered;

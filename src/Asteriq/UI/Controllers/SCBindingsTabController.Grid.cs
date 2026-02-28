@@ -273,6 +273,35 @@ public partial class SCBindingsTabController
         return false;
     }
 
+    /// <summary>
+    /// Rebuilds the shared-cell lookup from the current export profile.
+    /// Called after any binding change that may affect SharedWith lists.
+    /// </summary>
+    private void UpdateSharedCells()
+    {
+        _scSharedCells.Clear();
+        foreach (var binding in _scExportProfile.Bindings)
+        {
+            foreach (var shared in binding.SharedWith)
+            {
+                string key = $"{binding.ActionKey}|{shared.VJoySlot}";
+                _scSharedCells[key] = (binding.VJoyDevice, binding.InputName, shared.InputName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Parses a vJoy button index (0-based) from an SC input name like "button33".
+    /// Returns -1 if the input is not a button or cannot be parsed.
+    /// </summary>
+    private static int ParseButtonIndex(string inputName)
+    {
+        if (inputName.StartsWith("button", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(inputName[6..], out var n) && n >= 1)
+            return n - 1; // 0-based
+        return -1;
+    }
+
     private void UpdateConflictingBindings()
     {
         _scConflictingBindings.Clear();
@@ -488,6 +517,93 @@ public partial class SCBindingsTabController
             }
         }
 
+        // Cross-device conflict check: same action already bound to a DIFFERENT vJoy device.
+        // Only applies to vJoy bindings (not physical device columns).
+        if (!col.IsPhysical)
+        {
+            var existingOnOtherDevice = _scExportProfile.Bindings
+                .FirstOrDefault(b =>
+                    b.ActionMap == action.ActionMap &&
+                    b.ActionName == action.ActionName &&
+                    b.DeviceType == SCDeviceType.Joystick &&
+                    b.PhysicalDeviceId is null &&
+                    b.VJoyDevice != col.VJoyDeviceId);
+
+            if (existingOnOtherDevice is not null)
+            {
+                int primaryInstance = _scExportProfile.GetSCInstance(existingOnOtherDevice.VJoyDevice);
+                string primaryInputDisplay = FormatInputName(existingOnOtherDevice.InputName);
+                string secondaryInputDisplay = FormatInputName(inputName);
+
+                using var sharedDialog = new SCSharedBindingDialog(
+                    SCCategoryMapper.FormatActionName(action.ActionName),
+                    $"JS{primaryInstance}",
+                    primaryInputDisplay,
+                    $"JS{col.SCInstance}",
+                    secondaryInputDisplay);
+                sharedDialog.ShowDialog(_ctx.OwnerForm);
+
+                switch (sharedDialog.Result)
+                {
+                    case SCSharedBindingResult.Cancel:
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Cross-device binding cancelled for {action.ActionName}");
+                        return;
+
+                    case SCSharedBindingResult.Replace:
+                        // Remove the existing primary binding and fall through to assign normally
+                        _scExportProfile.RemoveBinding(existingOnOtherDevice);
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] Replaced JS{primaryInstance} binding for {action.ActionName}");
+                        break;
+
+                    case SCSharedBindingResult.Share:
+                        // Reroute physical button + update SharedWith — do not create a new SC binding
+                        PerformShare(existingOnOtherDevice, col.VJoyDeviceId, inputName);
+                        _scExportProfileService?.SaveProfile(_scExportProfile);
+                        UpdateSharedCells();
+                        UpdateConflictingBindings();
+                        SetStatus($"Shared: JS{col.SCInstance} {secondaryInputDisplay} → JS{primaryInstance} {primaryInputDisplay}");
+                        _ctx.MarkDirty();
+                        return; // Don't create a new binding — the share is the assignment
+                }
+            }
+        }
+
+        // Cross-device conflict check for physical device columns.
+        // SC only supports one joystick binding per action; no vJoy rerouting is available.
+        if (col.IsPhysical)
+        {
+            var existingOnOtherPhysical = _scExportProfile.Bindings
+                .FirstOrDefault(b =>
+                    b.ActionMap == action.ActionMap &&
+                    b.ActionName == action.ActionName &&
+                    b.DeviceType == SCDeviceType.Joystick &&
+                    b.PhysicalDeviceId is not null &&
+                    b.PhysicalDeviceId != col.PhysicalDevice!.HidDevicePath);
+
+            if (existingOnOtherPhysical is not null)
+            {
+                int existingInstance = _scExportProfile.GetSCInstanceForPhysical(existingOnOtherPhysical.PhysicalDeviceId!);
+                string existingInputDisplay = FormatInputName(existingOnOtherPhysical.InputName);
+                string newInputDisplay = FormatInputName(inputName);
+
+                using var replaceDialog = new FUIConfirmDialog(
+                    "Action Already Bound",
+                    $"\"{SCCategoryMapper.FormatActionName(action.ActionName)}\" is already bound to JS{existingInstance} / {existingInputDisplay}.\n\n" +
+                    $"Star Citizen only supports one joystick binding per action.\n\n" +
+                    $"Replace it with JS{col.SCInstance} / {newInputDisplay}?",
+                    "Replace", "Cancel");
+
+                if (replaceDialog.ShowDialog(_ctx.OwnerForm) != DialogResult.Yes)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Physical cross-device binding cancelled for {action.ActionName}");
+                    return;
+                }
+
+                _scExportProfile.RemoveBinding(existingOnOtherPhysical);
+                System.Diagnostics.Debug.WriteLine($"[SCBindings] Replaced physical JS{existingInstance} binding for {action.ActionName}");
+            }
+        }
+
         // Determine input type from input name
         var inputType = InferInputTypeFromName(inputName);
 
@@ -530,6 +646,126 @@ public partial class SCBindingsTabController
         UpdateConflictingBindings();
 
         SetStatus($"Bound {action.ActionName} to js{col.SCInstance}_{inputName}");
+    }
+
+    /// <summary>
+    /// Performs the Share operation: reroutes physical button mappings from secondary to primary
+    /// and adds a SharedWith entry to the primary binding.
+    /// </summary>
+    private void PerformShare(SCActionBinding primaryBinding, uint secondaryVJoySlot, string secondaryInputName)
+    {
+        int secondaryButtonIndex = ParseButtonIndex(secondaryInputName);
+        int primaryButtonIndex = ParseButtonIndex(primaryBinding.InputName);
+
+        var reroutedIds = new List<Guid>();
+
+        // Reroute in the active mapping profile if possible
+        var mappingProfile = _ctx.ProfileManager.ActiveProfile;
+        if (mappingProfile is not null && secondaryButtonIndex >= 0 && primaryButtonIndex >= 0)
+        {
+            foreach (var bm in mappingProfile.ButtonMappings)
+            {
+                if (bm.Output.Type == OutputType.VJoyButton &&
+                    bm.Output.VJoyDevice == secondaryVJoySlot &&
+                    bm.Output.Index == secondaryButtonIndex)
+                {
+                    bm.Output.VJoyDevice = primaryBinding.VJoyDevice;
+                    bm.Output.Index = primaryButtonIndex;
+                    reroutedIds.Add(bm.Id);
+                }
+            }
+
+            if (reroutedIds.Count > 0)
+            {
+                _ctx.OnMappingsChanged();
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SCBindings] Rerouted {reroutedIds.Count} mapping(s) from vJoy{secondaryVJoySlot}/{secondaryInputName} → vJoy{primaryBinding.VJoyDevice}/{primaryBinding.InputName}");
+            }
+        }
+
+        primaryBinding.SharedWith.Add(new SCSharedInput
+        {
+            VJoySlot = secondaryVJoySlot,
+            InputName = secondaryInputName,
+            ReroutedMappingIds = reroutedIds
+        });
+    }
+
+    /// <summary>
+    /// Handles a click on a shared cell — shows the Unshare dialog and performs the operation if confirmed.
+    /// </summary>
+    private void HandleSharedCellClick(SCAction action, SCGridColumn col)
+    {
+        string sharedKey = $"{action.Key}|{col.VJoyDeviceId}";
+        if (!_scSharedCells.TryGetValue(sharedKey, out var linkInfo))
+            return;
+
+        var primaryBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+            b.ActionMap == action.ActionMap &&
+            b.ActionName == action.ActionName &&
+            b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId is null &&
+            b.VJoyDevice == linkInfo.PrimaryVJoyDevice);
+
+        if (primaryBinding is null) return;
+
+        var sharedEntry = primaryBinding.SharedWith.FirstOrDefault(s => s.VJoySlot == col.VJoyDeviceId);
+        if (sharedEntry is null) return;
+
+        int primaryInstance = _scExportProfile.GetSCInstance(primaryBinding.VJoyDevice);
+        string primaryInputDisplay = FormatInputName(primaryBinding.InputName);
+        string secondaryInputDisplay = FormatInputName(sharedEntry.InputName);
+
+        using var dialog = new FUIConfirmDialog(
+            "Shared Binding",
+            $"{secondaryInputDisplay} on JS{col.SCInstance} is shared with JS{primaryInstance} / {primaryInputDisplay}.\n\nUnshare this binding?",
+            "Unshare", "Cancel");
+
+        if (dialog.ShowDialog(_ctx.OwnerForm) != DialogResult.Yes)
+            return;
+
+        PerformUnshare(primaryBinding, sharedEntry, col.SCInstance, primaryInstance, primaryInputDisplay, secondaryInputDisplay);
+    }
+
+    /// <summary>
+    /// Performs the Unshare operation: restores rerouted mappings and removes the SharedWith entry.
+    /// </summary>
+    private void PerformUnshare(
+        SCActionBinding primaryBinding,
+        Models.SCSharedInput sharedEntry,
+        int secondarySCInstance,
+        int primarySCInstance,
+        string primaryInputDisplay,
+        string secondaryInputDisplay)
+    {
+        int secondaryButtonIndex = ParseButtonIndex(sharedEntry.InputName);
+
+        // Restore rerouted mappings
+        var mappingProfile = _ctx.ProfileManager.ActiveProfile;
+        if (mappingProfile is not null && secondaryButtonIndex >= 0 && sharedEntry.ReroutedMappingIds.Count > 0)
+        {
+            foreach (var mappingId in sharedEntry.ReroutedMappingIds)
+            {
+                var mapping = mappingProfile.ButtonMappings.FirstOrDefault(m => m.Id == mappingId);
+                if (mapping is not null)
+                {
+                    mapping.Output.VJoyDevice = sharedEntry.VJoySlot;
+                    mapping.Output.Index = secondaryButtonIndex;
+                }
+            }
+            _ctx.OnMappingsChanged();
+            System.Diagnostics.Debug.WriteLine(
+                $"[SCBindings] Restored {sharedEntry.ReroutedMappingIds.Count} mapping(s) back to vJoy{sharedEntry.VJoySlot}/{sharedEntry.InputName}");
+        }
+
+        primaryBinding.SharedWith.Remove(sharedEntry);
+
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+        UpdateSharedCells();
+        UpdateConflictingBindings();
+        _ctx.MarkDirty();
+
+        SetStatus($"Unshared JS{secondarySCInstance} {secondaryInputDisplay} from JS{primarySCInstance} {primaryInputDisplay}");
     }
 
     private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex, SCGridColumn col)

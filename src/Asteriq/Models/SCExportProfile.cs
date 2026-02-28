@@ -272,6 +272,29 @@ public enum SCDeviceType
 }
 
 /// <summary>
+/// Represents a physical button rerouted to a primary vJoy input as part of shared binding.
+/// Stored on the primary binding's SharedWith list.
+/// </summary>
+public class SCSharedInput
+{
+    /// <summary>
+    /// vJoy device ID of the secondary device (the one that displays this action in its column).
+    /// </summary>
+    public uint VJoySlot { get; set; }
+
+    /// <summary>
+    /// SC input name on the secondary device (e.g. "button33").
+    /// </summary>
+    public string InputName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// IDs of ButtonMappings (from the active MappingProfile) that were rerouted when Share was
+    /// performed. Used to restore the original routing when Unshare is performed.
+    /// </summary>
+    public List<Guid> ReroutedMappingIds { get; set; } = new();
+}
+
+/// <summary>
 /// A single action binding for export to SC
 /// </summary>
 public class SCActionBinding
@@ -326,6 +349,13 @@ public class SCActionBinding
     /// Modifier keys (e.g., "lshift", "lctrl")
     /// </summary>
     public List<string> Modifiers { get; set; } = new();
+
+    /// <summary>
+    /// Secondary vJoy inputs that are rerouted to this (primary) binding.
+    /// Only populated on the primary binding. Each entry represents a physical button
+    /// that was rerouted so that both physical buttons trigger the same SC action.
+    /// </summary>
+    public List<SCSharedInput> SharedWith { get; set; } = new();
 
     /// <summary>
     /// Gets the full SC input string (e.g., "js1_button5", "kb1_w", "mo1_mouse1")

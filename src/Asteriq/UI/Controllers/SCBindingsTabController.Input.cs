@@ -340,7 +340,14 @@ public partial class SCBindingsTabController
                 _scDeviceOrderOpenRow = -1;
                 _scDeviceOrderHoveredIndex = -1;
                 _ctx.MarkDirty();
-                // Fall through so other panel clicks still work
+                // If the click landed on a row selector, return now to prevent the
+                // row selector loop below from immediately re-opening the dropdown
+                for (int i = 0; i < _scDeviceOrderSelectorBounds.Length; i++)
+                {
+                    if (!_scDeviceOrderSelectorBounds[i].IsEmpty && _scDeviceOrderSelectorBounds[i].Contains(point))
+                        return;
+                }
+                // Otherwise fall through so other panel clicks still work
             }
         }
 
@@ -485,6 +492,16 @@ public partial class SCBindingsTabController
                 var col = _scGridColumns[_scSelectedCell.colIndex];
                 if (!col.IsReadOnly)
                 {
+                    // Block ASSIGN for shared cells — user must unshare first
+                    if (col.IsJoystick && !col.IsPhysical && _scFilteredActions is not null
+                        && _scSelectedCell.actionIndex < _scFilteredActions.Count)
+                    {
+                        var selectedActionForAssign = _scFilteredActions[_scSelectedCell.actionIndex];
+                        string assignSharedKey = $"{selectedActionForAssign.Key}|{col.VJoyDeviceId}";
+                        if (_scSharedCells.ContainsKey(assignSharedKey))
+                            return;
+                    }
+
                     _scIsListeningForInput = true;
                     _scListeningStartTime = DateTime.Now;
                     _scListeningColumn = col;
@@ -500,7 +517,7 @@ public partial class SCBindingsTabController
             return;
         }
 
-        // Clear binding button
+        // Clear binding button (also serves as UNSHARE for shared cells)
         if (_scClearBindingButtonBounds.Contains(point) && _scSelectedActionIndex >= 0 && _scFilteredActions is not null)
         {
             var selectedAction = _scFilteredActions[_scSelectedActionIndex];
@@ -509,6 +526,18 @@ public partial class SCBindingsTabController
             if (_scSelectedCell.colIndex >= 0 && _scGridColumns is not null && _scSelectedCell.colIndex < _scGridColumns.Count)
             {
                 var selCol = _scGridColumns[_scSelectedCell.colIndex];
+
+                // For shared cells, show the unshare dialog instead of clearing a binding
+                if (selCol.IsJoystick && !selCol.IsPhysical)
+                {
+                    string clearSharedKey = $"{selectedAction.Key}|{selCol.VJoyDeviceId}";
+                    if (_scSharedCells.ContainsKey(clearSharedKey))
+                    {
+                        HandleSharedCellClick(selectedAction, selCol);
+                        return;
+                    }
+                }
+
                 if (selCol.IsPhysical)
                 {
                     var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
@@ -540,6 +569,7 @@ public partial class SCBindingsTabController
 
             _scExportProfileService?.SaveProfile(_scExportProfile);
             UpdateConflictingBindings();
+            UpdateSharedCells();
 
             return;
         }
@@ -652,6 +682,8 @@ public partial class SCBindingsTabController
     {
         if (_scGridColumns is null || colIndex < 0 || colIndex >= _scGridColumns.Count)
             return;
+        if (_scFilteredActions is null || actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
+            return;
 
         var col = _scGridColumns[colIndex];
 
@@ -669,6 +701,19 @@ public partial class SCBindingsTabController
         // Check for double-click on the same cell (within 400ms)
         bool isDoubleClick = _scSelectedCell == (actionIndex, colIndex) &&
                             (DateTime.Now - _scLastCellClickTime).TotalMilliseconds < 400;
+
+        // Shared cells: select normally but never enter listen mode — use CLEAR/right-click to unshare
+        if (col.IsJoystick && !col.IsPhysical)
+        {
+            var action = _scFilteredActions[actionIndex];
+            string sharedKey = $"{action.Key}|{col.VJoyDeviceId}";
+            if (_scSharedCells.ContainsKey(sharedKey))
+            {
+                _scSelectedCell = (actionIndex, colIndex);
+                _scLastCellClickTime = DateTime.Now;
+                return;
+            }
+        }
 
         if (isDoubleClick)
         {
@@ -723,11 +768,23 @@ public partial class SCBindingsTabController
                 _scExportProfile.RemoveBinding(binding);
                 _scExportProfileService?.SaveProfile(_scExportProfile);
                 UpdateConflictingBindings();
+                UpdateSharedCells();
                 System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared physical JS binding for {action.ActionName} on {col.Header}");
             }
         }
         else if (col.IsJoystick)
         {
+            // For shared cells, show the unshare dialog instead of clearing a binding
+            if (!col.IsPhysical)
+            {
+                string rightClickSharedKey = $"{action.Key}|{col.VJoyDeviceId}";
+                if (_scSharedCells.ContainsKey(rightClickSharedKey))
+                {
+                    HandleSharedCellClick(action, col);
+                    return;
+                }
+            }
+
             // vJoy column: find binding matching this column's SCInstance
             var userBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
                 b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
@@ -739,6 +796,7 @@ public partial class SCBindingsTabController
                 _scExportProfile.RemoveBinding(userBinding);
                 _scExportProfileService?.SaveProfile(_scExportProfile);
                 UpdateConflictingBindings();
+                UpdateSharedCells();
                 System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared vJoy JS binding for {action.ActionName} on {col.Header}");
             }
         }

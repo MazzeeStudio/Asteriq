@@ -235,6 +235,15 @@ public class SCXmlExportService
             }
 
             actionElement.Add(rebindElement);
+
+            // Write shared inputs as sibling elements so they round-trip across export/import.
+            // SC ignores unknown child elements, so these are safe to include.
+            foreach (var shared in binding.SharedWith)
+            {
+                int sharedScInstance = profile.GetSCInstance(shared.VJoySlot);
+                actionElement.Add(new XElement("asteriq_shared",
+                    new XAttribute("input", $"js{sharedScInstance}_{shared.InputName}")));
+            }
         }
 
         return actionElement;
@@ -365,6 +374,9 @@ public class SCXmlExportService
 
                     var rebinds = action.Elements("rebind").ToList();
 
+                    // Collect parsed bindings for this action so we can attach shared inputs
+                    var actionBindings = new List<SCActionBinding>();
+
                     foreach (var rebind in rebinds)
                     {
                         var inputStr = rebind.Attribute("input")?.Value;
@@ -392,6 +404,7 @@ public class SCXmlExportService
                             if (!string.IsNullOrEmpty(activationMode))
                                 binding.ActivationMode = ParseActivationMode(activationMode);
 
+                            actionBindings.Add(binding);
                             result.Bindings.Add(binding);
                         }
                         else
@@ -400,6 +413,29 @@ public class SCXmlExportService
                             // Log first few skipped for debugging
                             if (skippedOther <= 5)
                                 System.Diagnostics.Debug.WriteLine($"[SCXmlExportService] Skipped binding: {inputStr}");
+                        }
+                    }
+
+                    // Parse <asteriq_shared> siblings and attach to the primary JS binding.
+                    // VJoySlot is stored as SC instance number (same convention as VJoyDevice during import).
+                    var primaryJsBinding = actionBindings.FirstOrDefault(b => b.DeviceType == SCDeviceType.Joystick);
+                    if (primaryJsBinding is not null)
+                    {
+                        foreach (var sharedEl in action.Elements("asteriq_shared"))
+                        {
+                            var sharedInput = sharedEl.Attribute("input")?.Value;
+                            if (string.IsNullOrEmpty(sharedInput)) continue;
+
+                            var underscoreIdx = sharedInput.IndexOf('_');
+                            if (underscoreIdx > 2 && sharedInput.StartsWith("js") &&
+                                uint.TryParse(sharedInput[2..underscoreIdx], out var slot))
+                            {
+                                primaryJsBinding.SharedWith.Add(new SCSharedInput
+                                {
+                                    VJoySlot = slot,
+                                    InputName = sharedInput[(underscoreIdx + 1)..]
+                                });
+                            }
                         }
                     }
                 }

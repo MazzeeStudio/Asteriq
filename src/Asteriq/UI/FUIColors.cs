@@ -30,6 +30,35 @@ public enum FUITheme
 /// </summary>
 public static class FUIColors
 {
+    // ---------------------------------------------------------------------------
+    // Alpha constants — single source of truth for all WithAlpha() calls.
+    // Use these instead of magic numbers so bulk visual changes are one-line edits.
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Barely-visible tint (subtle overlap, glow edge) — 15/255</summary>
+    public const byte AlphaGhost = 15;
+
+    /// <summary>Very light tint (soft hover overlay, background shimmer) — 30/255</summary>
+    public const byte AlphaLightTint = 30;
+
+    /// <summary>Light interactive tint (default hover-bg, selection overlay) — 40/255</summary>
+    public const byte AlphaHoverBg = 40;
+
+    /// <summary>Medium glow / secondary highlight — 60/255</summary>
+    public const byte AlphaGlow = 60;
+
+    /// <summary>Strong hover tint / active-state emphasis — 80/255</summary>
+    public const byte AlphaHoverStrong = 80;
+
+    /// <summary>Subtle panel background (default closed state) — 120/255</summary>
+    public const byte AlphaPanelSubtle = 120;
+
+    /// <summary>Soft border / secondary indicator — 150/255</summary>
+    public const byte AlphaBorderSoft = 150;
+
+    /// <summary>Strong panel background (open/active dropdown state) — 180/255</summary>
+    public const byte AlphaPanelStrong = 180;
+
     private static FUITheme _currentTheme = FUITheme.Midnight;
 
     /// <summary>
@@ -377,4 +406,36 @@ public static class FUIColors
         FUITheme.RSI => new(0x2C, 0x34, 0x3C),       // Dim blue
         _ => new(0x30, 0x34, 0x3C)
     };
+
+    // ---------------------------------------------------------------------------
+    // Semantic compound colors — pre-combined color+alpha for the most common
+    // interactive states. Use these instead of inline WithAlpha() expressions.
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Panel/dropdown background in default (closed) state.</summary>
+    public static SKColor PanelBgDefault => Background2.WithAlpha(AlphaPanelSubtle);
+
+    /// <summary>Panel/dropdown background when hovered.</summary>
+    public static SKColor PanelBgHover => Background2.WithAlpha(AlphaPanelStrong);
+
+    /// <summary>Panel/dropdown background when open or selected.</summary>
+    public static SKColor PanelBgActive => Active.WithAlpha(AlphaHoverBg);
+
+    /// <summary>Light hover tint overlaid on any surface (Primary colour, very transparent).</summary>
+    public static SKColor HoverTint => Primary.WithAlpha(AlphaHoverBg);
+
+    /// <summary>Selection / active-item background highlight.</summary>
+    public static SKColor SelectionBg => Active.WithAlpha(AlphaHoverBg);
+
+    /// <summary>Stronger selection background (e.g. focused row, open section).</summary>
+    public static SKColor SelectionBgStrong => Active.WithAlpha(AlphaHoverStrong);
+
+    /// <summary>Soft border for active/selected elements.</summary>
+    public static SKColor SelectionBorder => Active.WithAlpha(AlphaBorderSoft);
+
+    /// <summary>Danger/conflict tint used as a cell background (very subtle).</summary>
+    public static SKColor DangerTint => Danger.WithAlpha(AlphaHoverBg);
+
+    /// <summary>Warning/conflict tint used as a cell background (very subtle).</summary>
+    public static SKColor WarningTint => Warning.WithAlpha(AlphaHoverBg);
 }

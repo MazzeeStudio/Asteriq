@@ -76,6 +76,7 @@ public partial class SCBindingsTabController
 
             // Initial conflict detection
             UpdateConflictingBindings();
+            UpdateSharedCells();
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstallations.Count} installations found");
         }
@@ -268,6 +269,7 @@ public partial class SCBindingsTabController
 
         _scProfileDirty = false;
         UpdateConflictingBindings();
+        UpdateSharedCells();
     }
 
     private void ReportProgress(int version, string message)
@@ -540,6 +542,7 @@ public partial class SCBindingsTabController
 
         // Update conflicts
         UpdateConflictingBindings();
+        UpdateSharedCells();
 
         // Log final profile stats
         var finalKb = _scExportProfile.Bindings.Count(b => b.DeviceType == SCDeviceType.Keyboard);
@@ -586,6 +589,7 @@ public partial class SCBindingsTabController
             _scExportProfile.ClearBindings();
             _scExportProfileService?.SaveProfile(_scExportProfile);
             UpdateConflictingBindings();
+            UpdateSharedCells();
 
             SetStatus($"Cleared {count} binding(s)");
 
@@ -615,6 +619,7 @@ public partial class SCBindingsTabController
             ApplyDefaultBindingsToProfile();
 
             UpdateConflictingBindings();
+            UpdateSharedCells();
 
             SetStatus("Reset to defaults");
 

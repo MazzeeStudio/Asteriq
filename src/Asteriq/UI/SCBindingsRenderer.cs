@@ -47,53 +47,6 @@ internal static class SCBindingsRenderer
         }
     }
 
-    internal static void DrawConflictIndicator(SKCanvas canvas, float x, float y)
-    {
-        float size = 8f;
-
-        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning, IsAntialias = true };
-        var path = new SKPath();
-        path.MoveTo(x + size / 2, y);
-        path.LineTo(x + size, y + size);
-        path.LineTo(x, y + size);
-        path.Close();
-        canvas.DrawPath(path, fillPaint);
-
-        using var textPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = SKColors.White,
-            IsAntialias = true,
-            TextSize = 10f
-        };
-        canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
-    }
-
-    /// <summary>
-    /// Draws a downward-pointing red triangle to indicate the same action is bound on multiple
-    /// joystick columns (cross-column action duplicate). Distinct from the amber upward conflict triangle.
-    /// </summary>
-    internal static void DrawDuplicateActionIndicator(SKCanvas canvas, float x, float y)
-    {
-        float size = 8f;
-
-        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(210, 60, 60), IsAntialias = true };
-        var path = new SKPath();
-        path.MoveTo(x, y);
-        path.LineTo(x + size, y);
-        path.LineTo(x + size / 2, y + size);
-        path.Close();
-        canvas.DrawPath(path, fillPaint);
-
-        using var textPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = SKColors.White,
-            IsAntialias = true,
-            TextSize = 10f
-        };
-        canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
-    }
 
     // ─── Binding Badges ───────────────────────────────────────────────────────
 
@@ -206,7 +159,8 @@ internal static class SCBindingsRenderer
     }
 
     internal static void DrawMultiKeycapBinding(SKCanvas canvas, SKRect cellBounds,
-        List<string> components, SKColor color, SCInputType? inputType)
+        List<string> components, SKColor color, SCInputType? inputType,
+        bool conflict = false, bool duplicate = false, bool rerouted = false)
     {
         if (components.Count == 0) return;
 
@@ -221,7 +175,9 @@ internal static class SCBindingsRenderer
         {
             float textWidth = FUIRenderer.MeasureText(components[i], fontSize);
             float indicatorSpace = (i == components.Count - 1 && inputType.HasValue) ? 12f : 0f;
-            badgeWidths[i] = textWidth + badgePadding * 2 + indicatorSpace;
+            // Reroute icon: ~10px icon + 6px right padding + 2px left breathing = 18px (only on last badge)
+            float rerouteSpace = (i == components.Count - 1 && rerouted) ? 18f : 0f;
+            badgeWidths[i] = textWidth + badgePadding * 2 + indicatorSpace + rerouteSpace;
             totalWidth += badgeWidths[i];
             if (i > 0) totalWidth += gap;
         }
@@ -246,11 +202,89 @@ internal static class SCBindingsRenderer
             using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = color.WithAlpha(borderAlpha), StrokeWidth = 1f, IsAntialias = true };
             canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
 
+            // Conflict stripe on the last badge's right interior (amber, clipped to badge shape)
+            if (isMainKey && conflict)
+            {
+                const float stripeW = 4f;
+                const float glowW   = 8f;
+
+                canvas.Save();
+                canvas.ClipRoundRect(new SKRoundRect(badgeBounds, 3f, 3f), SKClipOperation.Intersect, antialias: true);
+
+                // Soft bloom
+                using var glowPaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Fill,
+                    Color = FUIColors.Warning.WithAlpha(60),
+                    IsAntialias = true,
+                    MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3f)
+                };
+                canvas.DrawRect(new SKRect(badgeBounds.Right - glowW, badgeBounds.Top, badgeBounds.Right, badgeBounds.Bottom), glowPaint);
+
+                // Solid core stripe
+                using var sp = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(230), IsAntialias = true };
+                canvas.DrawRect(new SKRect(badgeBounds.Right - stripeW, badgeBounds.Top, badgeBounds.Right, badgeBounds.Bottom), sp);
+
+                canvas.Restore();
+            }
+
             float textX = currentX + badgePadding;
             if (isMainKey && inputType.HasValue)
             {
-                DrawInputTypeIndicator(canvas, currentX + 4, badgeY + badgeHeight / 2, inputType.Value, color);
+                float dotX = currentX + 4;
+                float dotY = badgeY + badgeHeight / 2;
+                SKColor dotColor = isMainKey && duplicate ? FUIColors.Danger : color;
+
+                // Danger dot: draw bloom glow behind the indicator
+                if (isMainKey && duplicate)
+                {
+                    using var bloom = new SKPaint
+                    {
+                        Style = SKPaintStyle.Fill,
+                        Color = FUIColors.Danger.WithAlpha(90),
+                        IsAntialias = true,
+                        MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3.5f)
+                    };
+                    canvas.DrawCircle(dotX, dotY, 5f, bloom);
+                }
+
+                DrawInputTypeIndicator(canvas, dotX, dotY, inputType.Value, dotColor);
                 textX = currentX + 14f;
+            }
+
+            // Reroute icon: circle ring + connected ">" chevron as a single path
+            // 2px top/bottom padding within badge, 6px from right badge edge
+            if (isMainKey && rerouted)
+            {
+                float iM     = badgeY + badgeHeight / 2f;
+                float iR     = badgeBounds.Right - 6f;  // 6px from right edge
+                const float halfH  = 4f;                // chevron half-height (8px total)
+                const float chevW  = 5f;                // chevron width
+                const float circR  = 1.5f;              // circle radius
+                const float circGap = 2f;               // gap between circle and chevron opening
+
+                float openX  = iR - chevW;
+                float circCX = openX - circGap - circR;
+
+                using var iconPaint = new SKPaint
+                {
+                    Style       = SKPaintStyle.Stroke,
+                    Color       = color.WithAlpha(210),
+                    StrokeWidth = 1.3f,
+                    IsAntialias = true,
+                    StrokeCap   = SKStrokeCap.Round,
+                    StrokeJoin  = SKStrokeJoin.Round
+                };
+
+                // Chevron as a single connected path: top-arm → tip → bottom-arm
+                using var chevPath = new SKPath();
+                chevPath.MoveTo(openX, iM - halfH);
+                chevPath.LineTo(iR, iM);
+                chevPath.LineTo(openX, iM + halfH);
+                canvas.DrawPath(chevPath, iconPaint);
+
+                // Circle ring at the left (inside the chevron opening)
+                canvas.DrawCircle(circCX, iM, circR, iconPaint);
             }
 
             float textY = badgeY + badgeHeight / 2 + 3.5f;

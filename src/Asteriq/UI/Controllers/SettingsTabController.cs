@@ -227,12 +227,7 @@ public class SettingsTabController : ITabController
             _profileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
             bool nameHovered = _profileNameBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-            using var nameBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(30) };
-            canvas.DrawRoundRect(_profileNameBounds, 4, 4, nameBgPaint);
-
-            var nameFrameColor = nameHovered ? FUIColors.Active : FUIColors.Active;
-            using var nameFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = nameFrameColor, StrokeWidth = 1f };
-            canvas.DrawRoundRect(_profileNameBounds, 4, 4, nameFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, _profileNameBounds, FUIColors.Active.WithAlpha(30), FUIColors.Active, 4f);
 
             float nameTextY = y + (nameBoxHeight - FUIRenderer.FontBody) / 2 + FUIRenderer.FontBody - 3;
             FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, FUIRenderer.FontBody, true);
@@ -315,11 +310,7 @@ public class SettingsTabController : ITabController
         if (profile is not null && y + buttonHeight <= bottom)
         {
             _deleteProfileButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
-            using var delBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(30) };
-            canvas.DrawRoundRect(_deleteProfileButtonBounds, 4, 4, delBgPaint);
-
-            using var delFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Danger.WithAlpha(150), StrokeWidth = 1f };
-            canvas.DrawRoundRect(_deleteProfileButtonBounds, 4, 4, delFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, _deleteProfileButtonBounds, FUIColors.Danger.WithAlpha(30), FUIColors.Danger.WithAlpha(150), 4f);
 
             FUIRenderer.DrawTextCentered(canvas, "Delete Profile", _deleteProfileButtonBounds, FUIColors.Danger, 14f);
             y += buttonHeight + 20f;
@@ -555,10 +546,7 @@ public class SettingsTabController : ITabController
             {
                 case UpdateStatus.UpToDate:
                 {
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
+                    FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Active.WithAlpha(25), FUIColors.Active.WithAlpha(50), bannerRadius);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Asteriq is up to date", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -567,10 +555,7 @@ public class SettingsTabController : ITabController
 
                 case UpdateStatus.UpdateAvailable:
                 {
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
+                    FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Active.WithAlpha(25), FUIColors.Active.WithAlpha(50), bannerRadius);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     string availText = $"Update available: v{latest}";
@@ -607,10 +592,7 @@ public class SettingsTabController : ITabController
 
                 case UpdateStatus.ReadyToApply:
                 {
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(25), IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
+                    FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Active.WithAlpha(25), FUIColors.Active.WithAlpha(50), bannerRadius);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Update ready", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -625,10 +607,7 @@ public class SettingsTabController : ITabController
 
                 case UpdateStatus.Error:
                 {
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(25), IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Danger.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
-                    canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
+                    FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Danger.WithAlpha(25), FUIColors.Danger.WithAlpha(50), bannerRadius);
                     using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger, IsAntialias = true };
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Check failed", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -953,10 +932,7 @@ public class SettingsTabController : ITabController
     {
         if (disabled)
         {
-            using var dbgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
-            canvas.DrawRoundRect(bounds, 4, 4, dbgPaint);
-            using var dfPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(60), StrokeWidth = 1f };
-            canvas.DrawRoundRect(bounds, 4, 4, dfPaint);
+            FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background1, FUIColors.Frame.WithAlpha(60), 4f);
             FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextDim.WithAlpha(80), 14f);
             return;
         }

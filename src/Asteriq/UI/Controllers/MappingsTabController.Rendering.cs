@@ -457,24 +457,8 @@ public partial class MappingsTabController
 
                 var keycapBounds = new SKRect(keycapLeft, keycapTop, keycapRight, keycapTop + keycapHeight);
 
-                // Keycap background
-                using var keycapBgPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.TextPrimary.WithAlpha(20),
-                    IsAntialias = true
-                };
-                canvas.DrawRoundRect(keycapBounds, 3, 3, keycapBgPaint);
-
-                // Keycap frame
-                using var keycapFramePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = FUIColors.TextPrimary.WithAlpha(100),
-                    StrokeWidth = 1f,
-                    IsAntialias = true
-                };
-                canvas.DrawRoundRect(keycapBounds, 3, 3, keycapFramePaint);
+                // Keycap background + frame
+                FUIRenderer.DrawRoundedPanel(canvas, keycapBounds, FUIColors.TextPrimary.WithAlpha(20), FUIColors.TextPrimary.WithAlpha(100));
 
                 // Keycap text - draw manually centered to ensure padding is respected
                 float textX = keycapLeft + keycapPadding;
@@ -502,11 +486,7 @@ public partial class MappingsTabController
                 float modBadgeLeft = modBadgeRight - modBadgeWidth;
                 var modBadgeBounds = new SKRect(modBadgeLeft, keycapTop, modBadgeRight, keycapTop + keycapHeight);
 
-                using var modBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(40), IsAntialias = true };
-                canvas.DrawRoundRect(modBadgeBounds, 3, 3, modBgPaint);
-
-                using var modFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Primary.WithAlpha(180), StrokeWidth = 1f, IsAntialias = true };
-                canvas.DrawRoundRect(modBadgeBounds, 3, 3, modFramePaint);
+                FUIRenderer.DrawRoundedPanel(canvas, modBadgeBounds, FUIColors.Primary.WithAlpha(40), FUIColors.Primary.WithAlpha(180));
 
                 float modTextY = modBadgeBounds.MidY + scaledFontSize / 3f;
                 using var modTextPaint = new SKPaint
@@ -720,17 +700,8 @@ public partial class MappingsTabController
                 var input = inputs[i];
                 var rowBounds = new SKRect(leftMargin, y, rightMargin - 30, y + rowHeight);
 
-                // Row background
-                using var rowBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
-                canvas.DrawRoundRect(rowBounds, 3, 3, rowBgPaint);
-
-                using var rowFramePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = FUIColors.Frame,
-                    StrokeWidth = 1f
-                };
-                canvas.DrawRoundRect(rowBounds, 3, 3, rowFramePaint);
+                // Row background + frame
+                FUIRenderer.DrawRoundedPanel(canvas, rowBounds, FUIColors.Background1, FUIColors.Frame);
 
                 // Line 1: Input type and index (e.g., "Button 5") - vertically centered in top half
                 string inputTypeText = input.Type == InputType.Button
@@ -745,20 +716,9 @@ public partial class MappingsTabController
                 var removeBounds = new SKRect(rightMargin - 26, y, rightMargin, y + rowHeight);
                 bool removeHovered = _hoveredInputSourceRemove == i;
 
-                using var removeBgPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = removeHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2
-                };
-                canvas.DrawRoundRect(removeBounds, 3, 3, removeBgPaint);
-
-                using var removeFramePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = removeHovered ? FUIColors.Warning : FUIColors.Frame,
-                    StrokeWidth = 1f
-                };
-                canvas.DrawRoundRect(removeBounds, 3, 3, removeFramePaint);
+                FUIRenderer.DrawRoundedPanel(canvas, removeBounds,
+                    removeHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2,
+                    removeHovered ? FUIColors.Warning : FUIColors.Frame);
 
                 FUIRenderer.DrawTextCentered(canvas, "├ù", removeBounds,
                     removeHovered ? FUIColors.Warning : FUIColors.TextDim, 14f);
@@ -1452,12 +1412,8 @@ public partial class MappingsTabController
 
             if (isModifierKey)
             {
-                // Disabled appearance ÔÇö clear bounds so hover and click don't fire
-                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100) };
-                canvas.DrawRoundRect(modeBounds, 3, 3, disabledBgPaint);
-
-                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(100), StrokeWidth = 1f };
-                canvas.DrawRoundRect(modeBounds, 3, 3, disabledFramePaint);
+                // Disabled appearance — clear bounds so hover and click don't fire
+                FUIRenderer.DrawRoundedPanel(canvas, modeBounds, FUIColors.Background2.WithAlpha(100), FUIColors.Frame.WithAlpha(100));
 
                 FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 12f);
                 _buttonModeBounds[i] = SKRect.Empty;

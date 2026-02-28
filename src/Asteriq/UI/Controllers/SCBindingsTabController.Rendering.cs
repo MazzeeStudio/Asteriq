@@ -1343,11 +1343,7 @@ public partial class SCBindingsTabController
         };
         canvas.DrawRoundRect(boxBounds, 4, 4, glowPaint);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(20) };
-        canvas.DrawRoundRect(boxBounds, 4, 4, bgPaint);
-
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Warning.WithAlpha(160), StrokeWidth = 1f };
-        canvas.DrawRoundRect(boxBounds, 4, 4, borderPaint);
+        FUIRenderer.DrawRoundedPanel(canvas, boxBounds, FUIColors.Warning.WithAlpha(20), FUIColors.Warning.WithAlpha(160), 4f);
 
         // Header
         float y = top + padV;

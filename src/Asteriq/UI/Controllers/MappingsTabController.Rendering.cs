@@ -89,12 +89,7 @@ public partial class MappingsTabController
         // Panel background (shifted right to make room for side tabs)
         var contentBounds = new SKRect(bounds.Left + frameInset + sideTabWidth, bounds.Top + frameInset,
                                         bounds.Right - frameInset, bounds.Bottom - frameInset);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(140),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
         canvas.DrawRect(contentBounds, bgPaint);
 
         // Draw vertical side tabs (M1 Axes, M2 Buttons)
@@ -314,19 +309,11 @@ public partial class MappingsTabController
         float trackWidth = 3f;
 
         // Track (subtle)
-        using var trackPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Frame.WithAlpha(40)
-        };
+        using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Frame.WithAlpha(40));
         canvas.DrawRoundRect(new SKRect(trackX, trackTop, trackX + trackWidth, trackTop + trackHeight), 1.5f, 1.5f, trackPaint);
 
         // Thumb
-        using var thumbPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Primary.WithAlpha(200)
-        };
+        using var thumbPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(200));
         canvas.DrawRoundRect(new SKRect(trackX, trackTop + thumbOffset, trackX + trackWidth, trackTop + thumbOffset + thumbHeight), 1.5f, 1.5f, thumbPaint);
     }
 
@@ -378,7 +365,7 @@ public partial class MappingsTabController
         else
             bgColor = FUIColors.Background2.WithAlpha(100);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
 
         // Draw attention highlight as overlay (additive, doesn't replace selection)
@@ -386,11 +373,7 @@ public partial class MappingsTabController
         {
             // Pulsing glow effect that fades out - use theme active color
             byte glowAlpha = (byte)(100 * attentionIntensity);
-            using var glowPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Active.WithAlpha(glowAlpha)
-            };
+            using var glowPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(glowAlpha));
             canvas.DrawRoundRect(bounds, 4, 4, glowPaint);
         }
 
@@ -414,12 +397,7 @@ public partial class MappingsTabController
             frameWidth = 1f;
         }
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = frameWidth
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, frameWidth);
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
         // Output name (centered vertically)
@@ -504,12 +482,7 @@ public partial class MappingsTabController
             // Binding indicator dot on the right
             float dotX = bounds.Right - 20;
             float dotY = bounds.MidY;
-            using var dotPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = FUIColors.Active,
-                IsAntialias = true
-            };
+            using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
             canvas.DrawCircle(dotX, dotY, 5f, dotPaint);
         }
     }
@@ -517,12 +490,7 @@ public partial class MappingsTabController
     private void DrawDeviceVisualizationPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(100),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(100));
         canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
             bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame.WithAlpha(150), 30f, 8f);
@@ -610,12 +578,7 @@ public partial class MappingsTabController
     private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(140),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
         canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
             bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
@@ -677,7 +640,7 @@ public partial class MappingsTabController
         {
             // No inputs - show "None" with dashed border
             var emptyBounds = new SKRect(leftMargin, y, rightMargin, y + 28);
-            using var emptyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(100) };
+            using var emptyBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(100));
             canvas.DrawRoundRect(emptyBounds, 3, 3, emptyBgPaint);
 
             using var emptyFramePaint = new SKPaint
@@ -742,7 +705,7 @@ public partial class MappingsTabController
                 var listenBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
                 byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
 
-                using var listenBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40) };
+                using var listenBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                 canvas.DrawRoundRect(listenBounds, 3, 3, listenBgPaint);
 
                 // Draw timeout progress bar
@@ -756,20 +719,11 @@ public partial class MappingsTabController
                         listenBounds.Top + 3,
                         listenBounds.Left + 3 + progressWidth,
                         listenBounds.Bottom - 3);
-                    using var progressPaint = new SKPaint
-                    {
-                        Style = SKPaintStyle.Fill,
-                        Color = FUIColors.Active.WithAlpha(80)
-                    };
+                    using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
                     canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
                 }
 
-                using var listenFramePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = FUIColors.Active.WithAlpha(alpha),
-                    StrokeWidth = 2f
-                };
+                using var listenFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(alpha), 2f);
                 canvas.DrawRoundRect(listenBounds, 3, 3, listenFramePaint);
 
                 FUIRenderer.DrawText(canvas, "Press input...", new SKPoint(leftMargin + 10, y + 18),
@@ -783,11 +737,7 @@ public partial class MappingsTabController
         _addInputButtonBounds = addBounds;
         bool addHovered = _addInputButtonHovered;
 
-        using var addBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = addHovered ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2
-        };
+        using var addBgPaint = FUIRenderer.CreateFillPaint(addHovered ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2);
         canvas.DrawRoundRect(addBounds, 3, 3, addBgPaint);
 
         using var addFramePaint = new SKPaint
@@ -853,10 +803,10 @@ public partial class MappingsTabController
             var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRoundRect(btnBounds, 3, 3, bgPaint);
 
-            using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = isActive ? 2f : 1f };
+            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, isActive ? 2f : 1f);
             canvas.DrawRoundRect(btnBounds, 3, 3, framePaint);
 
             FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 13f);
@@ -1032,10 +982,10 @@ public partial class MappingsTabController
                 : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
 
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRect(presetBounds, bgPaint);
 
-            using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
+            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
             canvas.DrawRect(presetBounds, framePaint);
 
             FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 12f);
@@ -1086,9 +1036,9 @@ public partial class MappingsTabController
                     ? (isHovered ? FUIColors.FrameBright : FUIColors.Frame)
                     : FUIColors.Frame.WithAlpha(100);
 
-                using var btnBg = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+                using var btnBg = FUIRenderer.CreateFillPaint(bgColor);
                 canvas.DrawRect(btnBounds, btnBg);
-                using var btnFrame = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = 1f };
+                using var btnFrame = FUIRenderer.CreateStrokePaint(frameColor);
                 canvas.DrawRect(btnBounds, btnFrame);
                 FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 12f);
             }
@@ -1145,9 +1095,7 @@ public partial class MappingsTabController
         float trackHeight = 8f;
         float trackY = bounds.MidY - trackHeight / 2;
 
-        using var trackBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        using var trackFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-        using var activePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(150) };
+        using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(150));
 
         if (_deadzoneCenterEnabled)
         {
@@ -1158,13 +1106,11 @@ public partial class MappingsTabController
 
             // Left track: from bounds.Left to centerX - gap/2
             var leftTrack = new SKRect(bounds.Left, trackY, centerX - gap / 2, trackY + trackHeight);
-            canvas.DrawRoundRect(leftTrack, 4, 4, trackBgPaint);
-            canvas.DrawRoundRect(leftTrack, 4, 4, trackFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, leftTrack, FUIColors.Background2, FUIColors.Frame, 4f);
 
             // Right track: from centerX + gap/2 to bounds.Right
             var rightTrack = new SKRect(centerX + gap / 2, trackY, bounds.Right, trackY + trackHeight);
-            canvas.DrawRoundRect(rightTrack, 4, 4, trackBgPaint);
-            canvas.DrawRoundRect(rightTrack, 4, 4, trackFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, rightTrack, FUIColors.Background2, FUIColors.Frame, 4f);
 
             // Active fill on left track (from min handle to center-min handle)
             float leftTrackWidth = leftTrack.Width;
@@ -1217,8 +1163,7 @@ public partial class MappingsTabController
         {
             // Single track spanning full width
             var track = new SKRect(bounds.Left, trackY, bounds.Right, trackY + trackHeight);
-            canvas.DrawRoundRect(track, 4, 4, trackBgPaint);
-            canvas.DrawRoundRect(track, 4, 4, trackFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, track, FUIColors.Background2, FUIColors.Frame, 4f);
 
             // Active fill from min to max
             float fillStart = bounds.Left + minPos * bounds.Width;
@@ -1246,21 +1191,10 @@ public partial class MappingsTabController
         // Selected handles get a highlighted fill
         SKColor fillColor = isDragging ? color : (isSelected ? color.WithAlpha(200) : FUIColors.TextPrimary);
 
-        using var fillPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = fillColor,
-            IsAntialias = true
-        };
+        using var fillPaint = FUIRenderer.CreateFillPaint(fillColor);
         canvas.DrawCircle(x, centerY, drawRadius, fillPaint);
 
-        using var strokePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color,
-            StrokeWidth = isSelected ? 2.5f : 1.5f,
-            IsAntialias = true
-        };
+        using var strokePaint = FUIRenderer.CreateStrokePaint(color, isSelected ? 2.5f : 1.5f);
         canvas.DrawCircle(x, centerY, drawRadius, strokePaint);
     }
 
@@ -1293,15 +1227,10 @@ public partial class MappingsTabController
                 : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
             var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
-            using var typeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            using var typeBgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRoundRect(typeBounds, 3, 3, typeBgPaint);
 
-            using var typeFramePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = selected ? FUIColors.Active : FUIColors.Frame,
-                StrokeWidth = selected ? 2f : 1f
-            };
+            using var typeFramePaint = FUIRenderer.CreateStrokePaint(selected ? FUIColors.Active : FUIColors.Frame, selected ? 2f : 1f);
             canvas.DrawRoundRect(typeBounds, 3, 3, typeFramePaint);
 
             FUIRenderer.DrawTextCentered(canvas, outputTypes[i], typeBounds, textColor, 14f);
@@ -1332,7 +1261,7 @@ public partial class MappingsTabController
                 ? FUIColors.Active.WithAlpha(40)
                 : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
-            using var keyBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = keyBgColor };
+            using var keyBgPaint = FUIRenderer.CreateFillPaint(keyBgColor);
             canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyBgPaint);
 
             // Draw timeout progress bar when capturing
@@ -1351,11 +1280,7 @@ public partial class MappingsTabController
                         _keyCaptureBounds.Top + 3,
                         _keyCaptureBounds.Left + 3 + progressWidth,
                         _keyCaptureBounds.Bottom - 3);
-                    using var progressPaint = new SKPaint
-                    {
-                        Style = SKPaintStyle.Fill,
-                        Color = FUIColors.Active.WithAlpha(80)
-                    };
+                    using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
                     canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
                 }
             }
@@ -1364,12 +1289,7 @@ public partial class MappingsTabController
                 ? FUIColors.Active
                 : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
 
-            using var keyFramePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = keyFrameColor,
-                StrokeWidth = _isCapturingKey ? 2f : 1f
-            };
+            using var keyFramePaint = FUIRenderer.CreateStrokePaint(keyFrameColor, _isCapturingKey ? 2f : 1f);
             canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyFramePaint);
 
             // Display key combo or prompt
@@ -1426,15 +1346,10 @@ public partial class MappingsTabController
                 SKColor bgColor = selected ? FUIColors.Active.WithAlpha(60) :
                     (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
-                using var modeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+                using var modeBgPaint = FUIRenderer.CreateFillPaint(bgColor);
                 canvas.DrawRoundRect(modeBounds, 3, 3, modeBgPaint);
 
-                using var modeFramePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = selected ? FUIColors.Active : FUIColors.Frame,
-                    StrokeWidth = selected ? 2f : 1f
-                };
+                using var modeFramePaint = FUIRenderer.CreateStrokePaint(selected ? FUIColors.Active : FUIColors.Frame, selected ? 2f : 1f);
                 canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
 
                 FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
@@ -1515,16 +1430,11 @@ public partial class MappingsTabController
     private void DrawCurveVisualization(SKCanvas canvas, SKRect bounds)
     {
         // Background - darker than the panel
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRect(bounds, bgPaint);
 
         // Grid lines (10% increments) - visible but subtle
-        using var gridPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = new SKColor(60, 70, 80), // Visible gray grid lines
-            StrokeWidth = 1f
-        };
+        using var gridPaint = FUIRenderer.CreateStrokePaint(new SKColor(60, 70, 80));
 
         for (float t = 0.1f; t < 1f; t += 0.1f)
         {
@@ -1538,12 +1448,7 @@ public partial class MappingsTabController
         }
 
         // Center lines (brighter, 50% mark)
-        using var centerPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = new SKColor(80, 95, 110), // More visible center lines
-            StrokeWidth = 1f
-        };
+        using var centerPaint = FUIRenderer.CreateStrokePaint(new SKColor(80, 95, 110));
         canvas.DrawLine(bounds.MidX, bounds.Top, bounds.MidX, bounds.Bottom, centerPaint);
         canvas.DrawLine(bounds.Left, bounds.MidY, bounds.Right, bounds.MidY, centerPaint);
 
@@ -1567,21 +1472,11 @@ public partial class MappingsTabController
         }
 
         // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(bounds, framePaint);
 
         // Tick marks and labels on edges
-        using var tickPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame.WithAlpha(150),
-            StrokeWidth = 1f
-        };
+        using var tickPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(150));
 
         float tickLen = 4f;
         float labelOffset = 3f;
@@ -1727,7 +1622,7 @@ public partial class MappingsTabController
             var barBounds = new SKRect(leftMargin, y, rightMargin, y + barHeight);
 
             // Background
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0 };
+            using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
             canvas.DrawRect(barBounds, bgPaint);
 
             // Convert output value to bar position (0..1)
@@ -1737,12 +1632,7 @@ public partial class MappingsTabController
             if (isCentered)
             {
                 // Center line for centered axes
-                using var centerPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = FUIColors.Frame,
-                    StrokeWidth = 1f
-                };
+                using var centerPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
                 canvas.DrawLine(barBounds.MidX, barBounds.Top, barBounds.MidX, barBounds.Bottom, centerPaint);
 
                 // Fill from center to current position
@@ -1750,33 +1640,23 @@ public partial class MappingsTabController
                     ? new SKRect(barBounds.MidX, barBounds.Top, barX, barBounds.Bottom)
                     : new SKRect(barX, barBounds.Top, barBounds.MidX, barBounds.Bottom);
 
-                using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
+                using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
                 canvas.DrawRect(fillBounds, fillPaint);
             }
             else
             {
                 // Fill from left edge to current position (for sliders/throttles)
                 var fillBounds = new SKRect(barBounds.Left, barBounds.Top, barX, barBounds.Bottom);
-                using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(180) };
+                using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
                 canvas.DrawRect(fillBounds, fillPaint);
             }
 
             // Position indicator (vertical line)
-            using var indicatorPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active,
-                StrokeWidth = 2f
-            };
+            using var indicatorPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active, 2f);
             canvas.DrawLine(barX, barBounds.Top, barX, barBounds.Bottom, indicatorPaint);
 
             // Frame
-            using var framePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Frame,
-                StrokeWidth = 1f
-            };
+            using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
             canvas.DrawRect(barBounds, framePaint);
 
             y += barHeight + 2f;
@@ -1966,22 +1846,11 @@ public partial class MappingsTabController
             }
 
             // Fill
-            using var fillPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = isEndpoint || isCenterPoint ? FUIColors.Background1 : color.WithAlpha(60),
-                IsAntialias = true
-            };
+            using var fillPaint = FUIRenderer.CreateFillPaint(isEndpoint || isCenterPoint ? FUIColors.Background1 : color.WithAlpha(60));
             canvas.DrawCircle(x, y, radius, fillPaint);
 
             // Stroke
-            using var strokePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = isCenterPoint ? FUIColors.Frame : color,
-                StrokeWidth = isEndpoint ? 2f : (isCenterPoint ? 1f : 1.5f),
-                IsAntialias = true
-            };
+            using var strokePaint = FUIRenderer.CreateStrokePaint(isCenterPoint ? FUIColors.Frame : color, isEndpoint ? 2f : (isCenterPoint ? 1f : 1.5f));
             canvas.DrawCircle(x, y, radius, strokePaint);
 
             // Value label when hovered/dragged (not for center point)
@@ -2012,12 +1881,7 @@ public partial class MappingsTabController
     private void DrawMappingEditorPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(160));
         canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Active, 30f, 8f);
 
@@ -2122,19 +1986,14 @@ public partial class MappingsTabController
             ? FUIColors.Warning.WithAlpha(40)
             : (_inputFieldHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
         var frameColor = _isListeningForInput
             ? FUIColors.Warning
             : (_inputFieldHovered ? FUIColors.Primary : FUIColors.Frame);
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = _isListeningForInput ? 2f : 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _isListeningForInput ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
         // Text content
@@ -2225,16 +2084,12 @@ public partial class MappingsTabController
             anchorBounds.Right, anchorBounds.Bottom + 2 + listHeight);
 
         // Draw shadow/backdrop for visual separation
-        using var shadowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = SKColors.Black.WithAlpha(120)
-        };
+        using var shadowPaint = FUIRenderer.CreateFillPaint(SKColors.Black.WithAlpha(120));
         var shadowBounds = new SKRect(listBounds.Left - 1, listBounds.Top - 1, listBounds.Right + 5, listBounds.Bottom + 5);
         canvas.DrawRect(shadowBounds, shadowPaint);
 
         // Solid opaque background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1);
         canvas.DrawRect(listBounds, bgPaint);
 
         // Draw items
@@ -2246,7 +2101,7 @@ public partial class MappingsTabController
 
             if (hovered)
             {
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(60) };
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(60));
                 canvas.DrawRect(itemBounds, hoverPaint);
             }
 
@@ -2256,12 +2111,7 @@ public partial class MappingsTabController
         }
 
         // Frame on top
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Primary);
         canvas.DrawRect(listBounds, framePaint);
     }
 
@@ -2274,16 +2124,12 @@ public partial class MappingsTabController
             anchorBounds.Right, anchorBounds.Bottom + 2 + listHeight);
 
         // Draw shadow/backdrop for visual separation
-        using var shadowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = SKColors.Black.WithAlpha(120)
-        };
+        using var shadowPaint = FUIRenderer.CreateFillPaint(SKColors.Black.WithAlpha(120));
         var shadowBounds = new SKRect(listBounds.Left - 1, listBounds.Top - 1, listBounds.Right + 5, listBounds.Bottom + 5);
         canvas.DrawRect(shadowBounds, shadowPaint);
 
         // Solid opaque background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1);
         canvas.DrawRect(listBounds, bgPaint);
 
         // Draw items
@@ -2295,7 +2141,7 @@ public partial class MappingsTabController
 
             if (hovered)
             {
-                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(60) };
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(60));
                 canvas.DrawRect(itemBounds, hoverPaint);
             }
 
@@ -2306,12 +2152,7 @@ public partial class MappingsTabController
         }
 
         // Frame on top
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Primary);
         canvas.DrawRect(listBounds, framePaint);
     }
 
@@ -2329,10 +2170,10 @@ public partial class MappingsTabController
             if (isModifier)
             {
                 // Disabled appearance ÔÇö clear bounds so hover and click don't fire
-                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100) };
+                using var disabledBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(100));
                 canvas.DrawRect(modeBounds, disabledBgPaint);
 
-                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(100), StrokeWidth = 1f };
+                using var disabledFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(100));
                 canvas.DrawRect(modeBounds, disabledFramePaint);
 
                 FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 13f);
@@ -2350,15 +2191,10 @@ public partial class MappingsTabController
                     : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
                 var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
-                using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+                using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
                 canvas.DrawRect(modeBounds, bgPaint);
 
-                using var framePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = selected ? FUIColors.Active : FUIColors.Frame,
-                    StrokeWidth = selected ? 2f : 1f
-                };
+                using var framePaint = FUIRenderer.CreateStrokePaint(selected ? FUIColors.Active : FUIColors.Frame, selected ? 2f : 1f);
                 canvas.DrawRect(modeBounds, framePaint);
 
                 FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 13f);
@@ -2386,15 +2222,10 @@ public partial class MappingsTabController
                 : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
             var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRect(typeBounds, bgPaint);
 
-            using var framePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = selected ? FUIColors.Active : FUIColors.Frame,
-                StrokeWidth = selected ? 2f : 1f
-            };
+            using var framePaint = FUIRenderer.CreateStrokePaint(selected ? FUIColors.Active : FUIColors.Frame, selected ? 2f : 1f);
             canvas.DrawRect(typeBounds, framePaint);
 
             FUIRenderer.DrawTextCentered(canvas, labels[i], typeBounds, textColor, 14f);
@@ -2408,19 +2239,14 @@ public partial class MappingsTabController
             ? FUIColors.Warning.WithAlpha(40)
             : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
         var frameColor = _isCapturingKey
             ? FUIColors.Warning
             : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = _isCapturingKey ? 2f : 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _isCapturingKey ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
         // Text content
@@ -2569,16 +2395,13 @@ public partial class MappingsTabController
         else
             bgColor = FUIColors.Background2.WithAlpha(60);
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = isEditing ? FUIColors.Active : (isSelected ? FUIColors.Active.WithAlpha(150) : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(80))),
-            StrokeWidth = isEditing ? 2f : (isSelected ? 1.5f : 1f)
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(
+            isEditing ? FUIColors.Active : (isSelected ? FUIColors.Active.WithAlpha(150) : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(80))),
+            isEditing ? 2f : (isSelected ? 1.5f : 1f));
         canvas.DrawRect(bounds, framePaint);
 
         // Output name (left)

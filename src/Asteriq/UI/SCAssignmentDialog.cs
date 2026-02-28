@@ -255,22 +255,12 @@ public class SCAssignmentDialog : Form
         canvas.DrawRect(bounds.Inset(2, 2), glowPaint);
 
         // Frame border
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 2f,
-            IsAntialias = true
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame, 2f);
         canvas.DrawRect(bounds.Inset(1, 1), framePaint);
 
         // Title bar
         float titleHeight = 40f;
-        using var titleBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background2.WithAlpha(200)
-        };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(200));
         canvas.DrawRect(new SKRect(0, 0, bounds.Width, titleHeight), titleBgPaint);
 
         string title = $"ASSIGN: {_action.ActionName.ToUpper()}";
@@ -385,15 +375,10 @@ public class SCAssignmentDialog : Form
             : FUIColors.FrameDim;
         var textColor = enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
@@ -409,15 +394,10 @@ public class SCAssignmentDialog : Form
             : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isPrimary ? FUIColors.TextBright : FUIColors.TextPrimary;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
@@ -429,15 +409,10 @@ public class SCAssignmentDialog : Form
         var frameColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = isChecked ? FUIColors.TextBright : FUIColors.TextDim;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
         canvas.DrawRect(bounds, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);

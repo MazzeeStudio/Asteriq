@@ -105,20 +105,11 @@ public class BindingConflictDialog : Form
 
         // Draw title bar background with warning tint
         var titleBarBounds = new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Top + 40);
-        using var titleBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Active.WithAlpha(40)
-        };
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
         canvas.DrawRect(titleBarBounds, titleBgPaint);
 
         // Draw title bar separator
-        using var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawLine(titleBarBounds.Left, titleBarBounds.Bottom, titleBarBounds.Right, titleBarBounds.Bottom, sepPaint);
 
         // Draw warning icon
@@ -138,20 +129,11 @@ public class BindingConflictDialog : Form
         // Conflict list background
         float listHeight = Math.Min(_conflicts.Count, 5) * 22 + 10;
         var listBounds = new SKRect(20, y, bounds.Right - 20, y + listHeight);
-        using var listBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background2
-        };
+        using var listBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(listBounds, listBgPaint);
 
         // Conflict list border
-        using var listBorderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var listBorderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(listBounds, listBorderPaint);
 
         // Draw conflict items
@@ -178,11 +160,7 @@ public class BindingConflictDialog : Form
 
         // Button panel background
         float buttonPanelTop = bounds.Bottom - 55;
-        using var buttonPanelPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background2
-        };
+        using var buttonPanelPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawRect(new SKRect(0, buttonPanelTop, bounds.Right, bounds.Bottom), buttonPanelPaint);
 
         // Draw separator above buttons
@@ -236,21 +214,10 @@ public class BindingConflictDialog : Form
     private void DrawWarningButton(SKCanvas canvas, SKRect bounds, string text, bool hovered)
     {
         // Warning-colored button for "Apply Anyway"
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Active.WithAlpha(30),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Active.WithAlpha(30));
         canvas.DrawRect(bounds, bgPaint);
 
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(150),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(150));
         canvas.DrawRect(bounds, borderPaint);
 
         // Text centered

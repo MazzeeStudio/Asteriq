@@ -214,13 +214,7 @@ public partial class MainForm
         // Draw subtitle if there's room
         if (showSubtitle)
         {
-            using (var sepPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Frame,
-                StrokeWidth = 1f,
-                IsAntialias = true
-            })
+            using (var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame))
             {
                 canvas.DrawLine(subtitleX + 10, titleBarY + 18, subtitleX + 10, titleBarY + 48, sepPaint);
             }
@@ -299,22 +293,11 @@ public partial class MainForm
 
         // Background
         bool isHovered = _profileSelectorBounds.Contains(_mousePosition.X, _mousePosition.Y);
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150),
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background1.WithAlpha(150));
         canvas.DrawRect(_profileSelectorBounds, bgPaint);
 
         // Border
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = _profileDropdownOpen ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
+        using var borderPaint = FUIRenderer.CreateStrokePaint(_profileDropdownOpen ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame));
         canvas.DrawRect(_profileSelectorBounds, borderPaint);
 
         // Profile name text
@@ -328,12 +311,7 @@ public partial class MainForm
         float arrowY = y + height / 2;
         var arrowColor = _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary;
 
-        using var arrowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = arrowColor,
-            IsAntialias = true
-        };
+        using var arrowPaint = FUIRenderer.CreateFillPaint(arrowColor);
 
         using var arrowPath = new SKPath();
         arrowPath.MoveTo(arrowX - arrowSize, arrowY - arrowSize / 2);  // Top left
@@ -370,21 +348,11 @@ public partial class MainForm
         canvas.DrawRect(_profileDropdownBounds, glowPaint);
 
         // Solid opaque background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Void,
-            IsAntialias = true
-        };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Void);
         canvas.DrawRect(_profileDropdownBounds, bgPaint);
 
         // Inner background with slight gradient feel
-        using var innerBgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background0,
-            IsAntialias = true
-        };
+        using var innerBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRect(new SKRect(x + 2, y + 2, x + width - 2, y + height - 2), innerBgPaint);
 
         // L-corner frame (FUI style)
@@ -402,33 +370,18 @@ public partial class MainForm
             // Hover background with FUI glow
             if (isHovered)
             {
-                using var hoverPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Active.WithAlpha(40),
-                    IsAntialias = true
-                };
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                 canvas.DrawRect(itemBounds, hoverPaint);
 
                 // Left accent bar on hover
-                using var accentPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Active,
-                    IsAntialias = true
-                };
+                using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                 canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), accentPaint);
             }
 
             // Active indicator (always show for active profile)
             if (isActive && !isHovered)
             {
-                using var activePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = FUIColors.Active.WithAlpha(60),
-                    IsAntialias = true
-                };
+                using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(60));
                 canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), activePaint);
             }
 
@@ -445,23 +398,11 @@ public partial class MainForm
 
         // Separator line before actions (FUI style)
         float sepY = itemY + 1;
-        using var sepPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
+        using var sepPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawLine(x + 12, sepY, x + width - 12, sepY, sepPaint);
 
         // Corner accents on separator
-        using var accentLinePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active.WithAlpha(120),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
+        using var accentLinePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(120));
         canvas.DrawLine(x + 8, sepY, x + 12, sepY, accentLinePaint);
         canvas.DrawLine(x + width - 12, sepY, x + width - 8, sepY, accentLinePaint);
 
@@ -571,7 +512,7 @@ public partial class MainForm
             if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.ReadyToApply)
             {
                 // Small filled circle — green for up-to-date / ready-to-apply
-                using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                 canvas.DrawCircle(startX + indicatorSize / 2f, midY, indicatorSize / 2f, dotPaint);
             }
             else
@@ -597,7 +538,7 @@ public partial class MainForm
                 arrowPath.LineTo(arrowMidX - stemW / 2f, arrowTop + stemH);
                 arrowPath.Close();
 
-                using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                using var arrowPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                 canvas.DrawPath(arrowPath, arrowPaint);
             }
 

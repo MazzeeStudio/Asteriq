@@ -405,15 +405,10 @@ public class SettingsTabController : ITabController
                 : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isSelected ? FUIColors.TextBright : FUIColors.TextDim;
 
-            using var iconBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+            using var iconBgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRect(iconBounds, iconBgPaint);
 
-            using var iconBorderPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = frameColor,
-                StrokeWidth = isSelected ? 1.5f : 1f
-            };
+            using var iconBorderPaint = FUIRenderer.CreateStrokePaint(frameColor, isSelected ? 1.5f : 1f);
             canvas.DrawRect(iconBounds, iconBorderPaint);
 
             FUIRenderer.DrawTextCentered(canvas, trayIconLabels[i], iconBounds, textColor, 13f);
@@ -439,7 +434,7 @@ public class SettingsTabController : ITabController
             float dotY = y + (statusLineHeight / 2);
             float textY = y + (statusLineHeight / 2) + 4;
 
-            using var vjoyDot = new SKPaint { Style = SKPaintStyle.Fill, Color = vjoyColor, IsAntialias = true };
+            using var vjoyDot = FUIRenderer.CreateFillPaint(vjoyColor);
             canvas.DrawCircle(leftMargin + statusDotRadius + 1, dotY, statusDotRadius, vjoyDot);
             FUIRenderer.DrawText(canvas, "vJoy", new SKPoint(statusTextX, textY), FUIColors.TextPrimary, 14f);
             float vjoyLabelW = FUIRenderer.MeasureText("vJoy", 14f);
@@ -455,7 +450,7 @@ public class SettingsTabController : ITabController
             float dotY = y + (statusLineHeight / 2);
             float textY = y + (statusLineHeight / 2) + 4;
 
-            using var hidHideDot = new SKPaint { Style = SKPaintStyle.Fill, Color = hidHideColor, IsAntialias = true };
+            using var hidHideDot = FUIRenderer.CreateFillPaint(hidHideColor);
             canvas.DrawCircle(leftMargin + statusDotRadius + 1, dotY, statusDotRadius, hidHideDot);
             FUIRenderer.DrawText(canvas, "HidHide", new SKPoint(statusTextX, textY), FUIColors.TextPrimary, 14f);
             float hidHideLabelW = FUIRenderer.MeasureText("HidHide", 14f);
@@ -547,7 +542,7 @@ public class SettingsTabController : ITabController
                 case UpdateStatus.UpToDate:
                 {
                     FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Active.WithAlpha(25), FUIColors.Active.WithAlpha(50), bannerRadius);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Asteriq is up to date", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
                     break;
@@ -556,7 +551,7 @@ public class SettingsTabController : ITabController
                 case UpdateStatus.UpdateAvailable:
                 {
                     FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Active.WithAlpha(25), FUIColors.Active.WithAlpha(50), bannerRadius);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     string availText = $"Update available: v{latest}";
                     FUIRenderer.DrawText(canvas, availText, new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
@@ -573,18 +568,18 @@ public class SettingsTabController : ITabController
                 {
                     int pct = _ctx.UpdateService.DownloadProgress;
                     // Progress bar fill as banner background
-                    using var bannerBg = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(15), IsAntialias = true };
+                    using var bannerBg = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(15));
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
                     float fillWidth = bannerRect.Width * (pct / 100f);
                     var fillRect = new SKRect(bannerRect.Left, bannerRect.Top, bannerRect.Left + fillWidth, bannerRect.Bottom);
-                    using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(40), IsAntialias = true };
+                    using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                     canvas.Save();
                     canvas.ClipRoundRect(new SKRoundRect(bannerRect, bannerRadius));
                     canvas.DrawRect(fillRect, fillPaint);
                     canvas.Restore();
-                    using var bannerBorder = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(50), StrokeWidth = 1f, IsAntialias = true };
+                    using var bannerBorder = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(50));
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBorder);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, $"Downloading update\u2026 {pct}%", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
                     break;
@@ -593,7 +588,7 @@ public class SettingsTabController : ITabController
                 case UpdateStatus.ReadyToApply:
                 {
                     FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Active.WithAlpha(25), FUIColors.Active.WithAlpha(50), bannerRadius);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active, IsAntialias = true };
+                    using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Update ready", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
 
@@ -608,7 +603,7 @@ public class SettingsTabController : ITabController
                 case UpdateStatus.Error:
                 {
                     FUIRenderer.DrawRoundedPanel(canvas, bannerRect, FUIColors.Danger.WithAlpha(25), FUIColors.Danger.WithAlpha(50), bannerRadius);
-                    using var dotPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger, IsAntialias = true };
+                    using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Danger);
                     canvas.DrawCircle(dotX, dotY, dotRadius, dotPaint);
                     FUIRenderer.DrawText(canvas, "Check failed", new SKPoint(textStartX, textY), FUIColors.TextPrimary, 13f);
                     break;
@@ -716,9 +711,9 @@ public class SettingsTabController : ITabController
             float sx = leftMargin + i * (swatchW + swatchGap);
             var rect = new SKRect(sx, y, sx + swatchW, y + swatchH);
             // Dark background tinted with the colour — mirrors Delete / Share button style
-            using var tintFill = new SKPaint { Style = SKPaintStyle.Fill, Color = row1[i].color.WithAlpha(35) };
+            using var tintFill = FUIRenderer.CreateFillPaint(row1[i].color.WithAlpha(35));
             canvas.DrawRect(rect, tintFill);
-            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = row1[i].color.WithAlpha(180), StrokeWidth = 1f };
+            using var borderPaint = FUIRenderer.CreateStrokePaint(row1[i].color.WithAlpha(180));
             canvas.DrawRect(rect, borderPaint);
             float lblW = FUIRenderer.MeasureText(row1[i].label, 9f);
             FUIRenderer.DrawText(canvas, row1[i].label,
@@ -739,11 +734,11 @@ public class SettingsTabController : ITabController
         {
             float sx = leftMargin + i * (swatchW + swatchGap);
             var rect = new SKRect(sx, y, sx + swatchW, y + swatchH);
-            using var fill = new SKPaint { Style = SKPaintStyle.Fill, Color = row2[i].color };
+            using var fill = FUIRenderer.CreateFillPaint(row2[i].color);
             canvas.DrawRect(rect, fill);
             // Dark label band at bottom
             var band = new SKRect(rect.Left, rect.Bottom - 14f, rect.Right, rect.Bottom);
-            using var bandFill = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(0, 0, 0, 130) };
+            using var bandFill = FUIRenderer.CreateFillPaint(new SKColor(0, 0, 0, 130));
             canvas.DrawRect(band, bandFill);
             float lblW = FUIRenderer.MeasureText(row2[i].label, 9f);
             FUIRenderer.DrawText(canvas, row2[i].label,
@@ -835,9 +830,9 @@ public class SettingsTabController : ITabController
             var ffBg = isActive ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
             var ffFrame = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var ffText = isActive ? FUIColors.TextBright : FUIColors.TextDim;
-            using var ffBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = ffBg };
+            using var ffBgPaint = FUIRenderer.CreateFillPaint(ffBg);
             canvas.DrawRect(ffBounds, ffBgPaint);
-            using var ffFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = ffFrame, StrokeWidth = isActive ? 1.5f : 1f };
+            using var ffFramePaint = FUIRenderer.CreateStrokePaint(ffFrame, isActive ? 1.5f : 1f);
             canvas.DrawRect(ffBounds, ffFramePaint);
             FUIRenderer.DrawTextCentered(canvas, fontFamilyLabels[i], ffBounds, ffText, 13f, scaleFont: false);
         }
@@ -865,8 +860,8 @@ public class SettingsTabController : ITabController
         var minusBg = !canDecrease ? FUIColors.Background1 : (minusHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
         var minusFrame = !canDecrease ? FUIColors.Frame.WithAlpha(60) : (minusHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var minusText = !canDecrease ? FUIColors.TextDim.WithAlpha(60) : (minusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        using (var p = new SKPaint { Style = SKPaintStyle.Fill, Color = minusBg }) canvas.DrawRect(minusBounds, p);
-        using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = minusFrame, StrokeWidth = 1f }) canvas.DrawRect(minusBounds, p);
+        using (var p = FUIRenderer.CreateFillPaint(minusBg)) canvas.DrawRect(minusBounds, p);
+        using (var p = FUIRenderer.CreateStrokePaint(minusFrame)) canvas.DrawRect(minusBounds, p);
         FUIRenderer.DrawTextCentered(canvas, "-", minusBounds, minusText, 17f, scaleFont: false);
 
         string valueText = $"{scale:F1}x";
@@ -879,8 +874,8 @@ public class SettingsTabController : ITabController
         var plusBg = !canIncrease ? FUIColors.Background1 : (plusHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
         var plusFrame = !canIncrease ? FUIColors.Frame.WithAlpha(60) : (plusHovered ? FUIColors.FrameBright : FUIColors.Frame);
         var plusText = !canIncrease ? FUIColors.TextDim.WithAlpha(60) : (plusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        using (var p = new SKPaint { Style = SKPaintStyle.Fill, Color = plusBg }) canvas.DrawRect(plusBounds, p);
-        using (var p = new SKPaint { Style = SKPaintStyle.Stroke, Color = plusFrame, StrokeWidth = 1f }) canvas.DrawRect(plusBounds, p);
+        using (var p = FUIRenderer.CreateFillPaint(plusBg)) canvas.DrawRect(plusBounds, p);
+        using (var p = FUIRenderer.CreateStrokePaint(plusFrame)) canvas.DrawRect(plusBounds, p);
         FUIRenderer.DrawTextCentered(canvas, "+", plusBounds, plusText, 17f, scaleFont: false);
     }
 
@@ -942,10 +937,10 @@ public class SettingsTabController : ITabController
         var frameColor = hovered ? accentColor : FUIColors.Frame;
         var textColor = hovered ? FUIColors.TextBright : FUIColors.TextPrimary;
 
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
 
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = hovered ? 1.5f : 1f };
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, hovered ? 1.5f : 1f);
         canvas.DrawRoundRect(bounds, 4, 4, framePaint);
 
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);

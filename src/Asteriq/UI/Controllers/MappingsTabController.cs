@@ -333,6 +333,14 @@ public class MappingsTabController : ITabController
         return key.ToString();
     }
 
+    // Modifier key names as stored in OutputTarget.KeyName (case-insensitive).
+    private static readonly HashSet<string> s_scModifierKeyNames =
+        new(StringComparer.OrdinalIgnoreCase) { "RCtrl", "LCtrl", "RShift", "LShift", "RAlt", "LAlt" };
+
+    /// <summary>Returns true when the given key name (as stored in OutputTarget.KeyName) is a modifier key.</summary>
+    private static bool IsModifierKeyName(string? keyName) =>
+        keyName is not null && s_scModifierKeyNames.Contains(keyName);
+
     public MappingsTabController(TabContext ctx)
     {
         _ctx = ctx;
@@ -413,8 +421,9 @@ public class MappingsTabController : ITabController
             return;
         }
 
-        // Right panel: Button mode selection (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredButtonMode >= 0)
+        // Right panel: Button mode selection (button category) — blocked for modifier keys
+        bool selectedIsModifier = _outputTypeIsKeyboard && IsModifierKeyName(_selectedKeyName);
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _hoveredButtonMode >= 0 && !selectedIsModifier)
         {
             _selectedButtonMode = (ButtonMode)_hoveredButtonMode;
             UpdateButtonModeForSelected();
@@ -1226,8 +1235,10 @@ public class MappingsTabController : ITabController
                     var keyParts = GetButtonKeyParts(profile, vjoyDevice!.Id, i);
                     bool isSelected = rowIndex == _selectedMappingRow;
                     bool isHovered = rowIndex == _hoveredMappingRow;
+                    // A button is a modifier when it outputs a single modifier key (no combo modifiers)
+                    bool isModifier = keyParts?.Count == 1 && IsModifierKeyName(keyParts[0]);
 
-                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts);
+                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -1345,7 +1356,7 @@ public class MappingsTabController : ITabController
     }
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
-        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null)
+        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "—";
         bool hasKeyParts = keyParts is not null && keyParts.Count > 0;
@@ -1504,6 +1515,33 @@ public class MappingsTabController : ITabController
 
                 // Move left for next keycap
                 keycapRight = keycapLeft - keycapGap;
+            }
+
+            // Draw MODIFIER badge to the left of the keycaps when this button acts as a modifier key
+            if (isModifier)
+            {
+                const string modText = "MODIFIER";
+                float modTextWidth = measurePaint.MeasureText(modText);
+                float modBadgeWidth = modTextWidth + keycapPadding * 2;
+                float modBadgeRight = keycapRight - 4f;
+                float modBadgeLeft = modBadgeRight - modBadgeWidth;
+                var modBadgeBounds = new SKRect(modBadgeLeft, keycapTop, modBadgeRight, keycapTop + keycapHeight);
+
+                using var modBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(40), IsAntialias = true };
+                canvas.DrawRoundRect(modBadgeBounds, 3, 3, modBgPaint);
+
+                using var modFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Primary.WithAlpha(180), StrokeWidth = 1f, IsAntialias = true };
+                canvas.DrawRoundRect(modBadgeBounds, 3, 3, modFramePaint);
+
+                float modTextY = modBadgeBounds.MidY + scaledFontSize / 3f;
+                using var modTextPaint = new SKPaint
+                {
+                    Color = FUIColors.Primary,
+                    TextSize = scaledFontSize,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Consolas", SKFontStyle.Normal)
+                };
+                canvas.DrawText(modText, modBadgeLeft + keycapPadding, modTextY, modTextPaint);
             }
         }
         else if (hasBinding)
@@ -2427,7 +2465,11 @@ public class MappingsTabController : ITabController
         }
 
         // Button Mode section
-        FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        // Modifier keys must stay in Normal mode — the OS handles the modifier behaviour.
+        bool isModifierKey = _outputTypeIsKeyboard && IsModifierKeyName(_selectedKeyName);
+
+        FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y),
+            isModifierKey ? FUIColors.TextDim.WithAlpha(60) : FUIColors.TextDim, 13f);
         y += 20;
 
         // Mode buttons - all on one row
@@ -2441,27 +2483,43 @@ public class MappingsTabController : ITabController
         {
             float buttonX = leftMargin + i * (buttonWidth + buttonGap);
             var modeBounds = new SKRect(buttonX, y, buttonX + buttonWidth, y + buttonHeight);
-            bool selected = i == (int)_selectedButtonMode;
-            bool hovered = i == _hoveredButtonMode;
 
-            SKColor bgColor = selected ? FUIColors.Active.WithAlpha(60) :
-                (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
-
-            using var modeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-            canvas.DrawRoundRect(modeBounds, 3, 3, modeBgPaint);
-
-            using var modeFramePaint = new SKPaint
+            if (isModifierKey)
             {
-                Style = SKPaintStyle.Stroke,
-                Color = selected ? FUIColors.Active : FUIColors.Frame,
-                StrokeWidth = selected ? 2f : 1f
-            };
-            canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
+                // Disabled appearance — clear bounds so hover and click don't fire
+                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40) };
+                canvas.DrawRoundRect(modeBounds, 3, 3, disabledBgPaint);
 
-            FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
-                selected ? FUIColors.Active : FUIColors.TextPrimary, 12f);
+                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1f };
+                canvas.DrawRoundRect(modeBounds, 3, 3, disabledFramePaint);
 
-            _buttonModeBounds[i] = modeBounds;
+                FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDim.WithAlpha(40), 12f);
+                _buttonModeBounds[i] = SKRect.Empty;
+            }
+            else
+            {
+                bool selected = i == (int)_selectedButtonMode;
+                bool hovered = i == _hoveredButtonMode;
+
+                SKColor bgColor = selected ? FUIColors.Active.WithAlpha(60) :
+                    (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+
+                using var modeBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+                canvas.DrawRoundRect(modeBounds, 3, 3, modeBgPaint);
+
+                using var modeFramePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = selected ? FUIColors.Active : FUIColors.Frame,
+                    StrokeWidth = selected ? 2f : 1f
+                };
+                canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
+
+                FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
+                    selected ? FUIColors.Active : FUIColors.TextPrimary, 12f);
+
+                _buttonModeBounds[i] = modeBounds;
+            }
         }
         y += buttonHeight + 12;
 
@@ -3632,11 +3690,13 @@ public class MappingsTabController : ITabController
                 y += keyFieldHeight + 10;
             }
 
-            // Button mode selector
+            // Button mode selector (disabled for modifier keys)
+            bool editIsModifier = _outputTypeIsKeyboard && IsModifierKeyName(_selectedKeyName);
             y += 10;
-            FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+            FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y),
+                editIsModifier ? FUIColors.TextDim.WithAlpha(60) : FUIColors.TextDim, 13f);
             y += 20;
-            DrawButtonModeSelector(canvas, leftMargin, y, rightMargin - leftMargin);
+            DrawButtonModeSelector(canvas, leftMargin, y, rightMargin - leftMargin, editIsModifier);
             y += 40;
         }
 
@@ -3878,7 +3938,7 @@ public class MappingsTabController : ITabController
         canvas.DrawRect(listBounds, framePaint);
     }
 
-    private void DrawButtonModeSelector(SKCanvas canvas, float x, float y, float width)
+    private void DrawButtonModeSelector(SKCanvas canvas, float x, float y, float width, bool isModifier = false)
     {
         ButtonMode[] modes = { ButtonMode.Normal, ButtonMode.Toggle, ButtonMode.Pulse, ButtonMode.HoldToActivate };
         string[] labels = { "Normal", "Toggle", "Pulse", "Hold" };
@@ -3888,28 +3948,44 @@ public class MappingsTabController : ITabController
         for (int i = 0; i < modes.Length; i++)
         {
             var modeBounds = new SKRect(x + i * (buttonWidth + 5), y, x + i * (buttonWidth + 5) + buttonWidth, y + buttonHeight);
-            _buttonModeBounds[i] = modeBounds;
 
-            bool selected = _selectedButtonMode == modes[i];
-            bool hovered = _hoveredButtonMode == i;
-
-            var bgColor = selected
-                ? FUIColors.Active.WithAlpha(60)
-                : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
-            var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-            canvas.DrawRect(modeBounds, bgPaint);
-
-            using var framePaint = new SKPaint
+            if (isModifier)
             {
-                Style = SKPaintStyle.Stroke,
-                Color = selected ? FUIColors.Active : FUIColors.Frame,
-                StrokeWidth = selected ? 2f : 1f
-            };
-            canvas.DrawRect(modeBounds, framePaint);
+                // Disabled appearance — clear bounds so hover and click don't fire
+                using var disabledBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40) };
+                canvas.DrawRect(modeBounds, disabledBgPaint);
 
-            FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 13f);
+                using var disabledFramePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame.WithAlpha(40), StrokeWidth = 1f };
+                canvas.DrawRect(modeBounds, disabledFramePaint);
+
+                FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDim.WithAlpha(40), 13f);
+                _buttonModeBounds[i] = SKRect.Empty;
+            }
+            else
+            {
+                _buttonModeBounds[i] = modeBounds;
+
+                bool selected = _selectedButtonMode == modes[i];
+                bool hovered = _hoveredButtonMode == i;
+
+                var bgColor = selected
+                    ? FUIColors.Active.WithAlpha(60)
+                    : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+                var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+                using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
+                canvas.DrawRect(modeBounds, bgPaint);
+
+                using var framePaint = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    Color = selected ? FUIColors.Active : FUIColors.Frame,
+                    StrokeWidth = selected ? 2f : 1f
+                };
+                canvas.DrawRect(modeBounds, framePaint);
+
+                FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, textColor, 13f);
+            }
         }
     }
 

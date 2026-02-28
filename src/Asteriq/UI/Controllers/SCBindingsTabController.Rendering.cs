@@ -594,6 +594,7 @@ public partial class SCBindingsTabController
                             SKColor textColor = FUIColors.TextPrimary;
                             SCInputType? inputType = null;
                             bool isConflicting = false;
+                            bool isDuplicateAction = false;
 
                             // All bindings now come from the profile (SCVirtStick model)
                             // No separate "defaults" - profile contains everything
@@ -629,10 +630,19 @@ public partial class SCBindingsTabController
                             {
                                 bindingComponents = GetBindingComponents(binding.InputName, binding.Modifiers);
                                 inputType = binding.InputType;
-                                // Check for conflicts (joystick only) — shared cells are intentional, not conflicts
+                                // Check for conflicts and cross-column action duplicates (joystick only)
                                 if (col.IsJoystick && !isCellShared)
                                 {
                                     isConflicting = _scConflictingBindings.Contains(binding.Key);
+                                    isDuplicateAction = _scDuplicateActionBindings.Contains(binding.Key);
+                                }
+
+                                // Duplicate cells: danger-colour background tint + badge text colour
+                                if (isDuplicateAction && !isCellSelected && !isCellListening)
+                                {
+                                    using var dupBgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Danger.WithAlpha(40) };
+                                    canvas.DrawRect(cellBounds, dupBgPaint);
+                                    textColor = FUIColors.Danger;
                                 }
                             }
 
@@ -672,7 +682,7 @@ public partial class SCBindingsTabController
                                 // Draw multiple keycap badges for binding (one per key component)
                                 DrawMultiKeycapBinding(canvas, cellBounds, bindingComponents, textColor, col.IsJoystick ? inputType : null);
 
-                                // Draw conflict warning or shared routing indicator
+                                // Draw conflict indicator; duplicate actions use cell background tint (see above)
                                 if (isConflicting)
                                 {
                                     DrawConflictIndicator(canvas, colX + colW - 12, cellBounds.MidY - 4);
@@ -888,6 +898,9 @@ public partial class SCBindingsTabController
 
     private void DrawConflictIndicator(SKCanvas canvas, float x, float y)
         => SCBindingsRenderer.DrawConflictIndicator(canvas, x, y);
+
+    private void DrawDuplicateActionIndicator(SKCanvas canvas, float x, float y)
+        => SCBindingsRenderer.DrawDuplicateActionIndicator(canvas, x, y);
 
     private static SCInputType DetectInputTypeFromName(string inputName)
     {
@@ -1193,7 +1206,7 @@ public partial class SCBindingsTabController
         _scExportButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
         _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-        bool canExport = _scInstallations.Count > 0;
+        bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0;
         DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
         y += buttonHeight + 5f;
 

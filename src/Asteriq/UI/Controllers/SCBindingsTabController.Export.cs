@@ -479,6 +479,8 @@ public partial class SCBindingsTabController
                 _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, profileName);
             _ctx.AppSettings.LastSCExportProfile = profileName;
             _scProfileDropdownOpen = false;
+            UpdateConflictingBindings();
+            UpdateSharedCells();
             SetStatus($"Loaded profile '{profileName}'");
         }
     }

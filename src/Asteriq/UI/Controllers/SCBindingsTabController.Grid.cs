@@ -302,6 +302,11 @@ public partial class SCBindingsTabController
         return -1;
     }
 
+    private void UpdateDuplicateActionBindings()
+    {
+        _scDuplicateActionBindings = _scExportProfile.GetDuplicateJoystickActionKeys();
+    }
+
     private void UpdateConflictingBindings()
     {
         _scConflictingBindings.Clear();
@@ -354,6 +359,8 @@ public partial class SCBindingsTabController
                 }
             }
         }
+
+        UpdateDuplicateActionBindings();
     }
 
     private void ApplyDefaultBindingsToProfile()

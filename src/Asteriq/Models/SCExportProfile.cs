@@ -215,6 +215,48 @@ public class SCExportProfile
 
     /// <summary>
     /// Gets all joystick bindings that would conflict with the given input on a vJoy device.
+    /// <summary>
+    /// Returns the binding keys of all non-axis joystick bindings where the same action (ActionMap+ActionName)
+    /// is assigned to more than one joystick column. Axis bindings are excluded because mapping the same
+    /// axis action on multiple devices (e.g. pitch on stick and throttle) is intentional.
+    /// </summary>
+    public HashSet<string> GetDuplicateJoystickActionKeys()
+    {
+        // Maps each action to its (scInstance, bindingKey) pairs
+        var actionsByCol = new Dictionary<(string, string), List<(int scInstance, string bindingKey)>>();
+
+        foreach (var b in Bindings)
+        {
+            if (b.DeviceType != SCDeviceType.Joystick) continue;
+            if (b.InputType == SCInputType.Axis) continue;
+            if (b.PhysicalDeviceId is not null) continue;
+
+            var action = (b.ActionMap, b.ActionName);
+            int scInstance = GetSCInstance(b.VJoyDevice);
+
+            if (!actionsByCol.TryGetValue(action, out var list))
+            {
+                list = new List<(int, string)>();
+                actionsByCol[action] = list;
+            }
+            list.Add((scInstance, b.Key));
+        }
+
+        // Only flag the higher-JS binding(s) — the base (lowest SC instance) is kept as-is
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var kvp in actionsByCol)
+        {
+            if (kvp.Value.Count <= 1) continue;
+            int baseInst = kvp.Value.Min(x => x.scInstance);
+            foreach (var (scInstance, key) in kvp.Value)
+            {
+                if (scInstance != baseInst)
+                    result.Add(key);
+            }
+        }
+        return result;
+    }
+
     /// Two bindings conflict only if they share both the same input name AND the same modifier set —
     /// e.g. "rctrl+button13" and "button13" are different bindings and do NOT conflict.
     /// Excludes the specified action to avoid reporting self-conflicts.

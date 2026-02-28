@@ -69,6 +69,32 @@ internal static class SCBindingsRenderer
         canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
     }
 
+    /// <summary>
+    /// Draws a downward-pointing red triangle to indicate the same action is bound on multiple
+    /// joystick columns (cross-column action duplicate). Distinct from the amber upward conflict triangle.
+    /// </summary>
+    internal static void DrawDuplicateActionIndicator(SKCanvas canvas, float x, float y)
+    {
+        float size = 8f;
+
+        using var fillPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(210, 60, 60), IsAntialias = true };
+        var path = new SKPath();
+        path.MoveTo(x, y);
+        path.LineTo(x + size, y);
+        path.LineTo(x + size / 2, y + size);
+        path.Close();
+        canvas.DrawPath(path, fillPaint);
+
+        using var textPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.White,
+            IsAntialias = true,
+            TextSize = 10f
+        };
+        canvas.DrawText("!", x + size / 2 - 1.5f, y + size - 1.5f, textPaint);
+    }
+
     // ─── Binding Badges ───────────────────────────────────────────────────────
 
     internal static void DrawBindingBadge(SKCanvas canvas, float x, float y, float maxWidth,

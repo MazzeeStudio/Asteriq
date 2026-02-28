@@ -485,6 +485,9 @@ public partial class SCBindingsTabController
                     bool isEvenRow = i % 2 == 0;
 
                     // Row background - alternating colors with selection/hover states
+                    bool isConflictHighlight = i == _scConflictHighlightActionIndex
+                        && (DateTime.Now - _scConflictHighlightStartTime).TotalSeconds < 1.5;
+
                     if (isSelected)
                     {
                         using var selPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Active.WithAlpha(60), IsAntialias = true };
@@ -500,6 +503,16 @@ public partial class SCBindingsTabController
                         // Subtle alternating row background
                         using var altPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(40), IsAntialias = true };
                         canvas.DrawRect(rowBounds, altPaint);
+                    }
+
+                    // Amber highlight pulse when navigated to from a conflict link
+                    if (isConflictHighlight)
+                    {
+                        float t = (float)(DateTime.Now - _scConflictHighlightStartTime).TotalSeconds / 1.5f;
+                        byte alpha = (byte)(Math.Max(0, 1f - t) * 120);
+                        using var highlightPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(alpha), IsAntialias = true };
+                        canvas.DrawRect(rowBounds, highlightPaint);
+                        _ctx.MarkDirty(); // keep redrawing while animating
                     }
 
                     float textY = scrollY + rowHeight / 2 + 4;
@@ -1135,6 +1148,13 @@ public partial class SCBindingsTabController
             }
 
             y += btnHeight + 10f;
+
+            // Conflict links panel — shown when the selected binding conflicts with other actions
+            if (_scConflictLinks.Count > 0)
+            {
+                y += 16f;
+                DrawConflictLinksPanel(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 100f);
+            }
         }
 
         // Clear All / Reset Defaults buttons
@@ -1493,6 +1513,85 @@ public partial class SCBindingsTabController
         var device = _ctx.Devices.Concat(_ctx.DisconnectedDevices)
             .FirstOrDefault(d => d.InstanceGuid.ToString().Equals(guid, StringComparison.OrdinalIgnoreCase));
         return device?.Name;
+    }
+
+    private void DrawConflictLinksPanel(SKCanvas canvas, float left, float right, float top, float maxBottom)
+    {
+        // Available height — cap at 4 rows so we don't blow the layout on large conflict lists
+        const float rowH = 22f;
+        const float padV = 8f;
+        const float padH = 10f;
+        const float headerH = 20f;
+
+        int maxVisible = (int)Math.Max(1, Math.Min(_scConflictLinks.Count, (maxBottom - top - headerH - padV * 2) / rowH));
+        float boxH = padV + headerH + maxVisible * rowH + padV;
+
+        if (top + boxH > maxBottom)
+            return; // not enough room — skip
+
+        var boxBounds = new SKRect(left, top, right, top + boxH);
+
+        // Amber glow background + border
+        using var glowFilter = SKImageFilter.CreateBlur(6f, 6f);
+        using var glowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.Warning.WithAlpha(60),
+            StrokeWidth = 3f,
+            IsAntialias = true,
+            ImageFilter = glowFilter
+        };
+        canvas.DrawRoundRect(boxBounds, 4, 4, glowPaint);
+
+        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(20) };
+        canvas.DrawRoundRect(boxBounds, 4, 4, bgPaint);
+
+        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Warning.WithAlpha(160), StrokeWidth = 1f };
+        canvas.DrawRoundRect(boxBounds, 4, 4, borderPaint);
+
+        // Header
+        float y = top + padV;
+        FUIRenderer.DrawText(canvas, "ALSO BOUND TO THIS INPUT:", new SKPoint(left + padH, y + 13f), FUIColors.Warning, 10f, true);
+        y += headerH;
+
+        // Resize bounds list for click detection
+        while (_scConflictLinkBounds.Count < _scConflictLinks.Count)
+            _scConflictLinkBounds.Add(SKRect.Empty);
+        for (int i = 0; i < _scConflictLinkBounds.Count; i++)
+            _scConflictLinkBounds[i] = SKRect.Empty;
+
+        // Link rows
+        for (int i = 0; i < maxVisible; i++)
+        {
+            var (map, name) = _scConflictLinks[i];
+            string category = SCCategoryMapper.GetCategoryNameForAction(map, name);
+            string formatted = SCCategoryMapper.FormatActionName(name);
+            string label = $"{category} > {formatted}";
+
+            var rowBounds = new SKRect(left + padH / 2, y, right - padH / 2, y + rowH);
+            _scConflictLinkBounds[i] = rowBounds;
+
+            bool hovered = i == _scConflictLinkHovered;
+            if (hovered)
+            {
+                using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(40) };
+                canvas.DrawRoundRect(rowBounds, 2, 2, hoverPaint);
+            }
+
+            string truncated = TruncateTextToWidth(label, right - left - padH * 2, 10f);
+            byte linkAlpha = hovered ? (byte)255 : (byte)180;
+            FUIRenderer.DrawText(canvas, truncated, new SKPoint(left + padH, y + rowH / 2 + 4f), FUIColors.Warning.WithAlpha(linkAlpha), 10f);
+
+            y += rowH;
+        }
+
+        // "and N more" if truncated
+        if (_scConflictLinks.Count > maxVisible)
+        {
+            int remaining = _scConflictLinks.Count - maxVisible;
+            FUIRenderer.DrawText(canvas, $"and {remaining} more…", new SKPoint(left + padH, y + 12f),
+                FUIColors.TextDim.WithAlpha(120), 10f);
+        }
     }
 
     private void DrawColumnActionsPanel(SKCanvas canvas, SKRect bounds, float frameInset)

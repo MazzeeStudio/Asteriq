@@ -1041,4 +1041,94 @@ public partial class SCBindingsTabController
             $"[SCBindings] UpdateModifierKeys: {_scModifierKeys.Count} modifier(s), " +
             $"{_scModifierPhysicalButtonNames.Count} modifier button(s): {string.Join(", ", _scModifierPhysicalButtonNames)}");
     }
+
+    /// <summary>
+    /// Rebuilds the conflict-links list for the currently selected cell.
+    /// Called whenever the selected cell changes.
+    /// </summary>
+    private void UpdateConflictLinks()
+    {
+        _scConflictLinks.Clear();
+        _scConflictLinkBounds.Clear();
+        _scConflictLinkHovered = -1;
+
+        if (_scSelectedActionIndex < 0 || _scFilteredActions is null
+            || _scSelectedCell.colIndex < 0 || _scGridColumns is null
+            || _scSelectedCell.colIndex >= _scGridColumns.Count)
+            return;
+
+        var selectedAction = _scFilteredActions[_scSelectedActionIndex];
+        var col = _scGridColumns[_scSelectedCell.colIndex];
+
+        // Find the binding for the selected cell
+        SCActionBinding? selectedBinding = col.IsPhysical
+            ? _scExportProfile.Bindings.FirstOrDefault(b =>
+                b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath)
+            : col.IsJoystick
+                ? _scExportProfile.Bindings.FirstOrDefault(b =>
+                    b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                    b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
+                    b.VJoyDevice == col.VJoyDeviceId)
+                : null;
+
+        if (selectedBinding is null || !_scConflictingBindings.Contains(selectedBinding.Key))
+            return;
+
+        // Find all other bindings with the same device + inputName + modifier set
+        var conflicts = col.IsPhysical
+            ? _scExportProfile.GetConflictingBindings(col.PhysicalDevice!.HidDevicePath,
+                selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers)
+            : _scExportProfile.GetConflictingBindings(col.VJoyDeviceId,
+                selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
+
+        foreach (var conflict in conflicts)
+            _scConflictLinks.Add((conflict.ActionMap, conflict.ActionName));
+    }
+
+    /// <summary>
+    /// Scrolls the binding list so the given action index is centred in view,
+    /// then starts the amber highlight animation on that row.
+    /// </summary>
+    private void ScrollToAction(int actionIndex)
+    {
+        if (_scFilteredActions is null || actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
+            return;
+
+        // Expand the category if it is collapsed
+        var target = _scFilteredActions[actionIndex];
+        string categoryName = SCCategoryMapper.GetCategoryNameForAction(target.ActionMap, target.ActionName);
+        _scCollapsedCategories.Remove(categoryName);
+
+        // Compute the Y offset of this action row within the content area
+        float rowHeight = 28f, rowGap = 2f, categoryHeaderHeight = 28f;
+        string? lastCategory = null;
+        float contentY = 0;
+        for (int i = 0; i <= actionIndex; i++)
+        {
+            var action = _scFilteredActions[i];
+            string cat = SCCategoryMapper.GetCategoryNameForAction(action.ActionMap, action.ActionName);
+            if (cat != lastCategory)
+            {
+                lastCategory = cat;
+                contentY += categoryHeaderHeight;
+            }
+            if (i == actionIndex) break;
+            contentY += rowHeight + rowGap;
+        }
+
+        // Centre the row vertically in the visible list area
+        float rowMid = contentY + rowHeight / 2f;
+        float viewHalf = _scBindingsListBounds.Height / 2f;
+        float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
+        _scBindingsScrollOffset = Math.Clamp(rowMid - viewHalf, 0, maxScroll);
+
+        // Select the row and start the highlight pulse
+        _scSelectedActionIndex = actionIndex;
+        _scSelectedCell = (actionIndex, _scSelectedCell.colIndex);
+        _scConflictHighlightActionIndex = actionIndex;
+        _scConflictHighlightStartTime = DateTime.Now;
+        UpdateConflictLinks();
+        _ctx.MarkDirty();
+    }
 }

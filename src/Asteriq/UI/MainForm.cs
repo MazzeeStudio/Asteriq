@@ -2826,6 +2826,11 @@ public partial class MainForm : Form
         FUIRenderer.DrawText(canvas, mousePos,
             new SKPoint(40, y + 22), FUIColors.TextDim, 13f);
 
+        // Window dimensions (layout debugging aid)
+        string winSize = $"{(int)bounds.Width}×{(int)bounds.Height}";
+        FUIRenderer.DrawText(canvas, winSize,
+            new SKPoint(40, y + 36), FUIColors.TextDim.WithAlpha(140), 11f);
+
         // Left-center: connection status
         int connectedCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
         int disconnectedCount = _devices.Count(d => !d.IsVirtual && !d.IsConnected);

@@ -14,13 +14,7 @@ internal static class SCBindingsRenderer
 
     internal static void DrawInputTypeIndicator(SKCanvas canvas, float x, float centerY, SCInputType inputType, SKColor color)
     {
-        using var paint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(150),
-            StrokeWidth = 1.2f,
-            IsAntialias = true
-        };
+        using var paint = FUIRenderer.CreateStrokePaint(color.WithAlpha(150), 1.2f);
 
         switch (inputType)
         {
@@ -191,7 +185,7 @@ internal static class SCBindingsRenderer
                 canvas.DrawRect(new SKRect(badgeBounds.Right - glowW, badgeBounds.Top, badgeBounds.Right, badgeBounds.Bottom), glowPaint);
 
                 // Solid core stripe
-                using var sp = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Warning.WithAlpha(230), IsAntialias = true };
+                using var sp = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(230));
                 canvas.DrawRect(new SKRect(badgeBounds.Right - stripeW, badgeBounds.Top, badgeBounds.Right, badgeBounds.Bottom), sp);
 
                 canvas.Restore();
@@ -310,7 +304,7 @@ internal static class SCBindingsRenderer
         {
             float cx = bounds.MidX;
             float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 1.5f, IsAntialias = true };
+            using var iconPaint = FUIRenderer.CreateStrokePaint(iconColor, 1.5f);
             canvas.DrawRect(cx - 5, cy - 5, 10, 10, iconPaint);
             canvas.DrawLine(cx - 2, cy - 5, cx - 2, cy - 2, iconPaint);
             canvas.DrawLine(cx + 2, cy - 5, cx + 2, cy - 2, iconPaint);
@@ -319,7 +313,7 @@ internal static class SCBindingsRenderer
         {
             float cx = bounds.MidX;
             float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 2f, IsAntialias = true };
+            using var iconPaint = FUIRenderer.CreateStrokePaint(iconColor, 2f);
             canvas.DrawLine(cx - 5, cy, cx + 5, cy, iconPaint);
             canvas.DrawLine(cx, cy - 5, cx, cy + 5, iconPaint);
         }
@@ -327,7 +321,7 @@ internal static class SCBindingsRenderer
         {
             float cx = bounds.MidX;
             float cy = bounds.MidY;
-            using var iconPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = iconColor, StrokeWidth = 2f, IsAntialias = true };
+            using var iconPaint = FUIRenderer.CreateStrokePaint(iconColor, 2f);
             canvas.DrawLine(cx - 4, cy - 4, cx + 4, cy + 4, iconPaint);
             canvas.DrawLine(cx + 4, cy - 4, cx - 4, cy + 4, iconPaint);
         }
@@ -342,12 +336,12 @@ internal static class SCBindingsRenderer
     internal static void DrawVJoyMappingRow(SKCanvas canvas, SKRect bounds, uint vjoyId, int scInstance, bool isHovered)
     {
         var bgColor = isHovered ? FUIColors.Background2.WithAlpha(150) : FUIColors.Background1.WithAlpha(80);
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         if (isHovered)
         {
-            using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Active.WithAlpha(150), StrokeWidth = 1f, IsAntialias = true };
+            using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(150));
             canvas.DrawRect(bounds, borderPaint);
         }
 
@@ -364,7 +358,7 @@ internal static class SCBindingsRenderer
     {
         if (isHovered)
         {
-            using var hoverPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2.WithAlpha(100), IsAntialias = true };
+            using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(100));
             canvas.DrawRect(bounds, hoverPaint);
         }
 

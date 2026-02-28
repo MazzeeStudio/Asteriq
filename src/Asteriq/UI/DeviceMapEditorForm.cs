@@ -360,7 +360,7 @@ public class DeviceMapEditorForm : Form
         var titleBounds = new SKRect(0, 0, bounds.Right, TitleBarHeight);
 
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1);
         canvas.DrawRect(titleBounds, bgPaint);
 
         // Title
@@ -375,7 +375,7 @@ public class DeviceMapEditorForm : Form
     private void DrawToolbar(SKCanvas canvas)
     {
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1.WithAlpha(200) };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(200));
         canvas.DrawRect(_toolbarBounds, bgPaint);
 
         float y = _toolbarBounds.Top + 10;
@@ -450,16 +450,11 @@ public class DeviceMapEditorForm : Form
     private void DrawSvgPanel(SKCanvas canvas)
     {
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background0 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRect(_svgPanelBounds, bgPaint);
 
         // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(_svgPanelBounds, framePaint);
 
         // Draw SVG
@@ -527,20 +522,11 @@ public class DeviceMapEditorForm : Form
 
             // Draw anchor point
             float radius = isSelected ? 10f : 6f;
-            using var anchorPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = isSelected ? FUIColors.Active : FUIColors.Primary.WithAlpha(180)
-            };
+            using var anchorPaint = FUIRenderer.CreateFillPaint(isSelected ? FUIColors.Active : FUIColors.Primary.WithAlpha(180));
             canvas.DrawCircle(anchorScreen, radius, anchorPaint);
 
             // Draw anchor outline
-            using var outlinePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = isSelected ? FUIColors.Active : FUIColors.Frame,
-                StrokeWidth = 2f
-            };
+            using var outlinePaint = FUIRenderer.CreateStrokePaint(isSelected ? FUIColors.Active : FUIColors.Frame, 2f);
             canvas.DrawCircle(anchorScreen, radius, outlinePaint);
 
             // Calculate label position (offset from anchor in viewbox coords)
@@ -593,20 +579,9 @@ public class DeviceMapEditorForm : Form
             canvas.DrawLine(shelfStart, shelfEnd, shelfPaint);
 
             // Draw label background
-            using var labelBgPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Background1.WithAlpha(200)
-            };
-            canvas.DrawRoundRect(labelRect, 3, 3, labelBgPaint);
-
-            using var labelFramePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = isSelected ? FUIColors.Active : FUIColors.Frame,
-                StrokeWidth = 1f
-            };
-            canvas.DrawRoundRect(labelRect, 3, 3, labelFramePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, labelRect,
+                isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Background1.WithAlpha(200),
+                isSelected ? FUIColors.Active : FUIColors.Frame);
 
             // Draw label text (baseline adjusted)
             using var textPaint = new SKPaint { TextSize = 14f, IsAntialias = true };
@@ -698,27 +673,9 @@ public class DeviceMapEditorForm : Form
 
     private void DrawSegmentHandles(SKCanvas canvas, SKPoint anchor, LeadLineDefinition leadLine)
     {
-        using var handleFill = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Active.WithAlpha(180),
-            IsAntialias = true
-        };
-
-        using var handleStroke = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active,
-            StrokeWidth = 2f,
-            IsAntialias = true
-        };
-
-        using var handleHover = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Primary.WithAlpha(100),
-            IsAntialias = true
-        };
+        using var handleFill = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
+        using var handleStroke = FUIRenderer.CreateStrokePaint(FUIColors.Active, 2f);
+        using var handleHover = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(100));
 
         // Draw shelf end handle
         bool shelfHovered = SKPoint.Distance(_shelfEndHandle, _mousePos) < HandleHitRadius;
@@ -751,16 +708,11 @@ public class DeviceMapEditorForm : Form
     private void DrawPropertiesPanel(SKCanvas canvas)
     {
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1);
         canvas.DrawRect(_propertiesPanelBounds, bgPaint);
 
         // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(_propertiesPanelBounds, framePaint);
 
         // Header
@@ -890,12 +842,7 @@ public class DeviceMapEditorForm : Form
 
     private void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text)
     {
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(bounds, 3, 3, bgPaint);
-
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = FUIColors.Frame, StrokeWidth = 1f };
-        canvas.DrawRoundRect(bounds, 3, 3, framePaint);
-
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background2, FUIColors.Frame);
         FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextPrimary, 12f);
     }
 
@@ -909,16 +856,7 @@ public class DeviceMapEditorForm : Form
 
         if (!readOnly)
         {
-            using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-            canvas.DrawRoundRect(valueBounds, 3, 3, bgPaint);
-
-            using var framePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Frame,
-                StrokeWidth = 1f
-            };
-            canvas.DrawRoundRect(valueBounds, 3, 3, framePaint);
+            FUIRenderer.DrawRoundedPanel(canvas, valueBounds, FUIColors.Background2, FUIColors.Frame);
         }
 
         FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + labelWidth + 4, y),
@@ -930,16 +868,11 @@ public class DeviceMapEditorForm : Form
     private void DrawControlsList(SKCanvas canvas)
     {
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1);
         canvas.DrawRect(_controlsListBounds, bgPaint);
 
         // Frame
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
+        using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(_controlsListBounds, framePaint);
 
         // Header
@@ -984,11 +917,7 @@ public class DeviceMapEditorForm : Form
 
                 if (isSelected || isHovered)
                 {
-                    using var hlPaint = new SKPaint
-                    {
-                        Style = SKPaintStyle.Fill,
-                        Color = isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Primary.WithAlpha(20)
-                    };
+                    using var hlPaint = FUIRenderer.CreateFillPaint(isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Primary.WithAlpha(20));
                     canvas.DrawRoundRect(itemBounds, 3, 3, hlPaint);
                 }
 
@@ -1011,7 +940,7 @@ public class DeviceMapEditorForm : Form
             var scrollbarBounds = new SKRect(_controlsListBounds.Right - 6, scrollbarY,
                 _controlsListBounds.Right - 2, scrollbarY + scrollbarHeight);
 
-            using var scrollPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Frame.WithAlpha(100) };
+            using var scrollPaint = FUIRenderer.CreateFillPaint(FUIColors.Frame.WithAlpha(100));
             canvas.DrawRoundRect(scrollbarBounds, 2, 2, scrollPaint);
         }
 
@@ -1032,7 +961,7 @@ public class DeviceMapEditorForm : Form
     private void DrawStatusBar(SKCanvas canvas)
     {
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
+        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1);
         canvas.DrawRect(_statusBarBounds, bgPaint);
 
         // Cursor position
@@ -1082,20 +1011,10 @@ public class DeviceMapEditorForm : Form
 
     private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = open ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2
-        };
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = open ? FUIColors.Primary : FUIColors.Frame,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds,
+            open ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2,
+            open ? FUIColors.Primary : FUIColors.Frame,
+            4f);
 
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
 
@@ -1112,16 +1031,7 @@ public class DeviceMapEditorForm : Form
             _svgDropdownBounds.Right, _svgDropdownBounds.Bottom + 2 + menuHeight);
 
         // Background
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background1 };
-        canvas.DrawRoundRect(menuBounds, 4, 4, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Primary,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRoundRect(menuBounds, 4, 4, framePaint);
+        FUIRenderer.DrawRoundedPanel(canvas, menuBounds, FUIColors.Background1, FUIColors.Primary, 4f);
 
         _svgDropdownItemBounds.Clear();
         float y = menuBounds.Top + 5;
@@ -1134,7 +1044,7 @@ public class DeviceMapEditorForm : Form
             bool hovered = i == _hoveredSvgDropdownItem;
             if (hovered)
             {
-                using var hlPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Primary.WithAlpha(40) };
+                using var hlPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(40));
                 canvas.DrawRoundRect(itemBounds, 3, 3, hlPaint);
             }
 
@@ -1147,16 +1057,7 @@ public class DeviceMapEditorForm : Form
 
     private void DrawTextBox(SKCanvas canvas, SKRect bounds, string text)
     {
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.Background2 };
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame,
-            StrokeWidth = 1f
-        };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background2, FUIColors.Frame, 4f);
 
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
     }

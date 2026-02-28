@@ -1036,7 +1036,7 @@ public static class FUIRenderer
     /// <summary>
     /// Draws standard panel chrome (background + L-corner frame) and returns layout metrics
     /// </summary>
-    public static PanelMetrics DrawPanelChrome(SKCanvas canvas, SKRect bounds, SKColor? frameColor = null)
+    public static PanelMetrics DrawPanelChrome(SKCanvas canvas, SKRect bounds, SKColor? frameColor = null, float cornerLength = 30f)
     {
         frameColor ??= FUIColors.Frame;
 
@@ -1048,7 +1048,7 @@ public static class FUIRenderer
             IsAntialias = true
         };
         canvas.DrawRect(bounds.Inset(FrameInset, FrameInset), bgPaint);
-        DrawLCornerFrame(canvas, bounds, frameColor.Value, 30f, 8f);
+        DrawLCornerFrame(canvas, bounds, frameColor.Value, cornerLength, 8f);
 
         // Calculate standard layout metrics
         float cornerPadding = SpaceXL;  // 24px

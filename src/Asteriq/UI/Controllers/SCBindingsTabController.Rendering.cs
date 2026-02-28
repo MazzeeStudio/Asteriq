@@ -643,11 +643,14 @@ public partial class SCBindingsTabController
                             // Draw cell content
                             if (isCellListening)
                             {
-                                // Show modifier hint if a modifier key (mapped in the Mappings profile) is held
+                                // Show modifier hint if a modifier is pending or held
                                 string listeningText = "PRESS INPUT";
                                 if (col.IsJoystick && _scModifierKeys.Count > 0)
                                 {
-                                    var heldMod = _scModifierKeys
+                                    // Priority 1: confirmed pending modifier (user already pressed modifier button)
+                                    string? heldMod = _scPendingJoystickModifiers?.FirstOrDefault()?.ToUpperInvariant();
+                                    // Priority 2: modifier VK currently held
+                                    heldMod ??= _scModifierKeys
                                         .Where(kv => IsKeyHeld(kv.Key))
                                         .Select(kv => kv.Value.ToUpperInvariant())
                                         .FirstOrDefault();

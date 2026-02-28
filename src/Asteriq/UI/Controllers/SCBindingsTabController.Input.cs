@@ -912,8 +912,10 @@ public partial class SCBindingsTabController
             var detectedKey = DetectKeyboardInput();
             if (detectedKey is not null)
             {
-                AssignKeyboardBinding(action, detectedKey.Value.key, detectedKey.Value.modifiers);
+                // Cancel BEFORE assigning — prevents timer from re-entering if assignment shows a blocking dialog
+                var key = detectedKey.Value;
                 CancelSCInputListening();
+                AssignKeyboardBinding(action, key.key, key.modifiers);
             }
         }
         else if (col.IsMouse)
@@ -921,24 +923,40 @@ public partial class SCBindingsTabController
             var detectedMouse = DetectMouseInput();
             if (detectedMouse is not null)
             {
-                AssignMouseBinding(action, detectedMouse);
+                var mouse = detectedMouse;
                 CancelSCInputListening();
+                AssignMouseBinding(action, mouse);
             }
         }
         else if (col.IsJoystick)
         {
-            // Joystick input detection will use physical→vJoy mapping lookup
+            // Modifier detection strategy: use the Mappings profile to know which physical
+            // buttons are mapped to keyboard modifier keys (e.g. physical button 31 → RCTRL).
+            // When one of those buttons is detected, skip it as a binding target and wait for
+            // the REAL target button.  This avoids all timing races between SDL2 button state
+            // and GetAsyncKeyState, which caused the old two-phase approach to be unreliable.
+
             var detectedJoystick = DetectJoystickInput(col);
             if (detectedJoystick is not null)
             {
-                // Check which modifier keys (from the Mappings profile) are held at the moment
-                // the joystick input is detected so we can create a compound SC binding.
-                var heldModifiers = _scModifierKeys
-                    .Where(kv => IsKeyHeld(kv.Key))
-                    .Select(kv => kv.Value)
-                    .ToList();
-                AssignJoystickBinding(action, col, detectedJoystick, heldModifiers.Count > 0 ? heldModifiers : null);
-                CancelSCInputListening();
+                if (_scPendingJoystickModifiers is null
+                    && _scModifierPhysicalButtonNames.Contains(detectedJoystick))
+                {
+                    // This is the modifier button — record which modifier it produces and
+                    // keep listening for the actual target button.
+                    _scPendingJoystickModifiers = _scModifierButtonToModifiers.TryGetValue(detectedJoystick, out var mods)
+                        ? new List<string>(mods) : null;
+                    _scListeningStartTime = DateTime.Now; // reset timeout so user has time to press target
+                    _ctx.MarkDirty();
+                }
+                else
+                {
+                    // Regular button or target button — assign with any pending modifier.
+                    // Cancel BEFORE assigning so a blocking conflict dialog cannot re-trigger detection.
+                    var finalModifiers = _scPendingJoystickModifiers;
+                    CancelSCInputListening();
+                    AssignJoystickBinding(action, col, detectedJoystick, finalModifiers);
+                }
             }
         }
     }
@@ -947,7 +965,8 @@ public partial class SCBindingsTabController
     {
         _scIsListeningForInput = false;
         _scListeningColumn = null;
-        ResetJoystickDetectionState(); // Reset all joystick detection state
+        _scPendingJoystickModifiers = null;
+        ResetJoystickDetectionState();
         System.Diagnostics.Debug.WriteLine("[SCBindings] Input listening cancelled");
     }
 

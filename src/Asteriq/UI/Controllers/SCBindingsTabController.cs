@@ -104,6 +104,17 @@ public partial class SCBindingsTabController : ITabController
     // Modifier keys detected from Mappings profile (vkCode → SC modifier name, e.g. {0xA3: "rctrl"})
     private Dictionary<int, string> _scModifierKeys = new();
 
+    // Physical button names (e.g. "button31") that are mapped to keyboard modifier keys.
+    // Used during joystick listen mode: pressing one of these is treated as the modifier half of a
+    // compound binding, NOT as the target button.  Built by UpdateModifierKeys().
+    private HashSet<string> _scModifierPhysicalButtonNames = new();
+
+    // Maps physical button name → list of SC modifier names (e.g. "button31" → ["rctrl"])
+    private Dictionary<string, List<string>> _scModifierButtonToModifiers = new();
+
+    // Modifier(s) established by the first press (the modifier button) while waiting for the target
+    private List<string>? _scPendingJoystickModifiers;
+
     // Header toggle button (JS REF / DEVICE)
     private SKRect _scHeaderToggleButtonBounds;
     private bool _scHeaderToggleButtonHovered;

@@ -60,23 +60,9 @@ internal static class SCBindingsRenderer
         float badgeHeight = 16f;
 
         var badgeBounds = new SKRect(x, y, x + badgeWidth, y + badgeHeight);
-
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 3f, 3f, bgPaint);
-
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 3f, 3f, borderPaint);
+        var bgColor = isDefault ? FUIColors.PanelBgHover : color.WithAlpha(FUIColors.AlphaHoverBg);
+        var borderColor = color.WithAlpha(isDefault ? (byte)100 : (byte)180);
+        FUIRenderer.DrawRoundedPanel(canvas, badgeBounds, bgColor, borderColor, radius: 3f);
 
         float textX = x + 5;
         if (inputType.HasValue)
@@ -107,22 +93,9 @@ internal static class SCBindingsRenderer
         float badgeY = cellBounds.Top + (cellBounds.Height - badgeHeight) / 2;
         var badgeBounds = new SKRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight);
 
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = isDefault ? FUIColors.Background2.WithAlpha(180) : color.WithAlpha(40),
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 4f, 4f, bgPaint);
-
-        using var borderPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = color.WithAlpha(isDefault ? (byte)100 : (byte)180),
-            StrokeWidth = 1f,
-            IsAntialias = true
-        };
-        canvas.DrawRoundRect(badgeBounds, 4f, 4f, borderPaint);
+        var bgColor = isDefault ? FUIColors.PanelBgHover : color.WithAlpha(FUIColors.AlphaHoverBg);
+        var borderColor = color.WithAlpha(isDefault ? (byte)100 : (byte)180);
+        FUIRenderer.DrawRoundedPanel(canvas, badgeBounds, bgColor, borderColor, radius: 4f);
 
         float textX = badgeX + padding;
         if (inputType.HasValue)
@@ -297,54 +270,23 @@ internal static class SCBindingsRenderer
 
     // ─── Profile Dropdowns ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Draws a profile selection dropdown. Text is truncated by pixel measurement to fit
+    /// within the available width (bounds.Width - 30px for arrow clearance).
+    /// </summary>
     internal static void DrawSCProfileDropdown(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
     {
-        var bgColor = open ? FUIColors.Active.WithAlpha(40) : (hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(120));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
+        var bgColor = open ? FUIColors.PanelBgActive : (hovered ? FUIColors.PanelBgHover : FUIColors.PanelBgDefault);
         var borderColor = open ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
-
-        string displayText = text.Length > 18 ? text.Substring(0, 15) + "..." : text;
-        FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 6, bounds.MidY + 4f), FUIColors.TextPrimary, 13f);
-
-        float arrowX = bounds.Right - 14f;
-        float arrowY = bounds.MidY;
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
-        using var arrowPath = new SKPath();
-        arrowPath.MoveTo(arrowX - 4, arrowY - 2);
-        arrowPath.LineTo(arrowX + 4, arrowY - 2);
-        arrowPath.LineTo(arrowX, arrowY + 3);
-        arrowPath.Close();
-        canvas.DrawPath(arrowPath, arrowPaint);
-    }
-
-    internal static void DrawSCProfileDropdownWide(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool open)
-    {
-        var bgColor = open ? FUIColors.Active.WithAlpha(40) : (hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(120));
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, bgPaint);
-
-        var borderColor = open ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        using var borderPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = borderColor, StrokeWidth = 1f, IsAntialias = true };
-        canvas.DrawRoundRect(bounds, 3f, 3f, borderPaint);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
 
         float maxTextWidth = bounds.Width - 30f;
-        string displayText = text;
-        if (FUIRenderer.MeasureText(text, 13f) > maxTextWidth)
-        {
-            int len = text.Length;
-            while (len > 0 && FUIRenderer.MeasureText(text.Substring(0, len) + "...", 13f) > maxTextWidth)
-                len--;
-            displayText = len > 0 ? text.Substring(0, len) + "..." : "...";
-        }
+        string displayText = FUIWidgets.TruncateTextToWidth(text, maxTextWidth, 13f);
         FUIRenderer.DrawText(canvas, displayText, new SKPoint(bounds.Left + 8, bounds.MidY + 4f), FUIColors.TextPrimary, 13f);
 
         float arrowX = bounds.Right - 14f;
         float arrowY = bounds.MidY;
-        using var arrowPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = FUIColors.TextDim, IsAntialias = true };
+        using var arrowPaint = FUIRenderer.CreateFillPaint(FUIColors.TextDim);
         using var arrowPath = new SKPath();
         arrowPath.MoveTo(arrowX - 4, arrowY - 2);
         arrowPath.LineTo(arrowX + 4, arrowY - 2);

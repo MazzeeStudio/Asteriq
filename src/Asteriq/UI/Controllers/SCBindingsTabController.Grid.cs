@@ -153,7 +153,7 @@ public partial class SCBindingsTabController
                     if (binding is not null && !string.IsNullOrEmpty(binding.InputName))
                     {
                         var components = GetBindingComponents(binding.InputName, binding.Modifiers);
-                        float badgesWidth = MeasureMultiKeycapWidth(components, binding.InputType) + padding;
+                        float badgesWidth = SCBindingsRenderer.MeasureMultiKeycapWidth(components, binding.InputType) + padding;
                         maxWidth = Math.Max(maxWidth, badgesWidth);
                     }
                 }
@@ -166,7 +166,7 @@ public partial class SCBindingsTabController
                     var modifiers = defaultBinding.Modifiers?.Where(m => !string.IsNullOrEmpty(m)).ToList();
                     var components = GetBindingComponents(defaultBinding.Input, modifiers);
                     // Default bindings don't have input type info
-                    float badgesWidth = MeasureMultiKeycapWidth(components, null) + padding;
+                    float badgesWidth = SCBindingsRenderer.MeasureMultiKeycapWidth(components, null) + padding;
                     maxWidth = Math.Max(maxWidth, badgesWidth);
                 }
             }

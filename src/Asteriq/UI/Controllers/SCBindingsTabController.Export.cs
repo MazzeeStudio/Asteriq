@@ -143,7 +143,7 @@ public partial class SCBindingsTabController
             LoadSCSchema(_scInstallations[_selectedSCInstallation]);
     }
 
-    private void LoadSCSchema(SCInstallation installation, bool autoLoadProfileForEnvironment = false)
+    private void LoadSCSchema(SCInstallation installation, bool autoLoadProfileForEnvironment = false, bool applyDefaultsAfterLoad = false)
     {
         if (_scProfileCacheService is null || _scSchemaService is null) return;
 
@@ -230,10 +230,16 @@ public partial class SCBindingsTabController
                         _scExportProfile.TargetEnvironment = installation.Environment;
                         _scExportProfile.TargetBuildId = installation.BuildId;
 
-                        // NOTE: We intentionally do NOT auto-apply defaults here.
-                        // Defaults are only applied when user explicitly clicks "Reset Defaults".
                         RefreshFilteredActions();
                         CalculateDeviceColumnWidths();
+
+                        if (applyDefaultsAfterLoad)
+                        {
+                            ApplyDefaultBindingsToProfile();
+                            UpdateConflictingBindings();
+                            UpdateSharedCells();
+                            SetStatus("Reset to defaults");
+                        }
 
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] Loaded {actions.Count} SC actions from {installation.Environment}");
                     }
@@ -606,22 +612,25 @@ public partial class SCBindingsTabController
 
         if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
         {
-            // Clear existing bindings
             _scExportProfile.ClearBindings();
 
-            // Reload schema from currently selected installation
-            if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+            if (_scActions is not null)
             {
-                LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+                // Schema already loaded — apply defaults immediately
+                ApplyDefaultBindingsToProfile();
+                UpdateConflictingBindings();
+                UpdateSharedCells();
+                SetStatus("Reset to defaults");
             }
-
-            // Apply default bindings from the loaded schema
-            ApplyDefaultBindingsToProfile();
-
-            UpdateConflictingBindings();
-            UpdateSharedCells();
-
-            SetStatus("Reset to defaults");
+            else if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+            {
+                // Schema not yet loaded — trigger load and apply defaults once it completes
+                LoadSCSchema(_scInstallations[_selectedSCInstallation], applyDefaultsAfterLoad: true);
+            }
+            else
+            {
+                SetStatus("No SC installation found", SCStatusKind.Error);
+            }
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] Reset SC bindings to defaults");
         }

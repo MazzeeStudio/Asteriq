@@ -1157,12 +1157,12 @@ public partial class MainForm : Form
 
     private void ApplyFontScaleToWindowSize()
     {
-        // The design baseline is Medium (1.3x): 1570×1000 logical pixels.
-        // Scale MinimumSize proportionally with the combined canvas scale factor
+        // Minimum window size at VSmall (1.0x) scale: 1280×1024.
+        // Scaled up proportionally with the combined canvas scale factor
         // (DPI × text scale × user preference) so the window is large enough
         // for the canvas drawing space at any DPI.
-        const float baseMinW = 1570f / 1.3f;  // ~1208 - base at VSmall (1.0x)
-        const float baseMinH = 1000f / 1.3f;  // ~769
+        const float baseMinW = 1280f;
+        const float baseMinH = 1024f;
         float scale = FUIRenderer.CanvasScaleFactor;
         MinimumSize = new Size((int)(baseMinW * scale), (int)(baseMinH * scale));
         // Windows enforces MinimumSize automatically; if the current size is smaller it will be grown.
@@ -2818,31 +2818,24 @@ public partial class MainForm : Form
     {
         float y = bounds.Bottom - 40;
 
-        // Far left: mouse position in viewBox coordinates (for JSON anchor editing)
-        // Convert screen coords to viewBox coords
+        // Far left: window size + mouse position in viewBox coordinates (for JSON anchor editing)
         float viewBoxX = (_mousePosition.X - _svgOffset.X) / _svgScale;
         float viewBoxY = (_mousePosition.Y - _svgOffset.Y) / _svgScale;
-        string mousePos = $"VB:{viewBoxX,5:F0},{viewBoxY,5:F0}";
+        string mousePos = $"WB: {(int)bounds.Width}, {(int)bounds.Height}  VB: {viewBoxX:F0}, {viewBoxY:F0}";
+        float mousePosX = 40;
         FUIRenderer.DrawText(canvas, mousePos,
-            new SKPoint(40, y + 22), FUIColors.TextDim, 13f);
+            new SKPoint(mousePosX, y + 22), FUIColors.TextDim, 13f);
 
-        // Window dimensions (layout debugging aid)
-        string winSize = $"{(int)bounds.Width}×{(int)bounds.Height}";
-        FUIRenderer.DrawText(canvas, winSize,
-            new SKPoint(40, y + 36), FUIColors.TextDim.WithAlpha(140), 11f);
-
-        // Left-center: connection status
+        // Centre: connection status, anchored to true window centre
         int connectedCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
         int disconnectedCount = _devices.Count(d => !d.IsVirtual && !d.IsConnected);
         string deviceText = disconnectedCount > 0
             ? $"{connectedCount} CONNECTED, {disconnectedCount} OFFLINE"
             : connectedCount == 1 ? "1 DEVICE CONNECTED" : $"{connectedCount} DEVICES CONNECTED";
+        float deviceTextWidth = FUIRenderer.MeasureText(deviceText, 15f);
         FUIRenderer.DrawText(canvas, deviceText,
-            new SKPoint(180, y + 22), FUIColors.TextDim, 15f);
+            new SKPoint(bounds.MidX - deviceTextWidth / 2f, y + 22), FUIColors.TextDim, 15f);
 
-        // Center: current status
-        FUIRenderer.DrawText(canvas, "READY",
-            new SKPoint(bounds.MidX - 20, y + 22), FUIColors.Success, 15f);
 
         // Right: update indicator shape + version and time
         string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";

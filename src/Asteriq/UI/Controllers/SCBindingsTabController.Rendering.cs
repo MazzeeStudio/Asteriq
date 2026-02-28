@@ -25,7 +25,7 @@ public partial class SCBindingsTabController
         //   2. Device Order and Control Profiles — mutually exclusive expand/collapse
         //   3. Column Actions (fixed 235px at bottom, when a vJoy column is selected)
         float verticalGap = 8f;
-        float installationHeight = 62f;
+        float installationHeight = 90f;
 
         var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
             rightBounds.Right, rightBounds.Top + installationHeight);
@@ -54,25 +54,27 @@ public partial class SCBindingsTabController
             bottomAreaBottom = columnActionsBounds.Top - verticalGap2;
         }
 
-        // Device Order (top) and Control Profiles (bottom) share the remaining area.
-        // Only one is expanded at a time; the other shows a collapsed title bar.
+        // Accordion layout: Device Order always on top, Control Profiles always on bottom.
+        // Only one is expanded at a time; the collapsed panel shows a fixed-height title bar.
         SKRect deviceOrderBounds = SKRect.Empty;
         SKRect controlProfilesBounds;
         if (hasDeviceOrder)
         {
-            float fullDevOrderH = 98f + vjoyDeviceCount * 28f;
             if (_scDeviceOrderExpanded)
             {
-                float devH = Math.Min(fullDevOrderH, bottomAreaBottom - afterInstall - CollapsedPanelH - verticalGap);
+                // Control Profiles: collapsed title bar anchored at the very bottom
+                float cpTop = bottomAreaBottom - CollapsedPanelH;
+                controlProfilesBounds = new SKRect(rightBounds.Left, cpTop, rightBounds.Right, bottomAreaBottom);
+                // Device Order: fills from top down to just above Control Profiles
+                float devH = Math.Max(CollapsedPanelH, cpTop - verticalGap - afterInstall);
                 deviceOrderBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, afterInstall + devH);
-                controlProfilesBounds = new SKRect(rightBounds.Left, deviceOrderBounds.Bottom + verticalGap,
-                    rightBounds.Right, bottomAreaBottom);
             }
             else
             {
-                float profBottom = bottomAreaBottom - CollapsedPanelH - verticalGap;
-                controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, profBottom);
-                deviceOrderBounds = new SKRect(rightBounds.Left, profBottom + verticalGap,
+                // Device Order: collapsed title bar at the top
+                deviceOrderBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, afterInstall + CollapsedPanelH);
+                // Control Profiles: fills the rest
+                controlProfilesBounds = new SKRect(rightBounds.Left, deviceOrderBounds.Bottom + verticalGap,
                     rightBounds.Right, bottomAreaBottom);
             }
         }
@@ -117,23 +119,12 @@ public partial class SCBindingsTabController
 
     private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        // Compact panel: no title, just the SC installation dropdown
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 20f, 8f);
-
-        float pad = 10f;
-        float leftMargin = bounds.Left + frameInset + pad;
-        float rightMargin = bounds.Right - frameInset - pad;
-        float y = bounds.Top + frameInset + pad;
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "GAME ENVIRONMENT");
 
         float selectorHeight = 32f;
-        _scInstallationSelectorBounds = new SKRect(leftMargin, y, rightMargin, y + selectorHeight);
+        _scInstallationSelectorBounds = new SKRect(m.LeftMargin, y, m.RightMargin, y + selectorHeight);
 
         string installationText = _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
             ? _scInstallations[_selectedSCInstallation].DisplayName
@@ -159,20 +150,10 @@ public partial class SCBindingsTabController
 
     private void DrawSCBindingsTablePanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
-
-        float cornerPadding = 15f;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 16;  // 4px aligned
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
+        float y = m.Y;
         // Title row with action count
         FUIRenderer.DrawText(canvas, "SC ACTIONS", new SKPoint(leftMargin, y), FUIColors.TextBright, 15f, true);
 
@@ -936,21 +917,11 @@ public partial class SCBindingsTabController
     private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset,
         bool suppressActionInfo = false, bool isExpanded = true, bool isCollapsible = false)
     {
-        // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, cornerLen, 8f);
-
-        float cornerPadding = 12f;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 10;
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
         float buttonGap = 6f;
 
         // Header bounds for click-to-expand handling (when part of the mutual-exclusive group)
@@ -1633,21 +1604,10 @@ public partial class SCBindingsTabController
 
         var col = _scGridColumns[_scHighlightedColumn];
 
-        // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
-
-        float cornerPadding = 15f;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 10;
-
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
         FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "COLUMN ACTIONS", withDivider: true);
 
         // Column label + device name
@@ -1702,7 +1662,7 @@ public partial class SCBindingsTabController
         // Action buttons anchored to panel bottom
         float btnH = 28f;
         float btnW = (rightMargin - leftMargin - 8f) / 2f;
-        float btnY = bounds.Bottom - frameInset - cornerPadding - btnH;
+        float btnY = bounds.Bottom - FUIRenderer.FrameInset - FUIRenderer.SpaceXL - btnH;
 
         bool canImport = _scColImportProfileIndex >= 0 && _scColImportColumnIndex >= 0;
         _scColImportButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnW, btnY + btnH);
@@ -1784,21 +1744,11 @@ public partial class SCBindingsTabController
         var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
         if (existingSlots.Count == 0) return;
 
-        // Panel background
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
         float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, cornerLen, 8f);
-
-        float cornerPadding = 12f;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - 10f;
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
 
         // Header bounds for click-to-expand handling
         _scDeviceOrderHeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
@@ -1875,7 +1825,7 @@ public partial class SCBindingsTabController
 
         // Auto-detect button anchored near the bottom
         float btnH = 26f;
-        float btnY = bounds.Bottom - frameInset - cornerPadding - btnH;
+        float btnY = bounds.Bottom - FUIRenderer.FrameInset - FUIRenderer.SpaceXL - btnH;
         _scDeviceOrderAutoDetectBounds = new SKRect(leftMargin, btnY, rightMargin, btnY + btnH);
         _scDeviceOrderAutoDetectHovered = _scDeviceOrderAutoDetectBounds.Contains(
             _ctx.MousePosition.X, _ctx.MousePosition.Y);

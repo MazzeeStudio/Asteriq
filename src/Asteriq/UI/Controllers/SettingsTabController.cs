@@ -348,20 +348,11 @@ public class SettingsTabController : ITabController
 
     private void DrawSystemSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
-
-        float cornerPadding = FUIRenderer.SpaceXL;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
-        float contentWidth = rightMargin - leftMargin;
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
+        float contentWidth = m.ContentWidth;
         float sectionSpacing = 20f;
         float rowHeight = 24f;
         float minControlGap = 12f;
@@ -650,20 +641,11 @@ public class SettingsTabController : ITabController
 
     private void DrawVisualSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
-
-        float cornerPadding = FUIRenderer.SpaceXL;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
-        float contentWidth = rightMargin - leftMargin;
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
+        float contentWidth = m.ContentWidth;
         float sectionSpacing = 16f;
 
         FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, FUIRenderer.FontBody, true);
@@ -866,19 +848,10 @@ public class SettingsTabController : ITabController
 
     private void DrawSupportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        using var bgPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Fill,
-            Color = FUIColors.Background1.WithAlpha(160),
-            IsAntialias = true
-        };
-        canvas.DrawRect(bounds.Inset(frameInset, frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
-
-        float cornerPadding = FUIRenderer.SpaceXL;
-        float y = bounds.Top + frameInset + cornerPadding;
-        float leftMargin = bounds.Left + frameInset + cornerPadding;
-        float rightMargin = bounds.Right - frameInset - FUIRenderer.SpaceLG;
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
 
         // Header row: "SUPPORT" left, SC referral descriptor right-aligned
         FUIRenderer.DrawText(canvas, "SUPPORT", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);

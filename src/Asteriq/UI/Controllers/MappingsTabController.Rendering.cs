@@ -996,7 +996,7 @@ public partial class MappingsTabController
         float curveHeight = 140f;
         _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
         DrawCurveVisualization(canvas, _curveEditorBounds);
-        y += curveHeight + 6f;
+        y += curveHeight + 50f;  // tick labels (bottom +14) + "IN" label (bottom +25) + 8px gap before live indicator
 
         // Live axis movement indicator
         var axisMapping = GetCurrentAxisMapping();
@@ -1056,7 +1056,7 @@ public partial class MappingsTabController
             float sliderHeight = 24f;
             _deadzoneSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
             DrawDualDeadzoneSlider(canvas, _deadzoneSliderBounds);
-            y += sliderHeight + 6f;
+            y += sliderHeight + 16f;  // baseline needs +16 so text top (baseline-10) clears slider handles
 
             // Value labels - fixed positions at track edges (prevents collision)
             if (_deadzoneCenterEnabled)
@@ -1514,7 +1514,7 @@ public partial class MappingsTabController
         }
 
         // Axis labels
-        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 22), FUIColors.TextDim, 12f);
+        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 32), FUIColors.TextDim, 12f);
 
         // Rotated "OUT" label
         canvas.Save();
@@ -1607,8 +1607,8 @@ public partial class MappingsTabController
         // Draw section header with live values
         string headerText = hasInput
             ? (isCentered
-                ? $"LIVE INPUT: {rawPercent:+0;-0;0}%  ÔåÆ  OUTPUT: {outPercent:+0;-0;0}%"
-                : $"LIVE INPUT: {rawPercent:0}%  ÔåÆ  OUTPUT: {outPercent:0}%")
+                ? $"LIVE INPUT: {rawPercent:+0;-0;0}%  >>  OUTPUT: {outPercent:+0;-0;0}%"
+                : $"LIVE INPUT: {rawPercent:0}%  >>  OUTPUT: {outPercent:0}%")
             : "LIVE INPUT: (no signal)";
 
         var headerColor = hasInput ? FUIColors.Active : FUIColors.TextDim.WithAlpha(150);
@@ -1659,7 +1659,7 @@ public partial class MappingsTabController
             using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
             canvas.DrawRect(barBounds, framePaint);
 
-            y += barHeight + 2f;
+            y += barHeight + 14f;  // baseline needs +14 so text top (baseline-10) clears bar bottom
 
             // Labels below bar - different for centered vs end-only
             if (isCentered)

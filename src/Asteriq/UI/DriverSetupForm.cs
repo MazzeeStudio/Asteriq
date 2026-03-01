@@ -312,14 +312,12 @@ public class DriverSetupForm : FUIBaseDialog
             if (_continueEnabled)
             {
                 FUIRenderer.DrawButton(canvas, _continueButtonBounds, "CONTINUE",
-                    _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                    FUIColors.Active);
+                    _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             }
             else
             {
                 FUIRenderer.DrawButton(canvas, _continueButtonBounds, "SKIP VJOY",
-                    _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                    FUIColors.Warning.WithAlpha(180));
+                    _hoveredRegion == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             }
         }
 
@@ -344,7 +342,7 @@ public class DriverSetupForm : FUIBaseDialog
         if (installed)
         {
             FUIRenderer.DrawButton(canvas, bounds, "INSTALLED",
-                FUIRenderer.ButtonState.Active, FUIColors.Success);
+                FUIRenderer.ButtonState.Active);
         }
         else if (installing)
         {
@@ -354,8 +352,7 @@ public class DriverSetupForm : FUIBaseDialog
         else
         {
             FUIRenderer.DrawButton(canvas, bounds, "INSTALL",
-                hovered ? FUIRenderer.ButtonState.Active : FUIRenderer.ButtonState.Hover,
-                FUIColors.Active);
+                hovered ? FUIRenderer.ButtonState.Active : FUIRenderer.ButtonState.Hover);
         }
     }
 

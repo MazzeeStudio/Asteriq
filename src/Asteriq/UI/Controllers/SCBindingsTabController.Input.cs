@@ -97,9 +97,9 @@ public partial class SCBindingsTabController
                 }
             }
 
-            if (!_scDeselectButtonBounds.IsEmpty && _scDeselectButtonBounds.Contains(point))
+            if (!_scClearColumnButtonBounds.IsEmpty && _scClearColumnButtonBounds.Contains(point))
             {
-                DeselectColumn();
+                ClearColumnBindings();
                 return;
             }
 
@@ -761,6 +761,7 @@ public partial class SCBindingsTabController
             {
                 _scSelectedCell = (actionIndex, colIndex);
                 _scLastCellClickTime = DateTime.Now;
+                UpdateConflictLinks();
                 return;
             }
         }

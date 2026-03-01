@@ -135,8 +135,8 @@ public partial class SCBindingsTabController : ITabController
     private int _scColImportColumnHoveredIndex = -1;
     private SKRect _scColImportButtonBounds;
     private bool _scColImportButtonHovered;
-    private SKRect _scDeselectButtonBounds;
-    private bool _scDeselectButtonHovered;
+    private SKRect _scClearColumnButtonBounds;
+    private bool _scClearColumnButtonHovered;
 
     // SC scrollbar state
     private bool _scIsDraggingVScroll = false;
@@ -545,7 +545,7 @@ public partial class SCBindingsTabController : ITabController
             (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)) ||
             (!_scHeaderToggleButtonBounds.IsEmpty && _scHeaderToggleButtonBounds.Contains(e.X, e.Y)) ||
             (!_scColImportButtonBounds.IsEmpty && _scColImportButtonBounds.Contains(e.X, e.Y)) ||
-            (!_scDeselectButtonBounds.IsEmpty && _scDeselectButtonBounds.Contains(e.X, e.Y)) ||
+            (!_scClearColumnButtonBounds.IsEmpty && _scClearColumnButtonBounds.Contains(e.X, e.Y)) ||
             (!_scColImportProfileSelectorBounds.IsEmpty && _scColImportProfileSelectorBounds.Contains(e.X, e.Y)) ||
             (!_scColImportColumnSelectorBounds.IsEmpty && _scColImportColumnSelectorBounds.Contains(e.X, e.Y)))
         {

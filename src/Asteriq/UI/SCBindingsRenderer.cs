@@ -220,7 +220,7 @@ internal static class SCBindingsRenderer
             if (isMainKey && rerouted)
             {
                 float iM     = badgeY + badgeHeight / 2f;
-                float iR     = badgeBounds.Right - 6f;  // 6px from right edge
+                float iR     = badgeBounds.Right - 8f;  // 8px from right edge
                 const float halfH  = 4f;                // chevron half-height (8px total)
                 const float chevW  = 5f;                // chevron width
                 const float circR  = 1.5f;              // circle radius

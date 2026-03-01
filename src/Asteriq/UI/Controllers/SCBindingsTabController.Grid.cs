@@ -1067,7 +1067,9 @@ public partial class SCBindingsTabController
         var selectedAction = _scFilteredActions[_scSelectedActionIndex];
         var col = _scGridColumns[_scSelectedCell.colIndex];
 
-        // Find the binding for the selected cell
+        // Find the binding for the selected cell.
+        // For shared/rerouted cells there is no direct binding on the secondary column —
+        // fall back to the primary binding so conflict links reflect what the cell routes to.
         SCActionBinding? selectedBinding = col.IsPhysical
             ? _scExportProfile.Bindings.FirstOrDefault(b =>
                 b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
@@ -1079,14 +1081,28 @@ public partial class SCBindingsTabController
                     b.VJoyDevice == col.VJoyDeviceId)
                 : null;
 
+        // If no direct binding, check whether this is a shared/rerouted cell and use the primary binding
+        if (selectedBinding is null && col.IsJoystick && !col.IsPhysical)
+        {
+            string sharedKey = $"{selectedAction.Key}|{col.VJoyDeviceId}";
+            if (_scSharedCells.TryGetValue(sharedKey, out var sharedInfo))
+            {
+                selectedBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                    b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                    b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
+                    b.VJoyDevice == sharedInfo.PrimaryVJoyDevice);
+            }
+        }
+
         if (selectedBinding is null || !_scConflictingBindings.Contains(selectedBinding.Key))
             return;
 
-        // Find all other bindings with the same device + inputName + modifier set
+        // Find all other bindings with the same device + inputName + modifier set.
+        // Use the binding's own VJoyDevice (may be the primary device for rerouted cells).
         var conflicts = col.IsPhysical
             ? _scExportProfile.GetConflictingBindings(col.PhysicalDevice!.HidDevicePath,
                 selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers)
-            : _scExportProfile.GetConflictingBindings(col.VJoyDeviceId,
+            : _scExportProfile.GetConflictingBindings(selectedBinding.VJoyDevice,
                 selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
 
         foreach (var conflict in conflicts)

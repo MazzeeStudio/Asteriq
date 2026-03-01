@@ -675,7 +675,7 @@ public partial class MappingsTabController
                 // Line 2: Device name (smaller, dimmer) - vertically centered in bottom half
                 FUIRenderer.DrawText(canvas, input.DeviceName, new SKPoint(leftMargin + 8, y + 32), FUIColors.TextDim, 12f);
 
-                // Remove [├ù] button (full height of row)
+                // Remove [X] button (full height of row)
                 var removeBounds = new SKRect(rightMargin - 26, y, rightMargin, y + rowHeight);
                 bool removeHovered = _hoveredInputSourceRemove == i;
 
@@ -683,7 +683,7 @@ public partial class MappingsTabController
                     removeHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2,
                     removeHovered ? FUIColors.Warning : FUIColors.Frame);
 
-                FUIRenderer.DrawTextCentered(canvas, "├ù", removeBounds,
+                FUIRenderer.DrawTextCentered(canvas, "X", removeBounds,
                     removeHovered ? FUIColors.Warning : FUIColors.TextDim, 14f);
 
                 _inputSourceRemoveBounds.Add(removeBounds);
@@ -2019,7 +2019,7 @@ public partial class MappingsTabController
         if (_pendingInput is not null && !_isListeningForInput)
         {
             var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
-            FUIWidgets.DrawSmallIconButton(canvas, clearBounds, "├ù", false, true);
+            FUIWidgets.DrawSmallIconButton(canvas, clearBounds, "X", false, true);
         }
     }
 
@@ -2272,7 +2272,7 @@ public partial class MappingsTabController
         if (!string.IsNullOrEmpty(_selectedKeyName) && !_isCapturingKey)
         {
             _keyClearButtonBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
-            FUIWidgets.DrawSmallIconButton(canvas, _keyClearButtonBounds, "├ù", _keyClearButtonHovered, true);
+            FUIWidgets.DrawSmallIconButton(canvas, _keyClearButtonBounds, "X", _keyClearButtonHovered, true);
         }
         else
         {
@@ -2425,7 +2425,7 @@ public partial class MappingsTabController
         string addIcon = hasBind ? "Ô£Ä" : "+";  // Pencil for edit, plus for add
         FUIWidgets.DrawSmallIconButton(canvas, addBounds, addIcon, addHovered);
 
-        // [├ù] button (only if bound)
+        // [X] button (only if bound)
         if (hasBind)
         {
             float removeButtonX = bounds.Right - 32;

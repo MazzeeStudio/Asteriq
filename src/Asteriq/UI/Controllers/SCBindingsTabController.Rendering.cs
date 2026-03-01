@@ -634,10 +634,18 @@ public partial class SCBindingsTabController
                             // For shared cells with no primary binding on this column, synthesize from secondary input name
                             if (binding is null && isCellShared)
                             {
-                                var (_, _, secondaryInputName) = _scSharedCells[sharedCellKey];
+                                var (primaryVJoy, _, secondaryInputName) = _scSharedCells[sharedCellKey];
                                 bindingComponents = SCBindingsRenderer.GetBindingComponents(secondaryInputName, new List<string>());
                                 inputType = InferInputTypeFromName(secondaryInputName);
                                 textColor = FUIColors.Primary.WithAlpha(180);
+
+                                // Propagate the conflict stripe from the primary binding this cell reroutes to
+                                var primaryBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
+                                    b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                                    b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
+                                    b.VJoyDevice == primaryVJoy);
+                                if (primaryBinding is not null)
+                                    isConflicting = _scConflictingBindings.Contains(primaryBinding.Key);
                             }
 
                             // Draw cell content
@@ -1004,7 +1012,8 @@ public partial class SCBindingsTabController
         if (hasBoundActions)
         {
             FUIRenderer.DrawButton(canvas, _scClearAllButtonBounds, "CLEAR ALL",
-                _scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                _scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                FUIColors.Danger);
         }
         else
         {
@@ -1016,7 +1025,8 @@ public partial class SCBindingsTabController
         _scResetDefaultsButtonBounds = new SKRect(leftMargin + smallBtnWidth + 5, y, rightMargin, y + smallBtnHeight);
         _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scResetDefaultsButtonBounds, "RESET DFLTS",
-            _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+            FUIColors.Danger);
 
         y += smallBtnHeight + 8f;
 
@@ -1472,10 +1482,20 @@ public partial class SCBindingsTabController
             FUIRenderer.DrawTextCentered(canvas, "IMPORT", _scColImportButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
         }
 
-        _scDeselectButtonBounds = new SKRect(leftMargin + btnW + 8f, btnY, rightMargin, btnY + btnH);
-        _scDeselectButtonHovered = _scDeselectButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawButton(canvas, _scDeselectButtonBounds, "DESELECT",
-            _scDeselectButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        _scClearColumnButtonBounds = new SKRect(leftMargin + btnW + 8f, btnY, rightMargin, btnY + btnH);
+        _scClearColumnButtonHovered = _scClearColumnButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        if (bindingCount > 0)
+        {
+            FUIRenderer.DrawButton(canvas, _scClearColumnButtonBounds, "CLEAR COL",
+                _scClearColumnButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                FUIColors.Danger);
+        }
+        else
+        {
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
+            canvas.DrawRect(_scClearColumnButtonBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "CLEAR COL", _scClearColumnButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
+        }
     }
 
     private void DrawColImportProfileDropdown(SKCanvas canvas)

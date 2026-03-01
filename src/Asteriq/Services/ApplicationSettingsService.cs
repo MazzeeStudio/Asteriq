@@ -214,7 +214,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         {
             var json = File.ReadAllText(_settingsFile);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
-            settings.FontSize = Math.Clamp(settings.FontSize, 0.8f, 1.5f);
+            settings.FontSize = Math.Clamp(settings.FontSize, 0.9f, 1.2f);
             return settings;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)

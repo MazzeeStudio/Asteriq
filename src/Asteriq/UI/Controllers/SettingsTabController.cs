@@ -849,8 +849,8 @@ public class SettingsTabController : ITabController
 
         float scale = _ctx.AppSettings.FontSize;
         float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
-        float max = MathF.Min(dynamicMax, 1.5f);
-        bool canDecrease = scale > 0.8f + 0.01f;
+        float max = MathF.Min(dynamicMax, 1.2f);
+        bool canDecrease = scale > 0.9f + 0.01f;
         bool canIncrease = scale < max - 0.01f;
         float stepperX = rightMargin - fontStepperWidth;
 
@@ -1006,12 +1006,12 @@ public class SettingsTabController : ITabController
         {
             float scale = _ctx.AppSettings.FontSize;
             float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
-            float max = MathF.Min(dynamicMax, 1.5f);
+            float max = MathF.Min(dynamicMax, 1.2f);
 
-            if (_fontSizeButtonBounds[0].Contains(pt) && scale > 0.8f + 0.01f)
+            if (_fontSizeButtonBounds[0].Contains(pt) && scale > 0.9f + 0.01f)
             {
                 float newScale = MathF.Round((scale - 0.1f) * 10f) / 10f;
-                newScale = MathF.Max(newScale, 0.8f);
+                newScale = MathF.Max(newScale, 0.9f);
                 _ctx.AppSettings.FontSize = newScale;
                 FUIRenderer.InterfaceScale = newScale;
                 _ctx.ApplyFontScale?.Invoke();

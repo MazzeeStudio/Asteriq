@@ -830,20 +830,24 @@ public partial class SCBindingsTabController
 
         y += dropdownHeight + 6f;
 
-        // Buttons row: + New, Save (aligned right)
-        float textBtnWidth = 52f;  // 4px aligned
+        // Buttons row: + New, Save (aligned right) — widths sized to text + 16px (8px each side)
+        const float textBtnPad = 16f;
         float textBtnHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum
+        float saveBtnWidth = FUIRenderer.MeasureText("Save", 14f) + textBtnPad;
+        float newBtnWidth = FUIRenderer.MeasureText("+ New", 14f) + textBtnPad;
 
         // Save button (rightmost)
-        _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y, rightMargin, y + textBtnHeight);
+        _scSaveProfileButtonBounds = new SKRect(rightMargin - saveBtnWidth, y, rightMargin, y + textBtnHeight);
         _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
+        FUIRenderer.DrawButton(canvas, _scSaveProfileButtonBounds, "Save",
+            _scSaveProfileButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // New button (left of Save)
-        float newBtnX = rightMargin - textBtnWidth * 2 - buttonGap;
-        _scNewProfileButtonBounds = new SKRect(newBtnX, y, newBtnX + textBtnWidth, y + textBtnHeight);
+        float newBtnX = rightMargin - saveBtnWidth - buttonGap - newBtnWidth;
+        _scNewProfileButtonBounds = new SKRect(newBtnX, y, newBtnX + newBtnWidth, y + textBtnHeight);
         _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawTextButton(canvas, _scNewProfileButtonBounds, "+ New", _scNewProfileButtonHovered);
+        FUIRenderer.DrawButton(canvas, _scNewProfileButtonBounds, "+ New",
+            _scNewProfileButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         y += textBtnHeight + 10f;
 
@@ -1011,7 +1015,7 @@ public partial class SCBindingsTabController
         {
             FUIRenderer.DrawButton(canvas, _scClearAllButtonBounds, "CLEAR ALL",
                 _scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                FUIColors.Danger);
+                isDanger: true);
         }
         else
         {
@@ -1024,7 +1028,7 @@ public partial class SCBindingsTabController
         _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scResetDefaultsButtonBounds, "RESET DFLTS",
             _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-            FUIColors.Danger);
+            isDanger: true);
 
         y += smallBtnHeight + 8f;
 
@@ -1035,7 +1039,8 @@ public partial class SCBindingsTabController
         _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0;
-        FUIWidgets.DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
+        FUIRenderer.DrawButton(canvas, _scExportButtonBounds, "EXPORT TO SC",
+            !canExport ? FUIRenderer.ButtonState.Disabled : (_scExportButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
         y += buttonHeight + 5f;
 
         // Status message
@@ -1486,7 +1491,7 @@ public partial class SCBindingsTabController
         {
             FUIRenderer.DrawButton(canvas, _scClearColumnButtonBounds, "CLEAR COL",
                 _scClearColumnButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                FUIColors.Danger);
+                isDanger: true);
         }
         else
         {

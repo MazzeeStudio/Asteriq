@@ -289,8 +289,7 @@ public class FUISelectionDialog : FUIBaseDialog
             _buttonBounds[i] = btnBounds;
 
             var state = _hoveredButton == i ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            SKColor? accent = i == 0 ? FUIColors.Active : null;
-            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state, accent);
+            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state);
         }
 
         // Draw L-corner decorations

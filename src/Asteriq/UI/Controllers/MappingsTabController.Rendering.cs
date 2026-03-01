@@ -1407,7 +1407,7 @@ public partial class MappingsTabController
             _clearAllButtonBounds = clearBounds;
 
             var state = _clearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            FUIRenderer.DrawButton(canvas, clearBounds, "CLEAR MAPPING", state, FUIColors.Danger);
+            FUIRenderer.DrawButton(canvas, clearBounds, "CLEAR MAPPING", state, isDanger: true);
         }
     }
 

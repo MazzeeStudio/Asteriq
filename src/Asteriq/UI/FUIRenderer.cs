@@ -74,7 +74,7 @@ public static class FUIRenderer
     }
 
     /// <summary>
-    /// User interface scale factor (0.8 – 1.5, default 1.0)
+    /// User interface scale factor (0.9 – 1.2, default 1.0)
     /// </summary>
     public static float InterfaceScale
     {

@@ -166,33 +166,24 @@ public partial class SCBindingsTabController
         int totalBound = _scActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
         int boundCount = _scFilteredActions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
         bool otherFilters = !string.IsNullOrEmpty(_scActionMapFilter) || !string.IsNullOrEmpty(_scSearchText);
-        bool isFiltered = otherFilters || _scShowBoundOnly;
+        bool showBoundOnly = _ctx.AppSettings.SCBindingsShowBoundOnly;
+        bool isFiltered = otherFilters || showBoundOnly;
 
         string countText;
         if (!isFiltered)
             countText = $"{totalCount} actions, {totalBound} bound";
-        else if (_scShowBoundOnly && !otherFilters)
+        else if (showBoundOnly && !otherFilters)
             countText = $"{totalBound} of {totalCount} bound";       // "239 of 1113 bound"
-        else if (_scShowBoundOnly)
+        else if (showBoundOnly)
             countText = $"{actionCount} of {totalBound} bound";       // "26 of 239 bound" (within current filter)
         else
             countText = $"{actionCount} of {totalCount}, {boundCount} bound"; // "55 of 1113, 26 bound"
         float countTextWidth = FUIRenderer.MeasureText(countText, 12f);
         FUIRenderer.DrawText(canvas, countText, new SKPoint(rightMargin - countTextWidth, y), FUIColors.TextDim, 12f);
 
-        // Header toggle button (JS REF / DEVICE) — placed just left of count text
-        float toggleBtnW = 58f;
-        float toggleBtnH = 18f;
-        float toggleBtnX = rightMargin - countTextWidth - 10f - toggleBtnW;
-        float toggleBtnY = y - 9f;
-        _scHeaderToggleButtonBounds = new SKRect(toggleBtnX, toggleBtnY, toggleBtnX + toggleBtnW, toggleBtnY + toggleBtnH);
-        _scHeaderToggleButtonHovered = _scHeaderToggleButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        string toggleLabel = _ctx.AppSettings.SCBindingsShowPhysicalHeaders ? "DEVICE" : "JS REF";
-        FUIWidgets.DrawTextButton(canvas, _scHeaderToggleButtonBounds, toggleLabel, _scHeaderToggleButtonHovered);
-
         y += 28f;
 
-        // Filter row: [search...] [☐] Bound only    [All Categories ▼]
+        // Filter row: [search...] [☐ Bound only] [☐ Show JS ref]    [All Categories ▼]
         float filterRowHeight = 32f;
         float checkboxSize = 16f;
         float filterWidth = 220f;  // Width for category selector
@@ -210,17 +201,28 @@ public partial class SCBindingsTabController
         _scSearchBoxBounds = new SKRect(leftMargin, y, leftMargin + maxSearchWidth, y + filterRowHeight);
         FUIWidgets.DrawSearchBox(canvas, _scSearchBoxBounds, _scSearchText, _scSearchBoxFocused, _ctx.MousePosition);
 
-        // Checkbox after search box
+        // "Bound only" checkbox
         float checkboxX = leftMargin + maxSearchWidth + gap;
         _scShowBoundOnlyBounds = new SKRect(checkboxX, y + (filterRowHeight - checkboxSize) / 2,
             checkboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
         _scShowBoundOnlyHovered = _scShowBoundOnlyBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawSCCheckbox(canvas, _scShowBoundOnlyBounds, _scShowBoundOnly, _scShowBoundOnlyHovered);
+        FUIWidgets.DrawSCCheckbox(canvas, _scShowBoundOnlyBounds, showBoundOnly, _scShowBoundOnlyHovered);
 
-        // "Bound only" label after checkbox
-        float labelX = checkboxX + checkboxSize + 6f;
-        FUIRenderer.DrawText(canvas, "Bound only", new SKPoint(labelX, y + filterRowHeight / 2 + 4),
-            _scShowBoundOnly ? FUIColors.Active : FUIColors.TextDim, 13f);
+        float boundOnlyLabelX = checkboxX + checkboxSize + 6f;
+        FUIRenderer.DrawText(canvas, "Bound only", new SKPoint(boundOnlyLabelX, y + filterRowHeight / 2 + 4),
+            showBoundOnly ? FUIColors.Active : FUIColors.TextDim, 13f);
+
+        // "Show JS ref" checkbox — 16px after "Bound only" label
+        float boundOnlyLabelW = FUIRenderer.MeasureText("Bound only", 13f);
+        float jsRefCheckboxX = boundOnlyLabelX + boundOnlyLabelW + 16f;
+        bool showJSRef = !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+        _scShowJSRefCheckboxBounds = new SKRect(jsRefCheckboxX, y + (filterRowHeight - checkboxSize) / 2,
+            jsRefCheckboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
+        _scShowJSRefCheckboxHovered = _scShowJSRefCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawSCCheckbox(canvas, _scShowJSRefCheckboxBounds, showJSRef, _scShowJSRefCheckboxHovered);
+        float jsRefLabelX = jsRefCheckboxX + checkboxSize + 6f;
+        FUIRenderer.DrawText(canvas, "Show JS ref", new SKPoint(jsRefLabelX, y + filterRowHeight / 2 + 4),
+            showJSRef ? FUIColors.Active : FUIColors.TextDim, 13f);
 
         y += filterRowHeight + 12f;
 
@@ -329,24 +331,20 @@ public partial class SCBindingsTabController
                 }
                 else if (col.IsJoystick && _ctx.AppSettings.SCBindingsShowPhysicalHeaders)
                 {
-                    // Physical header mode: device name on top + JS{N} sub-label
+                    // Device mode: show physical device name only — no JS# (user can toggle to see that)
                     var headerColor = c == _scHighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
                     string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
                     if (deviceName is not null)
                     {
-                        string shortName = FUIWidgets.TruncateTextToWidth(deviceName, colW - 4f, 10f);
-                        float nameTextWidth = FUIRenderer.MeasureText(shortName, 10f);
-                        FUIRenderer.DrawText(canvas, shortName, new SKPoint(colX + (colW - nameTextWidth) / 2, headerTextY - 5f), headerColor, 10f, true);
-                        string jsLabel = $"JS{col.SCInstance}";
-                        float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
-                        FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.Active.WithAlpha(180), 10f);
+                        string shortName = FUIWidgets.TruncateTextToWidth(deviceName, colW - 4f, 11f);
+                        float nameTextWidth = FUIRenderer.MeasureText(shortName, 11f);
+                        FUIRenderer.DrawText(canvas, shortName, new SKPoint(colX + (colW - nameTextWidth) / 2, headerTextY), headerColor, 11f, true);
                     }
                     else
                     {
-                        // No physical device mapped — fall back to JS{N} single-label
-                        float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
-                        float centeredX = colX + (colW - headerTextWidth) / 2;
-                        FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), FUIColors.Active, 12f, true);
+                        // No physical device mapped — dim dash
+                        float dashWidth = FUIRenderer.MeasureText("—", 12f);
+                        FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + (colW - dashWidth) / 2, headerTextY), FUIColors.TextDim.WithAlpha(80), 12f);
                     }
                 }
                 else
@@ -832,20 +830,24 @@ public partial class SCBindingsTabController
 
         y += dropdownHeight + 6f;
 
-        // Buttons row: + New, Save (aligned right)
-        float textBtnWidth = 52f;  // 4px aligned
+        // Buttons row: + New, Save (aligned right) — widths sized to text + 16px (8px each side)
+        const float textBtnPad = 16f;
         float textBtnHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum
+        float saveBtnWidth = FUIRenderer.MeasureText("Save", 14f) + textBtnPad;
+        float newBtnWidth = FUIRenderer.MeasureText("+ New", 14f) + textBtnPad;
 
         // Save button (rightmost)
-        _scSaveProfileButtonBounds = new SKRect(rightMargin - textBtnWidth, y, rightMargin, y + textBtnHeight);
+        _scSaveProfileButtonBounds = new SKRect(rightMargin - saveBtnWidth, y, rightMargin, y + textBtnHeight);
         _scSaveProfileButtonHovered = _scSaveProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawTextButton(canvas, _scSaveProfileButtonBounds, "Save", _scSaveProfileButtonHovered);
+        FUIRenderer.DrawButton(canvas, _scSaveProfileButtonBounds, "Save",
+            _scSaveProfileButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // New button (left of Save)
-        float newBtnX = rightMargin - textBtnWidth * 2 - buttonGap;
-        _scNewProfileButtonBounds = new SKRect(newBtnX, y, newBtnX + textBtnWidth, y + textBtnHeight);
+        float newBtnX = rightMargin - saveBtnWidth - buttonGap - newBtnWidth;
+        _scNewProfileButtonBounds = new SKRect(newBtnX, y, newBtnX + newBtnWidth, y + textBtnHeight);
         _scNewProfileButtonHovered = _scNewProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawTextButton(canvas, _scNewProfileButtonBounds, "+ New", _scNewProfileButtonHovered);
+        FUIRenderer.DrawButton(canvas, _scNewProfileButtonBounds, "+ New",
+            _scNewProfileButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         y += textBtnHeight + 10f;
 
@@ -1013,7 +1015,7 @@ public partial class SCBindingsTabController
         {
             FUIRenderer.DrawButton(canvas, _scClearAllButtonBounds, "CLEAR ALL",
                 _scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                FUIColors.Danger);
+                isDanger: true);
         }
         else
         {
@@ -1026,7 +1028,7 @@ public partial class SCBindingsTabController
         _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scResetDefaultsButtonBounds, "RESET DFLTS",
             _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-            FUIColors.Danger);
+            isDanger: true);
 
         y += smallBtnHeight + 8f;
 
@@ -1037,7 +1039,8 @@ public partial class SCBindingsTabController
         _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0;
-        FUIWidgets.DrawExportButton(canvas, _scExportButtonBounds, "EXPORT TO SC", _scExportButtonHovered, canExport);
+        FUIRenderer.DrawButton(canvas, _scExportButtonBounds, "EXPORT TO SC",
+            !canExport ? FUIRenderer.ButtonState.Disabled : (_scExportButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
         y += buttonHeight + 5f;
 
         // Status message
@@ -1488,7 +1491,7 @@ public partial class SCBindingsTabController
         {
             FUIRenderer.DrawButton(canvas, _scClearColumnButtonBounds, "CLEAR COL",
                 _scClearColumnButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                FUIColors.Danger);
+                isDanger: true);
         }
         else
         {
@@ -1614,24 +1617,26 @@ public partial class SCBindingsTabController
 
             bool isOpen = _scDeviceOrderOpenRow == row;
             bool isHovered = selectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || isOpen;
-            string selectorLabel = vjoySlotId > 0 ? $"vJoy {vjoySlotId}" : "—";
+            bool deviceMode = _ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+            string? assignedDevName = vjoySlotId > 0 ? GetPhysicalDeviceNameForVJoyId(vjoySlotId) : null;
+            string selectorLabel = vjoySlotId > 0
+                ? (deviceMode && assignedDevName is not null
+                    ? FUIWidgets.TruncateTextToWidth(assignedDevName, selectorW - 20f, 11f)
+                    : $"vJoy {vjoySlotId}")
+                : "—";
             FUIWidgets.DrawSelector(canvas, selectorBounds, selectorLabel, isHovered, existingSlots.Count > 1);
 
-            // Physical device name for the assigned vJoy slot
-            if (vjoySlotId > 0)
+            // In JS-ref mode, show the device name as a dim hint after the selector
+            if (!deviceMode && assignedDevName is not null)
             {
-                string? devName = GetPhysicalDeviceNameForVJoyId(vjoySlotId);
-                if (devName is not null)
+                float nameX = selectorBounds.Right + 6f;
+                float maxNameW = rightMargin - nameX;
+                if (maxNameW > 10f)
                 {
-                    float nameX = selectorBounds.Right + 6f;
-                    float maxNameW = rightMargin - nameX;
-                    if (maxNameW > 10f)
-                    {
-                        string truncated = FUIWidgets.TruncateTextToWidth(devName, maxNameW, 10f);
-                        FUIRenderer.DrawText(canvas, truncated,
-                            new SKPoint(nameX, y + selectorH / 2f + 4f),
-                            FUIColors.TextDim, 10f);
-                    }
+                    string truncated = FUIWidgets.TruncateTextToWidth(assignedDevName, maxNameW, 10f);
+                    FUIRenderer.DrawText(canvas, truncated,
+                        new SKPoint(nameX, y + selectorH / 2f + 4f),
+                        FUIColors.TextDim, 10f);
                 }
             }
 
@@ -1687,7 +1692,16 @@ public partial class SCBindingsTabController
             selectorBounds.Right,
             selectorBounds.Bottom + 2 + existingSlots.Count * itemH + 8f);
 
-        var items = existingSlots.Select(s => $"vJoy {s.Id}").ToList();
+        bool deviceMode = _ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+        var items = existingSlots.Select(s =>
+        {
+            if (deviceMode)
+            {
+                string? name = GetPhysicalDeviceNameForVJoyId(s.Id);
+                return name ?? $"vJoy {s.Id}";
+            }
+            return $"vJoy {s.Id}";
+        }).ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _scDeviceOrderDropdownBounds, items,
             selectedIdx, _scDeviceOrderHoveredIndex, itemH);
     }

@@ -780,12 +780,12 @@ public class DevicesTabController : ITabController
 
                 _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
                 var clearState = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState, FUIColors.Danger);
+                FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState, isDanger: true);
                 y += buttonHeight + buttonGap;
 
                 _removeDeviceButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
                 var removeState = _removeDeviceButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                FUIRenderer.DrawButton(canvas, _removeDeviceButtonBounds, "REMOVE DEVICE", removeState, FUIColors.Danger);
+                FUIRenderer.DrawButton(canvas, _removeDeviceButtonBounds, "REMOVE DEVICE", removeState, isDanger: true);
             }
             else
             {
@@ -800,7 +800,7 @@ public class DevicesTabController : ITabController
 
                     _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
                     var clearState2 = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                    FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, FUIColors.Danger);
+                    FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, isDanger: true);
                 }
                 else
                 {
@@ -888,7 +888,7 @@ public class DevicesTabController : ITabController
             float removeWidth = contentBounds.Width - pad * 2;
             _removeVJoyButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + removeWidth, y + buttonHeight);
             var removeVJoyState = _removeVJoyButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            FUIRenderer.DrawButton(canvas, _removeVJoyButtonBounds, "REMOVE VJOY DEVICE", removeVJoyState, FUIColors.Danger);
+            FUIRenderer.DrawButton(canvas, _removeVJoyButtonBounds, "REMOVE VJOY DEVICE", removeVJoyState, isDanger: true);
         }
         else
         {
@@ -954,16 +954,16 @@ public class DevicesTabController : ITabController
             _stopForwardingButtonBounds = new SKRect(contentBounds.Left + pad, buttonY,
                 contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
             _startForwardingButtonBounds = SKRect.Empty;
-            FUIWidgets.DrawForwardingButton(canvas, _stopForwardingButtonBounds, "STOP FORWARDING",
-                _stopForwardingButtonHovered, isStop: true);
+            FUIRenderer.DrawButton(canvas, _stopForwardingButtonBounds, "STOP FORWARDING",
+                FUIRenderer.ButtonState.Active, isDanger: true);
         }
         else
         {
             _startForwardingButtonBounds = new SKRect(contentBounds.Left + pad, buttonY,
                 contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
             _stopForwardingButtonBounds = SKRect.Empty;
-            FUIWidgets.DrawForwardingButton(canvas, _startForwardingButtonBounds, "START FORWARDING",
-                _startForwardingButtonHovered, isStop: false);
+            FUIRenderer.DrawButton(canvas, _startForwardingButtonBounds, "START FORWARDING",
+                _startForwardingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
     }
 

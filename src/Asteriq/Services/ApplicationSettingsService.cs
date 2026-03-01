@@ -142,6 +142,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool SCBindingsShowBoundOnly
+    {
+        get => _cachedSettings.SCBindingsShowBoundOnly;
+        set
+        {
+            _cachedSettings.SCBindingsShowBoundOnly = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public string? GetLastSCExportProfileForEnvironment(string environment)
     {
         _cachedSettings.LastSCExportProfileByEnvironment.TryGetValue(environment, out var name);
@@ -214,7 +224,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         {
             var json = File.ReadAllText(_settingsFile);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
-            settings.FontSize = Math.Clamp(settings.FontSize, 0.8f, 1.5f);
+            settings.FontSize = Math.Clamp(settings.FontSize, 0.9f, 1.2f);
             return settings;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
@@ -248,7 +258,8 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
-        public bool SCBindingsShowPhysicalHeaders { get; set; } = false;
+        public bool SCBindingsShowPhysicalHeaders { get; set; } = true;
+        public bool SCBindingsShowBoundOnly { get; set; } = false;
         public Dictionary<string, string> LastSCExportProfileByEnvironment { get; set; } = new();
         public string? PreferredSCEnvironment { get; set; }
         public bool SkipDriverSetup { get; set; }

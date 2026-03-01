@@ -68,23 +68,6 @@ internal static class FUIWidgets
 
     // ─── Forwarding / Status ──────────────────────────────────────────────────
 
-    internal static void DrawForwardingButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isStop)
-    {
-        var accentColor = isStop ? FUIColors.Danger : FUIColors.Active;
-
-        var bgColor = isHovered
-            ? accentColor.WithAlpha(50)
-            : (isStop ? FUIColors.Danger.WithAlpha(20) : FUIColors.Active.WithAlpha(20));
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRect(bounds, bgPaint);
-
-        var borderColor = isHovered ? accentColor : accentColor.WithAlpha(150);
-        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor, isHovered ? 2f : 1f);
-        canvas.DrawRect(bounds, borderPaint);
-
-        var textColor = isHovered ? FUIColors.TextBright : accentColor;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f, isHovered);
-    }
 
     internal static void DrawStatusItem(SKCanvas canvas, float x, float y, float width, string label, string value, SKColor valueColor)
     {
@@ -211,15 +194,6 @@ internal static class FUIWidgets
         FUIRenderer.DrawText(canvas, value, new SKPoint(x + valueOffset, y), FUIColors.TextPrimary, 13f);
     }
 
-    internal static void DrawSettingsButton(SKCanvas canvas, SKRect bounds, string text, bool disabled)
-    {
-        var bgColor = disabled ? FUIColors.Background2.WithAlpha(100) : FUIColors.Background2;
-        var frameColor = disabled ? FUIColors.Frame.WithAlpha(80) : FUIColors.Frame;
-        var textColor = disabled ? FUIColors.TextDim.WithAlpha(100) : FUIColors.TextPrimary;
-
-        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, frameColor, 4f);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
-    }
 
     internal static void DrawSettingsValueField(SKCanvas canvas, SKRect bounds, string value)
     {
@@ -630,50 +604,6 @@ internal static class FUIWidgets
 
     // ─── SC Bindings Shared Widgets ───────────────────────────────────────────
 
-    internal static void DrawExportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-    {
-        var bgColor = isEnabled
-            ? (isHovered ? FUIColors.Active.WithAlpha(180) : FUIColors.Active.WithAlpha(120))
-            : FUIColors.Background2.WithAlpha(100);
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        using var path = FUIRenderer.CreateFrame(bounds, 4f);
-        canvas.DrawPath(path, bgPaint);
-
-        var borderColor = isEnabled ? FUIColors.Active : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor, 1.5f);
-        canvas.DrawPath(path, borderPaint);
-
-        var textColor = isEnabled ? FUIColors.TextBright : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
-    }
-
-    internal static void DrawImportButton(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-    {
-        var bgColor = isEnabled
-            ? (isHovered ? FUIColors.Primary.WithAlpha(150) : FUIColors.Primary.WithAlpha(80))
-            : FUIColors.Background2.WithAlpha(100);
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        using var path = FUIRenderer.CreateFrame(bounds, 4f);
-        canvas.DrawPath(path, bgPaint);
-
-        var borderColor = isEnabled ? FUIColors.Primary : FUIColors.Frame.WithAlpha(100);
-        using var borderPaint = FUIRenderer.CreateStrokePaint(borderColor, 1.5f);
-        canvas.DrawPath(path, borderPaint);
-
-        var textColor = isEnabled ? FUIColors.TextPrimary : FUIColors.TextDim;
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
-
-        if (isEnabled)
-        {
-            float arrowX = bounds.Right - 16;
-            float arrowY = bounds.MidY;
-            using var arrowPaint = FUIRenderer.CreateStrokePaint(textColor, 1.5f);
-            canvas.DrawLine(arrowX - 4, arrowY - 2, arrowX, arrowY + 2, arrowPaint);
-            canvas.DrawLine(arrowX, arrowY + 2, arrowX + 4, arrowY - 2, arrowPaint);
-        }
-    }
 
     internal static void DrawSearchBox(SKCanvas canvas, SKRect bounds, string text, bool focused, Point mousePosition)
     {
@@ -780,22 +710,6 @@ internal static class FUIWidgets
         canvas.DrawPath(arrowPath, iconPaint);
     }
 
-    internal static void DrawTextButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool disabled = false)
-    {
-        SKColor bgColor;
-        if (disabled)
-            bgColor = FUIColors.Background2.WithAlpha(60);
-        else if (hovered)
-            bgColor = FUIColors.Active.WithAlpha(80);
-        else
-            bgColor = FUIColors.Background2.WithAlpha(100);
-
-        var borderColor = disabled ? FUIColors.Frame.WithAlpha(80) : (hovered ? FUIColors.Active : FUIColors.Frame);
-        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
-
-        var textColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 12f);
-    }
 
     // ─── General Navigation Widgets ───────────────────────────────────────────
 

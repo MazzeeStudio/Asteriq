@@ -584,6 +584,38 @@ public partial class SCBindingsTabController
         _ctx.InvalidateCanvas();
     }
 
+    private void ClearColumnBindings()
+    {
+        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
+            return;
+
+        var col = _scGridColumns[_scHighlightedColumn];
+        int bindingCount = _scExportProfile.Bindings.Count(b =>
+            b.DeviceType == SCDeviceType.Joystick &&
+            b.PhysicalDeviceId is null &&
+            _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
+
+        if (bindingCount == 0) return;
+
+        using var dialog = new FUIConfirmDialog(
+            "Clear Column Bindings",
+            $"Clear all {bindingCount} binding(s) from JS{col.SCInstance}?\n\nThis will remove all bindings from this column only.",
+            "Clear", "Cancel");
+
+        if (dialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
+        {
+            _scExportProfile.Bindings.RemoveAll(b =>
+                b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId is null &&
+                _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
+            _scExportProfile.Modified = DateTime.UtcNow;
+            _scExportProfileService?.SaveProfile(_scExportProfile);
+            UpdateConflictingBindings();
+            UpdateSharedCells();
+            SetStatus($"Cleared {bindingCount} binding(s) from JS{col.SCInstance}");
+        }
+    }
+
     private void ClearAllBindings()
     {
         using var dialog = new FUIConfirmDialog(

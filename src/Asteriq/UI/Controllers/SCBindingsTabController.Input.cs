@@ -614,6 +614,8 @@ public partial class SCBindingsTabController
             _scExportProfileService?.SaveProfile(_scExportProfile);
             UpdateConflictingBindings();
             UpdateSharedCells();
+            UpdateConflictLinks();
+            _ctx.MarkDirty();
 
             return;
         }
@@ -899,6 +901,8 @@ public partial class SCBindingsTabController
                 _scExportProfileService?.SaveProfile(_scExportProfile);
                 UpdateConflictingBindings();
                 UpdateSharedCells();
+                UpdateConflictLinks();
+                _ctx.MarkDirty();
                 System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared physical JS binding for {action.ActionName} on {col.Header}");
             }
         }
@@ -927,6 +931,8 @@ public partial class SCBindingsTabController
                 _scExportProfileService?.SaveProfile(_scExportProfile);
                 UpdateConflictingBindings();
                 UpdateSharedCells();
+                UpdateConflictLinks();
+                _ctx.MarkDirty();
                 System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared vJoy JS binding for {action.ActionName} on {col.Header}");
             }
         }

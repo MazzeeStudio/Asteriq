@@ -295,24 +295,32 @@ public class SettingsTabController : ITabController
 
         _newProfileButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
         _duplicateProfileButtonBounds = new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight);
-        FUIWidgets.DrawSettingsButton(canvas, _newProfileButtonBounds, "New Profile", false);
-        FUIWidgets.DrawSettingsButton(canvas, _duplicateProfileButtonBounds,
-            profile is not null ? "Duplicate" : "---", profile is null);
+        bool newHovered = _newProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        bool dupHovered = _duplicateProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _newProfileButtonBounds, "New Profile",
+            newHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        FUIRenderer.DrawButton(canvas, _duplicateProfileButtonBounds,
+            profile is not null ? "Duplicate" : "---",
+            profile is null ? FUIRenderer.ButtonState.Disabled : (dupHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
         y += buttonHeight + buttonGap;
 
         _importProfileButtonBounds = new SKRect(leftMargin, y, leftMargin + buttonWidth, y + buttonHeight);
         _exportProfileButtonBounds = new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight);
-        FUIWidgets.DrawSettingsButton(canvas, _importProfileButtonBounds, "Import", false);
-        FUIWidgets.DrawSettingsButton(canvas, _exportProfileButtonBounds,
-            profile is not null ? "Export" : "---", profile is null);
+        bool importHovered = _importProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        bool exportHovered = _exportProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _importProfileButtonBounds, "Import",
+            importHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        FUIRenderer.DrawButton(canvas, _exportProfileButtonBounds,
+            profile is not null ? "Export" : "---",
+            profile is null ? FUIRenderer.ButtonState.Disabled : (exportHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
         y += buttonHeight + buttonGap;
 
         if (profile is not null && y + buttonHeight <= bottom)
         {
             _deleteProfileButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
-            FUIRenderer.DrawRoundedPanel(canvas, _deleteProfileButtonBounds, FUIColors.Danger.WithAlpha(30), FUIColors.Danger.WithAlpha(150), 4f);
-
-            FUIRenderer.DrawTextCentered(canvas, "Delete Profile", _deleteProfileButtonBounds, FUIColors.Danger, 14f);
+            bool deleteHovered = _deleteProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIRenderer.DrawButton(canvas, _deleteProfileButtonBounds, "Delete Profile",
+                deleteHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal, isDanger: true);
             y += buttonHeight + 20f;
 
             if (y < bottom - 60)
@@ -463,7 +471,8 @@ public class SettingsTabController : ITabController
             float setupBtnY = y + (statusLineHeight - setupBtnHeight) / 2;
             _driverSetupButtonBounds = new SKRect(rightMargin - setupBtnWidth, setupBtnY, rightMargin, setupBtnY + setupBtnHeight);
             bool setupHovered = _driverSetupButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            DrawSupportActionButton(canvas, _driverSetupButtonBounds, "DRIVER SETUP", setupHovered, false);
+            FUIRenderer.DrawButton(canvas, _driverSetupButtonBounds, "DRIVER SETUP",
+                setupHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             y += statusLineHeight;
         }
 
@@ -504,8 +513,9 @@ public class SettingsTabController : ITabController
         _checkButtonBounds = new SKRect(rightMargin - checkBtnWidth, y, rightMargin, y + checkBtnHeight);
         bool checkHovered = checkBtnEnabled && _checkButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         string checkLabel = updateStatus == UpdateStatus.Checking ? "CHECKING\u2026" : "CHECK FOR UPDATES";
-        DrawSupportActionButton(canvas, _checkButtonBounds, checkLabel, checkHovered, false,
-            !checkBtnEnabled || updateStatus == UpdateStatus.Checking);
+        FUIRenderer.DrawButton(canvas, _checkButtonBounds, checkLabel,
+            (!checkBtnEnabled || updateStatus == UpdateStatus.Checking) ? FUIRenderer.ButtonState.Disabled
+            : checkHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Version text — vertically aligned with the button
         float versionTextY = y + (checkBtnHeight - 11f) / 2 + 11f - 3;
@@ -560,7 +570,8 @@ public class SettingsTabController : ITabController
                     float dlBtnWidth = FUIRenderer.MeasureText("DOWNLOAD", 13f) + 24f;
                     _downloadButtonBounds = new SKRect(rightMargin - dlBtnWidth - 6f, y + 4f, rightMargin - 6f, y + bannerHeight - 4f);
                     bool dlHovered = _downloadButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                    DrawSupportActionButton(canvas, _downloadButtonBounds, "DOWNLOAD", dlHovered, true);
+                    FUIRenderer.DrawButton(canvas, _downloadButtonBounds, "DOWNLOAD",
+                        dlHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
                     break;
                 }
 
@@ -596,7 +607,8 @@ public class SettingsTabController : ITabController
                     float apBtnWidth = FUIRenderer.MeasureText("APPLY", 13f) + 24f;
                     _applyButtonBounds = new SKRect(rightMargin - apBtnWidth - 6f, y + 4f, rightMargin - 6f, y + bannerHeight - 4f);
                     bool apHovered = _applyButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                    DrawSupportActionButton(canvas, _applyButtonBounds, "APPLY", apHovered, true);
+                    FUIRenderer.DrawButton(canvas, _applyButtonBounds, "APPLY",
+                        apHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
                     break;
                 }
 
@@ -857,12 +869,8 @@ public class SettingsTabController : ITabController
         var minusBounds = new SKRect(stepperX, y, stepperX + fontBtnWidth, y + fontBtnHeight);
         _fontSizeButtonBounds[0] = minusBounds;
         bool minusHovered = canDecrease && minusBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        var minusBg = !canDecrease ? FUIColors.Background1 : (minusHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-        var minusFrame = !canDecrease ? FUIColors.Frame.WithAlpha(60) : (minusHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var minusText = !canDecrease ? FUIColors.TextDim.WithAlpha(60) : (minusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        using (var p = FUIRenderer.CreateFillPaint(minusBg)) canvas.DrawRect(minusBounds, p);
-        using (var p = FUIRenderer.CreateStrokePaint(minusFrame)) canvas.DrawRect(minusBounds, p);
-        FUIRenderer.DrawTextCentered(canvas, "-", minusBounds, minusText, 17f, scaleFont: false);
+        FUIRenderer.DrawButton(canvas, minusBounds, "-",
+            !canDecrease ? FUIRenderer.ButtonState.Disabled : (minusHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
 
         string valueText = $"{scale:F1}x";
         var valueBounds = new SKRect(stepperX + fontBtnWidth + fontBtnGap, y, stepperX + fontBtnWidth + fontBtnGap + fontValueWidth, y + fontBtnHeight);
@@ -871,12 +879,8 @@ public class SettingsTabController : ITabController
         var plusBounds = new SKRect(valueBounds.Right + fontBtnGap, y, valueBounds.Right + fontBtnGap + fontBtnWidth, y + fontBtnHeight);
         _fontSizeButtonBounds[1] = plusBounds;
         bool plusHovered = canIncrease && plusBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        var plusBg = !canIncrease ? FUIColors.Background1 : (plusHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-        var plusFrame = !canIncrease ? FUIColors.Frame.WithAlpha(60) : (plusHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var plusText = !canIncrease ? FUIColors.TextDim.WithAlpha(60) : (plusHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
-        using (var p = FUIRenderer.CreateFillPaint(plusBg)) canvas.DrawRect(plusBounds, p);
-        using (var p = FUIRenderer.CreateStrokePaint(plusFrame)) canvas.DrawRect(plusBounds, p);
-        FUIRenderer.DrawTextCentered(canvas, "+", plusBounds, plusText, 17f, scaleFont: false);
+        FUIRenderer.DrawButton(canvas, plusBounds, "+",
+            !canIncrease ? FUIRenderer.ButtonState.Disabled : (plusHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
     }
 
     private void DrawSupportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -899,13 +903,15 @@ public class SettingsTabController : ITabController
         float bmacWidth = 170f;
         _bmacButtonBounds = new SKRect(leftMargin, y, leftMargin + bmacWidth, y + btnHeight);
         bool bmacHovered = _bmacButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        DrawSupportActionButton(canvas, _bmacButtonBounds, "BUY ME A COFFEE", bmacHovered, false);
+        FUIRenderer.DrawButton(canvas, _bmacButtonBounds, "BUY ME A COFFEE",
+            bmacHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Right: Join Star Citizen button — anchored to right margin
         float scLinkWidth = 180f;
         _referralLinkButtonBounds = new SKRect(rightMargin - scLinkWidth, y, rightMargin, y + btnHeight);
         bool scLinkHovered = _referralLinkButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        DrawSupportActionButton(canvas, _referralLinkButtonBounds, "JOIN STAR CITIZEN \u2192", scLinkHovered, false);
+        FUIRenderer.DrawButton(canvas, _referralLinkButtonBounds, "JOIN STAR CITIZEN \u2192",
+            scLinkHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Center: code field + copy button — centered between BMAC and JOIN
         float codeFieldWidth = 138f;
@@ -920,31 +926,10 @@ public class SettingsTabController : ITabController
             codeDisplayBounds.Right + FUIRenderer.SpaceSM, y,
             codeDisplayBounds.Right + FUIRenderer.SpaceSM + copyBtnWidth, y + btnHeight);
         bool copyHovered = _referralCopyButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        DrawSupportActionButton(canvas, _referralCopyButtonBounds, "COPY", copyHovered, true);
+        FUIRenderer.DrawButton(canvas, _referralCopyButtonBounds, "COPY",
+            copyHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
-    private static void DrawSupportActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool accent, bool disabled = false)
-    {
-        if (disabled)
-        {
-            FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background1, FUIColors.Frame.WithAlpha(60), 4f);
-            FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextDim.WithAlpha(80), 14f);
-            return;
-        }
-
-        var accentColor = accent ? FUIColors.Active : FUIColors.Primary;
-        var bgColor = hovered ? accentColor.WithAlpha(40) : FUIColors.Background2;
-        var frameColor = hovered ? accentColor : FUIColors.Frame;
-        var textColor = hovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, hovered ? 1.5f : 1f);
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
-    }
 
     private void StoreThemeButtonBounds(int index, SKRect bounds)
     {

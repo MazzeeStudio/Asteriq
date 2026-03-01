@@ -22,7 +22,7 @@ public class FUIMessageBox : FUIBaseDialog
     private readonly MessageBoxType _type;
     private readonly string[] _buttonLabels;
     private readonly string[]? _detailLines;
-    private readonly SKColor? _primaryButtonColor;
+    private readonly bool _primaryButtonIsDanger;
     private readonly SKControl _canvas;
     private int _hoveredButton = -1;
     private readonly SKRect[] _buttonBounds;
@@ -33,14 +33,14 @@ public class FUIMessageBox : FUIBaseDialog
     private Point _dragStart;
 
     private FUIMessageBox(string message, string title, MessageBoxType type, string[] buttonLabels,
-        string[]? detailLines = null, SKColor? primaryButtonColor = null)
+        string[]? detailLines = null, bool primaryButtonIsDanger = false)
     {
         _message = message;
         _title = title;
         _type = type;
         _buttonLabels = buttonLabels;
         _detailLines = detailLines;
-        _primaryButtonColor = primaryButtonColor;
+        _primaryButtonIsDanger = primaryButtonIsDanger;
         _buttonBounds = new SKRect[buttonLabels.Length];
 
         // Form setup
@@ -160,7 +160,7 @@ public class FUIMessageBox : FUIBaseDialog
             var detailBounds = new SKRect(16f, boxTop, bounds.Right - 16f, boxTop + boxHeight);
 
             // Use primary button colour (e.g. Danger red) for the box so it always pops
-            var boxColor = _primaryButtonColor ?? iconColor;
+            var boxColor = _primaryButtonIsDanger ? FUIColors.Danger : iconColor;
 
             using var boxBgPaint = FUIRenderer.CreateFillPaint(boxColor.WithAlpha(55));
             canvas.DrawRect(detailBounds, boxBgPaint);
@@ -196,8 +196,8 @@ public class FUIMessageBox : FUIBaseDialog
             _buttonBounds[i] = btnBounds;
 
             var state = _hoveredButton == i ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            SKColor? accent = i == 0 ? (_primaryButtonColor ?? FUIColors.Active) : null;
-            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state, accent);
+            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state,
+                isDanger: i == 0 && _primaryButtonIsDanger);
         }
 
         // Draw L-corner decorations
@@ -386,7 +386,7 @@ public class FUIMessageBox : FUIBaseDialog
         string confirmLabel, string[]? detailLines = null)
     {
         using var dialog = new FUIMessageBox(message, title, MessageBoxType.Warning,
-            new[] { confirmLabel, "Cancel" }, detailLines, FUIColors.Danger);
+            new[] { confirmLabel, "Cancel" }, detailLines, primaryButtonIsDanger: true);
         dialog.ShowDialog(owner);
         return dialog._result == 0;
     }

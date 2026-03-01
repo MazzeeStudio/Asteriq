@@ -197,6 +197,36 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool NetworkEnabled
+    {
+        get => _cachedSettings.NetworkEnabled;
+        set
+        {
+            _cachedSettings.NetworkEnabled = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public string NetworkMachineName
+    {
+        get => _cachedSettings.NetworkMachineName;
+        set
+        {
+            _cachedSettings.NetworkMachineName = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public int NetworkListenPort
+    {
+        get => _cachedSettings.NetworkListenPort;
+        set
+        {
+            _cachedSettings.NetworkListenPort = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public string? GetVJoySilhouetteOverride(uint vjoyId)
     {
         _cachedSettings.VJoySilhouetteOverrides.TryGetValue(vjoyId, out var key);
@@ -266,6 +296,12 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public DateTime? LastUpdateCheck { get; set; }
         /// <summary>Per-vJoy-slot silhouette override. Key = vJoy ID, Value = device map filename key.</summary>
         public Dictionary<uint, string> VJoySilhouetteOverrides { get; set; } = new();
+        /// <summary>Enable network input forwarding. Default false.</summary>
+        public bool NetworkEnabled { get; set; } = false;
+        /// <summary>Override for broadcast machine name. Empty = use Environment.MachineName.</summary>
+        public string NetworkMachineName { get; set; } = "";
+        /// <summary>TCP/UDP port for network discovery and forwarding. Default 47191.</summary>
+        public int NetworkListenPort { get; set; } = 47191;
     }
 
     /// <summary>

@@ -84,6 +84,8 @@ public partial class MainForm : Form
     private readonly IUpdateService _updateService;
     private readonly DriverSetupManager _driverSetupManager;
     private readonly DirectInput.DirectInputService? _directInputService;
+    private readonly INetworkDiscoveryService _networkDiscovery;
+    private readonly INetworkInputService _networkInput;
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
@@ -162,6 +164,10 @@ public partial class MainForm : Form
     // Input forwarding state (physical → vJoy)
     private bool _isForwarding = false;
 
+    // Network forwarding state
+    private volatile NetworkInputMode _networkMode = NetworkInputMode.Local;
+    private bool _lastSwitchButtonState = false;
+
     /// <summary>
     /// Constructor with dependency injection
     /// </summary>
@@ -182,7 +188,9 @@ public partial class MainForm : Form
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
         SCExportProfileService scExportProfileService,
-        DirectInput.DirectInputService? directInputService = null)
+        DirectInput.DirectInputService? directInputService = null,
+        INetworkDiscoveryService? networkDiscovery = null,
+        INetworkInputService? networkInput = null)
     {
         // Assign injected services
         _inputService = inputService ?? throw new ArgumentNullException(nameof(inputService));
@@ -197,6 +205,8 @@ public partial class MainForm : Form
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         _driverSetupManager = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
         _directInputService = directInputService; // nullable — unavailable in tests or headless environments
+        _networkDiscovery = networkDiscovery ?? new NullNetworkDiscoveryService();
+        _networkInput = networkInput ?? new NullNetworkInputService();
         // Update tray icon tooltip
         _trayIcon.SetToolTip($"Asteriq v{s_appVersion}");
 
@@ -218,6 +228,10 @@ public partial class MainForm : Form
 
         // Apply correct MinimumSize now that font settings are loaded
         ApplyFontScaleToWindowSize();
+
+        // Start network services if enabled in settings
+        if (_appSettings.NetworkEnabled)
+            InitializeNetworking();
 
         // Silent background update check — only if user has enabled auto-check
         if (_appSettings.AutoCheckUpdates)
@@ -274,6 +288,12 @@ public partial class MainForm : Form
         _tabContext.OpenDriverSetup = OpenDriverSetupDialog;
         _tabContext.RefreshVJoyDevices = RefreshVJoyDevicesInternal;
 
+        // Network forwarding
+        _tabContext.NetworkDiscovery = _networkDiscovery;
+        _tabContext.NetworkInput = _networkInput;
+        _tabContext.StartNetworking = InitializeNetworking;
+        _tabContext.ShutdownNetworking = ShutdownNetworking;
+
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
         _mappingsController = new MappingsTabController(_tabContext);
@@ -288,6 +308,9 @@ public partial class MainForm : Form
         _tabContext.ClearDeviceMappings = _mappingsController.ClearDeviceMappingsPublic;
         _tabContext.RemoveDisconnectedDevice = _mappingsController.RemoveDisconnectedDevicePublic;
         _tabContext.OpenMappingDialogForControl = _mappingsController.OpenMappingDialogForControlPublic;
+
+        // Wire up network conflict check (delegated to SCBindingsTabController)
+        _tabContext.CheckNetworkSwitchConflicts = _scBindingsController.CheckNetworkSwitchConflictsPublic;
     }
 
     private void SyncTabContext()
@@ -302,6 +325,7 @@ public partial class MainForm : Form
         _tabContext.MappingsPrimaryDeviceMap = _mappingsPrimaryDeviceMap;
         _tabContext.IsForwarding = _isForwarding;
         _tabContext.BackgroundDirty = _backgroundDirty;
+        _tabContext.NetworkMode = _networkMode;
         _tabContext.MousePosition = _mousePosition;
         _tabContext.LeadLineProgress = _leadLineProgress;
         _tabContext.PulsePhase = _pulsePhase;
@@ -1382,7 +1406,36 @@ public partial class MainForm : Form
 
     private void OnInputReceived(object? sender, DeviceInputState state)
     {
-        // Forward input to vJoy if forwarding is active
+        // ── Network switch button detection (highest priority, rising edge) ──
+        var switchCfg = _profileManager.ActiveProfile?.NetworkSwitchButton;
+        if (_appSettings.NetworkEnabled && switchCfg is not null)
+        {
+            bool buttonPressed = state.DeviceIndex == switchCfg.DeviceIndex
+                && switchCfg.ButtonIndex < state.Buttons.Length
+                && state.Buttons[switchCfg.ButtonIndex];
+
+            if (buttonPressed && !_lastSwitchButtonState)
+            {
+                // Rising edge — toggle mode
+                if (_networkMode == NetworkInputMode.Local)
+                    _ = SwitchToRemoteAsync();
+                else
+                    _ = SwitchToLocalAsync();
+            }
+            _lastSwitchButtonState = buttonPressed;
+
+            // Consumed — never reaches MappingEngine or vJoy
+            return;
+        }
+
+        // ── Remote forwarding — send raw state to peer ────────────────────────
+        if (_isForwarding && _networkMode == NetworkInputMode.Remote)
+        {
+            _networkInput.SendInputState(state, (byte)state.DeviceIndex);
+            return;
+        }
+
+        // ── Local forwarding — process through MappingEngine ─────────────────
         if (_isForwarding && _mappingEngine.IsRunning)
         {
             _mappingEngine.ProcessInput(state);
@@ -1879,6 +1932,104 @@ public partial class MainForm : Form
 
     #endregion
 
+    #region Networking
+
+    private void InitializeNetworking()
+    {
+        if (_networkDiscovery is NullNetworkDiscoveryService ||
+            _networkInput is NullNetworkInputService) return;
+
+        var machineName = string.IsNullOrEmpty(_appSettings.NetworkMachineName)
+            ? Environment.MachineName
+            : _appSettings.NetworkMachineName;
+        var port = _appSettings.NetworkListenPort;
+
+        if (_networkDiscovery is NetworkDiscoveryService nds)
+            nds.Configure(machineName, port);
+
+        _networkInput.ConnectionLost += OnNetworkConnectionLost;
+        if (_networkInput is NetworkInputService nis)
+            nis.PairingRequested += OnPairingRequested;
+
+        _ = _networkDiscovery.StartAsync();
+        _ = _networkInput.StartListenerAsync(port);
+
+        MarkDirty();
+    }
+
+    private void ShutdownNetworking()
+    {
+        _networkInput.ConnectionLost -= OnNetworkConnectionLost;
+        if (_networkInput is NetworkInputService nis)
+            nis.PairingRequested -= OnPairingRequested;
+
+        _ = _networkDiscovery.StopAsync();
+        _ = _networkInput.DisconnectAsync();
+    }
+
+    private async Task SwitchToRemoteAsync()
+    {
+        var peers = _networkDiscovery.KnownPeers;
+        if (peers.Count == 0)
+        {
+            BeginInvoke(() => _tabContext.MarkDirty()); // flash handled by status bar
+            return;
+        }
+
+        // Pick first known peer for MVP (2-machine scenario)
+        var peer = peers.Values.First(p => !p.IsStale);
+        try
+        {
+            await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
+            _networkMode = NetworkInputMode.Remote;
+            _tabContext.NetworkMode = _networkMode;
+        }
+        catch (Exception ex)
+        {
+            // Connection refused or rejected — stay local
+            System.Diagnostics.Debug.WriteLine($"[Network] SwitchToRemote failed: {ex.Message}");
+        }
+        BeginInvoke(MarkDirty);
+    }
+
+    private async Task SwitchToLocalAsync()
+    {
+        await _networkInput.DisconnectAsync().ConfigureAwait(false);
+        _networkMode = NetworkInputMode.Local;
+        _tabContext.NetworkMode = _networkMode;
+        BeginInvoke(MarkDirty);
+    }
+
+    private void OnNetworkConnectionLost(object? sender, EventArgs e)
+    {
+        _networkMode = NetworkInputMode.Local;
+        BeginInvoke(() =>
+        {
+            _tabContext.NetworkMode = _networkMode;
+            MarkDirty();
+        });
+    }
+
+    private void OnPairingRequested(object? sender, PairingRequestEventArgs e)
+    {
+        BeginInvoke(() =>
+        {
+            using var dlg = new PairingCodeDialog(e.PeerName, e.Code, e.IsSource);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                if (!e.IsSource && _networkInput is NetworkInputService nis)
+                    nis.AcceptPairing();
+            }
+            else
+            {
+                if (!e.IsSource && _networkInput is NetworkInputService nis)
+                    nis.RejectPairing();
+            }
+        });
+    }
+
+    #endregion
+
     #region Cleanup
 
     private bool _forceClose = false;
@@ -1906,6 +2057,7 @@ public partial class MainForm : Form
         _joystickSvg?.Dispose();
         _throttleSvg?.Dispose();
         _trayIcon?.Dispose();
+        ShutdownNetworking();
         base.OnFormClosing(e);
     }
 

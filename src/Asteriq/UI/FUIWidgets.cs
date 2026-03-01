@@ -916,4 +916,35 @@ internal static class FUIWidgets
         }
         canvas.Restore();
     }
+
+    // ─── Network Mode Indicator ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws the network mode indicator in the status bar.
+    /// Does nothing when <paramref name="networkEnabled"/> is false.
+    /// Local = dim gray circle; Remote = filled Active circle with outer ring.
+    /// </summary>
+    internal static void DrawNetworkModeIndicator(
+        SKCanvas canvas, float centerX, float midY,
+        Services.Abstractions.NetworkInputMode mode, bool networkEnabled)
+    {
+        if (!networkEnabled) return;
+
+        const float r = 3.5f;
+
+        if (mode == Services.Abstractions.NetworkInputMode.Remote)
+        {
+            // Filled active circle + outer ring
+            using var fill = FUIRenderer.CreateFillPaint(FUIColors.Active);
+            canvas.DrawCircle(centerX, midY, r, fill);
+            using var ring = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(FUIColors.AlphaBorderSoft), 1f);
+            canvas.DrawCircle(centerX, midY, r + 2.5f, ring);
+        }
+        else
+        {
+            // Dim local indicator
+            using var fill = FUIRenderer.CreateFillPaint(FUIColors.FrameDim.WithAlpha(FUIColors.AlphaBorderSoft));
+            canvas.DrawCircle(centerX, midY, r, fill);
+        }
+    }
 }

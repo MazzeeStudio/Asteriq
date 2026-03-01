@@ -96,6 +96,18 @@ public interface IApplicationSettingsService
     /// </summary>
     DateTime? LastUpdateCheck { get; set; }
 
+    /// <summary>Enable network input forwarding (default false).</summary>
+    bool NetworkEnabled { get; set; }
+
+    /// <summary>
+    /// Override for the broadcast machine name.
+    /// Empty string means use <see cref="Environment.MachineName"/>.
+    /// </summary>
+    string NetworkMachineName { get; set; }
+
+    /// <summary>TCP/UDP port for network discovery and input forwarding (default 47191).</summary>
+    int NetworkListenPort { get; set; }
+
     /// <summary>
     /// Get the user-specified silhouette override for a vJoy slot.
     /// Returns null if no override is set (auto-detect from physical device).

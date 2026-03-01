@@ -624,7 +624,8 @@ public partial class SCBindingsTabController
                                 // Check for conflicts and cross-column action duplicates (joystick only)
                                 if (col.IsJoystick && !isCellShared)
                                 {
-                                    isConflicting = _scConflictingBindings.Contains(binding.Key);
+                                    isConflicting = _scConflictingBindings.Contains(binding.Key)
+                                        || _networkConflictBindingKeys.Contains(binding.Key);
                                     isDuplicateAction = _scDuplicateActionBindings.Contains(binding.Key);
                                 }
                             }
@@ -643,7 +644,8 @@ public partial class SCBindingsTabController
                                     b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
                                     b.VJoyDevice == primaryVJoy);
                                 if (primaryBinding is not null)
-                                    isConflicting = _scConflictingBindings.Contains(primaryBinding.Key);
+                                    isConflicting = _scConflictingBindings.Contains(primaryBinding.Key)
+                                        || _networkConflictBindingKeys.Contains(primaryBinding.Key);
                             }
 
                             // Draw cell content
@@ -1030,7 +1032,8 @@ public partial class SCBindingsTabController
         // EXPORT TO SC — primary CTA, anchored to panel bottom
         _scExportButtonBounds = new SKRect(leftMargin, exportBtnY, rightMargin, exportBtnY + buttonHeight);
         _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0;
+        bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0
+            && !_exportBlockedByNetworkConflict;
         FUIRenderer.DrawButton(canvas, _scExportButtonBounds, "EXPORT TO SC",
             !canExport ? FUIRenderer.ButtonState.Disabled : (_scExportButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
 

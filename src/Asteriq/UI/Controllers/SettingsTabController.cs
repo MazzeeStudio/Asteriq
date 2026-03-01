@@ -49,6 +49,9 @@ public class SettingsTabController : ITabController
     // Driver setup button
     private SKRect _driverSetupButtonBounds;
 
+    // Network forwarding toggle
+    private SKRect _networkEnabledToggleBounds;
+
     // Version / update button bounds
     private SKRect _checkButtonBounds;
     private SKRect _downloadButtonBounds;
@@ -146,7 +149,7 @@ public class SettingsTabController : ITabController
         }
 
         // Toggles
-        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt))
+        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) || _networkEnabledToggleBounds.Contains(pt))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -482,6 +485,44 @@ public class SettingsTabController : ITabController
             y += 4f; // extra spacing from the status dot rows
             FUIRenderer.DrawTextTruncated(canvas, $"Available devices: {vjoyDevices.Count}",
                 new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
+            y += rowHeight;
+        }
+        y += sectionSpacing;
+
+        // NETWORK section
+        FUIRenderer.DrawText(canvas, "NETWORK", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+        y += sectionSpacing;
+
+        // Enable network forwarding toggle
+        float netLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float netLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Enable network forwarding", new SKPoint(leftMargin, netLabelY),
+            netLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float netToggleY = y + (rowHeight - toggleHeight) / 2;
+        _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
+        FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _ctx.AppSettings.NetworkEnabled, _ctx.MousePosition);
+        y += rowHeight;
+
+        // Machine name row
+        string machineName = string.IsNullOrEmpty(_ctx.AppSettings.NetworkMachineName)
+            ? Environment.MachineName
+            : _ctx.AppSettings.NetworkMachineName;
+        FUIRenderer.DrawTextTruncated(canvas, $"Machine name: {machineName}",
+            new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
+        y += rowHeight;
+
+        // Listen port row
+        FUIRenderer.DrawTextTruncated(canvas, $"Listen port: {_ctx.AppSettings.NetworkListenPort}",
+            new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
+        y += rowHeight;
+
+        // Peers visible row (only when enabled)
+        if (_ctx.AppSettings.NetworkEnabled && _ctx.NetworkDiscovery is not null)
+        {
+            int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
+            var peerColor = peerCount > 0 ? FUIColors.Active : FUIColors.TextDim;
+            FUIRenderer.DrawTextTruncated(canvas, $"Peers visible: {peerCount}",
+                new SKPoint(leftMargin, y + 12f), contentWidth, peerColor, 13f);
             y += rowHeight;
         }
         y += sectionSpacing;
@@ -1067,6 +1108,18 @@ public class SettingsTabController : ITabController
         if (_checkUpdatesToggleBounds.Contains(pt))
         {
             _ctx.AppSettings.AutoCheckUpdates = !_ctx.AppSettings.AutoCheckUpdates;
+            _ctx.InvalidateCanvas();
+            return;
+        }
+
+        // Network forwarding toggle
+        if (_networkEnabledToggleBounds.Contains(pt))
+        {
+            _ctx.AppSettings.NetworkEnabled = !_ctx.AppSettings.NetworkEnabled;
+            if (_ctx.AppSettings.NetworkEnabled)
+                _ctx.StartNetworking?.Invoke();
+            else
+                _ctx.ShutdownNetworking?.Invoke();
             _ctx.InvalidateCanvas();
             return;
         }

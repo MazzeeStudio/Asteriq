@@ -702,6 +702,13 @@ public class MappingProfile
         ModifiedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// The physical button that toggles network forwarding on/off.
+    /// When set, this button is intercepted before MappingEngine and never reaches vJoy.
+    /// Null = no network switch button assigned.
+    /// </summary>
+    public NetworkSwitchConfig? NetworkSwitchButton { get; set; }
+
     /// <summary>Update primary devices for all vJoy slots based on current mappings</summary>
     public void UpdateAllPrimaryDevices()
     {

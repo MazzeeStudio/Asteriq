@@ -2042,4 +2042,67 @@ public partial class MappingsTabController
         };
     }
 
+    /// <summary>
+    /// Assigns the currently selected button row as the network switch button.
+    /// Finds the first physical button input for that row and saves it to the profile.
+    /// </summary>
+    private void AssignSwitchButtonForSelectedRow()
+    {
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null || _selectedMappingRow < 0 || _mappingCategory != 0) return;
+        if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return;
+        if (!_ctx.AppSettings.NetworkEnabled) return;
+
+        var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+
+        // Find the button mapping for the selected output slot
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyButton &&
+            m.Output.VJoyDevice == vjoyDevice.Id &&
+            m.Output.Index == _selectedMappingRow);
+
+        // Find the first physical button input source
+        var inp = mapping?.Inputs.FirstOrDefault(i => i.Type == InputType.Button);
+
+        if (inp is null)
+        {
+            _noMappingFlashText = "Assign a physical button first";
+            _noMappingFlashTime = DateTime.Now;
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // Resolve SDL2 DeviceIndex from the device list (best-effort; stable ID is DeviceId)
+        int devIndex = _ctx.Devices
+            .FirstOrDefault(d => d.InstanceGuid.ToString()
+                .Equals(inp.DeviceId, StringComparison.OrdinalIgnoreCase))
+            ?.DeviceIndex ?? 0;
+
+        profile.NetworkSwitchButton = new NetworkSwitchConfig
+        {
+            DeviceIndex = devIndex,
+            ButtonIndex = inp.Index,
+            DeviceId = inp.DeviceId,
+            DisplayName = $"{inp.DeviceName} Button {inp.Index + 1}"
+        };
+
+        _ctx.ProfileManager.SaveActiveProfile();
+        _ctx.CheckNetworkSwitchConflicts?.Invoke();
+        _ctx.MarkDirty();
+    }
+
+    /// <summary>
+    /// Removes the network switch button assignment from the active profile.
+    /// </summary>
+    private void ClearNetworkSwitchButton()
+    {
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null || profile.NetworkSwitchButton is null) return;
+
+        profile.NetworkSwitchButton = null;
+        _ctx.ProfileManager.SaveActiveProfile();
+        _ctx.CheckNetworkSwitchConflicts?.Invoke();
+        _ctx.MarkDirty();
+    }
+
 }

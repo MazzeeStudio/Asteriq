@@ -733,21 +733,7 @@ public class MappingEngine : IMappingEngine
         return devices;
     }
 
-    private static HID_USAGES IndexToHidUsage(int index)
-    {
-        return index switch
-        {
-            0 => HID_USAGES.X,
-            1 => HID_USAGES.Y,
-            2 => HID_USAGES.Z,
-            3 => HID_USAGES.RX,
-            4 => HID_USAGES.RY,
-            5 => HID_USAGES.RZ,
-            6 => HID_USAGES.SL0,
-            7 => HID_USAGES.SL1,
-            _ => HID_USAGES.X
-        };
-    }
+    private static HID_USAGES IndexToHidUsage(int index) => VJoyAxisHelper.IndexToHidUsage(index);
 
     public void Dispose()
     {

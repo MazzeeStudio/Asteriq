@@ -131,8 +131,7 @@ public class FUIInputDialog : FUIBaseDialog
         FUIRenderer.DrawButton(canvas, _cancelButtonBounds, "CANCEL",
             _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         FUIRenderer.DrawButton(canvas, _confirmButtonBounds, _confirmText.ToUpperInvariant(),
-            _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-            FUIColors.Active);
+            _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // L-corner decorations
         FUIRenderer.DrawLCornerFrame(canvas, bounds.Inset(-4, -4), FUIColors.Frame.WithAlpha(100), 20f, 6f, 1f);

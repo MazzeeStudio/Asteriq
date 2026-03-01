@@ -202,7 +202,7 @@ public partial class SCBindingsTabController
         }
 
         // Apply "show bound only" filter if enabled
-        if (_scShowBoundOnly)
+        if (_ctx.AppSettings.SCBindingsShowBoundOnly)
         {
             actions = actions.Where(a =>
                 _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null

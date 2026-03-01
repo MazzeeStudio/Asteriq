@@ -87,17 +87,24 @@ public sealed class UpdateService : IUpdateService
 
     public async Task DownloadAsync(CancellationToken ct = default)
     {
-        if (DownloadUrl is null)
-        {
-            Status = UpdateStatus.Error;
-            return;
-        }
-
         Status = UpdateStatus.Downloading;
         DownloadProgress = 0;
 
         try
         {
+            // Re-fetch the latest release immediately before downloading so the user
+            // always gets the true latest, even if a newer release landed after the
+            // initial startup check. Falls back to the cached URL if the call fails.
+            string? freshUrl = await FetchLatestDownloadUrlAsync(ct);
+            if (freshUrl is not null)
+                DownloadUrl = freshUrl;
+
+            if (DownloadUrl is null)
+            {
+                Status = UpdateStatus.Error;
+                return;
+            }
+
             string tempPath = Path.Combine(Path.GetTempPath(), "Asteriq_update.zip");
 
             var client = _httpClientFactory.CreateClient("Asteriq");
@@ -202,6 +209,28 @@ public sealed class UpdateService : IUpdateService
         }
 
         return Task.CompletedTask;
+    }
+
+    private async Task<string?> FetchLatestDownloadUrlAsync(CancellationToken ct)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("Asteriq");
+            var release = await client.GetFromJsonAsync<GitHubRelease>(ApiUrl, ct);
+            if (release is null) return null;
+
+            // Update version info in case a newer release is available
+            LatestVersion = release.TagName.TrimStart('v');
+
+            return release.Assets
+                ?.FirstOrDefault(a => a.Name.Equals(AssetName, StringComparison.OrdinalIgnoreCase))
+                ?.BrowserDownloadUrl;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug("Could not refresh download URL before download, using cached: {Message}", ex.Message);
+            return null;
+        }
     }
 
     private static bool IsDirectoryWritable(string path)

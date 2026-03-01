@@ -56,18 +56,13 @@ internal static class FUIWidgets
                 FUIColors.TextDim, 14f);
         }
 
-        // Selection chevron
+        // Selection bar — 6px wide pill on the right edge
         if (isSelected)
         {
-            using var chevronPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = isDisconnected ? FUIColors.Danger : FUIColors.Active,
-                StrokeWidth = 2f,
-                IsAntialias = true
-            };
-            canvas.DrawLine(x + width - 18, y + 24, x + width - 10, y + 28, chevronPaint);
-            canvas.DrawLine(x + width - 10, y + 28, x + width - 18, y + 32, chevronPaint);
+            var barColor = isDisconnected ? FUIColors.Danger : FUIColors.Active;
+            var barRect = new SKRect(x + width - 12, y + 6, x + width - 6, y + 50);
+            using var barPaint = FUIRenderer.CreateFillPaint(barColor);
+            canvas.DrawRoundRect(barRect, 3f, 3f, barPaint);
         }
     }
 

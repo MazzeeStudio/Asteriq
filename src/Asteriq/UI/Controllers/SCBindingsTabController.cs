@@ -116,9 +116,9 @@ public partial class SCBindingsTabController : ITabController
     // Modifier(s) established by the first press (the modifier button) while waiting for the target
     private List<string>? _scPendingJoystickModifiers;
 
-    // Header toggle button (JS REF / DEVICE)
-    private SKRect _scHeaderToggleButtonBounds;
-    private bool _scHeaderToggleButtonHovered;
+    // "Show JS ref" checkbox
+    private SKRect _scShowJSRefCheckboxBounds;
+    private bool _scShowJSRefCheckboxHovered;
 
     // Column actions panel — Import From Profile
     private int _scColImportProfileIndex = -1;
@@ -152,7 +152,6 @@ public partial class SCBindingsTabController : ITabController
 
     // SC search/filter state
     private string _scSearchText = "";
-    private bool _scShowBoundOnly = false;
     private SKRect _scSearchBoxBounds;
     private bool _scSearchBoxFocused = false;
     private SKRect _scShowBoundOnlyBounds;
@@ -543,7 +542,7 @@ public partial class SCBindingsTabController : ITabController
             _scShowBoundOnlyBounds.Contains(e.X, e.Y) ||
             (!_scVScrollbarBounds.IsEmpty && _scVScrollbarBounds.Contains(e.X, e.Y)) ||
             (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)) ||
-            (!_scHeaderToggleButtonBounds.IsEmpty && _scHeaderToggleButtonBounds.Contains(e.X, e.Y)) ||
+            (!_scShowJSRefCheckboxBounds.IsEmpty && _scShowJSRefCheckboxBounds.Contains(e.X, e.Y)) ||
             (!_scColImportButtonBounds.IsEmpty && _scColImportButtonBounds.Contains(e.X, e.Y)) ||
             (!_scClearColumnButtonBounds.IsEmpty && _scClearColumnButtonBounds.Contains(e.X, e.Y)) ||
             (!_scColImportProfileSelectorBounds.IsEmpty && _scColImportProfileSelectorBounds.Contains(e.X, e.Y)) ||

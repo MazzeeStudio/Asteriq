@@ -31,8 +31,8 @@ public partial class SCBindingsTabController
             return;
         }
 
-        // Header toggle button (JS REF / DEVICE)
-        if (!_scHeaderToggleButtonBounds.IsEmpty && _scHeaderToggleButtonBounds.Contains(point))
+        // "Show JS ref" checkbox
+        if (!_scShowJSRefCheckboxBounds.IsEmpty && _scShowJSRefCheckboxBounds.Contains(point))
         {
             _ctx.AppSettings.SCBindingsShowPhysicalHeaders = !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
             _ctx.MarkDirty();
@@ -479,7 +479,7 @@ public partial class SCBindingsTabController
         // Show Bound Only checkbox click
         if (_scShowBoundOnlyBounds.Contains(point))
         {
-            _scShowBoundOnly = !_scShowBoundOnly;
+            _ctx.AppSettings.SCBindingsShowBoundOnly = !_ctx.AppSettings.SCBindingsShowBoundOnly;
             RefreshFilteredActions();
             return;
         }

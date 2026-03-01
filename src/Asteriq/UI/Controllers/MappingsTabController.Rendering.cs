@@ -996,7 +996,7 @@ public partial class MappingsTabController
         float curveHeight = 140f;
         _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
         DrawCurveVisualization(canvas, _curveEditorBounds);
-        y += curveHeight + 50f;  // tick labels (bottom +14) + "IN" label (bottom +25) + 8px gap before live indicator
+        y += curveHeight + 43f;  // tick labels end at bounds.Bottom+17; +16px gap before live indicator
 
         // Live axis movement indicator
         var axisMapping = GetCurrentAxisMapping();
@@ -1513,15 +1513,6 @@ public partial class MappingsTabController
             FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, labelY), FUIColors.TextDim, 12f);
         }
 
-        // Axis labels
-        FUIRenderer.DrawText(canvas, "IN", new SKPoint(bounds.MidX - 6, bounds.Bottom + 32), FUIColors.TextDim, 12f);
-
-        // Rotated "OUT" label
-        canvas.Save();
-        canvas.Translate(bounds.Left - 24, bounds.MidY + 8);
-        canvas.RotateDegrees(-90);
-        FUIRenderer.DrawText(canvas, "OUT", new SKPoint(0, 0), FUIColors.TextDim, 12f);
-        canvas.Restore();
     }
 
     private float DrawAxisMovementIndicator(SKCanvas canvas, float leftMargin, float rightMargin, float y, AxisMapping axisMapping)

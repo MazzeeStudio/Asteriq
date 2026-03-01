@@ -147,6 +147,15 @@ public partial class MappingsTabController : ITabController
     private List<SKPoint> _curveControlPoints = new() { new(0, 0), new(1, 1) };
     private int _hoveredCurvePoint = -1;
     private int _draggingCurvePoint = -1;
+
+    // ── Network switch button ─────────────────────────────────────────────────
+    // "SET AS NET SWITCH" action button on the selected row (far right)
+    private SKRect _switchButtonActionBounds;
+    private bool _switchButtonActionHovered;
+    // Badge at the bottom of the binding list: "NET SWITCH: {DisplayName}"
+    private SKRect _switchButtonBadgeBounds;
+    private SKRect _switchButtonBadgeXBounds;
+    private bool _switchButtonBadgeXHovered;
     private CurveType _selectedCurveType = CurveType.Linear;
     private bool _curveSymmetrical = false;  // When true, curve points mirror around center
     private SKRect _curveSymmetricalCheckboxBounds;
@@ -532,6 +541,20 @@ public partial class MappingsTabController : ITabController
             }
         }
 
+        // Left panel: NET SWITCH action button — assign switch button for selected row
+        if (!_switchButtonActionBounds.IsEmpty && _switchButtonActionBounds.Contains(e.X, e.Y))
+        {
+            AssignSwitchButtonForSelectedRow();
+            return;
+        }
+
+        // Left panel: NET SWITCH badge × — clear the switch button
+        if (!_switchButtonBadgeXBounds.IsEmpty && _switchButtonBadgeXBounds.Contains(e.X, e.Y))
+        {
+            ClearNetworkSwitchButton();
+            return;
+        }
+
         // Left panel: vJoy device navigation
         if (_vjoyPrevHovered && _ctx.SelectedVJoyDeviceIndex > 0)
         {
@@ -740,6 +763,22 @@ public partial class MappingsTabController : ITabController
                 _hoveredCurvePoint = -1;
                 _ctx.MarkDirty();
             }
+        }
+
+        // Left panel: NET SWITCH action button
+        if (!_switchButtonActionBounds.IsEmpty && _switchButtonActionBounds.Contains(e.X, e.Y))
+        {
+            _switchButtonActionHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Left panel: NET SWITCH badge × button
+        if (!_switchButtonBadgeXBounds.IsEmpty && _switchButtonBadgeXBounds.Contains(e.X, e.Y))
+        {
+            _switchButtonBadgeXHovered = true;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
         }
 
         // Left panel: vJoy device selector buttons

@@ -189,6 +189,12 @@ public partial class MappingsTabController
         float y = bounds.Top - _bindingsScrollOffset;
         int rowIndex = 0;
 
+        // Pre-compute NET SWITCH row index for this vJoy device (only for button category)
+        var switchCfg = profile?.NetworkSwitchButton;
+        int switchRowIndex = -1;
+        if (switchCfg is not null && _mappingCategory == 0 && vjoyDevice is not null)
+            switchRowIndex = GetSwitchButtonRowIndex(profile!, vjoyDevice.Id, switchCfg);
+
         // Show BUTTONS when category is 0
         if (_mappingCategory == 0 && hasVJoy && buttonCount > 0)
         {
@@ -205,10 +211,10 @@ public partial class MappingsTabController
                     var keyParts = GetButtonKeyParts(profile, vjoyDevice!.Id, i);
                     bool isSelected = rowIndex == _selectedMappingRow;
                     bool isHovered = rowIndex == _hoveredMappingRow;
-                    // A button is a modifier when it outputs a single modifier key (no combo modifiers)
                     bool isModifier = keyParts?.Count == 1 && IsModifierKeyName(keyParts[0]);
+                    bool isSwitchBtn = rowIndex == switchRowIndex;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier);
+                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier, isSwitchBtn);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -258,6 +264,45 @@ public partial class MappingsTabController
         {
             DrawScrollIndicator(canvas, bounds, _bindingsScrollOffset, _bindingsContentHeight);
         }
+
+        // NET SWITCH badge below the list
+        DrawNetSwitchBadge(canvas, bounds, profile);
+    }
+
+    private void DrawNetSwitchBadge(SKCanvas canvas, SKRect listBounds, MappingProfile? profile)
+    {
+        _switchButtonBadgeBounds = SKRect.Empty;
+        _switchButtonBadgeXBounds = SKRect.Empty;
+        _switchButtonBadgeXHovered = false;
+
+        var cfg = profile?.NetworkSwitchButton;
+        if (cfg is null) return;
+
+        const float badgeH = 26f;
+        const float badgeGap = 6f;
+        float badgeY = listBounds.Bottom + badgeGap;
+        var badgeRect = new SKRect(listBounds.Left, badgeY, listBounds.Right, badgeY + badgeH);
+        _switchButtonBadgeBounds = badgeRect;
+
+        FUIRenderer.DrawRoundedPanel(canvas, badgeRect,
+            FUIColors.Warning.WithAlpha(FUIColors.AlphaLightTint),
+            FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
+
+        float textY = badgeRect.MidY + 5f;
+        FUIRenderer.DrawText(canvas, "NET SWITCH: " + cfg.DisplayName,
+            new SKPoint(badgeRect.Left + 10f, textY), FUIColors.Warning, 13f);
+
+        // × close button on right
+        const float xSize = 16f;
+        var xBounds = new SKRect(badgeRect.Right - xSize - 6f, badgeRect.MidY - xSize / 2f,
+            badgeRect.Right - 6f, badgeRect.MidY + xSize / 2f);
+        _switchButtonBadgeXBounds = xBounds;
+        _switchButtonBadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+        using var xPaint = FUIRenderer.CreateTextPaint(
+            _switchButtonBadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
+        float xTextX = xBounds.MidX - 3f;
+        canvas.DrawText("\u00D7", xTextX, xBounds.MidY + 5f, xPaint);
     }
 
     /// <summary>
@@ -296,6 +341,24 @@ public partial class MappingsTabController
         return GetKeyboardMappingParts(mapping);
     }
 
+    /// <summary>
+    /// Returns the row index of the vJoy button slot that has the network switch physical input as its source.
+    /// Returns -1 if the switch button is not mapped to any output on this device.
+    /// </summary>
+    private static int GetSwitchButtonRowIndex(MappingProfile profile, uint vjoyId, NetworkSwitchConfig cfg)
+    {
+        var mapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyButton &&
+            m.Output.VJoyDevice == vjoyId &&
+            m.Inputs.Any(inp =>
+                inp.Type == InputType.Button &&
+                inp.Index == cfg.ButtonIndex &&
+                inp.DeviceId.Equals(cfg.DeviceId, StringComparison.OrdinalIgnoreCase)));
+
+        if (mapping is null) return -1;
+        return mapping.Output.Index; // 0-based output index = row index in button category
+    }
+
     private void DrawScrollIndicator(SKCanvas canvas, SKRect bounds, float scrollOffset, float contentHeight)
     {
         float trackHeight = bounds.Height - 20;
@@ -318,7 +381,8 @@ public partial class MappingsTabController
     }
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
-        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false)
+        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false,
+        bool isSwitchButton = false)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "ÔÇö";
         bool hasKeyParts = keyParts is not null && keyParts.Count > 0;
@@ -484,6 +548,37 @@ public partial class MappingsTabController
             float dotY = bounds.MidY;
             using var dotPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
             canvas.DrawCircle(dotX, dotY, 5f, dotPaint);
+        }
+
+        // ── Network switch button indicators ─────────────────────────────────
+        _switchButtonActionBounds = SKRect.Empty;
+        _switchButtonActionHovered = false;
+
+        if (isSwitchButton)
+        {
+            // Amber "NET" pill on the left edge
+            const float pillW = 30f;
+            const float pillH = 14f;
+            float pillX = bounds.Left + 2f;
+            float pillY = bounds.MidY - pillH / 2f;
+            var pillRect = new SKRect(pillX, pillY, pillX + pillW, pillY + pillH);
+            FUIRenderer.DrawRoundedPanel(canvas, pillRect,
+                FUIColors.Warning.WithAlpha(FUIColors.AlphaHoverBg),
+                FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
+            FUIRenderer.DrawTextCentered(canvas, "NET", pillRect, FUIColors.Warning, 10f);
+        }
+        else if (isSelected && _ctx.AppSettings.NetworkEnabled)
+        {
+            // "SET AS NET SWITCH" secondary action button at far right
+            const float btnW = 120f;
+            const float btnH = 20f;
+            float btnX = bounds.Right - btnW - 4f;
+            float btnY = bounds.MidY - btnH / 2f;
+            _switchButtonActionBounds = new SKRect(btnX, btnY, btnX + btnW, btnY + btnH);
+            _switchButtonActionHovered = _switchButtonActionBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+            FUIRenderer.DrawButton(canvas, _switchButtonActionBounds, "SET AS NET SWITCH",
+                _switchButtonActionHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
     }
 

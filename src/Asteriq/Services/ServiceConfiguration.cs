@@ -62,6 +62,10 @@ public static class ServiceConfiguration
         services.AddSingleton<DirectInput.DirectInputService>();
         services.AddSingleton<DirectInput.DirectInputReader>();
 
+        // Network forwarding services (Singleton - long-lived TCP/UDP state)
+        services.AddSingleton<INetworkDiscoveryService, NetworkDiscoveryService>();
+        services.AddSingleton<INetworkInputService, NetworkInputService>();
+
         return services;
     }
 }

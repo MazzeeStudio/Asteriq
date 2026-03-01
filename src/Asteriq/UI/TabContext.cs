@@ -94,6 +94,19 @@ public class TabContext
     public Action? OpenDriverSetup { get; set; }
     public Action? RefreshVJoyDevices { get; set; }
 
+    // Network forwarding (set after construction by MainForm)
+    public INetworkDiscoveryService? NetworkDiscovery { get; set; }
+    public INetworkInputService? NetworkInput { get; set; }
+    /// <summary>Current network forwarding mode — updated by MainForm on every sync.</summary>
+    public NetworkInputMode NetworkMode { get; set; } = NetworkInputMode.Local;
+    public Action? StartNetworking { get; set; }
+    public Action? ShutdownNetworking { get; set; }
+    /// <summary>
+    /// Called when the NET SWITCH button assignment changes.
+    /// SCBindingsTabController sets this to its CheckNetworkSwitchConflicts method.
+    /// </summary>
+    public Action? CheckNetworkSwitchConflicts { get; set; }
+
     public TabContext(
         IInputService inputService,
         IProfileManager profileManager,

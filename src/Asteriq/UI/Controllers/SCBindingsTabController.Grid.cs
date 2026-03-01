@@ -307,6 +307,52 @@ public partial class SCBindingsTabController
         _scDuplicateActionBindings = _scExportProfile.GetDuplicateJoystickActionKeys();
     }
 
+    /// <summary>
+    /// Checks whether any SC binding uses the same physical vJoy button as the NET SWITCH button.
+    /// Updates <c>_networkConflictBindingKeys</c> and <c>_exportBlockedByNetworkConflict</c>.
+    /// Called by <c>UpdateConflictingBindings</c> and by MappingsTabController via TabContext callback.
+    /// </summary>
+    internal void CheckNetworkSwitchConflicts()
+    {
+        _networkConflictBindingKeys.Clear();
+        _exportBlockedByNetworkConflict = false;
+
+        var switchCfg = _ctx.ProfileManager.ActiveProfile?.NetworkSwitchButton;
+        if (switchCfg is null) return;
+
+        // Find the ButtonMapping that has this physical input as a source
+        var profile = _ctx.ProfileManager.ActiveProfile!;
+        var physMapping = profile.ButtonMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyButton &&
+            m.Inputs.Any(inp =>
+                inp.Type == InputType.Button &&
+                inp.Index == switchCfg.ButtonIndex &&
+                inp.DeviceId.Equals(switchCfg.DeviceId, StringComparison.OrdinalIgnoreCase)));
+
+        if (physMapping is null) return;
+
+        uint switchVJoyDevice = physMapping.Output.VJoyDevice;
+        // vJoy button output is 0-based Index; SC binding uses "button{index+1}"
+        string switchInputName = $"button{physMapping.Output.Index + 1}";
+
+        // Find all SC bindings that use this vJoy button
+        foreach (var binding in _scExportProfile.Bindings)
+        {
+            if (binding.DeviceType != SCDeviceType.Joystick) continue;
+            if (binding.PhysicalDeviceId is not null) continue;
+            if (binding.VJoyDevice != switchVJoyDevice) continue;
+            if (!binding.InputName.Equals(switchInputName, StringComparison.OrdinalIgnoreCase)) continue;
+
+            _networkConflictBindingKeys.Add(binding.Key);
+        }
+
+        _exportBlockedByNetworkConflict = _networkConflictBindingKeys.Count > 0;
+        _ctx.MarkDirty();
+    }
+
+    /// <summary>Public entry point called via TabContext.CheckNetworkSwitchConflicts.</summary>
+    public void CheckNetworkSwitchConflictsPublic() => CheckNetworkSwitchConflicts();
+
     private void UpdateConflictingBindings()
     {
         _scConflictingBindings.Clear();
@@ -361,6 +407,7 @@ public partial class SCBindingsTabController
         }
 
         UpdateDuplicateActionBindings();
+        CheckNetworkSwitchConflicts();
     }
 
     private void ApplyDefaultBindingsToProfile()

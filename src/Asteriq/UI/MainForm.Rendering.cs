@@ -496,7 +496,7 @@ public partial class MainForm
             new SKPoint(bounds.MidX - deviceTextWidth / 2f, y + 22), FUIColors.TextDim, 15f);
 
 
-        // Right: update indicator shape + version and time
+        // Right: network indicator + update indicator shape + version and time
         string versionTime = $"v{s_appVersion} | {DateTime.Now:HH:mm:ss}";
         float versionWidth = FUIRenderer.MeasureText(versionTime, 15f);
         var footerUpdateStatus = _updateService.Status;
@@ -508,6 +508,12 @@ public partial class MainForm
             float textX = bounds.Right - versionWidth - 20;
             float startX = textX - indicatorGap - indicatorSize;
             float midY = y + 17f; // visual centre of 12 pt text row
+
+            // Network mode indicator — sits to the left of the update indicator cluster
+            const float netIndicatorGap = 14f;
+            float netCenterX = startX - netIndicatorGap;
+            FUIWidgets.DrawNetworkModeIndicator(canvas, netCenterX, midY,
+                _networkMode, _appSettings.NetworkEnabled);
 
             if (footerUpdateStatus is UpdateStatus.UpToDate or UpdateStatus.ReadyToApply)
             {

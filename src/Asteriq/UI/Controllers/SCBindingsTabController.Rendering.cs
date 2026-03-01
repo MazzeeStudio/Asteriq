@@ -329,24 +329,20 @@ public partial class SCBindingsTabController
                 }
                 else if (col.IsJoystick && _ctx.AppSettings.SCBindingsShowPhysicalHeaders)
                 {
-                    // Physical header mode: device name on top + JS{N} sub-label
+                    // Device mode: show physical device name only — no JS# (user can toggle to see that)
                     var headerColor = c == _scHighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
                     string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
                     if (deviceName is not null)
                     {
-                        string shortName = FUIWidgets.TruncateTextToWidth(deviceName, colW - 4f, 10f);
-                        float nameTextWidth = FUIRenderer.MeasureText(shortName, 10f);
-                        FUIRenderer.DrawText(canvas, shortName, new SKPoint(colX + (colW - nameTextWidth) / 2, headerTextY - 5f), headerColor, 10f, true);
-                        string jsLabel = $"JS{col.SCInstance}";
-                        float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
-                        FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.Active.WithAlpha(180), 10f);
+                        string shortName = FUIWidgets.TruncateTextToWidth(deviceName, colW - 4f, 11f);
+                        float nameTextWidth = FUIRenderer.MeasureText(shortName, 11f);
+                        FUIRenderer.DrawText(canvas, shortName, new SKPoint(colX + (colW - nameTextWidth) / 2, headerTextY), headerColor, 11f, true);
                     }
                     else
                     {
-                        // No physical device mapped — fall back to JS{N} single-label
-                        float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
-                        float centeredX = colX + (colW - headerTextWidth) / 2;
-                        FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY), FUIColors.Active, 12f, true);
+                        // No physical device mapped — dim dash
+                        float dashWidth = FUIRenderer.MeasureText("—", 12f);
+                        FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + (colW - dashWidth) / 2, headerTextY), FUIColors.TextDim.WithAlpha(80), 12f);
                     }
                 }
                 else

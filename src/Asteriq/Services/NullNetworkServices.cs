@@ -10,7 +10,7 @@ internal sealed class NullNetworkDiscoveryService : INetworkDiscoveryService
 {
     private static readonly Dictionary<string, NetworkPeer> s_empty = new();
     public IReadOnlyDictionary<string, NetworkPeer> KnownPeers => s_empty;
-    public event EventHandler? PeersChanged;
+    public event EventHandler? PeersChanged { add { } remove { } }
     public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
@@ -22,10 +22,14 @@ internal sealed class NullNetworkInputService : INetworkInputService
 {
     public NetworkInputMode Mode => NetworkInputMode.Local;
     public bool IsListening => false;
-    public event EventHandler? ConnectionLost;
+    public event EventHandler? ConnectionLost { add { } remove { } }
+    public event EventHandler<string>? ClientConnected { add { } remove { } }
+    public event EventHandler<TrustRequestEventArgs>? TrustRequested { add { } remove { } }
     public Task StartListenerAsync(int port, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task ConnectToAsync(NetworkPeer peer, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public void SendInputState(DeviceInputState state, byte deviceSlot) { }
+    public void SendVJoyState(VJoyOutputSnapshot snapshot) { }
+    public void AcceptPairing() { }
+    public void RejectPairing() { }
     public void Dispose() { }
 }

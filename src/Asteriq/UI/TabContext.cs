@@ -99,6 +99,8 @@ public class TabContext
     public INetworkInputService? NetworkInput { get; set; }
     /// <summary>Current network forwarding mode — updated by MainForm on every sync.</summary>
     public NetworkInputMode NetworkMode { get; set; } = NetworkInputMode.Local;
+    /// <summary>True when this machine is in client mode (receiving vJoy from master). Tabs 0 and 1 are locked.</summary>
+    public bool IsClientConnected { get; set; }
     public Action? StartNetworking { get; set; }
     public Action? ShutdownNetworking { get; set; }
     /// <summary>

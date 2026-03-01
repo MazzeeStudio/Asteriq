@@ -49,8 +49,14 @@ public class SettingsTabController : ITabController
     // Driver setup button
     private SKRect _driverSetupButtonBounds;
 
-    // Network forwarding toggle
+    // Network forwarding toggle + role/connect UI
     private SKRect _networkEnabledToggleBounds;
+    private SKRect[] _netRoleButtonBounds = new SKRect[3]; // 0=None, 1=Master, 2=Client
+    private SKRect _netRegenerateBounds;
+    private SKRect _netConnectBounds;
+    private SKRect _netDisconnectBounds;
+    private SKRect _netForgetBounds;
+    private int _selectedNetworkPeerIndex = -1;
 
     // Version / update button bounds
     private SKRect _checkButtonBounds;
@@ -516,14 +522,158 @@ public class SettingsTabController : ITabController
             new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
         y += rowHeight;
 
-        // Peers visible row (only when enabled)
-        if (_ctx.AppSettings.NetworkEnabled && _ctx.NetworkDiscovery is not null)
+        // Role + advanced network UI — only when networking is enabled
+        if (_ctx.AppSettings.NetworkEnabled)
         {
-            int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
-            var peerColor = peerCount > 0 ? FUIColors.Active : FUIColors.TextDim;
-            FUIRenderer.DrawTextTruncated(canvas, $"Peers visible: {peerCount}",
-                new SKPoint(leftMargin, y + 12f), contentWidth, peerColor, 13f);
-            y += rowHeight;
+            y += 4f;
+
+            // Role selector  [NONE]  [MASTER]  [CLIENT]
+            FUIRenderer.DrawTextTruncated(canvas, "Role", new SKPoint(leftMargin, y + 12f),
+                80f, FUIColors.TextDim, 13f);
+
+            float roleBtnW = 68f;
+            float roleBtnH = 24f;
+            float roleBtnGap = 6f;
+            float roleBtnStartX = leftMargin + 80f;
+            var roleLabels = new[] { "NONE", "MASTER", "CLIENT" };
+            var currentRole = _ctx.AppSettings.NetworkRole;
+            for (int ri = 0; ri < 3; ri++)
+            {
+                float rx = roleBtnStartX + ri * (roleBtnW + roleBtnGap);
+                _netRoleButtonBounds[ri] = new SKRect(rx, y, rx + roleBtnW, y + roleBtnH);
+                bool isActive = (ri == 0 && currentRole == NetworkRole.None)
+                             || (ri == 1 && currentRole == NetworkRole.Master)
+                             || (ri == 2 && currentRole == NetworkRole.Client);
+                bool hov = _netRoleButtonBounds[ri].Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                FUIRenderer.DrawButton(canvas, _netRoleButtonBounds[ri], roleLabels[ri],
+                    isActive ? FUIRenderer.ButtonState.Active :
+                    hov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            }
+            y += roleBtnH + 8f;
+
+            // ── Master-specific UI ─────────────────────────────────────────
+            if (currentRole == NetworkRole.Master)
+            {
+                // Code display
+                string code = _ctx.AppSettings.NetworkMasterCode;
+                FUIRenderer.DrawTextTruncated(canvas, $"Your code:  {code}",
+                    new SKPoint(leftMargin, y + 12f), contentWidth - 110f, FUIColors.TextBright, 13f);
+
+                float regenW = 100f; float regenH = 24f;
+                _netRegenerateBounds = new SKRect(rightMargin - regenW, y, rightMargin, y + regenH);
+                bool regenHov = _netRegenerateBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                FUIRenderer.DrawButton(canvas, _netRegenerateBounds, "REGENERATE",
+                    regenHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                y += regenH + 6f;
+
+                // Peer list (discovered clients)
+                var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+                if (peers.Count > 0)
+                {
+                    for (int pi = 0; pi < peers.Count; pi++)
+                    {
+                        var p = peers[pi];
+                        string label = $"  {p.MachineName}  {p.IpAddress}";
+                        bool pHov = new SKRect(leftMargin, y, rightMargin, y + rowHeight).Contains(
+                            _ctx.MousePosition.X, _ctx.MousePosition.Y);
+                        var pColor = _selectedNetworkPeerIndex == pi ? FUIColors.Active
+                                   : p.IsStale ? FUIColors.TextDim : FUIColors.TextPrimary;
+                        if (pHov)
+                        {
+                            using var hpaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(20));
+                            canvas.DrawRect(new SKRect(leftMargin, y, rightMargin, y + rowHeight), hpaint);
+                        }
+                        FUIRenderer.DrawTextTruncated(canvas, label, new SKPoint(leftMargin, y + 12f),
+                            contentWidth, pColor, 13f);
+                        y += rowHeight;
+                    }
+                }
+                else
+                {
+                    FUIRenderer.DrawTextTruncated(canvas, "No clients discovered yet",
+                        new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
+                    y += rowHeight;
+                }
+
+                // Connect / Disconnect
+                var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
+                float connBtnW = 100f; float connBtnH = 26f;
+                bool isConnected = netMode == NetworkInputMode.Remote;
+                _netConnectBounds = new SKRect(leftMargin, y, leftMargin + connBtnW, y + connBtnH);
+                _netDisconnectBounds = new SKRect(leftMargin + connBtnW + 8f, y,
+                    leftMargin + connBtnW + 8f + connBtnW, y + connBtnH);
+                bool connHov = _netConnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                bool discHov = _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                FUIRenderer.DrawButton(canvas, _netConnectBounds, "CONNECT",
+                    isConnected ? FUIRenderer.ButtonState.Disabled :
+                    connHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
+                    !isConnected ? FUIRenderer.ButtonState.Disabled :
+                    discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                    isDanger: true);
+                y += connBtnH + 6f;
+
+                // Status row
+                string statusText = isConnected ? "Sending" : "Not connected";
+                var statusColor = isConnected ? FUIColors.Active : FUIColors.TextDim;
+                FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
+                    new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
+                y += rowHeight;
+            }
+            // ── Client-specific UI ─────────────────────────────────────────
+            else if (currentRole == NetworkRole.Client)
+            {
+                var trusted = _ctx.AppSettings.TrustedMaster;
+                if (trusted is not null)
+                {
+                    FUIRenderer.DrawTextTruncated(canvas, $"Trusted master:  {trusted.MachineName}",
+                        new SKPoint(leftMargin, y + 12f), contentWidth - 110f, FUIColors.TextPrimary, 13f);
+                    float forgetW = 90f; float forgetH = 24f;
+                    _netForgetBounds = new SKRect(rightMargin - forgetW, y, rightMargin, y + forgetH);
+                    bool forgetHov = _netForgetBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                    FUIRenderer.DrawButton(canvas, _netForgetBounds, "FORGET",
+                        forgetHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                        isDanger: true);
+                    y += forgetH + 6f;
+                }
+                else
+                {
+                    FUIRenderer.DrawTextTruncated(canvas, "No trusted master — waiting for connection",
+                        new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
+                    y += rowHeight;
+                }
+
+                // Disconnect button
+                var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
+                bool isReceiving = netMode == NetworkInputMode.Receiving;
+                float discBtnW = 110f; float discBtnH = 26f;
+                _netDisconnectBounds = new SKRect(leftMargin, y, leftMargin + discBtnW, y + discBtnH);
+                bool discHov = _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
+                    !isReceiving ? FUIRenderer.ButtonState.Disabled :
+                    discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                    isDanger: true);
+                y += discBtnH + 6f;
+
+                // Status
+                string statusText = isReceiving ? $"Connected to {trusted?.MachineName ?? "master"}" : "Waiting for master";
+                var statusColor = isReceiving ? FUIColors.Active : FUIColors.TextDim;
+                FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
+                    new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
+                y += rowHeight;
+            }
+            else
+            {
+                // Role=None: just show peer count
+                if (_ctx.NetworkDiscovery is not null)
+                {
+                    int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
+                    var peerColor = peerCount > 0 ? FUIColors.Active : FUIColors.TextDim;
+                    FUIRenderer.DrawTextTruncated(canvas, $"Peers visible: {peerCount}",
+                        new SKPoint(leftMargin, y + 12f), contentWidth, peerColor, 13f);
+                    y += rowHeight;
+                }
+            }
         }
         y += sectionSpacing;
 
@@ -1122,6 +1272,73 @@ public class SettingsTabController : ITabController
                 _ctx.ShutdownNetworking?.Invoke();
             _ctx.InvalidateCanvas();
             return;
+        }
+
+        // Role selector buttons (only when networking is enabled)
+        if (_ctx.AppSettings.NetworkEnabled)
+        {
+            var roleValues = new[] { NetworkRole.None, NetworkRole.Master, NetworkRole.Client };
+            for (int ri = 0; ri < _netRoleButtonBounds.Length; ri++)
+            {
+                if (_netRoleButtonBounds[ri].Contains(pt))
+                {
+                    _ctx.AppSettings.NetworkRole = roleValues[ri];
+                    _ctx.InvalidateCanvas();
+                    return;
+                }
+            }
+
+            // Master-specific buttons
+            if (_ctx.AppSettings.NetworkRole == NetworkRole.Master)
+            {
+                if (_netRegenerateBounds.Contains(pt))
+                {
+                    // Clear the code — getter in ApplicationSettingsService auto-generates a new one
+                    _ctx.AppSettings.NetworkMasterCode = "";
+                    _ctx.InvalidateCanvas();
+                    return;
+                }
+
+                if (_netConnectBounds.Contains(pt) &&
+                    _ctx.NetworkInput?.Mode != NetworkInputMode.Remote)
+                {
+                    // Connect to the selected peer (or first available)
+                    var peers = _ctx.NetworkDiscovery?.KnownPeers.Values
+                        .Where(p => !p.IsStale).ToList() ?? [];
+                    int idx = _selectedNetworkPeerIndex >= 0 && _selectedNetworkPeerIndex < peers.Count
+                        ? _selectedNetworkPeerIndex : 0;
+                    if (idx < peers.Count && _ctx.NetworkInput is not null)
+                        _ = _ctx.NetworkInput.ConnectToAsync(peers[idx]);
+                    _ctx.InvalidateCanvas();
+                    return;
+                }
+
+                if (_netDisconnectBounds.Contains(pt) &&
+                    _ctx.NetworkInput?.Mode == NetworkInputMode.Remote)
+                {
+                    _ = _ctx.NetworkInput?.DisconnectAsync();
+                    _ctx.InvalidateCanvas();
+                    return;
+                }
+            }
+            // Client-specific buttons
+            else if (_ctx.AppSettings.NetworkRole == NetworkRole.Client)
+            {
+                if (_netForgetBounds.Contains(pt))
+                {
+                    _ctx.AppSettings.TrustedMaster = null;
+                    _ctx.InvalidateCanvas();
+                    return;
+                }
+
+                if (_netDisconnectBounds.Contains(pt) &&
+                    _ctx.NetworkInput?.Mode == NetworkInputMode.Receiving)
+                {
+                    _ = _ctx.NetworkInput?.DisconnectAsync();
+                    _ctx.InvalidateCanvas();
+                    return;
+                }
+            }
         }
 
         // Tray icon type button clicks

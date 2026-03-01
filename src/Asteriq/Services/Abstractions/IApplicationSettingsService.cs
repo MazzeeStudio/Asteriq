@@ -108,6 +108,21 @@ public interface IApplicationSettingsService
     /// <summary>TCP/UDP port for network discovery and input forwarding (default 47191).</summary>
     int NetworkListenPort { get; set; }
 
+    /// <summary>Whether this instance acts as master, client, or has no network role.</summary>
+    NetworkRole NetworkRole { get; set; }
+
+    /// <summary>
+    /// Permanent 6-digit code for this master instance.
+    /// Auto-generated on first read if empty.
+    /// </summary>
+    string NetworkMasterCode { get; set; }
+
+    /// <summary>
+    /// Client-side trust record for the known master.
+    /// Null means no master has been trusted yet.
+    /// </summary>
+    TrustedPeerConfig? TrustedMaster { get; set; }
+
     /// <summary>
     /// Get the user-specified silhouette override for a vJoy slot.
     /// Returns null if no override is set (auto-detect from physical device).

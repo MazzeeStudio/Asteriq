@@ -9,30 +9,41 @@ public enum NetworkInputMode
 {
     /// <summary>Input is processed locally by MappingEngine.</summary>
     Local,
-    /// <summary>Input is forwarded over TCP to the remote peer's vJoy.</summary>
-    Remote
+
+    /// <summary>
+    /// Master mode: input runs through MappingEngine (capture, no local vJoy write),
+    /// and the resulting vJoy snapshot is forwarded over TCP to the client.
+    /// </summary>
+    Remote,
+
+    /// <summary>
+    /// Client mode: this machine is receiving vJoy snapshots from a master
+    /// and applying them to a local vJoy slot. MappingEngine is bypassed.
+    /// </summary>
+    Receiving
 }
 
 /// <summary>
-/// Manages the TCP connection between source (sender) and receiver machines.
-/// Source sends raw DeviceInputState packets; receiver applies them directly to vJoy.
+/// Manages the TCP connection between master (sender) and client (receiver) machines.
+/// Master sends post-mapped <see cref="VJoyOutputSnapshot"/> packets;
+/// client applies them directly to its local vJoy slot.
 /// </summary>
 public interface INetworkInputService : IDisposable
 {
-    /// <summary>Current forwarding mode.</summary>
+    /// <summary>Current forwarding/receiving mode.</summary>
     NetworkInputMode Mode { get; }
 
-    /// <summary>True when the TCP listener is running (receiver side).</summary>
+    /// <summary>True when the TCP listener is running (client / receiver side).</summary>
     bool IsListening { get; }
 
     /// <summary>
-    /// Start the TCP listener so remote peers can connect.
+    /// Start the TCP listener so a remote master can connect.
     /// Called at startup when NetworkEnabled = true.
     /// </summary>
     Task StartListenerAsync(int port, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Connect to a remote peer and begin forwarding mode.
+    /// Connect to a remote peer (client) and begin forwarding mode.
     /// Sends ACQUIRE packet so the receiver takes ownership of its vJoy slot.
     /// </summary>
     Task ConnectToAsync(NetworkPeer peer, CancellationToken cancellationToken = default);
@@ -44,15 +55,60 @@ public interface INetworkInputService : IDisposable
     Task DisconnectAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Send a raw device input state to the remote peer.
+    /// Send a post-mapped vJoy output snapshot to the remote client.
     /// Called on the background input thread — must be thread-safe and non-blocking.
-    /// No-op when Mode == Local or not connected.
+    /// No-op when Mode != Remote or not connected.
     /// </summary>
-    void SendInputState(DeviceInputState state, byte deviceSlot);
+    void SendVJoyState(VJoyOutputSnapshot snapshot);
+
+    /// <summary>
+    /// Accept the pending trust request (called after the user approves in the trust dialog).
+    /// </summary>
+    void AcceptPairing();
+
+    /// <summary>
+    /// Reject the pending trust request (called after the user dismisses the trust dialog).
+    /// </summary>
+    void RejectPairing();
 
     /// <summary>
     /// Fired on the background receive thread when the TCP connection is lost unexpectedly.
-    /// Caller should BeginInvoke back to UI thread and call SwitchToLocal.
+    /// Caller should BeginInvoke back to UI thread and call DisconnectAsync / update mode.
     /// </summary>
     event EventHandler? ConnectionLost;
+
+    /// <summary>
+    /// Fired on the client side when a connection from a master is successfully established
+    /// (handshake complete, receive loop started). Includes the master's machine name.
+    /// Caller should BeginInvoke back to UI thread to enter client mode.
+    /// </summary>
+    event EventHandler<string>? ClientConnected;
+
+    /// <summary>
+    /// Fired on the client side when an unrecognised master requests to connect.
+    /// UI should show a one-time trust dialog and call AcceptPairing() or RejectPairing().
+    /// </summary>
+    event EventHandler<TrustRequestEventArgs>? TrustRequested;
+}
+
+/// <summary>
+/// Event args for a trust request from an unknown master instance.
+/// </summary>
+public sealed class TrustRequestEventArgs : EventArgs
+{
+    /// <summary>Machine name of the connecting master.</summary>
+    public string PeerName { get; }
+
+    /// <summary>6-digit code sent by the master (to display for user verification).</summary>
+    public string Code { get; }
+
+    /// <summary>Remote IP address of the connecting master.</summary>
+    public string IpAddress { get; }
+
+    public TrustRequestEventArgs(string peerName, string code, string ipAddress)
+    {
+        PeerName  = peerName;
+        Code      = code;
+        IpAddress = ipAddress;
+    }
 }

@@ -341,6 +341,9 @@ public partial class MainForm
                 float tabHitWidth = tabWidths[i] + (vi < visibleTabs.Length - 1 ? tabGap / 2 : 0);
                 if (se.X >= tabX && se.X < tabX + tabHitWidth)
                 {
+                    // Tabs 0 and 1 are locked in client mode
+                    if (_isClientConnected && i < 2) break;
+
                     if (_activeTab != i)
                     {
                         if (_activeTab == 1) _mappingsController.OnDeactivated();

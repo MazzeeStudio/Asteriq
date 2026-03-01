@@ -227,6 +227,50 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public NetworkRole NetworkRole
+    {
+        get => _cachedSettings.NetworkRole;
+        set
+        {
+            _cachedSettings.NetworkRole = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public string NetworkMasterCode
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(_cachedSettings.NetworkMasterCode))
+            {
+                _cachedSettings.NetworkMasterCode = GenerateMasterCode();
+                SaveSettings(_cachedSettings);
+            }
+            return _cachedSettings.NetworkMasterCode;
+        }
+        set
+        {
+            _cachedSettings.NetworkMasterCode = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public TrustedPeerConfig? TrustedMaster
+    {
+        get => _cachedSettings.TrustedMaster;
+        set
+        {
+            _cachedSettings.TrustedMaster = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    private static string GenerateMasterCode()
+    {
+        var rng = Random.Shared;
+        return $"{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}";
+    }
+
     public string? GetVJoySilhouetteOverride(uint vjoyId)
     {
         _cachedSettings.VJoySilhouetteOverrides.TryGetValue(vjoyId, out var key);
@@ -302,6 +346,12 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public string NetworkMachineName { get; set; } = "";
         /// <summary>TCP/UDP port for network discovery and forwarding. Default 47191.</summary>
         public int NetworkListenPort { get; set; } = 47191;
+        /// <summary>Whether this instance acts as master, client, or has no role.</summary>
+        public NetworkRole NetworkRole { get; set; } = NetworkRole.None;
+        /// <summary>Permanent 6-digit code generated once for the master. Empty = not yet generated.</summary>
+        public string NetworkMasterCode { get; set; } = "";
+        /// <summary>Client-side: the trusted master peer. Null = no master trusted yet.</summary>
+        public TrustedPeerConfig? TrustedMaster { get; set; }
     }
 
     /// <summary>

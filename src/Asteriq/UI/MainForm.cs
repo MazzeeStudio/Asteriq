@@ -168,6 +168,13 @@ public partial class MainForm : Form
     private volatile NetworkInputMode _networkMode = NetworkInputMode.Local;
     private bool _lastSwitchButtonState = false;
 
+    // NetworkVJoyService wrapper — provides capture-mode forwarding; always the same object as _vjoyService
+    private NetworkVJoyService _networkVjoy = null!;
+
+    // Client mode — true when this machine is receiving vJoy state from a master
+    private bool _isClientConnected;
+    private string _connectedMasterName = "";
+
     /// <summary>
     /// Constructor with dependency injection
     /// </summary>
@@ -200,6 +207,9 @@ public partial class MainForm : Form
         _themeService = themeService ?? throw new ArgumentNullException(nameof(themeService));
         _windowState = windowState ?? throw new ArgumentNullException(nameof(windowState));
         _vjoyService = vjoyService ?? throw new ArgumentNullException(nameof(vjoyService));
+        _networkVjoy = vjoyService as NetworkVJoyService
+            ?? throw new InvalidOperationException(
+                "IVJoyService must be a NetworkVJoyService. Check ServiceConfiguration.");
         _mappingEngine = mappingEngine ?? throw new ArgumentNullException(nameof(mappingEngine));
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
@@ -326,6 +336,7 @@ public partial class MainForm : Form
         _tabContext.IsForwarding = _isForwarding;
         _tabContext.BackgroundDirty = _backgroundDirty;
         _tabContext.NetworkMode = _networkMode;
+        _tabContext.IsClientConnected = _isClientConnected;
         _tabContext.MousePosition = _mousePosition;
         _tabContext.LeadLineProgress = _leadLineProgress;
         _tabContext.PulsePhase = _pulsePhase;
@@ -1428,10 +1439,13 @@ public partial class MainForm : Form
             return;
         }
 
-        // ── Remote forwarding — send raw state to peer ────────────────────────
-        if (_isForwarding && _networkMode == NetworkInputMode.Remote)
+        // ── Master mode: run MappingEngine in capture mode, send snapshot ────
+        if (_isForwarding && _networkMode == NetworkInputMode.Remote &&
+            _appSettings.NetworkRole == NetworkRole.Master)
         {
-            _networkInput.SendInputState(state, (byte)state.DeviceIndex);
+            _mappingEngine.ProcessInput(state);   // NetworkVJoyService captures; no local vJoy write
+            var snapshot = _networkVjoy.GetSnapshot(1u);  // vJoy slot 1
+            if (snapshot is not null) _networkInput.SendVJoyState(snapshot);
             return;
         }
 
@@ -1947,9 +1961,9 @@ public partial class MainForm : Form
         if (_networkDiscovery is NetworkDiscoveryService nds)
             nds.Configure(machineName, port);
 
-        _networkInput.ConnectionLost += OnNetworkConnectionLost;
-        if (_networkInput is NetworkInputService nis)
-            nis.PairingRequested += OnPairingRequested;
+        _networkInput.ConnectionLost  += OnNetworkConnectionLost;
+        _networkInput.ClientConnected += OnClientConnected;
+        _networkInput.TrustRequested  += OnTrustRequested;
 
         _ = _networkDiscovery.StartAsync();
         _ = _networkInput.StartListenerAsync(port);
@@ -1959,9 +1973,9 @@ public partial class MainForm : Form
 
     private void ShutdownNetworking()
     {
-        _networkInput.ConnectionLost -= OnNetworkConnectionLost;
-        if (_networkInput is NetworkInputService nis)
-            nis.PairingRequested -= OnPairingRequested;
+        _networkInput.ConnectionLost  -= OnNetworkConnectionLost;
+        _networkInput.ClientConnected -= OnClientConnected;
+        _networkInput.TrustRequested  -= OnTrustRequested;
 
         _ = _networkDiscovery.StopAsync();
         _ = _networkInput.DisconnectAsync();
@@ -1983,8 +1997,9 @@ public partial class MainForm : Form
             await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
             _networkMode = NetworkInputMode.Remote;
             _tabContext.NetworkMode = _networkMode;
+            _networkVjoy.ForwardingMode = true;   // capture mode — no local vJoy writes
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Connection refused or rejected — stay local
             System.Diagnostics.Debug.WriteLine($"[Network] SwitchToRemote failed: {ex.Message}");
@@ -1994,6 +2009,7 @@ public partial class MainForm : Form
 
     private async Task SwitchToLocalAsync()
     {
+        _networkVjoy.ForwardingMode = false;      // resume local vJoy writes
         await _networkInput.DisconnectAsync().ConfigureAwait(false);
         _networkMode = NetworkInputMode.Local;
         _tabContext.NetworkMode = _networkMode;
@@ -2002,30 +2018,66 @@ public partial class MainForm : Form
 
     private void OnNetworkConnectionLost(object? sender, EventArgs e)
     {
+        _networkVjoy.ForwardingMode = false;      // resume local vJoy writes on disconnect
         _networkMode = NetworkInputMode.Local;
         BeginInvoke(() =>
         {
+            // If we were in client mode, unlock tabs
+            if (_isClientConnected)
+            {
+                _isClientConnected = false;
+                _connectedMasterName = "";
+            }
             _tabContext.NetworkMode = _networkMode;
+            _tabContext.IsClientConnected = _isClientConnected;
             MarkDirty();
         });
     }
 
-    private void OnPairingRequested(object? sender, PairingRequestEventArgs e)
+    private void OnTrustRequested(object? sender, TrustRequestEventArgs e)
     {
         BeginInvoke(() =>
         {
-            using var dlg = new PairingCodeDialog(e.PeerName, e.Code, e.IsSource);
+            using var dlg = new TrustRequestDialog(e.PeerName, e.Code);
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
-                if (!e.IsSource && _networkInput is NetworkInputService nis)
-                    nis.AcceptPairing();
+                _networkInput.AcceptPairing();
+                _appSettings.TrustedMaster = new TrustedPeerConfig
+                {
+                    MachineName = e.PeerName,
+                    Code        = e.Code,
+                    LastIp      = e.IpAddress
+                };
+                EnterClientMode(e.PeerName);
             }
             else
             {
-                if (!e.IsSource && _networkInput is NetworkInputService nis)
-                    nis.RejectPairing();
+                _networkInput.RejectPairing();
             }
         });
+    }
+
+    private void OnClientConnected(object? sender, string masterName)
+    {
+        // Fired on the background receive thread — marshal to UI thread
+        BeginInvoke(() => EnterClientMode(masterName));
+    }
+
+    private void EnterClientMode(string masterName)
+    {
+        _isClientConnected   = true;
+        _connectedMasterName = masterName;
+        _networkMode         = NetworkInputMode.Receiving;
+        _tabContext.NetworkMode       = _networkMode;
+        _tabContext.IsClientConnected = _isClientConnected;
+
+        // Force to Settings tab (the only tab freely accessible in client mode)
+        if (_activeTab < 2)
+        {
+            if (_activeTab == 1) _mappingsController.OnDeactivated();
+            _activeTab = 3;
+        }
+        MarkDirty();
     }
 
     #endregion

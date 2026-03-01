@@ -4,38 +4,36 @@ using SkiaSharp.Views.Desktop;
 namespace Asteriq.UI;
 
 /// <summary>
-/// Displays a 6-digit pairing code in the FUI style — one large digit per card tile.
-/// Shown on both source (which generated the code) and receiver (which received it).
+/// Shown on the client side when an unknown master requests a connection.
+/// Displays the master name and 6-digit code so the user can decide to TRUST or REJECT.
 ///
-/// Source side: shows the code it sent — user just visually confirms it matches the receiver screen.
-/// Receiver side: shows the code it received — user clicks OK to accept or Escape to reject.
+/// On DialogResult.OK:  caller should call AcceptPairing() and save TrustedMaster.
+/// On DialogResult.Cancel: caller should call RejectPairing().
 /// </summary>
-public sealed class PairingCodeDialog : FUIBaseDialog
+public sealed class TrustRequestDialog : FUIBaseDialog
 {
     private SKControl _canvas = null!;
 
     private readonly string _peerName;
     private readonly string _code;
-    private readonly bool _isSource;
 
-    private SKRect _okButtonBounds;
-    private SKRect _cancelButtonBounds;
-    private int _hoveredButton = -1; // 0=OK, 1=Cancel
+    private SKRect _trustButtonBounds;
+    private SKRect _rejectButtonBounds;
+    private int _hoveredButton = -1; // 0=Trust, 1=Reject
 
-    public PairingCodeDialog(string peerName, string code, bool isSource)
+    public TrustRequestDialog(string peerName, string code)
     {
         _peerName = peerName;
-        _code = code;
-        _isSource = isSource;
+        _code     = code;
         InitializeForm();
         InitializeCanvas();
     }
 
     private void InitializeForm()
     {
-        Text = "Network Pairing";
+        Text = "Network Connection Request";
         float s = FUIRenderer.CanvasScaleFactor;
-        Size = new Size((int)(480 * s), (int)(280 * s));
+        Size = new Size((int)(440 * s), (int)(240 * s));
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = Color.Black;
@@ -74,7 +72,8 @@ public sealed class PairingCodeDialog : FUIBaseDialog
         float s = FUIRenderer.CanvasScaleFactor;
         var pt = new SKPoint(e.X / s, e.Y / s);
         int prev = _hoveredButton;
-        _hoveredButton = _okButtonBounds.Contains(pt) ? 0 : _cancelButtonBounds.Contains(pt) ? 1 : -1;
+        _hoveredButton = _trustButtonBounds.Contains(pt) ? 0
+                       : _rejectButtonBounds.Contains(pt) ? 1 : -1;
         if (_hoveredButton != prev) _canvas.Invalidate();
     }
 
@@ -83,8 +82,8 @@ public sealed class PairingCodeDialog : FUIBaseDialog
         if (e.Button != MouseButtons.Left) return;
         float s = FUIRenderer.CanvasScaleFactor;
         var pt = new SKPoint(e.X / s, e.Y / s);
-        if (_okButtonBounds.Contains(pt)) { DialogResult = DialogResult.OK; Close(); }
-        else if (_cancelButtonBounds.Contains(pt)) { DialogResult = DialogResult.Cancel; Close(); }
+        if (_trustButtonBounds.Contains(pt))  { DialogResult = DialogResult.OK;     Close(); }
+        else if (_rejectButtonBounds.Contains(pt)) { DialogResult = DialogResult.Cancel; Close(); }
     }
 
     private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
@@ -99,84 +98,49 @@ public sealed class PairingCodeDialog : FUIBaseDialog
         // Outer border
         using var framePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame, 2f);
         canvas.DrawRect(bounds, framePaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Primary, 20f, 6f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Warning, 20f, 6f);
 
-        // Title
-        string title = _isSource ? "CONNECTING TO PEER" : "INCOMING CONNECTION";
-        float titleY = 22f;
-        float titleW = FUIRenderer.MeasureText(title, 13f);
-        FUIRenderer.DrawText(canvas, title, new SKPoint(bounds.MidX - titleW / 2f, titleY),
-            FUIColors.TextDim, 13f);
+        float cx = bounds.MidX;
+
+        // Header
+        const string header = "NEW CONNECTION REQUEST";
+        float headerW = FUIRenderer.MeasureText(header, 13f);
+        FUIRenderer.DrawText(canvas, header,
+            new SKPoint(cx - headerW / 2f, 26f), FUIColors.Warning, 13f);
 
         // Peer name
-        string peerLabel = _isSource
-            ? $"Sending to: {_peerName}"
-            : $"From: {_peerName}";
-        float peerW = FUIRenderer.MeasureText(peerLabel, 15f);
-        FUIRenderer.DrawText(canvas, peerLabel, new SKPoint(bounds.MidX - peerW / 2f, 44f),
-            FUIColors.TextPrimary, 15f);
+        string from = $"FROM:  {_peerName.ToUpperInvariant()}";
+        float fromW = FUIRenderer.MeasureText(from, 15f);
+        FUIRenderer.DrawText(canvas, from,
+            new SKPoint(cx - fromW / 2f, 54f), FUIColors.TextPrimary, 15f);
+
+        // Code
+        string codeLabel = $"CODE:  {_code}";
+        float codeW = FUIRenderer.MeasureText(codeLabel, 22f);
+        FUIRenderer.DrawText(canvas, codeLabel,
+            new SKPoint(cx - codeW / 2f, 86f), FUIColors.TextBright, 22f);
 
         // Instruction
-        string instruction = _isSource
-            ? "Confirm this code matches the remote screen"
-            : "Confirm this code to allow the connection";
-        float instrW = FUIRenderer.MeasureText(instruction, 13f);
-        FUIRenderer.DrawText(canvas, instruction,
-            new SKPoint(bounds.MidX - instrW / 2f, 66f), FUIColors.TextDim, 13f);
+        const string hint = "Trust this master to allow future auto-connections";
+        float hintW = FUIRenderer.MeasureText(hint, 12f);
+        FUIRenderer.DrawText(canvas, hint,
+            new SKPoint(cx - hintW / 2f, 114f), FUIColors.TextDim, 12f);
 
-        // ── Digit tiles ──────────────────────────────────────────────────────
-        DrawDigitTiles(canvas, bounds);
-
-        // ── Buttons ──────────────────────────────────────────────────────────
-        float btnW = 110f;
+        // Buttons
+        float btnW = 120f;
         float btnH = 30f;
         float btnY = bounds.Bottom - btnH - 20f;
-        float btnGap = 12f;
+        float btnGap = 16f;
         float totalBtnW = btnW * 2 + btnGap;
-        float btnStartX = bounds.MidX - totalBtnW / 2f;
+        float btnStartX = cx - totalBtnW / 2f;
 
-        _okButtonBounds = new SKRect(btnStartX, btnY, btnStartX + btnW, btnY + btnH);
-        _cancelButtonBounds = new SKRect(btnStartX + btnW + btnGap, btnY,
-            btnStartX + totalBtnW, btnY + btnH);
+        _trustButtonBounds  = new SKRect(btnStartX,              btnY, btnStartX + btnW,              btnY + btnH);
+        _rejectButtonBounds = new SKRect(btnStartX + btnW + btnGap, btnY, btnStartX + totalBtnW, btnY + btnH);
 
-        FUIRenderer.DrawButton(canvas, _okButtonBounds, "CONFIRM",
+        FUIRenderer.DrawButton(canvas, _trustButtonBounds, "TRUST",
             _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-        FUIRenderer.DrawButton(canvas, _cancelButtonBounds, "REJECT",
+        FUIRenderer.DrawButton(canvas, _rejectButtonBounds, "REJECT",
             _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
             isDanger: true);
-    }
-
-    private void DrawDigitTiles(SKCanvas canvas, SKRect bounds)
-    {
-        const int digitCount = 6;
-        const float tileW = 54f;
-        const float tileH = 72f;
-        const float tileGap = 10f;
-        const float tileRadius = 6f;
-        float totalW = tileW * digitCount + tileGap * (digitCount - 1);
-        float startX = bounds.MidX - totalW / 2f;
-        float tileY = 90f;
-
-        // Pad / truncate code to exactly 6 digits
-        string digits = (_code + "      ").Substring(0, digitCount);
-
-        for (int i = 0; i < digitCount; i++)
-        {
-            float tx = startX + i * (tileW + tileGap);
-            var tile = new SKRect(tx, tileY, tx + tileW, tileY + tileH);
-
-            // Tile background — dark panel with accent border
-            FUIRenderer.FillFrame(canvas, tile, FUIColors.Active.WithAlpha(FUIColors.AlphaLightTint), tileRadius);
-            FUIRenderer.DrawFrame(canvas, tile, FUIColors.Active.WithAlpha(FUIColors.AlphaBorderSoft),
-                tileRadius, 1.5f);
-
-            // Digit character
-            char digit = digits[i];
-            string digitStr = digit.ToString();
-            float digitW = FUIRenderer.MeasureText(digitStr, 38f);
-            FUIRenderer.DrawText(canvas, digitStr,
-                new SKPoint(tx + (tileW - digitW) / 2f, tileY + tileH - 16f),
-                FUIColors.TextBright, 38f);
-        }
     }
 }

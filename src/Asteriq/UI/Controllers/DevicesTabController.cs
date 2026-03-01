@@ -947,7 +947,7 @@ public class DevicesTabController : ITabController
 
         float buttonHeight = 36f;
         float buttonWidth = contentBounds.Width - pad * 2;
-        float buttonY = contentBounds.Bottom - buttonHeight - pad;
+        float buttonY = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - buttonHeight;
 
         if (_ctx.IsForwarding)
         {

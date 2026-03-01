@@ -1003,52 +1003,43 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Clear All / Reset Defaults buttons
-        y = bounds.Bottom - frameInset - 95f;
-        float smallBtnWidth = (rightMargin - leftMargin - 5) / 2;
+        // Button group — built bottom-up so every button has a consistent anchor
+        float buttonHeight = 32f;
         float smallBtnHeight = 24f;
+        float smallBtnWidth = (rightMargin - leftMargin - FUIRenderer.SpaceSM) / 2;
 
-        _scClearAllButtonBounds = new SKRect(leftMargin, y, leftMargin + smallBtnWidth, y + smallBtnHeight);
+        float exportBtnY  = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - buttonHeight;
+        float clearBtnY   = exportBtnY - FUIRenderer.SpaceSM - smallBtnHeight;
+        float statusBannerY = clearBtnY - FUIRenderer.SpaceSM - 24f;
+
+        // CLEAR ALL / RESET DFLTS
+        _scClearAllButtonBounds = new SKRect(leftMargin, clearBtnY, leftMargin + smallBtnWidth, clearBtnY + smallBtnHeight);
         _scClearAllButtonHovered = _scClearAllButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         bool hasBoundActions = _scExportProfile.Bindings.Count > 0;
-        if (hasBoundActions)
-        {
-            FUIRenderer.DrawButton(canvas, _scClearAllButtonBounds, "CLEAR ALL",
-                _scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                isDanger: true);
-        }
-        else
-        {
-            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
-            canvas.DrawRect(_scClearAllButtonBounds, disabledPaint);
-            FUIRenderer.DrawTextCentered(canvas, "CLEAR ALL", _scClearAllButtonBounds, FUIColors.TextDim.WithAlpha(100), 12f);
-        }
+        FUIRenderer.DrawButton(canvas, _scClearAllButtonBounds, "CLEAR ALL",
+            !hasBoundActions ? FUIRenderer.ButtonState.Disabled
+            : (_scClearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal),
+            isDanger: true);
 
-        _scResetDefaultsButtonBounds = new SKRect(leftMargin + smallBtnWidth + 5, y, rightMargin, y + smallBtnHeight);
+        _scResetDefaultsButtonBounds = new SKRect(leftMargin + smallBtnWidth + FUIRenderer.SpaceSM, clearBtnY, rightMargin, clearBtnY + smallBtnHeight);
         _scResetDefaultsButtonHovered = _scResetDefaultsButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _scResetDefaultsButtonBounds, "RESET DFLTS",
             _scResetDefaultsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
             isDanger: true);
 
-        y += smallBtnHeight + 8f;
-
-        // Export button at bottom
-        float buttonWidth = rightMargin - leftMargin;
-        float buttonHeight = 32f;
-        _scExportButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
+        // EXPORT TO SC — primary CTA, anchored to panel bottom
+        _scExportButtonBounds = new SKRect(leftMargin, exportBtnY, rightMargin, exportBtnY + buttonHeight);
         _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
         bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0;
         FUIRenderer.DrawButton(canvas, _scExportButtonBounds, "EXPORT TO SC",
             !canExport ? FUIRenderer.ButtonState.Disabled : (_scExportButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
-        y += buttonHeight + 5f;
 
-        // Status message
+        // Status banner — appears above the button group so it is never clipped
         if (!string.IsNullOrEmpty(_scExportStatus))
         {
             var elapsed = DateTime.Now - _scExportStatusTime;
             if (elapsed.TotalSeconds < 10)
-                DrawStatusBanner(canvas, new SKRect(leftMargin, y, rightMargin, y + 24f));
+                DrawStatusBanner(canvas, new SKRect(leftMargin, statusBannerY, rightMargin, statusBannerY + 24f));
             else
                 _scExportStatus = null;
         }
@@ -1468,7 +1459,7 @@ public partial class SCBindingsTabController
         // Action buttons anchored to panel bottom
         float btnH = 28f;
         float btnW = (rightMargin - leftMargin - 8f) / 2f;
-        float btnY = bounds.Bottom - FUIRenderer.FrameInset - FUIRenderer.SpaceXL - btnH;
+        float btnY = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - btnH;
 
         bool canImport = _scColImportProfileIndex >= 0 && _scColImportColumnIndex >= 0;
         _scColImportButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnW, btnY + btnH);
@@ -1645,7 +1636,7 @@ public partial class SCBindingsTabController
 
         // Auto-detect button anchored near the bottom
         float btnH = 26f;
-        float btnY = bounds.Bottom - FUIRenderer.FrameInset - FUIRenderer.SpaceXL - btnH;
+        float btnY = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - btnH;
         _scDeviceOrderAutoDetectBounds = new SKRect(leftMargin, btnY, rightMargin, btnY + btnH);
         _scDeviceOrderAutoDetectHovered = _scDeviceOrderAutoDetectBounds.Contains(
             _ctx.MousePosition.X, _ctx.MousePosition.Y);

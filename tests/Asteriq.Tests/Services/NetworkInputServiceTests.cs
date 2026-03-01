@@ -7,57 +7,61 @@ namespace Asteriq.Tests.Services;
 
 public class NetworkInputServiceTests
 {
-    // ── 1. Packet codec round-trip ────────────────────────────────────────────
+    // ── 1. VJoy snapshot codec round-trip ─────────────────────────────────────
 
     [Fact]
-    public void PacketCodec_InputRoundTrip_AxesButtonsHats()
+    public void PacketCodec_VJoySnapshotRoundTrip_AxesButtonsHats()
     {
-        var original = new DeviceInputState
+        var original = new VJoyOutputSnapshot
         {
-            DeviceIndex = 2,
-            Axes = [-1f, 0f, 0.5f, 1f],
-            Buttons = [true, false, true, false, false, true],
-            Hats = [0, 180, -1],
-            Timestamp = DateTime.UtcNow
+            DeviceId    = 1,
+            Axes        = [-1f, 0f, 0.5f, 1f, 0f, 0f, 0f, 0f],
+            Buttons     = new bool[128],
+            Hats        = [0, 18000, -1, 0],
+            AxisCount   = 4,
+            ButtonCount = 6,
+            HatCount    = 3
         };
-        byte deviceSlot = 2;
+        original.Buttons[0] = true;
+        original.Buttons[2] = true;
+        original.Buttons[5] = true;
 
-        var encoded = NetworkInputService.EncodeInputPayload(original, deviceSlot);
-        var (decodedSlot, decoded) = NetworkInputService.DecodeInputPayload(encoded);
+        var encoded = NetworkInputService.EncodeVJoyPayload(original);
+        var decoded = NetworkInputService.DecodeVJoyPayload(encoded);
 
-        Assert.Equal(deviceSlot, decodedSlot);
-        Assert.Equal(original.Axes.Length, decoded.Axes.Length);
-        for (int i = 0; i < original.Axes.Length; i++)
+        Assert.Equal(original.DeviceId,    decoded.DeviceId);
+        Assert.Equal(original.AxisCount,   decoded.AxisCount);
+        Assert.Equal(original.ButtonCount, decoded.ButtonCount);
+        Assert.Equal(original.HatCount,    decoded.HatCount);
+
+        for (int i = 0; i < original.AxisCount; i++)
             Assert.Equal(original.Axes[i], decoded.Axes[i], precision: 5);
 
-        Assert.Equal(original.Buttons.Length, decoded.Buttons.Length);
-        for (int i = 0; i < original.Buttons.Length; i++)
+        for (int i = 0; i < original.ButtonCount; i++)
             Assert.Equal(original.Buttons[i], decoded.Buttons[i]);
 
-        Assert.Equal(original.Hats.Length, decoded.Hats.Length);
-        for (int i = 0; i < original.Hats.Length; i++)
+        for (int i = 0; i < original.HatCount; i++)
             Assert.Equal(original.Hats[i], decoded.Hats[i]);
     }
 
     [Fact]
-    public void PacketCodec_EmptyArrays_DoesNotThrow()
+    public void PacketCodec_EmptySnapshot_DoesNotThrow()
     {
-        var state = new DeviceInputState
+        var snapshot = new VJoyOutputSnapshot
         {
-            DeviceIndex = 0,
-            Axes = [],
-            Buttons = [],
-            Hats = [],
-            Timestamp = DateTime.UtcNow
+            DeviceId    = 2,
+            AxisCount   = 0,
+            ButtonCount = 0,
+            HatCount    = 0
         };
 
-        var encoded = NetworkInputService.EncodeInputPayload(state, 0);
-        var (slot, decoded) = NetworkInputService.DecodeInputPayload(encoded);
+        var encoded = NetworkInputService.EncodeVJoyPayload(snapshot);
+        var decoded = NetworkInputService.DecodeVJoyPayload(encoded);
 
-        Assert.Equal(0, slot);
-        Assert.Empty(decoded.Axes);
-        Assert.Empty(decoded.Buttons);
-        Assert.Empty(decoded.Hats);
+        Assert.Equal(2u, decoded.DeviceId);
+        Assert.Equal(0,  decoded.AxisCount);
+        Assert.Equal(0,  decoded.ButtonCount);
+        Assert.Equal(0,  decoded.HatCount);
     }
 
     // ── 2. MappingProfile serialization ──────────────────────────────────────
@@ -116,5 +120,20 @@ public class NetworkInputServiceTests
     {
         var result = VJoyAxisHelper.IndexToHidUsage(index);
         Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData(HID_USAGES.X,   0)]
+    [InlineData(HID_USAGES.Y,   1)]
+    [InlineData(HID_USAGES.Z,   2)]
+    [InlineData(HID_USAGES.RX,  3)]
+    [InlineData(HID_USAGES.RY,  4)]
+    [InlineData(HID_USAGES.RZ,  5)]
+    [InlineData(HID_USAGES.SL0, 6)]
+    [InlineData(HID_USAGES.SL1, 7)]
+    public void VJoyAxisHelper_HidUsageToIndex_IsRoundTripOfIndexToHidUsage(HID_USAGES usage, int expectedIndex)
+    {
+        var result = VJoyAxisHelper.HidUsageToIndex(usage);
+        Assert.Equal(expectedIndex, result);
     }
 }

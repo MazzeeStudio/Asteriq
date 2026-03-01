@@ -25,4 +25,21 @@ public static class VJoyAxisHelper
         7 => HID_USAGES.SL1,
         _ => HID_USAGES.X
     };
+
+    /// <summary>
+    /// Convert a vJoy HID_USAGES axis constant back to a 0-based index.
+    /// Reverse of <see cref="IndexToHidUsage"/>. Unknown values return 0.
+    /// </summary>
+    public static int HidUsageToIndex(HID_USAGES axis) => axis switch
+    {
+        HID_USAGES.X   => 0,
+        HID_USAGES.Y   => 1,
+        HID_USAGES.Z   => 2,
+        HID_USAGES.RX  => 3,
+        HID_USAGES.RY  => 4,
+        HID_USAGES.RZ  => 5,
+        HID_USAGES.SL0 => 6,
+        HID_USAGES.SL1 => 7,
+        _ => 0
+    };
 }

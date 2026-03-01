@@ -15,7 +15,14 @@ public static class ServiceConfiguration
     {
         // Core services (Singleton - stateful, maintain state across application lifetime)
         services.AddSingleton<IInputService, InputService>();
-        services.AddSingleton<IVJoyService, VJoyService>();
+        // Register the real VJoy service as its concrete type, then wrap it in
+        // NetworkVJoyService for capture-mode forwarding. Everything that depends on
+        // IVJoyService (including MappingEngine) gets the NetworkVJoyService wrapper.
+        services.AddSingleton<VJoyService>();
+        services.AddSingleton<NetworkVJoyService>(sp =>
+            new NetworkVJoyService(sp.GetRequiredService<VJoyService>()));
+        services.AddSingleton<IVJoyService>(sp =>
+            sp.GetRequiredService<NetworkVJoyService>());
         services.AddSingleton<IMappingEngine, MappingEngine>();
         services.AddSingleton<IHidHideService, HidHideService>();
         services.AddSingleton<KeyboardService>();

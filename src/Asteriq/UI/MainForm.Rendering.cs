@@ -234,7 +234,9 @@ public partial class MainForm
         {
             int i = visibleTabs[vi];
             bool isActive = i == _activeTab;
-            var tabColor = isActive ? FUIColors.Active : FUIColors.TextDim;
+            bool isLocked = _isClientConnected && i < 2;
+            var tabColor = isLocked ? FUIColors.Frame :
+                           isActive ? FUIColors.Active : FUIColors.TextDim;
 
             FUIRenderer.DrawText(canvas, _tabNames[i], new SKPoint(tabX, titleBarY + 38), tabColor, 16f);
 
@@ -485,15 +487,25 @@ public partial class MainForm
         FUIRenderer.DrawText(canvas, mousePos,
             new SKPoint(mousePosX, y + 22), FUIColors.TextDim, 13f);
 
-        // Centre: connection status, anchored to true window centre
-        int connectedCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
-        int disconnectedCount = _devices.Count(d => !d.IsVirtual && !d.IsConnected);
-        string deviceText = disconnectedCount > 0
-            ? $"{connectedCount} CONNECTED, {disconnectedCount} OFFLINE"
-            : connectedCount == 1 ? "1 DEVICE CONNECTED" : $"{connectedCount} DEVICES CONNECTED";
-        float deviceTextWidth = FUIRenderer.MeasureText(deviceText, 15f);
-        FUIRenderer.DrawText(canvas, deviceText,
-            new SKPoint(bounds.MidX - deviceTextWidth / 2f, y + 22), FUIColors.TextDim, 15f);
+        // Centre: client mode banner OR normal device connection status
+        if (_isClientConnected)
+        {
+            string banner = $"CLIENT MODE — {_connectedMasterName.ToUpperInvariant()}";
+            float bannerWidth = FUIRenderer.MeasureText(banner, 15f);
+            FUIRenderer.DrawText(canvas, banner,
+                new SKPoint(bounds.MidX - bannerWidth / 2f, y + 22), FUIColors.Warning, 15f);
+        }
+        else
+        {
+            int connectedCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
+            int disconnectedCount = _devices.Count(d => !d.IsVirtual && !d.IsConnected);
+            string deviceText = disconnectedCount > 0
+                ? $"{connectedCount} CONNECTED, {disconnectedCount} OFFLINE"
+                : connectedCount == 1 ? "1 DEVICE CONNECTED" : $"{connectedCount} DEVICES CONNECTED";
+            float deviceTextWidth = FUIRenderer.MeasureText(deviceText, 15f);
+            FUIRenderer.DrawText(canvas, deviceText,
+                new SKPoint(bounds.MidX - deviceTextWidth / 2f, y + 22), FUIColors.TextDim, 15f);
+        }
 
 
         // Right: network indicator + update indicator shape + version and time

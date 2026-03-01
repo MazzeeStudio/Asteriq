@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Asteriq.Services;
 
 /// <summary>
-/// Manages TCP-based raw input forwarding between two Asteriq instances.
+/// Manages TCP-based vJoy state forwarding between two Asteriq instances.
 ///
 /// Protocol framing:
 ///   [4] uint32 magic = 0x41535459 ("ASTY")
@@ -24,18 +24,19 @@ public sealed class NetworkInputService : INetworkInputService
 
     private static class MsgType
     {
-        public const byte Input = 0;
-        public const byte Acquire = 1;
-        public const byte Release = 2;
-        public const byte Ping = 3;
-        public const byte Pong = 4;
-        public const byte Hello = 5;       // source→receiver: {nameLen,name,port[2],codeLen,code}
-        public const byte HelloAccept = 6; // receiver→source: empty
-        public const byte HelloReject = 7; // receiver→source: empty
+        public const byte Input       = 0;
+        public const byte Acquire     = 1;
+        public const byte Release     = 2;
+        public const byte Ping        = 3;
+        public const byte Pong        = 4;
+        public const byte Hello       = 5; // master→client: {nameLen,name,port[2],codeLen,code}
+        public const byte HelloAccept = 6; // client→master: empty
+        public const byte HelloReject = 7; // client→master: empty
     }
 
     // ── Services ─────────────────────────────────────────────────────────────
     private readonly IVJoyService _vjoy;
+    private readonly IApplicationSettingsService _settings;
     private readonly ILogger<NetworkInputService> _logger;
 
     // ── State ────────────────────────────────────────────────────────────────
@@ -47,34 +48,30 @@ public sealed class NetworkInputService : INetworkInputService
     private CancellationTokenSource? _receiveCts;
     private readonly object _sendLock = new();
 
-    // ── Pairing ───────────────────────────────────────────────────────────────
-    // Set when a receiver-side connection arrives; UI reads these to show PairingCodeDialog.
-    private TaskCompletionSource<bool>? _pairingTcs; // true=accepted, false=rejected
-    private string _pendingPeerName = "";
-    private string _pendingCode = "";
+    // ── Trust handshake ───────────────────────────────────────────────────────
+    private TaskCompletionSource<bool>? _pairingTcs;
     private TcpClient? _pendingClient;
     private NetworkStream? _pendingStream;
 
     // ── Events ───────────────────────────────────────────────────────────────
     public event EventHandler? ConnectionLost;
-
-    /// <summary>
-    /// Fired on the receiver side when a remote peer requests to connect.
-    /// EventArgs: <see cref="PairingRequestEventArgs"/> — contains machine name and 6-digit code.
-    /// UI should show the code, then call <see cref="AcceptPairingAsync"/> or <see cref="RejectPairing"/>.
-    /// </summary>
-    public event EventHandler<PairingRequestEventArgs>? PairingRequested;
+    public event EventHandler<string>? ClientConnected;
+    public event EventHandler<TrustRequestEventArgs>? TrustRequested;
 
     public NetworkInputMode Mode => _mode;
     public bool IsListening => _listener is not null;
 
-    public NetworkInputService(IVJoyService vjoy, ILogger<NetworkInputService> logger)
+    public NetworkInputService(
+        IVJoyService vjoy,
+        IApplicationSettingsService settings,
+        ILogger<NetworkInputService> logger)
     {
-        _vjoy = vjoy ?? throw new ArgumentNullException(nameof(vjoy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _vjoy     = vjoy     ?? throw new ArgumentNullException(nameof(vjoy));
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _logger   = logger   ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    // ── Listener (receiver side) ─────────────────────────────────────────────
+    // ── Listener (client / receiver side) ────────────────────────────────────
 
     public async Task StartListenerAsync(int port, CancellationToken cancellationToken = default)
     {
@@ -101,7 +98,7 @@ public sealed class NetworkInputService : INetworkInputService
                 _ = HandleIncomingHandshakeAsync(client, ct);
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "Accept loop error");
             }
@@ -113,6 +110,8 @@ public sealed class NetworkInputService : INetworkInputService
         try
         {
             var stream = client.GetStream();
+            var remoteIp = (client.Client.RemoteEndPoint as IPEndPoint)?.Address.ToString() ?? "";
+
             var (type, payload) = await ReadPacketAsync(stream, ct).ConfigureAwait(false);
             if (type != MsgType.Hello)
             {
@@ -124,15 +123,28 @@ public sealed class NetworkInputService : INetworkInputService
             var (peerName, _, code) = DecodeHello(payload);
             _logger.LogInformation("Hello from {Peer} with code {Code}", peerName, code);
 
-            _pendingPeerName = peerName;
-            _pendingCode = code;
+            // Check for auto-accept (known trusted master with matching code)
+            var trusted = _settings.TrustedMaster;
+            bool autoAccept = trusted is not null
+                && trusted.MachineName == peerName
+                && trusted.Code == code;
+
             _pendingClient = client;
             _pendingStream = stream;
             _pairingTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            PairingRequested?.Invoke(this, new PairingRequestEventArgs(peerName, code));
+            if (autoAccept)
+            {
+                _logger.LogInformation("Auto-accepting trusted master {Peer}", peerName);
+                _pairingTcs.TrySetResult(true);
+            }
+            else
+            {
+                TrustRequested?.Invoke(this,
+                    new TrustRequestEventArgs(peerName, code, remoteIp));
+            }
 
-            // Wait for UI response (accept/reject)
+            // Wait for UI response (or immediate auto-accept above)
             bool accepted;
             try
             {
@@ -140,7 +152,7 @@ public sealed class NetworkInputService : INetworkInputService
             }
             catch (TimeoutException)
             {
-                _logger.LogWarning("Pairing confirmation timed out");
+                _logger.LogWarning("Trust confirmation timed out for {Peer}", peerName);
                 accepted = false;
             }
 
@@ -148,37 +160,41 @@ public sealed class NetworkInputService : INetworkInputService
             {
                 await WritePacketAsync(stream, MsgType.HelloReject, [], ct).ConfigureAwait(false);
                 client.Dispose();
-                _logger.LogInformation("Pairing rejected for {Peer}", peerName);
+                _logger.LogInformation("Connection rejected for {Peer}", peerName);
                 return;
             }
 
             await WritePacketAsync(stream, MsgType.HelloAccept, [], ct).ConfigureAwait(false);
             _client = client;
             _stream = stream;
+            _mode   = NetworkInputMode.Receiving;
 
-            _logger.LogInformation("Pairing accepted, starting receive loop for {Peer}", peerName);
-            _ = RunReceiveLoopAsync(stream, ct);
+            _logger.LogInformation("Connection accepted, starting receive loop for {Peer}", peerName);
+            ClientConnected?.Invoke(this, peerName);
+            _receiveCts = new CancellationTokenSource();
+            _ = RunReceiveLoopAsync(stream, _receiveCts.Token);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Handshake error");
             client.Dispose();
         }
     }
 
-    /// <summary>Call from UI after showing PairingCodeDialog to accept the connection.</summary>
+    /// <summary>Accept the pending trust request.</summary>
     public void AcceptPairing() => _pairingTcs?.TrySetResult(true);
 
-    /// <summary>Call from UI after showing PairingCodeDialog to reject the connection.</summary>
+    /// <summary>Reject the pending trust request.</summary>
     public void RejectPairing() => _pairingTcs?.TrySetResult(false);
 
-    // ── Connect (source side) ─────────────────────────────────────────────────
+    // ── Connect (master side) ─────────────────────────────────────────────────
 
     public async Task ConnectToAsync(NetworkPeer peer, CancellationToken cancellationToken = default)
     {
         await DisconnectAsync(cancellationToken).ConfigureAwait(false);
 
-        var code = GeneratePairingCode();
+        // Master uses its own permanent code (never changes)
+        var code = _settings.NetworkMasterCode;
         _logger.LogInformation("Connecting to {Peer} @ {Ip}:{Port} with code {Code}",
             peer.MachineName, peer.IpAddress, peer.TcpPort, code);
 
@@ -187,14 +203,11 @@ public sealed class NetworkInputService : INetworkInputService
 
         var stream = client.GetStream();
 
-        // Send HELLO with pairing code
+        // Send HELLO with our permanent master code
         var helloPayload = EncodeHello(Environment.MachineName, (ushort)peer.TcpPort, code);
         await WritePacketAsync(stream, MsgType.Hello, helloPayload, cancellationToken).ConfigureAwait(false);
 
-        // Notify UI to display code — source side shows the same code it sent
-        PairingRequested?.Invoke(this, new PairingRequestEventArgs(peer.MachineName, code, isSource: true));
-
-        // Wait for accept/reject from receiver
+        // Wait for accept/reject from client — no source-side dialog
         var (responseType, _) = await ReadPacketAsync(stream, cancellationToken).ConfigureAwait(false);
         if (responseType != MsgType.HelloAccept)
         {
@@ -205,14 +218,13 @@ public sealed class NetworkInputService : INetworkInputService
 
         _client = client;
         _stream = stream;
-        _mode = NetworkInputMode.Remote;
+        _mode   = NetworkInputMode.Remote;
 
-        // Send ACQUIRE so receiver grabs vJoy
+        // Send ACQUIRE so client grabs vJoy
         await WritePacketAsync(stream, MsgType.Acquire, [], cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation("Connected to {Peer}, mode=Remote", peer.MachineName);
 
-        // Start ping keepalive
         _receiveCts = new CancellationTokenSource();
         _ = RunPingAsync(stream, _receiveCts.Token);
     }
@@ -225,7 +237,7 @@ public sealed class NetworkInputService : INetworkInputService
             {
                 await WritePacketAsync(_stream, MsgType.Release, [], cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogDebug(ex, "Release send error (ignored)");
             }
@@ -244,9 +256,9 @@ public sealed class NetworkInputService : INetworkInputService
         _logger.LogInformation("NetworkInput disconnected, mode=Local");
     }
 
-    // ── Send (source, hot path) ───────────────────────────────────────────────
+    // ── Send (master, hot path) ───────────────────────────────────────────────
 
-    public void SendInputState(DeviceInputState state, byte deviceSlot)
+    public void SendVJoyState(VJoyOutputSnapshot snapshot)
     {
         if (_mode != NetworkInputMode.Remote || _stream is null) return;
 
@@ -254,19 +266,18 @@ public sealed class NetworkInputService : INetworkInputService
         {
             try
             {
-                // Write synchronously inside the lock — stream is buffered, NoDelay flushes quickly
-                WriteInputPacketSync(_stream, state, deviceSlot);
+                WriteVJoyPacketSync(_stream, snapshot);
             }
             catch (IOException ex)
             {
-                _logger.LogWarning(ex, "SendInputState failed — connection lost");
+                _logger.LogWarning(ex, "SendVJoyState failed — connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
         }
     }
 
-    // ── Receive loop (receiver side) ─────────────────────────────────────────
+    // ── Receive loop (client side) ────────────────────────────────────────────
 
     private async Task RunReceiveLoopAsync(NetworkStream stream, CancellationToken ct)
     {
@@ -284,12 +295,14 @@ public sealed class NetworkInputService : INetworkInputService
                     case MsgType.Release:
                         _vjoy.ResetDevice(1);
                         _vjoy.ReleaseDevice(1);
-                        _logger.LogInformation("Remote released vJoy slot 1");
+                        _mode = NetworkInputMode.Local;
+                        _logger.LogInformation("Master released vJoy slot 1");
+                        ConnectionLost?.Invoke(this, EventArgs.Empty);
                         break;
 
                     case MsgType.Input:
-                        var (_, inputState) = DecodeInputPayload(payload);
-                        ApplyToVJoy(inputState, deviceId: 1);
+                        var snapshot = DecodeVJoyPayload(payload);
+                        ApplySnapshot(snapshot, deviceId: 1);
                         break;
 
                     case MsgType.Ping:
@@ -299,9 +312,10 @@ public sealed class NetworkInputService : INetworkInputService
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Receive loop error — connection lost");
+            _mode = NetworkInputMode.Local;
             ConnectionLost?.Invoke(this, EventArgs.Empty);
         }
         finally
@@ -311,7 +325,7 @@ public sealed class NetworkInputService : INetworkInputService
         }
     }
 
-    // ── Ping keepalive (source side) ─────────────────────────────────────────
+    // ── Ping keepalive (master side) ──────────────────────────────────────────
 
     private async Task RunPingAsync(NetworkStream stream, CancellationToken ct)
     {
@@ -321,11 +335,10 @@ public sealed class NetworkInputService : INetworkInputService
             {
                 await Task.Delay(3000, ct).ConfigureAwait(false);
                 await WritePacketAsync(stream, MsgType.Ping, [], ct).ConfigureAwait(false);
-                // Don't wait for pong — if connection is dead, SendInputState will catch it
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Ping failed — connection lost");
             _mode = NetworkInputMode.Local;
@@ -335,68 +348,69 @@ public sealed class NetworkInputService : INetworkInputService
 
     // ── Codec ─────────────────────────────────────────────────────────────────
 
-    /// <summary>Encode an INPUT payload from DeviceInputState.</summary>
-    public static byte[] EncodeInputPayload(DeviceInputState state, byte deviceSlot)
+    /// <summary>Encode a <see cref="VJoyOutputSnapshot"/> as an INPUT payload.</summary>
+    public static byte[] EncodeVJoyPayload(VJoyOutputSnapshot snapshot)
     {
-        int axisCount = Math.Min(state.Axes.Length, 255);
-        int buttonCount = Math.Min(state.Buttons.Length, 65535);
-        int hatCount = Math.Min(state.Hats.Length, 255);
+        int axisCount   = Math.Min(snapshot.AxisCount, 8);
+        int buttonCount = Math.Min(snapshot.ButtonCount, 128);
+        int hatCount    = Math.Min(snapshot.HatCount, 4);
         int buttonByteCount = (buttonCount + 7) / 8;
 
-        int size = 1 + 1 + axisCount * 4 + 2 + buttonByteCount + 1 + hatCount * 4;
+        int size = 4 + 1 + axisCount * 4 + 2 + buttonByteCount + 1 + hatCount * 4;
         using var ms = new System.IO.MemoryStream(size);
-        using var w = new System.IO.BinaryWriter(ms);
+        using var w  = new System.IO.BinaryWriter(ms);
 
-        w.Write(deviceSlot);
+        w.Write(snapshot.DeviceId);
         w.Write((byte)axisCount);
-        for (int i = 0; i < axisCount; i++) w.Write(state.Axes[i]);
+        for (int i = 0; i < axisCount; i++) w.Write(snapshot.Axes[i]);
 
         w.Write((ushort)buttonCount);
         var buttonBytes = new byte[buttonByteCount];
         for (int i = 0; i < buttonCount; i++)
         {
-            if (state.Buttons[i])
+            if (snapshot.Buttons[i])
                 buttonBytes[i / 8] |= (byte)(1 << (i % 8));
         }
         w.Write(buttonBytes);
 
         w.Write((byte)hatCount);
-        for (int i = 0; i < hatCount; i++) w.Write(state.Hats[i]);
+        for (int i = 0; i < hatCount; i++) w.Write(snapshot.Hats[i]);
 
         return ms.ToArray();
     }
 
-    /// <summary>Decode an INPUT payload to DeviceInputState (DeviceIndex = deviceSlot).</summary>
-    public static (byte DeviceSlot, DeviceInputState State) DecodeInputPayload(byte[] payload)
+    /// <summary>Decode an INPUT payload back to a <see cref="VJoyOutputSnapshot"/>.</summary>
+    public static VJoyOutputSnapshot DecodeVJoyPayload(byte[] payload)
     {
         using var ms = new System.IO.MemoryStream(payload);
-        using var r = new System.IO.BinaryReader(ms);
+        using var r  = new System.IO.BinaryReader(ms);
 
-        byte deviceSlot = r.ReadByte();
-        int axisCount = r.ReadByte();
-        var axes = new float[axisCount];
+        uint deviceId  = r.ReadUInt32();
+        int axisCount  = r.ReadByte();
+        var axes       = new float[8];
         for (int i = 0; i < axisCount; i++) axes[i] = r.ReadSingle();
 
-        int buttonCount = r.ReadUInt16();
+        int buttonCount     = r.ReadUInt16();
         int buttonByteCount = (buttonCount + 7) / 8;
-        var buttonBytes = r.ReadBytes(buttonByteCount);
-        var buttons = new bool[buttonCount];
+        var buttonBytes     = r.ReadBytes(buttonByteCount);
+        var buttons         = new bool[128];
         for (int i = 0; i < buttonCount; i++)
             buttons[i] = (buttonBytes[i / 8] & (1 << (i % 8))) != 0;
 
         int hatCount = r.ReadByte();
-        var hats = new int[hatCount];
+        var hats     = new int[4];
         for (int i = 0; i < hatCount; i++) hats[i] = r.ReadInt32();
 
-        var state = new DeviceInputState
+        return new VJoyOutputSnapshot
         {
-            DeviceIndex = deviceSlot,
-            Axes = axes,
-            Buttons = buttons,
-            Hats = hats,
-            Timestamp = DateTime.UtcNow
+            DeviceId    = deviceId,
+            Axes        = axes,
+            Buttons     = buttons,
+            Hats        = hats,
+            AxisCount   = axisCount,
+            ButtonCount = buttonCount,
+            HatCount    = hatCount
         };
-        return (deviceSlot, state);
     }
 
     private static byte[] EncodeHello(string machineName, ushort tcpPort, string code)
@@ -404,7 +418,7 @@ public sealed class NetworkInputService : INetworkInputService
         var nameBytes = System.Text.Encoding.UTF8.GetBytes(machineName);
         var codeBytes = System.Text.Encoding.UTF8.GetBytes(code);
         using var ms = new System.IO.MemoryStream();
-        using var w = new System.IO.BinaryWriter(ms);
+        using var w  = new System.IO.BinaryWriter(ms);
         w.Write((byte)nameBytes.Length);
         w.Write(nameBytes);
         w.Write(tcpPort);
@@ -416,25 +430,25 @@ public sealed class NetworkInputService : INetworkInputService
     private static (string Name, ushort Port, string Code) DecodeHello(byte[] payload)
     {
         using var ms = new System.IO.MemoryStream(payload);
-        using var r = new System.IO.BinaryReader(ms);
-        int nameLen = r.ReadByte();
-        var name = System.Text.Encoding.UTF8.GetString(r.ReadBytes(nameLen));
-        ushort port = r.ReadUInt16();
-        int codeLen = r.ReadByte();
-        var code = System.Text.Encoding.UTF8.GetString(r.ReadBytes(codeLen));
+        using var r  = new System.IO.BinaryReader(ms);
+        int nameLen  = r.ReadByte();
+        var name     = System.Text.Encoding.UTF8.GetString(r.ReadBytes(nameLen));
+        ushort port  = r.ReadUInt16();
+        int codeLen  = r.ReadByte();
+        var code     = System.Text.Encoding.UTF8.GetString(r.ReadBytes(codeLen));
         return (name, port, code);
     }
 
-    private void ApplyToVJoy(DeviceInputState state, uint deviceId)
+    private void ApplySnapshot(VJoyOutputSnapshot snapshot, uint deviceId)
     {
-        for (int i = 0; i < state.Axes.Length && i < 8; i++)
-            _vjoy.SetAxis(deviceId, VJoyAxisHelper.IndexToHidUsage(i), state.Axes[i]);
+        for (int i = 0; i < snapshot.AxisCount && i < 8; i++)
+            _vjoy.SetAxis(deviceId, VJoyAxisHelper.IndexToHidUsage(i), snapshot.Axes[i]);
 
-        for (int i = 0; i < state.Buttons.Length; i++)
-            _vjoy.SetButton(deviceId, i + 1, state.Buttons[i]); // vJoy buttons are 1-indexed
+        for (int i = 0; i < snapshot.ButtonCount; i++)
+            _vjoy.SetButton(deviceId, i + 1, snapshot.Buttons[i]);
 
-        for (int i = 0; i < state.Hats.Length; i++)
-            _vjoy.SetContinuousPov(deviceId, (uint)i, state.Hats[i]);
+        for (int i = 0; i < snapshot.HatCount; i++)
+            _vjoy.SetContinuousPov(deviceId, (uint)i, snapshot.Hats[i]);
     }
 
     // ── Packet I/O ────────────────────────────────────────────────────────────
@@ -449,7 +463,7 @@ public sealed class NetworkInputService : INetworkInputService
         if (magic != Magic)
             throw new InvalidDataException($"Bad magic: 0x{magic:X8}");
 
-        byte type = header[4];
+        byte type   = header[4];
         uint length = BitConverter.ToUInt32(header, 5);
         if (length > 65536)
             throw new InvalidDataException($"Payload too large: {length}");
@@ -474,10 +488,10 @@ public sealed class NetworkInputService : INetworkInputService
             await stream.WriteAsync(payload, ct).ConfigureAwait(false);
     }
 
-    private void WriteInputPacketSync(NetworkStream stream, DeviceInputState state, byte deviceSlot)
+    private void WriteVJoyPacketSync(NetworkStream stream, VJoyOutputSnapshot snapshot)
     {
-        var payload = EncodeInputPayload(state, deviceSlot);
-        var header = new byte[9];
+        var payload = EncodeVJoyPayload(snapshot);
+        var header  = new byte[9];
         BitConverter.TryWriteBytes(header.AsSpan(0), Magic);
         header[4] = MsgType.Input;
         BitConverter.TryWriteBytes(header.AsSpan(5), (uint)payload.Length);
@@ -496,42 +510,11 @@ public sealed class NetworkInputService : INetworkInputService
         }
     }
 
-    private static string GeneratePairingCode()
-    {
-        var rng = Random.Shared;
-        return $"{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}{rng.Next(0, 10)}";
-    }
-
     public void Dispose()
     {
         DisconnectAsync().GetAwaiter().GetResult();
         _listenerCts?.Cancel();
         _listenerCts?.Dispose();
         _listener?.Stop();
-    }
-}
-
-/// <summary>
-/// Event args for a pairing request from a remote Asteriq instance.
-/// </summary>
-public sealed class PairingRequestEventArgs : EventArgs
-{
-    /// <summary>Machine name of the remote peer.</summary>
-    public string PeerName { get; }
-
-    /// <summary>6-digit pairing code to display.</summary>
-    public string Code { get; }
-
-    /// <summary>
-    /// True when fired on the source (initiating) side — the code was generated locally.
-    /// False when fired on the receiver side — the code was received from the remote.
-    /// </summary>
-    public bool IsSource { get; }
-
-    public PairingRequestEventArgs(string peerName, string code, bool isSource = false)
-    {
-        PeerName = peerName;
-        Code = code;
-        IsSource = isSource;
     }
 }

@@ -166,6 +166,7 @@ public partial class MainForm : Form
 
     // Network forwarding state
     private volatile NetworkInputMode _networkMode = NetworkInputMode.Local;
+    private bool _isNetworkConnecting;    // true while master-side handshake is in-flight
     private bool _lastSwitchButtonState = false;
 
     // NetworkVJoyService wrapper — provides capture-mode forwarding; always the same object as _vjoyService
@@ -174,6 +175,10 @@ public partial class MainForm : Form
     // Client mode — true when this machine is receiving vJoy state from a master
     private bool _isClientConnected;
     private string _connectedMasterName = "";
+
+    // Master heartbeat — sends current snapshot at 20 Hz when in Remote mode
+    // even if no physical input events are generated (e.g. stick at rest).
+    private CancellationTokenSource? _heartbeatCts;
 
     /// <summary>
     /// Constructor with dependency injection
@@ -303,6 +308,8 @@ public partial class MainForm : Form
         _tabContext.NetworkInput = _networkInput;
         _tabContext.StartNetworking = InitializeNetworking;
         _tabContext.ShutdownNetworking = ShutdownNetworking;
+        _tabContext.ConnectToPeerAsync = ConnectAsMasterAsync;
+        _tabContext.NetworkDisconnectAsync = SwitchToLocalAsync;
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
@@ -336,6 +343,7 @@ public partial class MainForm : Form
         _tabContext.IsForwarding = _isForwarding;
         _tabContext.BackgroundDirty = _backgroundDirty;
         _tabContext.NetworkMode = _networkMode;
+        _tabContext.IsNetworkConnecting = _isNetworkConnecting;
         _tabContext.IsClientConnected = _isClientConnected;
         _tabContext.MousePosition = _mousePosition;
         _tabContext.LeadLineProgress = _leadLineProgress;
@@ -1434,18 +1442,18 @@ public partial class MainForm : Form
                     _ = SwitchToLocalAsync();
             }
             _lastSwitchButtonState = buttonPressed;
-
-            // Consumed — never reaches MappingEngine or vJoy
-            return;
+            // Do NOT return — input must still reach the forwarding / local-vJoy path below.
         }
 
         // ── Master mode: run MappingEngine in capture mode, send snapshot ────
-        if (_isForwarding && _networkMode == NetworkInputMode.Remote &&
-            _appSettings.NetworkRole == NetworkRole.Master)
+        // ForwardingMode is set exclusively by ConnectAsMasterAsync — no role setting required.
+        if (_networkMode == NetworkInputMode.Remote && _networkVjoy.ForwardingMode)
         {
-            _mappingEngine.ProcessInput(state);   // NetworkVJoyService captures; no local vJoy write
-            var snapshot = _networkVjoy.GetSnapshot(1u);  // vJoy slot 1
-            if (snapshot is not null) _networkInput.SendVJoyState(snapshot);
+            if (_mappingEngine.IsRunning)
+                _mappingEngine.ProcessInput(state);
+
+            // Do NOT send here — the 20 Hz heartbeat handles transmission.
+            // Sending on every SDL2 event would flood the connection with joystick noise.
             return;
         }
 
@@ -1981,6 +1989,120 @@ public partial class MainForm : Form
         _ = _networkInput.DisconnectAsync();
     }
 
+    /// <summary>
+    /// Connect to a specific peer as master (called from Settings tab CONNECT button).
+    /// Auto-starts the MappingEngine if needed so snapshots are populated.
+    /// </summary>
+    private async Task ConnectAsMasterAsync(NetworkPeer peer)
+    {
+        if (_isNetworkConnecting) return;   // guard against concurrent attempts
+
+        // Set capture mode first so AcquireDevice in NetworkVJoyService skips real vJoy.
+        // This lets MappingEngine.Start() succeed even when CASTRA has no vJoy configured.
+        _networkVjoy.ForwardingMode = true;
+
+        // Ensure MappingEngine is running so NetworkVJoyService captures output.
+        if (!_isForwarding)
+        {
+            var profile = _profileManager.ActiveProfile;
+            if (profile is not null)
+            {
+                _mappingEngine.LoadProfile(profile);
+                if (_mappingEngine.Start())
+                {
+                    _isForwarding = true;
+                    _trayIcon.SetActive(true);
+                }
+            }
+        }
+
+        _isNetworkConnecting = true;
+        BeginInvoke(MarkDirty);   // disable CONNECT button immediately
+
+        try
+        {
+            await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
+            _networkMode = NetworkInputMode.Remote;
+            _tabContext.NetworkMode = _networkMode;
+
+            // Pre-initialise snapshots for every vJoy device in the active profile so the
+            // encoder always sends correctly-sized packets from the very first input tick.
+            PreInitializeAllNetworkSnapshots();
+            StartNetworkHeartbeat();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Connection failed — roll back capture mode
+            _networkVjoy.ForwardingMode = false;
+            System.Diagnostics.Debug.WriteLine($"[Network] ConnectAsMaster failed: {ex.Message}");
+        }
+        finally
+        {
+            _isNetworkConnecting = false;
+        }
+        BeginInvoke(MarkDirty);
+    }
+
+    /// <summary>
+    /// Pre-initialises snapshots for every vJoy device referenced in the active profile.
+    /// Falls back to device 1 if the profile has no mappings.
+    /// </summary>
+    private void PreInitializeAllNetworkSnapshots()
+    {
+        var profile = _profileManager.ActiveProfile;
+        IEnumerable<uint> deviceIds = profile is null
+            ? [1u]
+            : profile.AxisMappings.Select(m => m.Output.VJoyDevice)
+                .Concat(profile.ButtonMappings.Select(m => m.Output.VJoyDevice))
+                .Concat(profile.HatMappings.Select(m => m.Output.VJoyDevice))
+                .Where(id => id > 0)
+                .Distinct();
+
+        bool any = false;
+        foreach (var id in deviceIds)
+        {
+            PreInitializeNetworkSnapshot(id);
+            any = true;
+        }
+        if (!any) PreInitializeNetworkSnapshot(1u);
+    }
+
+    /// <summary>
+    /// Pre-populates the NetworkVJoyService snapshot for <paramref name="deviceId"/> with
+    /// the axis/button/hat capacities reported by the vJoy driver.  Falls back to safe
+    /// maximums if the device info cannot be obtained.
+    /// </summary>
+    private void PreInitializeNetworkSnapshot(uint deviceId)
+    {
+        try
+        {
+            var info = _networkVjoy.GetDeviceInfo(deviceId);
+            int axisCount = ComputeVJoyAxisCount(info);
+            int hatCount  = Math.Max(info.ContPovCount, info.DiscPovCount);
+            _networkVjoy.PreInitializeSnapshot(deviceId, axisCount, info.ButtonCount, hatCount);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Network] GetDeviceInfo({deviceId}) failed: {ex.Message}; using maximum capacities");
+            _networkVjoy.PreInitializeSnapshot(deviceId, 8, 128, 4);
+        }
+    }
+
+    /// <summary>Returns the highest-indexed axis + 1 for the given vJoy device.</summary>
+    private static int ComputeVJoyAxisCount(VJoyDeviceInfo info)
+    {
+        int max = -1;
+        if (info.HasAxisX)   max = Math.Max(max, 0);
+        if (info.HasAxisY)   max = Math.Max(max, 1);
+        if (info.HasAxisZ)   max = Math.Max(max, 2);
+        if (info.HasAxisRX)  max = Math.Max(max, 3);
+        if (info.HasAxisRY)  max = Math.Max(max, 4);
+        if (info.HasAxisRZ)  max = Math.Max(max, 5);
+        if (info.HasSlider0) max = Math.Max(max, 6);
+        if (info.HasSlider1) max = Math.Max(max, 7);
+        return max + 1;
+    }
+
     private async Task SwitchToRemoteAsync()
     {
         var peers = _networkDiscovery.KnownPeers;
@@ -1992,16 +2114,37 @@ public partial class MainForm : Form
 
         // Pick first known peer for MVP (2-machine scenario)
         var peer = peers.Values.First(p => !p.IsStale);
+
+        // Set capture mode first (same as ConnectAsMasterAsync) so AcquireDevice skips vJoy.
+        _networkVjoy.ForwardingMode = true;
+
+        // Ensure MappingEngine is running so snapshots are populated from physical input.
+        if (!_isForwarding)
+        {
+            var profile = _profileManager.ActiveProfile;
+            if (profile is not null)
+            {
+                _mappingEngine.LoadProfile(profile);
+                if (_mappingEngine.Start())
+                {
+                    _isForwarding = true;
+                    _trayIcon.SetActive(true);
+                }
+            }
+        }
+
         try
         {
             await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
             _networkMode = NetworkInputMode.Remote;
             _tabContext.NetworkMode = _networkMode;
-            _networkVjoy.ForwardingMode = true;   // capture mode — no local vJoy writes
+            PreInitializeAllNetworkSnapshots();
+            StartNetworkHeartbeat();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Connection refused or rejected — stay local
+            // Connection refused or rejected — roll back
+            _networkVjoy.ForwardingMode = false;
             System.Diagnostics.Debug.WriteLine($"[Network] SwitchToRemote failed: {ex.Message}");
         }
         BeginInvoke(MarkDirty);
@@ -2009,6 +2152,7 @@ public partial class MainForm : Form
 
     private async Task SwitchToLocalAsync()
     {
+        StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes
         await _networkInput.DisconnectAsync().ConfigureAwait(false);
         _networkMode = NetworkInputMode.Local;
@@ -2016,8 +2160,51 @@ public partial class MainForm : Form
         BeginInvoke(MarkDirty);
     }
 
+    /// <summary>
+    /// Starts a 20 Hz background loop that sends the current vJoy snapshot to the client
+    /// even when no physical input events are generated (stick at rest, etc.).
+    /// Replaces any previously running heartbeat.
+    /// </summary>
+    private void StartNetworkHeartbeat()
+    {
+        StopNetworkHeartbeat();
+        var cts = new CancellationTokenSource();
+        _heartbeatCts = cts;
+        _ = RunNetworkHeartbeatAsync(cts.Token);
+    }
+
+    private void StopNetworkHeartbeat()
+    {
+        _heartbeatCts?.Cancel();
+        _heartbeatCts?.Dispose();
+        _heartbeatCts = null;
+    }
+
+    private async Task RunNetworkHeartbeatAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(50, ct).ConfigureAwait(false); // 20 Hz
+
+                if (_networkMode != NetworkInputMode.Remote || !_networkVjoy.ForwardingMode)
+                    break;
+
+                foreach (var snapshot in _networkVjoy.GetAllSnapshots())
+                    _networkInput.SendVJoyState(snapshot);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Network] Heartbeat error: {ex.Message}");
+        }
+    }
+
     private void OnNetworkConnectionLost(object? sender, EventArgs e)
     {
+        StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes on disconnect
         _networkMode = NetworkInputMode.Local;
         BeginInvoke(() =>
@@ -2070,6 +2257,11 @@ public partial class MainForm : Form
         _networkMode         = NetworkInputMode.Receiving;
         _tabContext.NetworkMode       = _networkMode;
         _tabContext.IsClientConnected = _isClientConnected;
+
+        // Refresh vJoy device list so the SC Keybindings tab shows JS columns.
+        // This is necessary because the first render of the tab in client mode uses
+        // _ctx.VJoyDevices which may not have been synced since startup.
+        RefreshVJoyDevicesInternal();
 
         // Force to Settings tab (the only tab freely accessible in client mode)
         if (_activeTab < 2)

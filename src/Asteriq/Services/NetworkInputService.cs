@@ -53,13 +53,22 @@ public sealed class NetworkInputService : INetworkInputService
     private TcpClient? _pendingClient;
     private NetworkStream? _pendingStream;
 
+    // ── Client-side vJoy tracking ─────────────────────────────────────────────
+    // Devices acquired on behalf of the master; may be more than just slot 1.
+    private readonly HashSet<uint> _acquiredDevices = [];
+    // Devices that failed acquisition — skip retry until next session to avoid spam.
+    private readonly HashSet<uint> _failedDevices = [];
+
     // ── Events ───────────────────────────────────────────────────────────────
     public event EventHandler? ConnectionLost;
     public event EventHandler<string>? ClientConnected;
     public event EventHandler<TrustRequestEventArgs>? TrustRequested;
 
+    private int _packetsReceived;
+
     public NetworkInputMode Mode => _mode;
     public bool IsListening => _listener is not null;
+    public int PacketsReceived => _packetsReceived;
 
     public NetworkInputService(
         IVJoyService vjoy,
@@ -207,8 +216,21 @@ public sealed class NetworkInputService : INetworkInputService
         var helloPayload = EncodeHello(Environment.MachineName, (ushort)peer.TcpPort, code);
         await WritePacketAsync(stream, MsgType.Hello, helloPayload, cancellationToken).ConfigureAwait(false);
 
-        // Wait for accept/reject from client — no source-side dialog
-        var (responseType, _) = await ReadPacketAsync(stream, cancellationToken).ConfigureAwait(false);
+        // Wait for accept/reject from client.  The client shows a trust dialog so we
+        // allow up to 45 seconds — longer than the client's own 60 s timeout so Castra
+        // gets a clean rejection rather than a raw socket error.
+        using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        handshakeCts.CancelAfter(TimeSpan.FromSeconds(45));
+        byte responseType;
+        try
+        {
+            (responseType, _) = await ReadPacketAsync(stream, handshakeCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            client.Dispose();
+            throw new TimeoutException($"Connection to {peer.MachineName} timed out waiting for trust confirmation.");
+        }
         if (responseType != MsgType.HelloAccept)
         {
             _logger.LogWarning("Connection to {Peer} rejected", peer.MachineName);
@@ -235,7 +257,10 @@ public sealed class NetworkInputService : INetworkInputService
         {
             try
             {
-                await WritePacketAsync(_stream, MsgType.Release, [], cancellationToken).ConfigureAwait(false);
+                lock (_sendLock)
+                {
+                    WritePacketSync(_stream, MsgType.Release, []);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -252,6 +277,8 @@ public sealed class NetworkInputService : INetworkInputService
         _client?.Dispose();
         _client = null;
         _mode = NetworkInputMode.Local;
+        _acquiredDevices.Clear();
+        Interlocked.Exchange(ref _packetsReceived, 0);
 
         _logger.LogInformation("NetworkInput disconnected, mode=Local");
     }
@@ -289,20 +316,30 @@ public sealed class NetworkInputService : INetworkInputService
                 switch (type)
                 {
                     case MsgType.Acquire:
-                        _vjoy.AcquireDevice(1);
+                        // Ensure vJoy is initialized — it may have been skipped at startup
+                        // if the driver wasn't ready yet.
+                        if (!_vjoy.IsInitialized)
+                            _vjoy.Initialize();
+
+                        // Acquire device 1 upfront; additional devices are acquired lazily
+                        // the first time we receive a snapshot for them (see MsgType.Input below).
+                        EnsureDeviceAcquired(1);
                         break;
 
                     case MsgType.Release:
-                        _vjoy.ResetDevice(1);
-                        _vjoy.ReleaseDevice(1);
+                        ReleaseAllDevices();
                         _mode = NetworkInputMode.Local;
-                        _logger.LogInformation("Master released vJoy slot 1");
+                        _logger.LogInformation("Master released all vJoy devices");
                         ConnectionLost?.Invoke(this, EventArgs.Empty);
-                        break;
+                        return;  // master is closing the connection — exit cleanly
 
                     case MsgType.Input:
                         var snapshot = DecodeVJoyPayload(payload);
-                        ApplySnapshot(snapshot, deviceId: 1);
+                        // Acquire the device lazily — the master may forward multiple vJoy
+                        // devices (e.g. JS1, JS2, JS3) but only sends one Acquire packet.
+                        EnsureDeviceAcquired(snapshot.DeviceId);
+                        ApplySnapshot(snapshot, snapshot.DeviceId);
+                        Interlocked.Increment(ref _packetsReceived);
                         break;
 
                     case MsgType.Ping:
@@ -320,9 +357,39 @@ public sealed class NetworkInputService : INetworkInputService
         }
         finally
         {
-            _vjoy.ResetDevice(1);
-            _vjoy.ReleaseDevice(1);
+            ReleaseAllDevices();
         }
+    }
+
+    private void EnsureDeviceAcquired(uint deviceId)
+    {
+        if (_acquiredDevices.Contains(deviceId)) return;
+        if (_failedDevices.Contains(deviceId)) return;  // don't spam retries each session
+
+        if (!_vjoy.IsInitialized)
+            _vjoy.Initialize();
+
+        if (_vjoy.AcquireDevice(deviceId))
+        {
+            _acquiredDevices.Add(deviceId);
+            _logger.LogInformation("Acquired vJoy device {DeviceId}", deviceId);
+        }
+        else
+        {
+            _failedDevices.Add(deviceId);
+            _logger.LogWarning("vJoy device {DeviceId} not available on this machine — skipping", deviceId);
+        }
+    }
+
+    private void ReleaseAllDevices()
+    {
+        foreach (var deviceId in _acquiredDevices)
+        {
+            _vjoy.ResetDevice(deviceId);
+            _vjoy.ReleaseDevice(deviceId);
+        }
+        _acquiredDevices.Clear();
+        _failedDevices.Clear();        // reset so next session can retry (vJoy config may have changed)
     }
 
     // ── Ping keepalive (master side) ──────────────────────────────────────────
@@ -334,7 +401,12 @@ public sealed class NetworkInputService : INetworkInputService
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(3000, ct).ConfigureAwait(false);
-                await WritePacketAsync(stream, MsgType.Ping, [], ct).ConfigureAwait(false);
+                // Write inside _sendLock — same lock used by SendVJoyState/heartbeat
+                // to prevent concurrent writes corrupting the TCP frame.
+                lock (_sendLock)
+                {
+                    WritePacketSync(stream, MsgType.Ping, []);
+                }
             }
         }
         catch (OperationCanceledException) { }
@@ -344,6 +416,17 @@ public sealed class NetworkInputService : INetworkInputService
             _mode = NetworkInputMode.Local;
             ConnectionLost?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private static void WritePacketSync(NetworkStream stream, byte type, byte[] payload)
+    {
+        var header = new byte[9];
+        BitConverter.TryWriteBytes(header.AsSpan(0), Magic);
+        header[4] = type;
+        BitConverter.TryWriteBytes(header.AsSpan(5), (uint)payload.Length);
+        stream.Write(header);
+        if (payload.Length > 0)
+            stream.Write(payload);
     }
 
     // ── Codec ─────────────────────────────────────────────────────────────────

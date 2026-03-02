@@ -934,15 +934,21 @@ internal static class FUIWidgets
 
         if (mode == Services.Abstractions.NetworkInputMode.Remote)
         {
-            // Filled active circle + outer ring
+            // Master sending — filled green circle + outer ring
             using var fill = FUIRenderer.CreateFillPaint(FUIColors.Active);
             canvas.DrawCircle(centerX, midY, r, fill);
             using var ring = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(FUIColors.AlphaBorderSoft), 1f);
             canvas.DrawCircle(centerX, midY, r + 2.5f, ring);
         }
+        else if (mode == Services.Abstractions.NetworkInputMode.Receiving)
+        {
+            // Client receiving — green ring only (no fill)
+            using var ring = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(FUIColors.AlphaBorderSoft), 1.5f);
+            canvas.DrawCircle(centerX, midY, r, ring);
+        }
         else
         {
-            // Dim local indicator
+            // Local / not connected — dim grey dot
             using var fill = FUIRenderer.CreateFillPaint(FUIColors.FrameDim.WithAlpha(FUIColors.AlphaBorderSoft));
             canvas.DrawCircle(centerX, midY, r, fill);
         }

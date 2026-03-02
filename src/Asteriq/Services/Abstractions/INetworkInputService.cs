@@ -37,6 +37,13 @@ public interface INetworkInputService : IDisposable
     bool IsListening { get; }
 
     /// <summary>
+    /// Number of INPUT packets received since the current connection was established.
+    /// Zero on the master; increments on the client for every vJoy snapshot applied.
+    /// Resets to zero on disconnect.
+    /// </summary>
+    int PacketsReceived { get; }
+
+    /// <summary>
     /// Start the TCP listener so a remote master can connect.
     /// Called at startup when NetworkEnabled = true.
     /// </summary>

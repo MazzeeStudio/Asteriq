@@ -9,7 +9,6 @@ $ErrorActionPreference = "Stop"
 $csproj    = "src\Asteriq\Asteriq.csproj"
 $outputDir = "publish-release"
 $distDir   = "dist"
-$zipPath   = Join-Path (Get-Location) "$distDir\Asteriq.zip"
 
 # --- Read version ---
 [xml]$proj = Get-Content $csproj
@@ -17,6 +16,8 @@ $major   = $proj.Project.PropertyGroup.MajorVersion | Where-Object { $_ } | Sele
 $minor   = $proj.Project.PropertyGroup.MinorVersion | Where-Object { $_ } | Select-Object -First 1
 $build   = git rev-list --count HEAD
 $version = "$major.$minor.$build"
+$zipName = "Asteriq v$version.zip"
+$zipPath = Join-Path (Get-Location) "$distDir\$zipName"
 
 Write-Host "Building Asteriq v$version..."
 
@@ -42,8 +43,8 @@ if (Test-Path $zipPath) { Remove-Item $zipPath }
 Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath
 
 Write-Host ""
-Write-Host "Done: dist\Asteriq.zip  (v$version)"
+Write-Host "Done: dist\$zipName  (v$version)"
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  git push"
-Write-Host "  gh release create v$version dist\Asteriq.zip --title `"Asteriq v$version`" --notes `"<release notes>`""
+Write-Host "  gh release create v$version `"dist\$zipName#Asteriq.zip`" --title `"Asteriq v$version`" --notes `"<release notes>`""

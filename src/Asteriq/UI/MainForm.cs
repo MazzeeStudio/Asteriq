@@ -2105,15 +2105,14 @@ public partial class MainForm : Form
 
     private async Task SwitchToRemoteAsync()
     {
-        var peers = _networkDiscovery.KnownPeers;
-        if (peers.Count == 0)
+        // Pick first known peer for MVP (2-machine scenario).
+        // Skip staleness check — TCP connect fails fast (<1s) if truly unreachable.
+        var peer = _networkDiscovery.KnownPeers.Values.FirstOrDefault();
+        if (peer is null)
         {
             BeginInvoke(() => _tabContext.MarkDirty()); // flash handled by status bar
             return;
         }
-
-        // Pick first known peer for MVP (2-machine scenario)
-        var peer = peers.Values.First(p => !p.IsStale);
 
         // Set capture mode first (same as ConnectAsMasterAsync) so AcquireDevice skips vJoy.
         _networkVjoy.ForwardingMode = true;

@@ -286,7 +286,7 @@ public partial class MappingsTabController
             FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
 
         float textY = badgeRect.MidY + 5f;
-        FUIRenderer.DrawText(canvas, "NET SWITCH: " + cfg.DisplayName,
+        FUIRenderer.DrawText(canvas, "TX TOGGLE: " + cfg.DisplayName,
             new SKPoint(badgeRect.Left + 10f, textY), FUIColors.Warning, 13f);
 
         // × close button on right
@@ -1518,7 +1518,7 @@ public partial class MappingsTabController
                 FUIRenderer.DrawRoundedPanel(canvas, bannerRect,
                     FUIColors.Warning.WithAlpha(FUIColors.AlphaLightTint),
                     FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
-                FUIRenderer.DrawText(canvas, "NET SWITCH: " + switchDisplayName,
+                FUIRenderer.DrawText(canvas, "TX TOGGLE: " + switchDisplayName,
                     new SKPoint(bannerRect.Left + 10f, bannerRect.MidY + 5f), FUIColors.Warning, 13f);
 
                 const float xSize = 16f;
@@ -1532,7 +1532,7 @@ public partial class MappingsTabController
                 canvas.DrawText("\u00D7", xBounds.MidX - 3f, xBounds.MidY + 5f, xPaint);
             }
 
-            // SET AS NET SWITCH / NET SWITCH ACTIVE — anchored to panel bottom
+            // SET AS TX TOGGLE / TX TOGGLE ACTIVE — anchored to panel bottom
             var netBounds = new SKRect(leftMargin, bottom - 32, rightMargin, bottom);
             _switchButtonActionBounds = isCurrentRowSwitchBtn ? SKRect.Empty : netBounds;
             _switchButtonActionHovered = !isCurrentRowSwitchBtn &&
@@ -1540,12 +1540,12 @@ public partial class MappingsTabController
 
             if (isCurrentRowSwitchBtn)
             {
-                FUIRenderer.DrawButton(canvas, netBounds, "NET SWITCH ACTIVE",
+                FUIRenderer.DrawButton(canvas, netBounds, "TX TOGGLE ACTIVE",
                     FUIRenderer.ButtonState.Disabled);
             }
             else
             {
-                FUIRenderer.DrawButton(canvas, netBounds, "SET AS NET SWITCH",
+                FUIRenderer.DrawButton(canvas, netBounds, "SET AS TX TOGGLE",
                     _switchButtonActionHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             }
         }

@@ -198,9 +198,17 @@ public class SettingsTabController : ITabController
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
         }
-        foreach (var (c, d, _) in _peerActionBounds)
+        bool netConnected = _ctx.NetworkMode == NetworkInputMode.Remote;
+        bool netConnecting = _ctx.IsNetworkConnecting;
+        foreach (var (c, d, ip) in _peerActionBounds)
         {
-            if (c.Contains(pt) || d.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+            bool isActiveBtn = netConnected && _ctx.ConnectedPeerIp == ip; // DISCONNECT button
+            bool isIdleBtn   = !netConnected && !netConnecting;             // CONNECT button (active state)
+            if ((isActiveBtn && d.Contains(pt)) || (isIdleBtn && c.Contains(pt)))
+            {
+                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                return;
+            }
         }
 
         // Update section buttons
@@ -1333,6 +1341,7 @@ public class SettingsTabController : ITabController
                         return;
                     }
                     if (!thisConnected && !_ctx.IsNetworkConnecting
+                        && _ctx.NetworkMode != NetworkInputMode.Remote
                         && connectBtn.Contains(pt) && _ctx.ConnectToPeerAsync is not null)
                     {
                         Log.Debug("[UI] CONNECT clicked | peer={Ip} mode={Mode} connectedIp={ConnectedIp}",

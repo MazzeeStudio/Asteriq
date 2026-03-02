@@ -98,8 +98,7 @@ public partial class SCBindingsTabController : ITabController
     private HashSet<string> _scConflictingBindings = new();
     private HashSet<string> _scDuplicateActionBindings = new();
 
-    // Network switch button conflict detection
-    private bool _exportBlockedByNetworkConflict;
+    // Network switch button conflict detection — keys are excluded from export (not blocking)
     private HashSet<string> _networkConflictBindingKeys = new();
     private int _scHighlightedColumn = -1;
 

@@ -315,7 +315,6 @@ public partial class SCBindingsTabController
     internal void CheckNetworkSwitchConflicts()
     {
         _networkConflictBindingKeys.Clear();
-        _exportBlockedByNetworkConflict = false;
 
         var switchCfg = _ctx.ProfileManager.ActiveProfile?.NetworkSwitchButton;
         if (switchCfg is null) return;
@@ -346,7 +345,6 @@ public partial class SCBindingsTabController
             _networkConflictBindingKeys.Add(binding.Key);
         }
 
-        _exportBlockedByNetworkConflict = _networkConflictBindingKeys.Count > 0;
         _ctx.MarkDirty();
     }
 

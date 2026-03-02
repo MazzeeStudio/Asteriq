@@ -16,8 +16,9 @@ $major   = $proj.Project.PropertyGroup.MajorVersion | Where-Object { $_ } | Sele
 $minor   = $proj.Project.PropertyGroup.MinorVersion | Where-Object { $_ } | Select-Object -First 1
 $build   = git rev-list --count HEAD
 $version = "$major.$minor.$build"
-$zipName = "Asteriq v$version.zip"
-$zipPath = Join-Path (Get-Location) "$distDir\$zipName"
+$zipName    = "Asteriq v$version.zip"
+$zipPath    = Join-Path (Get-Location) "$distDir\$zipName"
+$uploadPath = Join-Path (Get-Location) "$distDir\Asteriq.zip"  # fixed name for update checker
 
 Write-Host "Building Asteriq v$version..."
 
@@ -42,9 +43,15 @@ if (Test-Path $zipPath) { Remove-Item $zipPath }
 
 Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath
 
+# Also write a fixed-name copy — the update checker and the GitHub Pages download
+# button both reference the asset by the literal name "Asteriq.zip". The asset name
+# comes from the filename on disk; a #label suffix in 'gh release create' only sets
+# the display label, not the name the API returns.
+Copy-Item $zipPath $uploadPath -Force
+
 Write-Host ""
 Write-Host "Done: dist\$zipName  (v$version)"
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  git push"
-Write-Host "  gh release create v$version `"dist\$zipName#Asteriq.zip`" --title `"Asteriq v$version`" --notes `"<release notes>`""
+Write-Host "  gh release create v$version `"dist\Asteriq.zip`" --title `"Asteriq v$version`" --notes `"<release notes>`""

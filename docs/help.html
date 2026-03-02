@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asteriq — User Guide</title>
+<meta name="description" content="Comprehensive user guide for Asteriq, the unified HOTAS management application for Star Citizen.">
+<style>
+/* ===== Reset ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#070b0f;
+  --bg-surface:#0c1318;
+  --bg-panel:#101820;
+  --bg-card:#0e1922;
+  --border:#182840;
+  --border-hi:#1e3858;
+  --accent:#0090cc;
+  --accent-hi:#00b4f0;
+  --accent-glow:rgba(0,144,204,0.15);
+  --text:#b8c8d8;
+  --text-dim:#506070;
+  --text-label:#6080a0;
+  --white:#ddeaf4;
+  --danger:#f06070;
+  --warning:#e0c050;
+  --success:#50d0a0;
+  --sidebar-w:260px;
+  --header-h:56px;
+}
+
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--header-h) + 1.5rem)}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.7}
+
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hi);text-decoration:underline}
+img{max-width:100%;display:block;border-radius:6px}
+code{background:var(--bg-panel);border:1px solid var(--border);padding:0.15em 0.4em;border-radius:3px;font-size:0.92em;color:var(--accent-hi);font-family:'Cascadia Code','Consolas',monospace}
+pre{background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:1.2rem 1.4rem;overflow-x:auto;font-size:0.88em;line-height:1.6;color:var(--text);font-family:'Cascadia Code','Consolas',monospace}
+pre code{background:none;border:none;padding:0;color:inherit}
+
+/* ===== Header ===== */
+.site-header{
+  position:fixed;top:0;left:0;right:0;height:var(--header-h);z-index:100;
+  background:rgba(7,11,15,0.95);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 2rem;gap:1.5rem;
+}
+.site-header .logo{font-size:1.15rem;font-weight:700;letter-spacing:0.12em;color:var(--white)}
+.site-header .subtitle{font-size:0.85rem;color:var(--text-dim);letter-spacing:0.05em}
+.site-header .home-link{margin-left:auto;font-size:0.85rem}
+
+/* ===== Sidebar ===== */
+.sidebar{
+  position:fixed;top:var(--header-h);left:0;bottom:0;width:var(--sidebar-w);
+  background:var(--bg-surface);border-right:1px solid var(--border);
+  overflow-y:auto;padding:1.5rem 0;z-index:50;
+}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+.sidebar nav{display:flex;flex-direction:column}
+.sidebar .nav-section{
+  font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--text-dim);padding:0.6rem 1.5rem 0.3rem;margin-top:0.6rem;
+}
+.sidebar a{
+  display:block;padding:0.35rem 1.5rem;font-size:0.87rem;color:var(--text-label);
+  border-left:2px solid transparent;transition:all 0.15s;
+}
+.sidebar a:hover{color:var(--accent-hi);background:var(--accent-glow);text-decoration:none}
+.sidebar a.sub{padding-left:2.2rem;font-size:0.82rem;color:var(--text-dim)}
+.sidebar a.sub:hover{color:var(--accent)}
+
+/* ===== Main Content ===== */
+.content{
+  margin-left:var(--sidebar-w);margin-top:var(--header-h);
+  padding:2.5rem 3rem 4rem;max-width:900px;
+}
+
+/* ===== Typography ===== */
+h1{font-size:2rem;font-weight:700;color:var(--white);letter-spacing:0.04em;margin-bottom:0.5rem}
+h2{font-size:1.5rem;font-weight:600;color:var(--white);margin-top:3rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.15rem;font-weight:600;color:var(--accent-hi);margin-top:2rem;margin-bottom:0.7rem}
+h4{font-size:1rem;font-weight:600;color:var(--text);margin-top:1.5rem;margin-bottom:0.5rem}
+p{margin-bottom:1rem}
+ul,ol{margin-bottom:1rem;padding-left:1.5rem}
+li{margin-bottom:0.35rem}
+li::marker{color:var(--accent)}
+blockquote{border-left:3px solid var(--accent);background:var(--accent-glow);padding:1rem 1.2rem;border-radius:0 6px 6px 0;margin-bottom:1.5rem;font-style:italic;color:var(--text-label)}
+hr{border:none;border-top:1px solid var(--border);margin:2.5rem 0}
+
+/* ===== Tables ===== */
+table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;font-size:0.92rem}
+th{text-align:left;font-weight:600;color:var(--text-label);letter-spacing:0.03em;padding:0.6rem 0.8rem;border-bottom:2px solid var(--border);font-size:0.8rem;text-transform:uppercase}
+td{padding:0.55rem 0.8rem;border-bottom:1px solid var(--border);vertical-align:top}
+tr:hover td{background:rgba(0,144,204,0.04)}
+
+/* ===== Cards / Callouts ===== */
+.callout{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:8px;
+  padding:1.2rem 1.4rem;margin-bottom:1.5rem;
+}
+.callout.tip{border-left:3px solid var(--success)}
+.callout.warn{border-left:3px solid var(--warning)}
+.callout.danger{border-left:3px solid var(--danger)}
+.callout .callout-title{font-weight:600;font-size:0.85rem;letter-spacing:0.05em;margin-bottom:0.4rem;text-transform:uppercase}
+.callout.tip .callout-title{color:var(--success)}
+.callout.warn .callout-title{color:var(--warning)}
+.callout.danger .callout-title{color:var(--danger)}
+
+/* ===== Screenshot Placeholders ===== */
+.screenshot{
+  background:var(--bg-panel);border:1px dashed var(--border-hi);border-radius:8px;
+  padding:2.5rem 1.5rem;text-align:center;margin:1.5rem 0;
+  color:var(--text-dim);font-size:0.85rem;font-style:italic;
+}
+.screenshot::before{
+  content:'';display:block;width:48px;height:36px;margin:0 auto 0.8rem;
+  border:2px solid var(--border-hi);border-radius:4px;position:relative;
+}
+.screenshot::after{
+  content:'';position:absolute;width:8px;height:8px;border-radius:50%;
+  border:1.5px solid var(--border-hi);
+}
+
+/* ===== ASCII Diagram ===== */
+.diagram{
+  background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;
+  padding:1.5rem 2rem;margin:1.5rem 0;overflow-x:auto;
+  font-family:'Cascadia Code','Consolas',monospace;font-size:0.82rem;
+  color:var(--accent);line-height:1.5;white-space:pre;
+}
+
+/* ===== Footer ===== */
+.site-footer{
+  margin-left:var(--sidebar-w);padding:2rem 3rem;
+  border-top:1px solid var(--border);color:var(--text-dim);font-size:0.82rem;
+}
+
+/* ===== Responsive ===== */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .content,.site-footer{margin-left:0}
+  .content{padding:2rem 1.5rem}
+}
+
+/* ===== Print ===== */
+@media print{
+  .sidebar,.site-header{display:none}
+  .content{margin:0;padding:1rem;max-width:100%}
+  body{background:#fff;color:#222}
+  h1,h2,h3{color:#111}
+  a{color:#0066cc}
+  table{font-size:10pt}
+  .screenshot{border-style:solid}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header class="site-header">
+  <span class="logo">ASTERIQ</span>
+  <span class="subtitle">User Guide</span>
+  <a href="https://mazzeestudio.github.io/Asteriq/" class="home-link">Home</a>
+</header>
+
+<!-- ===== Sidebar ===== -->
+<aside class="sidebar">
+<nav>
+  <div class="nav-section">Getting Started</div>
+  <a href="#getting-started">Overview</a>
+  <a href="#system-requirements" class="sub">System Requirements</a>
+  <a href="#installation" class="sub">Installation</a>
+  <a href="#driver-setup" class="sub">Driver Setup</a>
+  <a href="#first-launch" class="sub">First Launch</a>
+
+  <div class="nav-section">Devices Tab</div>
+  <a href="#devices-tab">Devices</a>
+  <a href="#physical-devices" class="sub">Physical Devices</a>
+  <a href="#virtual-devices" class="sub">Virtual Devices</a>
+  <a href="#device-ordering" class="sub">Device Ordering</a>
+  <a href="#device-silhouettes" class="sub">Silhouettes</a>
+  <a href="#hiding-devices" class="sub">Hiding (HidHide)</a>
+
+  <div class="nav-section">Mappings Tab</div>
+  <a href="#mappings-tab">Mappings</a>
+  <a href="#creating-a-mapping" class="sub">Creating a Mapping</a>
+  <a href="#axis-mappings" class="sub">Axis Mappings</a>
+  <a href="#button-mappings" class="sub">Button Mappings</a>
+  <a href="#curve-editor" class="sub">Curve Editor</a>
+  <a href="#tx-toggle" class="sub">TX Toggle</a>
+
+  <div class="nav-section">SC Bindings Tab</div>
+  <a href="#sc-bindings-tab">SC Bindings</a>
+  <a href="#binding-grid" class="sub">Binding Grid</a>
+  <a href="#column-actions" class="sub">Column Actions</a>
+  <a href="#exporting" class="sub">Exporting</a>
+
+  <div class="nav-section">Settings Tab</div>
+  <a href="#settings-tab">Settings</a>
+  <a href="#profile-management" class="sub">Profiles</a>
+  <a href="#visual-settings" class="sub">Visual Settings</a>
+  <a href="#network-settings" class="sub">Network</a>
+  <a href="#updates" class="sub">Updates</a>
+
+  <div class="nav-section">Network</div>
+  <a href="#network-guide">Network Forwarding</a>
+  <a href="#tx-setup" class="sub">TX (Master) Setup</a>
+  <a href="#rx-setup" class="sub">RX (Client) Setup</a>
+
+  <div class="nav-section">Reference</div>
+  <a href="#profiles-ref">Profiles</a>
+  <a href="#auto-update">Auto-Update</a>
+  <a href="#cli-reference">Command Line</a>
+  <a href="#file-locations">File Locations</a>
+  <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+</aside>
+
+<!-- ===== Main Content ===== -->
+<main class="content">
+
+<h1 id="getting-started">Asteriq User Guide</h1>
+<blockquote>Asteriq is a unified HOTAS management application for Star Citizen. It replaces the need for separate tools like JoystickGremlin, the vJoy configuration GUI, and HidHide's own interface &mdash; everything is managed from one place.</blockquote>
+
+<!-- ────────────────────────────────── Getting Started ────────────────────────────────── -->
+
+<h2 id="system-requirements">System Requirements</h2>
+<table>
+  <tr><th>Requirement</th><th>Details</th></tr>
+  <tr><td>OS</td><td>Windows 10 or 11 (64-bit)</td></tr>
+  <tr><td>Runtime</td><td>None &mdash; Asteriq is self-contained</td></tr>
+  <tr><td>Drivers</td><td>vJoy 2.x <em>(optional but recommended)</em></td></tr>
+  <tr><td></td><td>HidHide <em>(optional, needed to hide physical devices from SC)</em></td></tr>
+</table>
+<p>vJoy and HidHide are the same drivers you may already have from JoystickGremlin setups. Asteriq replaces the GUI tools, not the drivers themselves.</p>
+
+<h2 id="installation">Installation</h2>
+<ol>
+  <li>Download <code>Asteriq.zip</code> from <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.zip">the latest release</a>.</li>
+  <li>Extract the ZIP to any folder (e.g. <code>C:\Asteriq</code>).</li>
+  <li>Run <code>Asteriq.exe</code>.</li>
+</ol>
+<p>There is no installer &mdash; just extract and run. To uninstall, delete the folder.</p>
+
+<h2 id="driver-setup">Driver Setup</h2>
+<p>On first launch, Asteriq checks whether vJoy and HidHide are installed. If either is missing, a setup dialog appears.</p>
+<div class="screenshot">Screenshot: Driver Setup dialog showing vJoy and HidHide status</div>
+<ul>
+  <li><strong>vJoy</strong> is required for virtual device output. Without it, Asteriq can still visualise SC bindings, but mapping and forwarding are unavailable.</li>
+  <li><strong>HidHide</strong> is optional. It hides your physical devices from Star Citizen so only the vJoy virtual devices are visible &mdash; preventing double-input problems.</li>
+</ul>
+<p>You can re-open this dialog at any time from <strong>Settings &gt; DRIVER SETUP</strong>.</p>
+
+<h2 id="first-launch">First Launch</h2>
+<p>After driver setup, Asteriq opens with four tabs across the top:</p>
+<table>
+  <tr><th>Tab</th><th>Purpose</th></tr>
+  <tr><td><strong>Devices</strong></td><td>See connected hardware and vJoy assignments</td></tr>
+  <tr><td><strong>Mappings</strong></td><td>Create axis curves, button maps, and output configurations</td></tr>
+  <tr><td><strong>SC Bindings</strong></td><td>Manage Star Citizen keybind XML files</td></tr>
+  <tr><td><strong>Settings</strong></td><td>Profiles, themes, network, updates</td></tr>
+</table>
+<p>A profile dropdown in the title bar lets you switch between saved configurations.</p>
+
+<hr>
+
+<!-- ────────────────────────────────── Devices Tab ────────────────────────────────── -->
+
+<h2 id="devices-tab">Devices Tab</h2>
+<p>The Devices tab shows all connected hardware and how it maps to vJoy virtual devices.</p>
+<div class="screenshot">Screenshot: Devices tab with physical device list, vJoy assignments, and silhouette</div>
+
+<h3 id="physical-devices">Physical Devices</h3>
+<p>The left panel lists every physical joystick, throttle, gamepad, and input device detected via SDL2. Each entry shows the device name, manufacturer, VID:PID, and a live connection indicator.</p>
+<p>Press any button or move any axis on your hardware &mdash; the corresponding device entry will pulse briefly to confirm detection.</p>
+
+<h3 id="virtual-devices">Virtual Devices (vJoy)</h3>
+<p>The assignment follows the device list order: first device &rarr; vJoy 1, second &rarr; vJoy 2, and so on. Up to 16 vJoy slots are available.</p>
+
+<h3 id="device-ordering">Device Ordering</h3>
+<p>Drag physical devices up and down to change their vJoy slot assignment. This order is saved in your active profile. Asteriq tracks devices by hardware identity, not USB port &mdash; swapping ports won't break your mapping.</p>
+
+<h3 id="device-silhouettes">Device Silhouettes</h3>
+<p>When a device has a matching silhouette map, a visual representation shows the physical layout with labelled controls and lead-lines. Hover to highlight, click to select.</p>
+<div class="screenshot">Screenshot: Device silhouette with lead-line labels</div>
+<p>Silhouettes are currently available for Virpil hardware. Other devices display a generic placeholder.</p>
+
+<h3 id="hiding-devices">Hiding Devices (HidHide)</h3>
+<p>With HidHide installed, Asteriq can hide physical devices from other applications so Star Citizen only sees the vJoy virtual devices &mdash; preventing "double input" problems. Asteriq automatically whitelists itself.</p>
+
+<hr>
+
+<!-- ────────────────────────────────── Mappings Tab ────────────────────────────────── -->
+
+<h2 id="mappings-tab">Mappings Tab</h2>
+<p>The Mappings tab is where you define how physical inputs translate to vJoy outputs.</p>
+<div class="screenshot">Screenshot: Mappings tab showing mapping list, curve editor, and silhouette</div>
+
+<h3 id="creating-a-mapping">Creating a Mapping</h3>
+<ol>
+  <li>Select a vJoy device using the <strong>&lt; &gt;</strong> arrows at the top.</li>
+  <li>Click <strong>Add Mapping</strong> (or double-click an empty row).</li>
+  <li>The Mapping Dialog opens.</li>
+</ol>
+<div class="screenshot">Screenshot: Mapping Dialog</div>
+<p><strong>Input detection:</strong> Move an axis or press a button &mdash; Asteriq auto-detects the device, input type, and index (15-second timeout).</p>
+<p><strong>Manual entry:</strong> Use dropdowns to choose the input device and specific control.</p>
+<p><strong>Output:</strong> Choose vJoy Axis, vJoy Button, vJoy POV, or Keyboard key.</p>
+
+<h3 id="axis-mappings">Axis Mappings</h3>
+<p>Translate analog inputs (sticks, throttle sliders) to vJoy axis outputs with:</p>
+<ul>
+  <li><strong>Curve</strong> &mdash; shape the response (see <a href="#curve-editor">Curve Editor</a>)</li>
+  <li><strong>Deadzone</strong> &mdash; centred (joystick) or end-only (throttle)</li>
+  <li><strong>Saturation</strong> &mdash; limit the output range</li>
+  <li><strong>Inversion</strong> &mdash; reverse the axis direction</li>
+</ul>
+<p>Multiple inputs can merge into one output: Average, Min, Max, or Sum.</p>
+
+<h3 id="button-mappings">Button Mappings</h3>
+<table>
+  <tr><th>Mode</th><th>Behaviour</th></tr>
+  <tr><td><strong>Normal</strong></td><td>Output mirrors input &mdash; pressed when held, released when let go</td></tr>
+  <tr><td><strong>Toggle</strong></td><td>Each press flips the output state (on &rarr; off &rarr; on)</td></tr>
+  <tr><td><strong>Pulse</strong></td><td>Brief activation on press (100&ndash;1000 ms)</td></tr>
+  <tr><td><strong>Hold-to-Activate</strong></td><td>Output activates only after holding for a duration (200&ndash;2000 ms)</td></tr>
+</table>
+
+<h3 id="curve-editor">Curve Editor</h3>
+<p>Shape axis response with an interactive graph. Drag control points to adjust, or use presets: Linear, S-Curve, Exponential. The preview shows real-time output as you move the physical axis.</p>
+<div class="screenshot">Screenshot: Curve editor graph</div>
+
+<h3 id="tx-toggle">TX Toggle Assignment</h3>
+<p>Designate a physical button as the <strong>TX TOGGLE</strong> &mdash; a hardware switch that toggles network forwarding on the master machine. The button row shows a "TX TOGGLE" badge when assigned.</p>
+
+<hr>
+
+<!-- ────────────────────────────────── SC Bindings Tab ────────────────────────────────── -->
+
+<h2 id="sc-bindings-tab">SC Bindings Tab</h2>
+<p>Manage Star Citizen keybinding XML files &mdash; import existing layouts, assign new bindings, and export for SC to use.</p>
+<div class="screenshot">Screenshot: SC Bindings tab showing binding grid</div>
+
+<h3 id="sc-detection">SC Installation Detection</h3>
+<p>Asteriq auto-detects LIVE, PTU, and EPTU installations. Select the environment from the dropdown &mdash; Asteriq reads <code>defaultProfile.xml</code> from SC's <code>Data.p4k</code> for the full action list.</p>
+
+<h3 id="binding-grid">Binding Grid</h3>
+<p>Rows = SC actions, columns = input sources (Mouse, Keyboard, vJoy). Filter by category or search by name.</p>
+<p>To assign: click a cell, then press a button or move an axis. 5-second timeout.</p>
+
+<h3 id="column-actions">Column Actions</h3>
+<p>Click a vJoy column header to select it. Actions appear:</p>
+<table>
+  <tr><th>Action</th><th>Description</th></tr>
+  <tr><td><strong>Import from Profile</strong></td><td>Load bindings from a saved profile or SC XML file</td></tr>
+  <tr><td><strong>Clear Column</strong></td><td>Remove all bindings for this vJoy device</td></tr>
+  <tr><td><strong>Deselect</strong></td><td>Return to full grid view</td></tr>
+</table>
+
+<h3 id="exporting">Exporting to Star Citizen</h3>
+<ol>
+  <li>Set a profile name.</li>
+  <li>Click <strong>EXPORT</strong> to generate <code>actionmaps.xml</code>.</li>
+  <li>The file is saved to SC's bindings directory.</li>
+</ol>
+
+<div class="callout tip">
+  <div class="callout-title">Read-Only Policy</div>
+  <p>Asteriq <strong>never modifies</strong> SC's existing binding files. It only writes new export files.</p>
+</div>
+
+<h3 id="conflicts">Conflict Detection</h3>
+<p>Amber = shared binding across multiple vJoy devices. Red = hard conflict (must resolve before export).</p>
+
+<hr>
+
+<!-- ────────────────────────────────── Settings Tab ────────────────────────────────── -->
+
+<h2 id="settings-tab">Settings Tab</h2>
+<div class="screenshot">Screenshot: Settings tab</div>
+
+<h3 id="profile-management">Profile Management</h3>
+<table>
+  <tr><th>Button</th><th>Description</th></tr>
+  <tr><td><strong>NEW</strong></td><td>Create a blank profile</td></tr>
+  <tr><td><strong>DUPLICATE</strong></td><td>Copy all mappings to a new profile</td></tr>
+  <tr><td><strong>IMPORT</strong></td><td>Load a <code>.json</code> profile file</td></tr>
+  <tr><td><strong>EXPORT</strong></td><td>Save the active profile to a <code>.json</code> file</td></tr>
+  <tr><td><strong>DELETE</strong></td><td>Remove the active profile</td></tr>
+</table>
+<p>Click the profile name to rename it. Profiles auto-save on every change.</p>
+
+<h3 id="system-settings">System Settings</h3>
+<ul>
+  <li><strong>Auto-load profile</strong> &mdash; load the last-used profile on startup</li>
+  <li><strong>Close to tray</strong> &mdash; minimise to system tray instead of exiting</li>
+  <li><strong>Tray icon type</strong> &mdash; throttle or joystick icon</li>
+</ul>
+
+<h3 id="visual-settings">Visual Settings</h3>
+<p><strong>Font:</strong> size (0.8x&ndash;2.0x), family (Carbon or Consolas).</p>
+<p><strong>Theme:</strong> 12 colour themes &mdash; Midnight, Matrix, Amber, Ice, plus SC manufacturer themes (Drake, Aegis, Anvil, Argo, Crusader, Origin, MISC, RSI).</p>
+<p><strong>Background effects</strong> (sliders 0&ndash;100): Grid, Glow, Noise, Scanline, Vignette.</p>
+
+<h3 id="network-settings">Network Forwarding</h3>
+<p>Enable network forwarding toggle, machine name, role selector (TX/RX), per-peer connection toggles, trust code management. See <a href="#network-guide">Network Forwarding Guide</a>.</p>
+
+<h3 id="updates">Updates</h3>
+<p>Version display, auto-check toggle, manual check button. When an update is available: <strong>DOWNLOAD</strong> &rarr; <strong>APPLY</strong> &rarr; auto-relaunch.</p>
+
+<hr>
+
+<!-- ────────────────────────────────── Network Forwarding ────────────────────────────────── -->
+
+<h2 id="network-guide">Network Forwarding Guide</h2>
+<p>Share input between two Asteriq machines on a LAN &mdash; one master (TX), one client (RX).</p>
+
+<div class="diagram">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;    TCP/LAN    &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  TX (Master)  &#9474;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9654;&#9474;  RX (Client)  &#9474;
+&#9474;               &#9474;               &#9474;               &#9474;
+&#9474;  Physical     &#9474;               &#9474;  vJoy devices &#9474;
+&#9474;  devices      &#9474;               &#9474;  receive      &#9474;
+&#9474;  &#8594; Mappings   &#9474;               &#9474;  snapshots    &#9474;
+&#9474;  &#8594; vJoy out   &#9474;               &#9474;  from master  &#9474;
+&#9474;  &#8594; Snapshot   &#9474;               &#9474;               &#9474;
+&#9474;    to client  &#9474;               &#9474;  SC reads     &#9474;
+&#9474;               &#9474;               &#9474;  local vJoy   &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;               &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</div>
+
+<h3 id="tx-setup">TX (Master) Setup</h3>
+<ol>
+  <li><strong>Settings &gt; Network</strong> &mdash; enable network forwarding.</li>
+  <li>Set role to <strong>TX</strong>.</li>
+  <li>A trust code is generated. Share it with the RX operator.</li>
+  <li>Discovered RX peers appear with a toggle switch each.</li>
+</ol>
+
+<h3 id="rx-setup">RX (Client) Setup</h3>
+<ol>
+  <li><strong>Settings &gt; Network</strong> &mdash; enable network forwarding.</li>
+  <li>Set role to <strong>RX</strong>.</li>
+  <li>Wait for the TX machine to connect, or enter the trust code.</li>
+  <li>Devices and Mappings tabs are locked while connected.</li>
+</ol>
+
+<h3 id="connecting">Connecting</h3>
+<p>Both machines must be on the same LAN. Discovery is automatic (UDP port 47191).</p>
+<ul>
+  <li>Click a peer's toggle to connect. The knob slides to the middle (connecting) then fully right (connected).</li>
+  <li>Click a different peer to switch &mdash; single tap, no disconnect step needed.</li>
+  <li>Click the connected peer's toggle to disconnect.</li>
+</ul>
+
+<div class="callout warn">
+  <div class="callout-title">Firewall</div>
+  <p>Allow Asteriq through Windows Firewall on both machines (UDP 47191 for discovery, TCP for data).</p>
+</div>
+
+<hr>
+
+<!-- ────────────────────────────────── Profiles ────────────────────────────────── -->
+
+<h2 id="profiles-ref">Profiles</h2>
+<p>A profile stores your complete configuration: all mappings (axes, buttons, hats, curves, deadzones), device ordering, shift layers, silhouette selections, and the TX Toggle assignment.</p>
+<p>Profiles auto-save on every change. Export as <code>.json</code> to share or back up. Import on another machine to use the same configuration.</p>
+
+<hr>
+
+<!-- ────────────────────────────────── Auto-Update ────────────────────────────────── -->
+
+<h2 id="auto-update">Auto-Update</h2>
+<p>Asteriq checks GitHub for new releases on startup (if enabled) and on manual request.</p>
+<ol>
+  <li><strong>Check</strong> &mdash; polls the GitHub releases API.</li>
+  <li><strong>Download</strong> &mdash; fetches the update ZIP to a temporary location.</li>
+  <li><strong>Apply</strong> &mdash; replaces the application files and relaunches.</li>
+</ol>
+<p>All your settings, profiles, and preferences are preserved &mdash; only the application binary is replaced.</p>
+
+<hr>
+
+<!-- ────────────────────────────────── CLI Reference ────────────────────────────────── -->
+
+<h2 id="cli-reference">Command Line Reference</h2>
+<pre><code>Asteriq.exe                          Launch GUI
+Asteriq.exe --diag                   Live input diagnostics (console)
+Asteriq.exe --hidhide                Show HidHide configuration
+Asteriq.exe --match                  Correlate SDL &harr; HidHide devices
+Asteriq.exe --whitelist              Add Asteriq to HidHide whitelist
+
+Asteriq.exe --passthrough N M        Pass device N to vJoy M
+Asteriq.exe --maptest N M            Test mapping with S-curve
+Asteriq.exe --keytest [dev] [btn] [key]  Test keyboard output
+
+Asteriq.exe --profiles               List saved profiles
+Asteriq.exe --profile-run ID         Load and run a profile
+Asteriq.exe --profile-export ID PATH Export profile to file
+Asteriq.exe --profile-import PATH    Import profile from file
+
+Asteriq.exe --scdetect               Detect SC installations
+Asteriq.exe --scextract [ENV]        Extract defaultProfile.xml
+Asteriq.exe --scschema [ENV]         Parse SC action schema
+Asteriq.exe --scexport [ENV]         Test SC XML export
+
+Asteriq.exe --driver-setup           Force driver setup dialog</code></pre>
+
+<hr>
+
+<!-- ────────────────────────────────── File Locations ────────────────────────────────── -->
+
+<h2 id="file-locations">Data &amp; File Locations</h2>
+<table>
+  <tr><th>Location</th><th>Contents</th></tr>
+  <tr><td><code>%APPDATA%\Asteriq\appsettings.json</code></td><td>All application settings</td></tr>
+  <tr><td><code>%APPDATA%\Asteriq\Profiles\</code></td><td>Saved profiles (<code>.json</code>)</td></tr>
+  <tr><td><code>%APPDATA%\Asteriq\Logs\</code></td><td>Diagnostic logs (7-day rolling)</td></tr>
+  <tr><td>Application folder</td><td><code>Asteriq.exe</code>, <code>vJoyInterface.dll</code>, <code>asteriq.ico</code>, <code>Images/</code></td></tr>
+</table>
+
+<hr>
+
+<!-- ────────────────────────────────── Troubleshooting ────────────────────────────────── -->
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<h3>Devices not detected</h3>
+<ul>
+  <li>Check the device in Windows Device Manager.</li>
+  <li>Asteriq uses SDL2 &mdash; some very old or exotic devices may not be detected.</li>
+  <li>Try unplugging and reconnecting.</li>
+</ul>
+
+<h3>vJoy not working</h3>
+<ul>
+  <li>Run <strong>Settings &gt; DRIVER SETUP</strong> to verify installation.</li>
+  <li>Ensure at least one device is enabled in the vJoy Configuration utility.</li>
+  <li>Restart Asteriq after configuring vJoy.</li>
+</ul>
+
+<h3>Star Citizen sees double inputs</h3>
+<ul>
+  <li>Install HidHide and hide physical devices.</li>
+  <li>Only vJoy devices should be visible to SC.</li>
+  <li>In SC's <strong>Options &gt; Keybinding</strong>, verify only "vJoy" entries appear.</li>
+</ul>
+
+<h3>SC Bindings tab shows no actions</h3>
+<ul>
+  <li>Ensure SC is detected (check the dropdown at the top).</li>
+  <li>Asteriq reads from SC's <code>Data.p4k</code>. Corrupted or incomplete installations may fail.</li>
+  <li>Run <code>Asteriq.exe --scdetect</code> to diagnose.</li>
+</ul>
+
+<h3>Update check fails</h3>
+<ul>
+  <li>Ensure internet access.</li>
+  <li>GitHub's API has rate limits &mdash; wait a few minutes and retry.</li>
+  <li>Check logs in <code>%APPDATA%\Asteriq\Logs\</code>.</li>
+</ul>
+
+<h3>Application crashes on startup</h3>
+<ul>
+  <li>Delete <code>%APPDATA%\Asteriq\appsettings.json</code> to reset settings.</li>
+  <li>Run <code>Asteriq.exe --driver-setup</code> to re-check drivers.</li>
+  <li>Check the latest log file for the error.</li>
+</ul>
+
+</main>
+
+<footer class="site-footer">
+  Asteriq is developed by MazzeeStudio. Report issues at <a href="https://github.com/MazzeeStudio/Asteriq/issues">github.com/MazzeeStudio/Asteriq/issues</a>.
+</footer>
+
+</body>
+</html>

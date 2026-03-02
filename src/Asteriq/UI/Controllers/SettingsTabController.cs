@@ -53,10 +53,11 @@ public class SettingsTabController : ITabController
     private SKRect _networkEnabledToggleBounds;
     private SKRect[] _netRoleButtonBounds = new SKRect[2]; // 0=Master, 1=Client
     private SKRect _netRegenerateBounds;
-    private SKRect _netConnectBounds;
-    private SKRect _netDisconnectBounds;
+    private SKRect _netDisconnectBounds;   // RX (client) role only
     private SKRect _netForgetBounds;
-    private int _selectedNetworkPeerIndex = -1;
+    // Per-peer action bounds (TX role) — rebuilt every frame; one entry per discovered peer
+    private readonly List<(SKRect Connect, SKRect Disconnect, string IpAddress)> _peerActionBounds = [];
+    private string? _connectingPeerIp;     // IP of the peer a connect attempt is currently targeting
 
     // Version / update button bounds
     private SKRect _checkButtonBounds;
@@ -190,12 +191,15 @@ public class SettingsTabController : ITabController
             if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
         if ((!_netRegenerateBounds.IsEmpty && _netRegenerateBounds.Contains(pt))
-            || (!_netConnectBounds.IsEmpty && _netConnectBounds.Contains(pt))
             || (!_netDisconnectBounds.IsEmpty && _netDisconnectBounds.Contains(pt))
             || (!_netForgetBounds.IsEmpty && _netForgetBounds.Contains(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
+        }
+        foreach (var (c, d, _) in _peerActionBounds)
+        {
+            if (c.Contains(pt) || d.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
 
         // Update section buttons
@@ -560,25 +564,61 @@ public class SettingsTabController : ITabController
                     regenHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
                 y += regenH + 6f;
 
-                // Peer list (discovered clients)
+                // Peer list — each row has its own CONNECT / DISCONNECT button
                 var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+                var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
+                bool isConnected = netMode == NetworkInputMode.Remote;
+                bool isConnecting = _ctx.IsNetworkConnecting;
+                string? connectedIp = _ctx.ConnectedPeerIp;
+                const float peerBtnW = 100f;
+                const float peerBtnH = 24f;
+                _peerActionBounds.Clear();
+
                 if (peers.Count > 0)
                 {
                     for (int pi = 0; pi < peers.Count; pi++)
                     {
                         var p = peers[pi];
-                        string label = $"  {p.MachineName}  {p.IpAddress}";
-                        bool pHov = new SKRect(leftMargin, y, rightMargin, y + rowHeight).Contains(
-                            _ctx.MousePosition.X, _ctx.MousePosition.Y);
-                        var pColor = _selectedNetworkPeerIndex == pi ? FUIColors.Active
-                                   : p.IsStale ? FUIColors.TextDim : FUIColors.TextPrimary;
-                        if (pHov)
+                        bool thisConnected  = isConnected  && connectedIp == p.IpAddress;
+                        bool thisConnecting = isConnecting && _connectingPeerIp == p.IpAddress;
+
+                        string peerLabel = $"  {p.MachineName}  {p.IpAddress}";
+                        var pColor = thisConnected ? FUIColors.Active
+                                   : p.IsStale    ? FUIColors.TextDim : FUIColors.TextPrimary;
+
+                        float btnY = y + (rowHeight - peerBtnH) / 2f;
+                        var actionBtn = new SKRect(rightMargin - peerBtnW, btnY, rightMargin, btnY + peerBtnH);
+                        _peerActionBounds.Add((actionBtn, actionBtn, p.IpAddress));
+
+                        // Hover highlight on label area when idle
+                        bool labelHov = !isConnected && !isConnecting &&
+                            new SKRect(leftMargin, y, rightMargin - peerBtnW - 6f, y + rowHeight)
+                                .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                        if (labelHov)
                         {
-                            using var hpaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(20));
+                            using var hpaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(15));
                             canvas.DrawRect(new SKRect(leftMargin, y, rightMargin, y + rowHeight), hpaint);
                         }
-                        FUIRenderer.DrawTextTruncated(canvas, label, new SKPoint(leftMargin, y + 12f),
-                            contentWidth, pColor, 13f);
+                        FUIRenderer.DrawTextTruncated(canvas, peerLabel, new SKPoint(leftMargin, y + 12f),
+                            contentWidth - peerBtnW - 8f, pColor, 13f);
+
+                        if (thisConnected)
+                        {
+                            bool dHov = actionBtn.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                            FUIRenderer.DrawButton(canvas, actionBtn, "DISCONNECT",
+                                dHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
+                                isDanger: true);
+                        }
+                        else
+                        {
+                            bool disabled = isConnected || isConnecting;
+                            string btnLabel = thisConnecting ? "CONNECTING..." : "CONNECT";
+                            bool cHov = !disabled && actionBtn.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                            FUIRenderer.DrawButton(canvas, actionBtn, btnLabel,
+                                disabled ? FUIRenderer.ButtonState.Disabled :
+                                cHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                        }
+
                         y += rowHeight;
                     }
                 }
@@ -588,26 +628,6 @@ public class SettingsTabController : ITabController
                         new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
                     y += rowHeight;
                 }
-
-                // CONNECT / DISCONNECT — right-aligned pair
-                var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
-                float connBtnW = 100f; float connBtnH = 26f;
-                bool isConnected = netMode == NetworkInputMode.Remote;
-                bool isConnecting = _ctx.IsNetworkConnecting;
-                // DISCONNECT rightmost (danger), CONNECT to its left
-                _netDisconnectBounds = new SKRect(rightMargin - connBtnW, y, rightMargin, y + connBtnH);
-                _netConnectBounds    = new SKRect(rightMargin - connBtnW * 2 - 8f, y, rightMargin - connBtnW - 8f, y + connBtnH);
-                bool connHov = !isConnected && !isConnecting && _netConnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                bool discHov = isConnected && _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIRenderer.DrawButton(canvas, _netConnectBounds,
-                    isConnecting ? "CONNECTING..." : "CONNECT",
-                    isConnected || isConnecting ? FUIRenderer.ButtonState.Disabled :
-                    connHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-                FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
-                    !isConnected ? FUIRenderer.ButtonState.Disabled :
-                    discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                    isDanger: true);
-                y += connBtnH + 6f;
 
                 // Status row
                 string statusText = isConnecting ? "Connecting..." : isConnected ? "Connected — sending" : "Not connected";
@@ -1299,27 +1319,31 @@ public class SettingsTabController : ITabController
                     return;
                 }
 
-                if (_netConnectBounds.Contains(pt) &&
-                    _ctx.NetworkInput?.Mode != NetworkInputMode.Remote &&
-                    !_ctx.IsNetworkConnecting)
+                // Per-peer CONNECT / DISCONNECT buttons
+                foreach (var (connectBtn, disconnectBtn, peerIp) in _peerActionBounds)
                 {
-                    // Route through MainForm.ConnectAsMasterAsync — sets _networkMode and starts engine
-                    var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
-                    int idx = _selectedNetworkPeerIndex >= 0 && _selectedNetworkPeerIndex < peers.Count
-                        ? _selectedNetworkPeerIndex : 0;
-                    if (idx < peers.Count && _ctx.ConnectToPeerAsync is not null)
-                        _ = _ctx.ConnectToPeerAsync(peers[idx]);
-                    _ctx.InvalidateCanvas();
-                    return;
-                }
-
-                if (_netDisconnectBounds.Contains(pt) &&
-                    _ctx.NetworkInput?.Mode == NetworkInputMode.Remote)
-                {
-                    // Route through MainForm.SwitchToLocalAsync — clears _networkMode and ForwardingMode
-                    _ = _ctx.NetworkDisconnectAsync?.Invoke();
-                    _ctx.InvalidateCanvas();
-                    return;
+                    bool thisConnected = _ctx.NetworkMode == NetworkInputMode.Remote
+                                     && _ctx.ConnectedPeerIp == peerIp;
+                    if (thisConnected && disconnectBtn.Contains(pt))
+                    {
+                        _ = _ctx.NetworkDisconnectAsync?.Invoke();
+                        _ctx.InvalidateCanvas();
+                        return;
+                    }
+                    if (!thisConnected && !_ctx.IsNetworkConnecting
+                        && _ctx.NetworkMode != NetworkInputMode.Remote
+                        && connectBtn.Contains(pt) && _ctx.ConnectToPeerAsync is not null)
+                    {
+                        var peer = _ctx.NetworkDiscovery?.KnownPeers.Values
+                            .FirstOrDefault(p => p.IpAddress == peerIp);
+                        if (peer is not null)
+                        {
+                            _connectingPeerIp = peerIp;
+                            _ = _ctx.ConnectToPeerAsync(peer);
+                        }
+                        _ctx.InvalidateCanvas();
+                        return;
+                    }
                 }
             }
             // Client-specific buttons

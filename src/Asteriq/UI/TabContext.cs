@@ -101,6 +101,8 @@ public class TabContext
     public NetworkInputMode NetworkMode { get; set; } = NetworkInputMode.Local;
     /// <summary>True while a master-side connect handshake is in progress. CONNECT button is disabled.</summary>
     public bool IsNetworkConnecting { get; set; }
+    /// <summary>IP address of the RX peer currently connected as TX master. Null when not connected.</summary>
+    public string? ConnectedPeerIp { get; set; }
     /// <summary>True when this machine is in client mode (receiving vJoy from master). Tabs 0 and 1 are locked.</summary>
     public bool IsClientConnected { get; set; }
     public Action? StartNetworking { get; set; }

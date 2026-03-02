@@ -2,6 +2,7 @@ using System.Reflection;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
+using Serilog;
 using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
@@ -1326,6 +1327,7 @@ public class SettingsTabController : ITabController
                                      && _ctx.ConnectedPeerIp == peerIp;
                     if (thisConnected && disconnectBtn.Contains(pt))
                     {
+                        Log.Debug("[UI] DISCONNECT clicked | peer={Ip} mode={Mode}", peerIp, _ctx.NetworkMode);
                         _ = _ctx.NetworkDisconnectAsync?.Invoke();
                         _ctx.InvalidateCanvas();
                         return;
@@ -1333,6 +1335,8 @@ public class SettingsTabController : ITabController
                     if (!thisConnected && !_ctx.IsNetworkConnecting
                         && connectBtn.Contains(pt) && _ctx.ConnectToPeerAsync is not null)
                     {
+                        Log.Debug("[UI] CONNECT clicked | peer={Ip} mode={Mode} connectedIp={ConnectedIp}",
+                            peerIp, _ctx.NetworkMode, _ctx.ConnectedPeerIp ?? "none");
                         var peer = _ctx.NetworkDiscovery?.KnownPeers.Values
                             .FirstOrDefault(p => p.IpAddress == peerIp);
                         if (peer is not null)

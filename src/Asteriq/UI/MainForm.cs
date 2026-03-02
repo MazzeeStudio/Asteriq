@@ -6,6 +6,7 @@ using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
 using Asteriq.UI.Controllers;
+using Microsoft.Extensions.Logging;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using Svg.Skia;
@@ -86,6 +87,7 @@ public partial class MainForm : Form
     private readonly DirectInput.DirectInputService? _directInputService;
     private readonly INetworkDiscoveryService _networkDiscovery;
     private readonly INetworkInputService _networkInput;
+    private readonly ILogger<MainForm> _logger;
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
@@ -200,6 +202,7 @@ public partial class MainForm : Form
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
         SCExportProfileService scExportProfileService,
+        ILogger<MainForm> logger,
         DirectInput.DirectInputService? directInputService = null,
         INetworkDiscoveryService? networkDiscovery = null,
         INetworkInputService? networkInput = null)
@@ -219,6 +222,7 @@ public partial class MainForm : Form
         _trayIcon = trayIcon ?? throw new ArgumentNullException(nameof(trayIcon));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         _driverSetupManager = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _directInputService = directInputService; // nullable — unavailable in tests or headless environments
         _networkDiscovery = networkDiscovery ?? new NullNetworkDiscoveryService();
         _networkInput = networkInput ?? new NullNetworkInputService();
@@ -1437,21 +1441,36 @@ public partial class MainForm : Form
             {
                 // Rising edge — cycle through peers: disconnected → peer[0] → peer[1] → … → disconnected
                 var peers = _networkDiscovery.KnownPeers.Values.ToList();
+                _logger.LogDebug("[NetToggle] Rising edge | mode={Mode} connectedIp={ConnectedIp} peers={PeerCount} connecting={Connecting}",
+                    _networkMode, _tabContext.ConnectedPeerIp ?? "none", peers.Count, _isNetworkConnecting);
+
                 if (_networkMode == NetworkInputMode.Local)
                 {
-                    // Not connected: connect to first peer
                     if (peers.Count > 0)
+                    {
+                        _logger.LogDebug("[NetToggle] Disconnected → connecting to peers[0]={Peer}", peers[0].IpAddress);
                         _ = ConnectAsMasterAsync(peers[0]);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("[NetToggle] No peers discovered — ignoring");
+                    }
                 }
                 else
                 {
-                    // Connected: find current peer and advance to next, or disconnect after last
                     int cur = peers.FindIndex(p => p.IpAddress == _tabContext.ConnectedPeerIp);
                     int next = cur + 1;
+                    _logger.LogDebug("[NetToggle] Connected | curIdx={Cur} nextIdx={Next} peerCount={Count}", cur, next, peers.Count);
                     if (next < peers.Count)
+                    {
+                        _logger.LogDebug("[NetToggle] Switching → peers[{Next}]={Peer}", next, peers[next].IpAddress);
                         _ = ConnectAsMasterAsync(peers[next]);
+                    }
                     else
+                    {
+                        _logger.LogDebug("[NetToggle] Last peer reached → disconnecting");
                         _ = SwitchToLocalAsync();
+                    }
                 }
             }
             _lastSwitchButtonState = buttonPressed;
@@ -2008,7 +2027,14 @@ public partial class MainForm : Form
     /// </summary>
     private async Task ConnectAsMasterAsync(NetworkPeer peer)
     {
-        if (_isNetworkConnecting) return;   // guard against concurrent attempts
+        _logger.LogDebug("[ConnectMaster] Enter → {Peer} ({Ip}) | mode={Mode} connectedIp={ConnectedIp} connecting={Connecting}",
+            peer.MachineName, peer.IpAddress, _networkMode, _tabContext.ConnectedPeerIp ?? "none", _isNetworkConnecting);
+
+        if (_isNetworkConnecting)
+        {
+            _logger.LogDebug("[ConnectMaster] BLOCKED — connect already in progress");
+            return;
+        }
 
         // Set capture mode first so AcquireDevice in NetworkVJoyService skips real vJoy.
         // This lets MappingEngine.Start() succeed even when CASTRA has no vJoy configured.
@@ -2038,6 +2064,8 @@ public partial class MainForm : Form
             _networkMode = NetworkInputMode.Remote;
             _tabContext.NetworkMode = _networkMode;
             _tabContext.ConnectedPeerIp = peer.IpAddress;
+            _logger.LogInformation("[ConnectMaster] SUCCESS → {Peer} ({Ip}) | mode={Mode}",
+                peer.MachineName, peer.IpAddress, _networkMode);
 
             // Pre-initialise snapshots for every vJoy device in the active profile so the
             // encoder always sends correctly-sized packets from the very first input tick.
@@ -2049,11 +2077,14 @@ public partial class MainForm : Form
             // Connection failed — roll back capture mode
             _networkVjoy.ForwardingMode = false;
             _tabContext.ConnectedPeerIp = null;
-            System.Diagnostics.Debug.WriteLine($"[Network] ConnectAsMaster failed: {ex.Message}");
+            _logger.LogWarning("[ConnectMaster] FAILED → {Peer} ({Ip}): {Error}",
+                peer.MachineName, peer.IpAddress, ex.Message);
         }
         finally
         {
             _isNetworkConnecting = false;
+            _logger.LogDebug("[ConnectMaster] Exit | mode={Mode} connectedIp={ConnectedIp}",
+                _networkMode, _tabContext.ConnectedPeerIp ?? "none");
         }
         BeginInvoke(MarkDirty);
     }
@@ -2167,12 +2198,15 @@ public partial class MainForm : Form
 
     private async Task SwitchToLocalAsync()
     {
+        _logger.LogDebug("[Disconnect] SwitchToLocalAsync | mode={Mode} connectedIp={ConnectedIp}",
+            _networkMode, _tabContext.ConnectedPeerIp ?? "none");
         StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes
         await _networkInput.DisconnectAsync().ConfigureAwait(false);
         _networkMode = NetworkInputMode.Local;
         _tabContext.NetworkMode = _networkMode;
         _tabContext.ConnectedPeerIp = null;
+        _logger.LogInformation("[Disconnect] Disconnected — mode=Local");
         BeginInvoke(MarkDirty);
     }
 
@@ -2220,6 +2254,8 @@ public partial class MainForm : Form
 
     private void OnNetworkConnectionLost(object? sender, EventArgs e)
     {
+        _logger.LogWarning("[ConnLost] ConnectionLost event | mode={Mode} connectedIp={ConnectedIp}",
+            _networkMode, _tabContext.ConnectedPeerIp ?? "none");
         StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes on disconnect
         _networkMode = NetworkInputMode.Local;

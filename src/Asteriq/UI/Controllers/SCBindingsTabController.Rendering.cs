@@ -1032,8 +1032,7 @@ public partial class SCBindingsTabController
         // EXPORT TO SC — primary CTA, anchored to panel bottom
         _scExportButtonBounds = new SKRect(leftMargin, exportBtnY, rightMargin, exportBtnY + buttonHeight);
         _scExportButtonHovered = _scExportButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0
-            && !_exportBlockedByNetworkConflict;
+        bool canExport = _scInstallations.Count > 0 && _scDuplicateActionBindings.Count == 0;
         FUIRenderer.DrawButton(canvas, _scExportButtonBounds, "EXPORT TO SC",
             !canExport ? FUIRenderer.ButtonState.Disabled : (_scExportButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
 

@@ -164,6 +164,28 @@ public sealed class UpdateService : IUpdateService
             string scriptPath = Path.Combine(Path.GetTempPath(), "asteriq_update.ps1");
             string tempPath = _downloadedTempPath;
             string installDir = Path.GetDirectoryName(currentExe)!;
+            bool needsElevation = !IsDirectoryWritable(installDir);
+
+            // Build the relaunch fragment first — how we restart Asteriq depends on whether
+            // the script runs elevated.  When it does, Start-Process would inherit the admin
+            // token; instead we schedule a one-shot Task Scheduler job at RunLevel=Limited so
+            // Asteriq relaunches at the user's normal (non-elevated) privilege level.
+            string relaunchFragment = needsElevation
+                ? $$"""
+                        try {
+                            $action   = New-ScheduledTaskAction -Execute '{{currentExe}}' -Argument '--post-update'
+                            $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+                            Register-ScheduledTask -TaskName 'AsteriqPostUpdate' -Action $action -Settings $settings -RunLevel Limited -Force | Out-Null
+                            Start-ScheduledTask -TaskName 'AsteriqPostUpdate'
+                            Start-Sleep -Seconds 5
+                            Unregister-ScheduledTask -TaskName 'AsteriqPostUpdate' -Confirm:$false | Out-Null
+                        } catch {
+                            # Task Scheduler unavailable — fall back to direct launch (may remain elevated)
+                            Start-Process -FilePath '{{currentExe}}' -ArgumentList '--post-update'
+                        }
+                    """
+                : $"    Start-Process -FilePath '{currentExe}' -ArgumentList '--post-update'";
+
             string script = $$"""
                 $success = $false
                 for ($i = 0; $i -lt 5; $i++) {
@@ -177,15 +199,13 @@ public sealed class UpdateService : IUpdateService
                     }
                 }
                 if ($success) {
-                    Start-Process -FilePath '{{currentExe}}' -ArgumentList '--post-update'
+                {{relaunchFragment}}
                 }
                 Remove-Item -Path '{{tempPath}}' -ErrorAction SilentlyContinue
                 Remove-Item -Path '{{scriptPath}}' -ErrorAction SilentlyContinue
                 """;
 
             File.WriteAllText(scriptPath, script);
-
-            bool needsElevation = !IsDirectoryWritable(Path.GetDirectoryName(currentExe)!);
 
             var psi = new System.Diagnostics.ProcessStartInfo
             {

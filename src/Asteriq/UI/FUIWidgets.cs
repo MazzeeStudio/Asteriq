@@ -220,25 +220,78 @@ internal static class FUIWidgets
     }
 
     /// <param name="mousePosition">Current mouse position for hover detection.</param>
-    internal static void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, bool on, Point mousePosition)
+    /// <param name="knobT">Animation position: 0 = fully off, 1 = fully on. Caller lerps this over time.</param>
+    internal static void DrawToggleSwitch(SKCanvas canvas, SKRect bounds, float knobT, Point mousePosition)
     {
-        // Snap to whole pixels to avoid asymmetric top/bottom rounding
-        var snapped = new SKRect(
+        knobT = Math.Clamp(knobT, 0f, 1f);
+
+        var b = new SKRect(
             MathF.Round(bounds.Left), MathF.Round(bounds.Top),
             MathF.Round(bounds.Right), MathF.Round(bounds.Bottom));
 
         bool isHovered = bounds.Contains(mousePosition.X, mousePosition.Y);
+        float r = b.Height / 2f;
+        float knobRadius = r - 2f;
+        float knobOffX = b.Left + r;
+        float knobOnX = b.Right - r;
+        float knobX = knobOffX + (knobOnX - knobOffX) * knobT;
+        float knobY = b.MidY;
 
-        SKColor trackColor = on
-            ? FUIColors.Active.WithAlpha(150)
-            : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-        var frameColor = on ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        FUIRenderer.DrawRoundedPanel(canvas, snapped, trackColor, frameColor, snapped.Height / 2);
+        // --- Track: sunken dark slot ---
+        using var trackFill = FUIRenderer.CreateFillPaint(FUIColors.Background0);
+        canvas.DrawRoundRect(b, r, r, trackFill);
 
-        float knobRadius = snapped.Height / 2 - 3;
-        float knobX = on ? snapped.Right - knobRadius - 3 : snapped.Left + knobRadius + 3;
-        using var knobPaint = FUIRenderer.CreateFillPaint(FUIColors.TextBright);
-        canvas.DrawCircle(knobX, snapped.MidY, knobRadius, knobPaint);
+        // Active tint: left portion glows as knob slides right
+        if (knobT > 0.01f)
+        {
+            float fillRight = Math.Min(knobX + knobRadius, b.Right - r);
+            var activeFillRect = new SKRect(b.Left, b.Top, fillRight, b.Bottom);
+            using var activePaint = FUIRenderer.CreateFillPaint(
+                FUIColors.Active.WithAlpha((byte)(knobT * 45)));
+            canvas.DrawRoundRect(activeFillRect, r, r, activePaint);
+        }
+
+        // Track border
+        var trackBorder = isHovered ? FUIColors.Frame : FUIColors.FrameDim;
+        using var borderPaint = FUIRenderer.CreateStrokePaint(trackBorder, 1f);
+        canvas.DrawRoundRect(b, r, r, borderPaint);
+
+        // --- "○" ring symbol on the left side — fades in when ON ---
+        float alphaOn = knobT;
+        if (alphaOn > 0.02f)
+        {
+            float symX = b.Left + r;
+            float symR = b.Height * 0.17f;
+            using var ringPaint = FUIRenderer.CreateStrokePaint(
+                FUIColors.Active.WithAlpha((byte)(alphaOn * 155)), 1.5f);
+            canvas.DrawCircle(symX, knobY, symR, ringPaint);
+        }
+
+        // --- "–" dash on the right side — fades out when ON ---
+        float alphaOff = 1f - knobT;
+        if (alphaOff > 0.02f)
+        {
+            float symX = b.Right - r;
+            float dashHalf = b.Height * 0.17f;
+            using var dashPaint = FUIRenderer.CreateStrokePaint(
+                FUIColors.TextDim.WithAlpha((byte)(alphaOff * 155)), 1.5f);
+            canvas.DrawLine(symX - dashHalf, knobY, symX + dashHalf, knobY, dashPaint);
+        }
+
+        // --- Knob: raised pill button feel ---
+        // Knob fill: theme-tinted surface (slightly lighter than the track)
+        var knobFillColor = FUIColors.Primary.WithAlpha(20);
+        using var knobBase = FUIRenderer.CreateFillPaint(FUIColors.Background2);
+        canvas.DrawCircle(knobX, knobY, knobRadius, knobBase);
+        using var knobTint = FUIRenderer.CreateFillPaint(knobFillColor);
+        canvas.DrawCircle(knobX, knobY, knobRadius, knobTint);
+
+        // Knob border: active colour when on, framebright when off
+        var knobBorderColor = knobT > 0.5f
+            ? FUIColors.Active.WithAlpha((byte)(80 + knobT * 120))
+            : FUIColors.FrameBright.WithAlpha((byte)(80 + (1f - knobT) * 70));
+        using var knobBorder = FUIRenderer.CreateStrokePaint(knobBorderColor, 1f);
+        canvas.DrawCircle(knobX, knobY, knobRadius, knobBorder);
     }
 
     internal static void DrawSettingsSlider(SKCanvas canvas, SKRect bounds, int value, int maxValue)

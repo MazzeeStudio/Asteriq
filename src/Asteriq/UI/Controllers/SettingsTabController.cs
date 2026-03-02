@@ -65,9 +65,21 @@ public class SettingsTabController : ITabController
     private SKRect _downloadButtonBounds;
     private SKRect _applyButtonBounds;
 
+    // Toggle knob animation positions (0 = off, 1 = on); initialized from current settings
+    private float _autoLoadT;
+    private float _closeToTrayT;
+    private float _networkEnabledT;
+    private float _checkUpdatesT;
+    private const float ToggleLerpSpeed = 0.14f;  // per 60Hz tick ≈ ~120 ms transition
+
     public SettingsTabController(TabContext ctx)
     {
         _ctx = ctx;
+        // Snap to current settings on first construction — no animation on startup
+        _autoLoadT      = ctx.AppSettings.AutoLoadLastProfile ? 1f : 0f;
+        _closeToTrayT   = ctx.AppSettings.CloseToTray ? 1f : 0f;
+        _networkEnabledT = ctx.AppSettings.NetworkEnabled ? 1f : 0f;
+        _checkUpdatesT  = ctx.AppSettings.AutoCheckUpdates ? 1f : 0f;
     }
 
     public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
@@ -233,7 +245,20 @@ public class SettingsTabController : ITabController
     public void OnMouseWheel(MouseEventArgs e) { }
     public bool ProcessCmdKey(ref Message msg, Keys keyData) => false;
     public void OnMouseLeave() { }
-    public void OnTick() { }
+    public void OnTick()
+    {
+        _autoLoadT      = LerpToggle(_autoLoadT,      _ctx.AppSettings.AutoLoadLastProfile);
+        _closeToTrayT   = LerpToggle(_closeToTrayT,   _ctx.AppSettings.CloseToTray);
+        _networkEnabledT = LerpToggle(_networkEnabledT, _ctx.AppSettings.NetworkEnabled);
+        _checkUpdatesT  = LerpToggle(_checkUpdatesT,  _ctx.AppSettings.AutoCheckUpdates);
+    }
+
+    private static float LerpToggle(float current, bool on)
+    {
+        float target = on ? 1f : 0f;
+        float delta = target - current;
+        return MathF.Abs(delta) < 0.002f ? target : current + delta * ToggleLerpSpeed;
+    }
     public void OnActivated() { }
     public void OnDeactivated() { }
 
@@ -404,7 +429,7 @@ public class SettingsTabController : ITabController
             autoLoadLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float toggleY = y + (rowHeight - toggleHeight) / 2;
         _autoLoadToggleBounds = new SKRect(rightMargin - toggleWidth, toggleY, rightMargin, toggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _autoLoadToggleBounds, _ctx.AppSettings.AutoLoadLastProfile, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _autoLoadToggleBounds, _autoLoadT, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Close to Tray toggle
@@ -414,7 +439,7 @@ public class SettingsTabController : ITabController
             closeToTrayLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float closeToTrayToggleY = y + (rowHeight - toggleHeight) / 2;
         _closeToTrayToggleBounds = new SKRect(rightMargin - toggleWidth, closeToTrayToggleY, rightMargin, closeToTrayToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _ctx.AppSettings.CloseToTray, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _closeToTrayT, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Tray icon type selection
@@ -520,7 +545,7 @@ public class SettingsTabController : ITabController
             netLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float netToggleY = y + (rowHeight - toggleHeight) / 2;
         _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _ctx.AppSettings.NetworkEnabled, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT, _ctx.MousePosition);
         y += rowHeight + 4f;
 
         // Machine name + port on one compact row
@@ -724,7 +749,7 @@ public class SettingsTabController : ITabController
             autoCheckLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
         _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _ctx.AppSettings.AutoCheckUpdates, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _checkUpdatesT, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Version row: "v0.8.289" left, [Check for updates] button right

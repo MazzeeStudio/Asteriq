@@ -611,7 +611,7 @@ public class SettingsTabController : ITabController
                         }
                         else
                         {
-                            bool disabled = isConnected || isConnecting;
+                            bool disabled = isConnecting;
                             string btnLabel = thisConnecting ? "CONNECTING..." : "CONNECT";
                             bool cHov = !disabled && actionBtn.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                             FUIRenderer.DrawButton(canvas, actionBtn, btnLabel,
@@ -1331,7 +1331,6 @@ public class SettingsTabController : ITabController
                         return;
                     }
                     if (!thisConnected && !_ctx.IsNetworkConnecting
-                        && _ctx.NetworkMode != NetworkInputMode.Remote
                         && connectBtn.Contains(pt) && _ctx.ConnectToPeerAsync is not null)
                     {
                         var peer = _ctx.NetworkDiscovery?.KnownPeers.Values

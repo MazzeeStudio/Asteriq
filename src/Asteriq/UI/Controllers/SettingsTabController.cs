@@ -611,7 +611,7 @@ public class SettingsTabController : ITabController
                         }
                         else
                         {
-                            bool disabled = isConnecting;
+                            bool disabled = isConnected || isConnecting;
                             string btnLabel = thisConnecting ? "CONNECTING..." : "CONNECT";
                             bool cHov = !disabled && actionBtn.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                             FUIRenderer.DrawButton(canvas, actionBtn, btnLabel,

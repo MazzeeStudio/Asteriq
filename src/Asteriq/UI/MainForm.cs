@@ -1435,11 +1435,24 @@ public partial class MainForm : Form
 
             if (buttonPressed && !_lastSwitchButtonState)
             {
-                // Rising edge — toggle mode
+                // Rising edge — cycle through peers: disconnected → peer[0] → peer[1] → … → disconnected
+                var peers = _networkDiscovery.KnownPeers.Values.ToList();
                 if (_networkMode == NetworkInputMode.Local)
-                    _ = SwitchToRemoteAsync();
+                {
+                    // Not connected: connect to first peer
+                    if (peers.Count > 0)
+                        _ = ConnectAsMasterAsync(peers[0]);
+                }
                 else
-                    _ = SwitchToLocalAsync();
+                {
+                    // Connected: find current peer and advance to next, or disconnect after last
+                    int cur = peers.FindIndex(p => p.IpAddress == _tabContext.ConnectedPeerIp);
+                    int next = cur + 1;
+                    if (next < peers.Count)
+                        _ = ConnectAsMasterAsync(peers[next]);
+                    else
+                        _ = SwitchToLocalAsync();
+                }
             }
             _lastSwitchButtonState = buttonPressed;
             // Do NOT return — input must still reach the forwarding / local-vJoy path below.

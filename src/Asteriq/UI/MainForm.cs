@@ -170,6 +170,8 @@ public partial class MainForm : Form
     private volatile NetworkInputMode _networkMode = NetworkInputMode.Local;
     private bool _isNetworkConnecting;    // true while master-side handshake is in-flight
     private bool _lastSwitchButtonState = false;
+    private long _lastSwitchButtonTick = 0;
+    private const int SwitchDebounceMs = 400;
 
     // NetworkVJoyService wrapper — provides capture-mode forwarding; always the same object as _vjoyService
     private NetworkVJoyService _networkVjoy = null!;
@@ -1439,7 +1441,15 @@ public partial class MainForm : Form
 
             if (buttonPressed && !_lastSwitchButtonState)
             {
-                // Rising edge — cycle through peers: disconnected → peer[0] → peer[1] → … → disconnected
+                // Rising edge — debounce then cycle through peers
+                var nowTick = Environment.TickCount64;
+                if (nowTick - _lastSwitchButtonTick < SwitchDebounceMs)
+                {
+                    _logger.LogDebug("[NetToggle] Rising edge DEBOUNCED ({Ms}ms since last)", nowTick - _lastSwitchButtonTick);
+                }
+                else
+                {
+                _lastSwitchButtonTick = nowTick;
                 var peers = _networkDiscovery.KnownPeers.Values.ToList();
                 _logger.LogDebug("[NetToggle] Rising edge | mode={Mode} connectedIp={ConnectedIp} peers={PeerCount} connecting={Connecting}",
                     _networkMode, _tabContext.ConnectedPeerIp ?? "none", peers.Count, _isNetworkConnecting);
@@ -1472,6 +1482,7 @@ public partial class MainForm : Form
                         _ = SwitchToLocalAsync();
                     }
                 }
+                } // end debounce else
             }
             _lastSwitchButtonState = buttonPressed;
             // Do NOT return — input must still reach the forwarding / local-vJoy path below.

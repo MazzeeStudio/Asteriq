@@ -2024,6 +2024,7 @@ public partial class MainForm : Form
             await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
             _networkMode = NetworkInputMode.Remote;
             _tabContext.NetworkMode = _networkMode;
+            _tabContext.ConnectedPeerIp = peer.IpAddress;
 
             // Pre-initialise snapshots for every vJoy device in the active profile so the
             // encoder always sends correctly-sized packets from the very first input tick.
@@ -2034,6 +2035,7 @@ public partial class MainForm : Form
         {
             // Connection failed — roll back capture mode
             _networkVjoy.ForwardingMode = false;
+            _tabContext.ConnectedPeerIp = null;
             System.Diagnostics.Debug.WriteLine($"[Network] ConnectAsMaster failed: {ex.Message}");
         }
         finally
@@ -2137,6 +2139,7 @@ public partial class MainForm : Form
             await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
             _networkMode = NetworkInputMode.Remote;
             _tabContext.NetworkMode = _networkMode;
+            _tabContext.ConnectedPeerIp = peer.IpAddress;
             PreInitializeAllNetworkSnapshots();
             StartNetworkHeartbeat();
         }
@@ -2156,6 +2159,7 @@ public partial class MainForm : Form
         await _networkInput.DisconnectAsync().ConfigureAwait(false);
         _networkMode = NetworkInputMode.Local;
         _tabContext.NetworkMode = _networkMode;
+        _tabContext.ConnectedPeerIp = null;
         BeginInvoke(MarkDirty);
     }
 
@@ -2216,6 +2220,7 @@ public partial class MainForm : Form
             }
             _tabContext.NetworkMode = _networkMode;
             _tabContext.IsClientConnected = _isClientConnected;
+            _tabContext.ConnectedPeerIp = null;
             MarkDirty();
         });
     }

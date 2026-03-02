@@ -21,9 +21,6 @@ public class SettingsTabController : ITabController
     // Theme selector state
     private SKRect[] _themeButtonBounds = new SKRect[12];
 
-    // Font size stepper ([-] value [+]) — index 0 = minus, 1 = plus
-    private SKRect[] _fontSizeButtonBounds = new SKRect[2];
-    private SKRect[] _fontFamilyButtonBounds = new SKRect[2];
 
     // Background settings slider bounds
     private SKRect _bgGridSliderBounds;
@@ -147,18 +144,6 @@ public class SettingsTabController : ITabController
 
         // Theme buttons
         foreach (var b in _themeButtonBounds)
-        {
-            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
-        }
-
-        // Font size stepper buttons
-        foreach (var b in _fontSizeButtonBounds)
-        {
-            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
-        }
-
-        // Font family buttons
-        foreach (var b in _fontFamilyButtonBounds)
         {
             if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
@@ -1068,59 +1053,6 @@ public class SettingsTabController : ITabController
         FUIRenderer.DrawText(canvas, bg.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
         y += sliderRowHeight + sectionSpacing;
 
-        // Font section — family selector + size stepper, clearly grouped
-        FUIRenderer.DrawText(canvas, "FONT", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += sectionSpacing;
-
-        float fontBtnGap = 4f;
-        float fontFamilyBtnWidth = (contentWidth - fontBtnGap) / 2;
-        float fontFamilyBtnHeight = 28f;
-        UIFontFamily[] fontFamilyValues = { UIFontFamily.Carbon, UIFontFamily.Consolas };
-        string[] fontFamilyLabels = { "CARBON", "CONSOLAS" };
-
-        for (int i = 0; i < fontFamilyValues.Length; i++)
-        {
-            var ffBounds = new SKRect(
-                leftMargin + i * (fontFamilyBtnWidth + fontBtnGap), y,
-                leftMargin + i * (fontFamilyBtnWidth + fontBtnGap) + fontFamilyBtnWidth, y + fontFamilyBtnHeight);
-            _fontFamilyButtonBounds[i] = ffBounds;
-            bool isActive = _ctx.AppSettings.FontFamily == fontFamilyValues[i];
-            bool isHovered = ffBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            FUIWidgets.DrawToggleButton(canvas, ffBounds, fontFamilyLabels[i], isActive, isHovered, 13f, scaleFont: false);
-        }
-        y += fontFamilyBtnHeight + sectionSpacing;
-
-        // Size stepper on a single labeled row
-        float fontBtnWidth = 32f;
-        float fontBtnHeight = 28f;
-        float fontValueWidth = 44f;
-        float fontStepperWidth = fontBtnWidth * 2 + fontBtnGap * 2 + fontValueWidth;
-
-        FUIRenderer.DrawTextTruncated(canvas, "Interface Scale", new SKPoint(leftMargin, y + 6),
-            contentWidth - fontStepperWidth - FUIRenderer.SpaceSM, FUIColors.TextPrimary, 13f);
-
-        float scale = _ctx.AppSettings.FontSize;
-        float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
-        float max = MathF.Min(dynamicMax, 1.2f);
-        bool canDecrease = scale > 0.9f + 0.01f;
-        bool canIncrease = scale < max - 0.01f;
-        float stepperX = rightMargin - fontStepperWidth;
-
-        var minusBounds = new SKRect(stepperX, y, stepperX + fontBtnWidth, y + fontBtnHeight);
-        _fontSizeButtonBounds[0] = minusBounds;
-        bool minusHovered = canDecrease && minusBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawButton(canvas, minusBounds, "-",
-            !canDecrease ? FUIRenderer.ButtonState.Disabled : (minusHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
-
-        string valueText = $"{scale:F1}x";
-        var valueBounds = new SKRect(stepperX + fontBtnWidth + fontBtnGap, y, stepperX + fontBtnWidth + fontBtnGap + fontValueWidth, y + fontBtnHeight);
-        FUIRenderer.DrawTextCentered(canvas, valueText, valueBounds, FUIColors.TextBright, 14f, scaleFont: false);
-
-        var plusBounds = new SKRect(valueBounds.Right + fontBtnGap, y, valueBounds.Right + fontBtnGap + fontBtnWidth, y + fontBtnHeight);
-        _fontSizeButtonBounds[1] = plusBounds;
-        bool plusHovered = canIncrease && plusBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawButton(canvas, plusBounds, "+",
-            !canIncrease ? FUIRenderer.ButtonState.Disabled : (plusHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal));
     }
 
     private void DrawSupportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1225,47 +1157,6 @@ public class SettingsTabController : ITabController
         {
             _ctx.DeleteActiveProfile?.Invoke();
             return;
-        }
-
-        // Font size stepper clicks ([-] and [+])
-        {
-            float scale = _ctx.AppSettings.FontSize;
-            float dynamicMax = FUIRenderer.MaxInterfaceScale(Screen.PrimaryScreen?.Bounds.Width ?? 1920);
-            float max = MathF.Min(dynamicMax, 1.2f);
-
-            if (_fontSizeButtonBounds[0].Contains(pt) && scale > 0.9f + 0.01f)
-            {
-                float newScale = MathF.Round((scale - 0.1f) * 10f) / 10f;
-                newScale = MathF.Max(newScale, 0.9f);
-                _ctx.AppSettings.FontSize = newScale;
-                FUIRenderer.InterfaceScale = newScale;
-                _ctx.ApplyFontScale?.Invoke();
-                _ctx.InvalidateCanvas();
-                return;
-            }
-            if (_fontSizeButtonBounds[1].Contains(pt) && scale < max - 0.01f)
-            {
-                float newScale = MathF.Round((scale + 0.1f) * 10f) / 10f;
-                newScale = MathF.Min(newScale, max);
-                _ctx.AppSettings.FontSize = newScale;
-                FUIRenderer.InterfaceScale = newScale;
-                _ctx.ApplyFontScale?.Invoke();
-                _ctx.InvalidateCanvas();
-                return;
-            }
-        }
-
-        // Font family button clicks
-        UIFontFamily[] fontFamilies = { UIFontFamily.Carbon, UIFontFamily.Consolas };
-        for (int i = 0; i < _fontFamilyButtonBounds.Length; i++)
-        {
-            if (_fontFamilyButtonBounds[i].Contains(pt))
-            {
-                _ctx.AppSettings.FontFamily = fontFamilies[i];
-                FUIRenderer.FontFamily = fontFamilies[i];
-                _ctx.InvalidateCanvas();
-                return;
-            }
         }
 
         // Theme button clicks

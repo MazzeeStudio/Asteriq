@@ -339,10 +339,33 @@ public partial class SCBindingsTabController
             }
 
             string exportPath = Path.Combine(installation.MappingsPath, filename);
-            _scExportService.ExportToFile(_scExportProfile, exportPath);
+
+            // TX TOGGLE bindings share a vJoy button with the network switch — exclude them
+            // from the export so SC never sees that button, rather than blocking the whole export.
+            List<SCActionBinding>? excluded = null;
+            if (_networkConflictBindingKeys.Count > 0)
+            {
+                excluded = _scExportProfile.Bindings
+                    .Where(b => _networkConflictBindingKeys.Contains(b.Key))
+                    .ToList();
+                excluded.ForEach(b => _scExportProfile.Bindings.Remove(b));
+            }
+
+            try
+            {
+                _scExportService.ExportToFile(_scExportProfile, exportPath);
+            }
+            finally
+            {
+                // Always restore excluded bindings so the UI stays consistent
+                excluded?.ForEach(b => _scExportProfile.Bindings.Add(b));
+            }
 
             // Export succeeded — notify user before non-critical post-export operations
-            SetStatus($"Success! Exported to {filename}", SCStatusKind.Success);
+            string statusMsg = excluded?.Count > 0
+                ? $"Exported to {filename} (TX TOGGLE binding excluded)"
+                : $"Success! Exported to {filename}";
+            SetStatus(statusMsg, SCStatusKind.Success);
             System.Diagnostics.Debug.WriteLine($"[MainForm] Exported SC profile to: {exportPath}");
 
             // Refresh available profiles list (non-critical — export already succeeded)

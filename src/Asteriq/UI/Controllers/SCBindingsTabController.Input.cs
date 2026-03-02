@@ -492,11 +492,6 @@ public partial class SCBindingsTabController
                 SetStatus("Resolve duplicate action bindings across joystick columns before exporting", SCStatusKind.Error);
                 return;
             }
-            if (_exportBlockedByNetworkConflict)
-            {
-                SetStatus("Network switch button conflicts with a SC binding — resolve before exporting", SCStatusKind.Error);
-                return;
-            }
             ExportToSC();
             return;
         }

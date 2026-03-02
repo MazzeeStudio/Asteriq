@@ -54,7 +54,7 @@ public class DriverSetupManager
             using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\vjoy");
             if (key is not null)
             {
-                _logger.LogDebug("vJoy service found in registry");
+                _logger.LogTrace("vJoy service found in registry");
                 return true;
             }
 
@@ -66,7 +66,7 @@ public class DriverSetupManager
                 {
                     if (subKeyName.Contains("VID_1234&PID_BEAD", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger.LogDebug("vJoy device found in registry: {DeviceKey}", subKeyName);
+                        _logger.LogTrace("vJoy device found in registry: {DeviceKey}", subKeyName);
                         return true;
                     }
                 }
@@ -157,7 +157,7 @@ public class DriverSetupManager
     public bool IsHidHideInstalled()
     {
         var isAvailable = _hidHideService.IsAvailable();
-        _logger.LogDebug("HidHide availability: {IsAvailable}", isAvailable);
+        _logger.LogTrace("HidHide availability: {IsAvailable}", isAvailable);
         return isAvailable;
     }
 

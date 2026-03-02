@@ -41,7 +41,14 @@ public sealed class NetworkVJoyService : IVJoyService
     public bool Initialize()             => _inner.Initialize();
     public List<VJoyDeviceInfo> EnumerateDevices() => _inner.EnumerateDevices();
     public VJoyDeviceInfo GetDeviceInfo(uint deviceId) => _inner.GetDeviceInfo(deviceId);
-    public bool AcquireDevice(uint deviceId)    => _inner.AcquireDevice(deviceId);
+    public bool AcquireDevice(uint deviceId)
+    {
+        // In capture/forwarding mode we never write to real vJoy, so acquisition is
+        // unnecessary.  Returning true allows MappingEngine.Start() to succeed even
+        // when the master machine has no vJoy devices configured.
+        if (ForwardingMode) return true;
+        return _inner.AcquireDevice(deviceId);
+    }
     public void ReleaseDevice(uint deviceId)    => _inner.ReleaseDevice(deviceId);
     public bool ResetDevice(uint deviceId)
     {
@@ -118,10 +125,31 @@ public sealed class NetworkVJoyService : IVJoyService
     // ── Snapshot access ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns the current snapshot for the given device, or null if no writes have occurred.
+    /// Pre-creates the snapshot for <paramref name="deviceId"/> and sets its capacity
+    /// fields so the encoder sends a correctly-sized packet even before the first
+    /// MappingEngine output fires.  Safe to call multiple times (max wins).
+    /// </summary>
+    public void PreInitializeSnapshot(uint deviceId, int axisCount, int buttonCount, int hatCount)
+    {
+        var snap = EnsureSnapshot(deviceId);
+        snap.AxisCount   = Math.Max(snap.AxisCount,   axisCount);
+        snap.ButtonCount = Math.Max(snap.ButtonCount, buttonCount);
+        snap.HatCount    = Math.Max(snap.HatCount,    hatCount);
+    }
+
+    /// <summary>
+    /// Returns the current snapshot for the given device, or null if
+    /// <see cref="PreInitializeSnapshot"/> has not been called and no writes have occurred.
     /// </summary>
     public VJoyOutputSnapshot? GetSnapshot(uint deviceId)
         => _snapshots.TryGetValue(deviceId, out var s) ? s : null;
+
+    /// <summary>
+    /// Returns all populated snapshots (one per vJoy device that has been written to).
+    /// Returns a stable copy safe to iterate on a background thread.
+    /// </summary>
+    public VJoyOutputSnapshot[] GetAllSnapshots()
+        => [.. _snapshots.Values];
 
     public void Dispose() => _inner.Dispose();
 

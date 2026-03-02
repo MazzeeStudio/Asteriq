@@ -264,9 +264,6 @@ public partial class MappingsTabController
         {
             DrawScrollIndicator(canvas, bounds, _bindingsScrollOffset, _bindingsContentHeight);
         }
-
-        // NET SWITCH badge below the list
-        DrawNetSwitchBadge(canvas, bounds, profile);
     }
 
     private void DrawNetSwitchBadge(SKCanvas canvas, SKRect listBounds, MappingProfile? profile)
@@ -541,7 +538,7 @@ public partial class MappingsTabController
                 canvas.DrawText(modText, modBadgeLeft + keycapPadding, modTextY, modTextPaint);
             }
         }
-        else if (hasBinding)
+        else if (hasBinding && !isSwitchButton)
         {
             // Binding indicator dot on the right
             float dotX = bounds.Right - 20;
@@ -550,35 +547,18 @@ public partial class MappingsTabController
             canvas.DrawCircle(dotX, dotY, 5f, dotPaint);
         }
 
-        // ── Network switch button indicators ─────────────────────────────────
-        _switchButtonActionBounds = SKRect.Empty;
-        _switchButtonActionHovered = false;
-
+        // ── Network switch button indicator — amber "NET" pill on the right (replaces dot) ──
         if (isSwitchButton)
         {
-            // Amber "NET" pill on the left edge
             const float pillW = 30f;
             const float pillH = 14f;
-            float pillX = bounds.Left + 2f;
+            float pillX = bounds.Right - pillW - 8f;
             float pillY = bounds.MidY - pillH / 2f;
             var pillRect = new SKRect(pillX, pillY, pillX + pillW, pillY + pillH);
             FUIRenderer.DrawRoundedPanel(canvas, pillRect,
                 FUIColors.Warning.WithAlpha(FUIColors.AlphaHoverBg),
                 FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
             FUIRenderer.DrawTextCentered(canvas, "NET", pillRect, FUIColors.Warning, 10f);
-        }
-        else if (isSelected && _ctx.AppSettings.NetworkEnabled)
-        {
-            // "SET AS NET SWITCH" secondary action button at far right
-            const float btnW = 120f;
-            const float btnH = 20f;
-            float btnX = bounds.Right - btnW - 4f;
-            float btnY = bounds.MidY - btnH / 2f;
-            _switchButtonActionBounds = new SKRect(btnX, btnY, btnX + btnW, btnY + btnH);
-            _switchButtonActionHovered = _switchButtonActionBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-            FUIRenderer.DrawButton(canvas, _switchButtonActionBounds, "SET AS NET SWITCH",
-                _switchButtonActionHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
     }
 
@@ -685,6 +665,13 @@ public partial class MappingsTabController
         // Title
         FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 17f, true);
         y += 36;
+
+        // Reset net-switch bounds each frame (set later in DrawButtonSettings if applicable)
+        _switchButtonActionBounds = SKRect.Empty;
+        _switchButtonActionHovered = false;
+        _switchButtonBadgeBounds = SKRect.Empty;
+        _switchButtonBadgeXBounds = SKRect.Empty;
+        _switchButtonBadgeXHovered = false;
 
         // Show settings for selected row
         if (_selectedMappingRow < 0)
@@ -1503,6 +1490,64 @@ public partial class MappingsTabController
 
             var state = _clearAllButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
             FUIRenderer.DrawButton(canvas, clearBounds, "CLEAR MAPPING", state, isDanger: true);
+            y += 32;
+        }
+
+        // NET SWITCH section (only when network is enabled and in button category)
+        if (_ctx.AppSettings.NetworkEnabled)
+        {
+            // Determine if this row is already the configured switch button
+            bool isCurrentRowSwitchBtn = false;
+            string switchDisplayName = "";
+            var profile = _ctx.ProfileManager.ActiveProfile;
+            var switchCfg = profile?.NetworkSwitchButton;
+            if (switchCfg is not null && profile is not null &&
+                _ctx.VJoyDevices.Count > _ctx.SelectedVJoyDeviceIndex)
+            {
+                var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+                int switchRowIndex = GetSwitchButtonRowIndex(profile, vjoyDevice.Id, switchCfg);
+                isCurrentRowSwitchBtn = _selectedMappingRow == switchRowIndex;
+                if (isCurrentRowSwitchBtn) switchDisplayName = switchCfg.DisplayName;
+            }
+
+            // Amber banner with × — shown when this row IS the net switch button
+            if (isCurrentRowSwitchBtn)
+            {
+                y += 8;
+                var bannerRect = new SKRect(leftMargin, y, rightMargin, y + 32);
+                FUIRenderer.DrawRoundedPanel(canvas, bannerRect,
+                    FUIColors.Warning.WithAlpha(FUIColors.AlphaLightTint),
+                    FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
+                FUIRenderer.DrawText(canvas, "NET SWITCH: " + switchDisplayName,
+                    new SKPoint(bannerRect.Left + 10f, bannerRect.MidY + 5f), FUIColors.Warning, 13f);
+
+                const float xSize = 16f;
+                var xBounds = new SKRect(bannerRect.Right - xSize - 6f, bannerRect.MidY - xSize / 2f,
+                    bannerRect.Right - 6f, bannerRect.MidY + xSize / 2f);
+                _switchButtonBadgeBounds = bannerRect;
+                _switchButtonBadgeXBounds = xBounds;
+                _switchButtonBadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                using var xPaint = FUIRenderer.CreateTextPaint(
+                    _switchButtonBadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
+                canvas.DrawText("\u00D7", xBounds.MidX - 3f, xBounds.MidY + 5f, xPaint);
+            }
+
+            // SET AS NET SWITCH / NET SWITCH ACTIVE — anchored to panel bottom
+            var netBounds = new SKRect(leftMargin, bottom - 32, rightMargin, bottom);
+            _switchButtonActionBounds = isCurrentRowSwitchBtn ? SKRect.Empty : netBounds;
+            _switchButtonActionHovered = !isCurrentRowSwitchBtn &&
+                netBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+            if (isCurrentRowSwitchBtn)
+            {
+                FUIRenderer.DrawButton(canvas, netBounds, "NET SWITCH ACTIVE",
+                    FUIRenderer.ButtonState.Disabled);
+            }
+            else
+            {
+                FUIRenderer.DrawButton(canvas, netBounds, "SET AS NET SWITCH",
+                    _switchButtonActionHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            }
         }
     }
 

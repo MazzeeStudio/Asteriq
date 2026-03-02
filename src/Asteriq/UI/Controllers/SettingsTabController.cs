@@ -599,13 +599,15 @@ public class SettingsTabController : ITabController
                 var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
                 float connBtnW = 100f; float connBtnH = 26f;
                 bool isConnected = netMode == NetworkInputMode.Remote;
+                bool isConnecting = _ctx.IsNetworkConnecting;
                 _netConnectBounds = new SKRect(leftMargin, y, leftMargin + connBtnW, y + connBtnH);
                 _netDisconnectBounds = new SKRect(leftMargin + connBtnW + 8f, y,
                     leftMargin + connBtnW + 8f + connBtnW, y + connBtnH);
                 bool connHov = _netConnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 bool discHov = _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIRenderer.DrawButton(canvas, _netConnectBounds, "CONNECT",
-                    isConnected ? FUIRenderer.ButtonState.Disabled :
+                FUIRenderer.DrawButton(canvas, _netConnectBounds,
+                    isConnecting ? "CONNECTING..." : "CONNECT",
+                    isConnected || isConnecting ? FUIRenderer.ButtonState.Disabled :
                     connHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
                 FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
                     !isConnected ? FUIRenderer.ButtonState.Disabled :
@@ -614,8 +616,8 @@ public class SettingsTabController : ITabController
                 y += connBtnH + 6f;
 
                 // Status row
-                string statusText = isConnected ? "Sending" : "Not connected";
-                var statusColor = isConnected ? FUIColors.Active : FUIColors.TextDim;
+                string statusText = isConnecting ? "Connecting..." : isConnected ? "Sending" : "Not connected";
+                var statusColor = isConnected ? FUIColors.Active : isConnecting ? FUIColors.Warning : FUIColors.TextDim;
                 FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
                     new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
                 y += rowHeight;
@@ -655,12 +657,22 @@ public class SettingsTabController : ITabController
                     isDanger: true);
                 y += discBtnH + 6f;
 
-                // Status
+                // Status + packet counter
                 string statusText = isReceiving ? $"Connected to {trusted?.MachineName ?? "master"}" : "Waiting for master";
                 var statusColor = isReceiving ? FUIColors.Active : FUIColors.TextDim;
                 FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
                     new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
                 y += rowHeight;
+
+                if (isReceiving)
+                {
+                    int pkts = _ctx.NetworkInput?.PacketsReceived ?? 0;
+                    string pktText = pkts == 0 ? "Packets:  0  (no data received yet)" : $"Packets:  {pkts:N0}";
+                    var pktColor = pkts > 0 ? FUIColors.Active : FUIColors.Warning;
+                    FUIRenderer.DrawTextTruncated(canvas, pktText,
+                        new SKPoint(leftMargin, y + 12f), contentWidth, pktColor, 12f);
+                    y += rowHeight;
+                }
             }
             else
             {
@@ -1300,15 +1312,16 @@ public class SettingsTabController : ITabController
                 }
 
                 if (_netConnectBounds.Contains(pt) &&
-                    _ctx.NetworkInput?.Mode != NetworkInputMode.Remote)
+                    _ctx.NetworkInput?.Mode != NetworkInputMode.Remote &&
+                    !_ctx.IsNetworkConnecting)
                 {
-                    // Connect to the selected peer (or first available)
+                    // Route through MainForm.ConnectAsMasterAsync — sets _networkMode and starts engine
                     var peers = _ctx.NetworkDiscovery?.KnownPeers.Values
                         .Where(p => !p.IsStale).ToList() ?? [];
                     int idx = _selectedNetworkPeerIndex >= 0 && _selectedNetworkPeerIndex < peers.Count
                         ? _selectedNetworkPeerIndex : 0;
-                    if (idx < peers.Count && _ctx.NetworkInput is not null)
-                        _ = _ctx.NetworkInput.ConnectToAsync(peers[idx]);
+                    if (idx < peers.Count && _ctx.ConnectToPeerAsync is not null)
+                        _ = _ctx.ConnectToPeerAsync(peers[idx]);
                     _ctx.InvalidateCanvas();
                     return;
                 }
@@ -1316,7 +1329,8 @@ public class SettingsTabController : ITabController
                 if (_netDisconnectBounds.Contains(pt) &&
                     _ctx.NetworkInput?.Mode == NetworkInputMode.Remote)
                 {
-                    _ = _ctx.NetworkInput?.DisconnectAsync();
+                    // Route through MainForm.SwitchToLocalAsync — clears _networkMode and ForwardingMode
+                    _ = _ctx.NetworkDisconnectAsync?.Invoke();
                     _ctx.InvalidateCanvas();
                     return;
                 }
@@ -1334,7 +1348,8 @@ public class SettingsTabController : ITabController
                 if (_netDisconnectBounds.Contains(pt) &&
                     _ctx.NetworkInput?.Mode == NetworkInputMode.Receiving)
                 {
-                    _ = _ctx.NetworkInput?.DisconnectAsync();
+                    // Route through MainForm.SwitchToLocalAsync — clears client state
+                    _ = _ctx.NetworkDisconnectAsync?.Invoke();
                     _ctx.InvalidateCanvas();
                     return;
                 }

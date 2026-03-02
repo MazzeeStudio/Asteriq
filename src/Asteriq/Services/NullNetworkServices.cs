@@ -22,6 +22,7 @@ internal sealed class NullNetworkInputService : INetworkInputService
 {
     public NetworkInputMode Mode => NetworkInputMode.Local;
     public bool IsListening => false;
+    public int PacketsReceived => 0;
     public event EventHandler? ConnectionLost { add { } remove { } }
     public event EventHandler<string>? ClientConnected { add { } remove { } }
     public event EventHandler<TrustRequestEventArgs>? TrustRequested { add { } remove { } }

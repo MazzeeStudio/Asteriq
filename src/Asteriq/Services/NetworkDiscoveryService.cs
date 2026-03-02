@@ -67,7 +67,7 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
             if (_listenTask is not null) await _listenTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogDebug(ex, "NetworkDiscovery stop exception (expected on cancel)");
         }
@@ -153,7 +153,7 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
                 PeersChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "UDP listen error");
             }
@@ -184,7 +184,7 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
             foreach (var addr in host.AddressList)
                 _ownIps.Add(addr.ToString());
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Could not enumerate own IP addresses");
         }

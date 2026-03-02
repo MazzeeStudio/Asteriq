@@ -99,10 +99,22 @@ public class TabContext
     public INetworkInputService? NetworkInput { get; set; }
     /// <summary>Current network forwarding mode — updated by MainForm on every sync.</summary>
     public NetworkInputMode NetworkMode { get; set; } = NetworkInputMode.Local;
+    /// <summary>True while a master-side connect handshake is in progress. CONNECT button is disabled.</summary>
+    public bool IsNetworkConnecting { get; set; }
     /// <summary>True when this machine is in client mode (receiving vJoy from master). Tabs 0 and 1 are locked.</summary>
     public bool IsClientConnected { get; set; }
     public Action? StartNetworking { get; set; }
     public Action? ShutdownNetworking { get; set; }
+    /// <summary>
+    /// Connect to a specific peer as master (starts MappingEngine if needed, sets forwarding mode).
+    /// Called from the Settings tab CONNECT button. Returns a task that completes when connected.
+    /// </summary>
+    public Func<NetworkPeer, Task>? ConnectToPeerAsync { get; set; }
+    /// <summary>
+    /// Disconnect from the current network peer and resume local mode.
+    /// Called from the Settings tab DISCONNECT button.
+    /// </summary>
+    public Func<Task>? NetworkDisconnectAsync { get; set; }
     /// <summary>
     /// Called when the NET SWITCH button assignment changes.
     /// SCBindingsTabController sets this to its CheckNetworkSwitchConflicts method.

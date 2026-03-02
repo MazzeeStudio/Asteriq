@@ -237,59 +237,83 @@ internal static class FUIWidgets
         float knobX = knobOffX + (knobOnX - knobOffX) * knobT;
         float knobY = b.MidY;
 
-        // --- Track: sunken dark slot ---
+        // Soft drop shadow — lifts the toggle slightly off the background
+        using var shadowPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill,
+            Color = SKColors.Transparent,
+            ImageFilter = SKImageFilter.CreateDropShadow(0, 2f, 3f, 3f, new SKColor(0, 0, 0, 100))
+        };
+        canvas.DrawRoundRect(b, r, r, shadowPaint);
+
+        // --- Track: always dark — no active tint ---
         using var trackFill = FUIRenderer.CreateFillPaint(FUIColors.Background0);
         canvas.DrawRoundRect(b, r, r, trackFill);
-
-        // Active tint: left portion glows as knob slides right
-        if (knobT > 0.01f)
-        {
-            float fillRight = Math.Min(knobX + knobRadius, b.Right - r);
-            var activeFillRect = new SKRect(b.Left, b.Top, fillRight, b.Bottom);
-            using var activePaint = FUIRenderer.CreateFillPaint(
-                FUIColors.Active.WithAlpha((byte)(knobT * 45)));
-            canvas.DrawRoundRect(activeFillRect, r, r, activePaint);
-        }
 
         // Track border
         var trackBorder = isHovered ? FUIColors.Frame : FUIColors.FrameDim;
         using var borderPaint = FUIRenderer.CreateStrokePaint(trackBorder, 1f);
         canvas.DrawRoundRect(b, r, r, borderPaint);
 
-        // --- "○" ring symbol on the left side — fades in when ON ---
+        // --- "○" ring symbol on the left side — large white ring, fades in when ON ---
         float alphaOn = knobT;
         if (alphaOn > 0.02f)
         {
             float symX = b.Left + r;
-            float symR = b.Height * 0.17f;
+            float symR = b.Height * 0.22f;
             using var ringPaint = FUIRenderer.CreateStrokePaint(
-                FUIColors.Active.WithAlpha((byte)(alphaOn * 155)), 1.5f);
+                FUIColors.Active.WithAlpha((byte)(alphaOn * 220)), 2f);
             canvas.DrawCircle(symX, knobY, symR, ringPaint);
         }
 
-        // --- "–" dash on the right side — fades out when ON ---
+        // --- "–" pill on the right side — filled rounded rect, fades out when ON ---
         float alphaOff = 1f - knobT;
         if (alphaOff > 0.02f)
         {
             float symX = b.Right - r;
-            float dashHalf = b.Height * 0.17f;
-            using var dashPaint = FUIRenderer.CreateStrokePaint(
-                FUIColors.TextDim.WithAlpha((byte)(alphaOff * 155)), 1.5f);
-            canvas.DrawLine(symX - dashHalf, knobY, symX + dashHalf, knobY, dashPaint);
+            float pillW = b.Height * 0.38f;
+            float pillH = b.Height * 0.15f;
+            var pillRect = new SKRect(symX - pillW / 2f, knobY - pillH / 2f,
+                                      symX + pillW / 2f, knobY + pillH / 2f);
+            using var pillPaint = FUIRenderer.CreateFillPaint(
+                FUIColors.Primary.WithAlpha((byte)(alphaOff * 200)));
+            canvas.DrawRoundRect(pillRect, pillH / 2f, pillH / 2f, pillPaint);
         }
 
-        // --- Knob: raised pill button feel ---
-        // Knob fill: theme-tinted surface (slightly lighter than the track)
-        var knobFillColor = FUIColors.Primary.WithAlpha(20);
-        using var knobBase = FUIRenderer.CreateFillPaint(FUIColors.Background2);
+        // --- Knob: near-black with radial top-left highlight for 3D raised look ---
+        // Base: near-black fill
+        using var knobBase = FUIRenderer.CreateFillPaint(FUIColors.Void);
         canvas.DrawCircle(knobX, knobY, knobRadius, knobBase);
-        using var knobTint = FUIRenderer.CreateFillPaint(knobFillColor);
-        canvas.DrawCircle(knobX, knobY, knobRadius, knobTint);
 
-        // Knob border: active colour when on, framebright when off
-        var knobBorderColor = knobT > 0.5f
-            ? FUIColors.Active.WithAlpha((byte)(80 + knobT * 120))
-            : FUIColors.FrameBright.WithAlpha((byte)(80 + (1f - knobT) * 70));
+        // Subtle top-left highlight simulates light source
+        var highlightPt = new SKPoint(knobX - knobRadius * 0.25f, knobY - knobRadius * 0.32f);
+        using var highlightPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill,
+            Shader = SKShader.CreateRadialGradient(
+                highlightPt, knobRadius * 0.75f,
+                new SKColor[] { new SKColor(0xFF, 0xFF, 0xFF, 28), SKColors.Transparent },
+                null, SKShaderTileMode.Clamp)
+        };
+        canvas.DrawCircle(knobX, knobY, knobRadius, highlightPaint);
+
+        // Rim: slightly lighter edge reinforces the raised-button illusion
+        using var rimPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill,
+            Shader = SKShader.CreateRadialGradient(
+                new SKPoint(knobX, knobY), knobRadius,
+                new SKColor[] { SKColors.Transparent, new SKColor(0x30, 0x36, 0x3C, 160) },
+                new float[] { 0.78f, 1f },
+                SKShaderTileMode.Clamp)
+        };
+        canvas.DrawCircle(knobX, knobY, knobRadius, rimPaint);
+
+        // Knob border: always active colour
+        var knobBorderColor = FUIColors.Active.WithAlpha(160);
         using var knobBorder = FUIRenderer.CreateStrokePaint(knobBorderColor, 1f);
         canvas.DrawCircle(knobX, knobY, knobRadius, knobBorder);
     }

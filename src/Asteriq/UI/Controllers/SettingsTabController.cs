@@ -51,7 +51,7 @@ public class SettingsTabController : ITabController
 
     // Network forwarding toggle + role/connect UI
     private SKRect _networkEnabledToggleBounds;
-    private SKRect[] _netRoleButtonBounds = new SKRect[3]; // 0=None, 1=Master, 2=Client
+    private SKRect[] _netRoleButtonBounds = new SKRect[2]; // 0=Master, 1=Client
     private SKRect _netRegenerateBounds;
     private SKRect _netConnectBounds;
     private SKRect _netDisconnectBounds;
@@ -179,6 +179,20 @@ public class SettingsTabController : ITabController
 
         // Driver setup button
         if (!_driverSetupButtonBounds.IsEmpty && _driverSetupButtonBounds.Contains(pt))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Network buttons
+        foreach (var b in _netRoleButtonBounds)
+        {
+            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+        }
+        if ((!_netRegenerateBounds.IsEmpty && _netRegenerateBounds.Contains(pt))
+            || (!_netConnectBounds.IsEmpty && _netConnectBounds.Contains(pt))
+            || (!_netDisconnectBounds.IsEmpty && _netDisconnectBounds.Contains(pt))
+            || (!_netForgetBounds.IsEmpty && _netForgetBounds.Contains(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -507,54 +521,49 @@ public class SettingsTabController : ITabController
         float netToggleY = y + (rowHeight - toggleHeight) / 2;
         _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _ctx.AppSettings.NetworkEnabled, _ctx.MousePosition);
-        y += rowHeight;
+        y += rowHeight + 4f;
 
-        // Machine name row
+        // Machine name + port on one compact row
         string machineName = string.IsNullOrEmpty(_ctx.AppSettings.NetworkMachineName)
             ? Environment.MachineName
             : _ctx.AppSettings.NetworkMachineName;
-        FUIRenderer.DrawTextTruncated(canvas, $"Machine name: {machineName}",
-            new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
-        y += rowHeight;
-
-        // Listen port row
-        FUIRenderer.DrawTextTruncated(canvas, $"Listen port: {_ctx.AppSettings.NetworkListenPort}",
-            new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
-        y += rowHeight;
+        FUIRenderer.DrawTextTruncated(canvas, $"Machine: {machineName}  ·  Port: {_ctx.AppSettings.NetworkListenPort}",
+            new SKPoint(leftMargin, y + 10f), contentWidth, FUIColors.TextDim, 13f);
+        y += 20f;
 
         // Role + advanced network UI — only when networking is enabled
         if (_ctx.AppSettings.NetworkEnabled)
         {
-            y += 4f;
+            y += 10f;
 
-            // Role selector  [NONE]  [MASTER]  [CLIENT]
-            FUIRenderer.DrawTextTruncated(canvas, "Role", new SKPoint(leftMargin, y + 12f),
-                80f, FUIColors.TextDim, 13f);
-
-            float roleBtnW = 68f;
-            float roleBtnH = 24f;
+            // Role selector  [MASTER]  [CLIENT] — right-aligned, NONE implicit when neither active
+            float roleBtnW = 60f;
+            float roleBtnH = 22f;
             float roleBtnGap = 6f;
-            float roleBtnStartX = leftMargin + 80f;
-            var roleLabels = new[] { "NONE", "MASTER", "CLIENT" };
+            var roleLabels = new[] { "MASTER", "CLIENT" };
             var currentRole = _ctx.AppSettings.NetworkRole;
-            for (int ri = 0; ri < 3; ri++)
+            float roleLabelW = FUIRenderer.MeasureText("Role", 13f);
+            FUIRenderer.DrawTextTruncated(canvas, "Role", new SKPoint(leftMargin, y + roleBtnH / 2f + 4f),
+                roleLabelW + 4f, FUIColors.TextDim, 13f);
+            float rolePairW = roleBtnW * 2 + roleBtnGap;
+            float rolePairX = rightMargin - rolePairW;
+            for (int ri = 0; ri < 2; ri++)
             {
-                float rx = roleBtnStartX + ri * (roleBtnW + roleBtnGap);
+                float rx = rolePairX + ri * (roleBtnW + roleBtnGap);
                 _netRoleButtonBounds[ri] = new SKRect(rx, y, rx + roleBtnW, y + roleBtnH);
-                bool isActive = (ri == 0 && currentRole == NetworkRole.None)
-                             || (ri == 1 && currentRole == NetworkRole.Master)
-                             || (ri == 2 && currentRole == NetworkRole.Client);
+                bool isActive = (ri == 0 && currentRole == NetworkRole.Master)
+                             || (ri == 1 && currentRole == NetworkRole.Client);
                 bool hov = _netRoleButtonBounds[ri].Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 FUIRenderer.DrawButton(canvas, _netRoleButtonBounds[ri], roleLabels[ri],
                     isActive ? FUIRenderer.ButtonState.Active :
                     hov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             }
-            y += roleBtnH + 8f;
+            y += roleBtnH + 10f;
 
             // ── Master-specific UI ─────────────────────────────────────────
             if (currentRole == NetworkRole.Master)
             {
-                // Code display
+                // Code display + REGENERATE right-aligned
                 string code = _ctx.AppSettings.NetworkMasterCode;
                 FUIRenderer.DrawTextTruncated(canvas, $"Your code:  {code}",
                     new SKPoint(leftMargin, y + 12f), contentWidth - 110f, FUIColors.TextBright, 13f);
@@ -595,16 +604,16 @@ public class SettingsTabController : ITabController
                     y += rowHeight;
                 }
 
-                // Connect / Disconnect
+                // CONNECT / DISCONNECT — right-aligned pair
                 var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
                 float connBtnW = 100f; float connBtnH = 26f;
                 bool isConnected = netMode == NetworkInputMode.Remote;
                 bool isConnecting = _ctx.IsNetworkConnecting;
-                _netConnectBounds = new SKRect(leftMargin, y, leftMargin + connBtnW, y + connBtnH);
-                _netDisconnectBounds = new SKRect(leftMargin + connBtnW + 8f, y,
-                    leftMargin + connBtnW + 8f + connBtnW, y + connBtnH);
-                bool connHov = _netConnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                bool discHov = _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                // DISCONNECT rightmost (danger), CONNECT to its left
+                _netDisconnectBounds = new SKRect(rightMargin - connBtnW, y, rightMargin, y + connBtnH);
+                _netConnectBounds    = new SKRect(rightMargin - connBtnW * 2 - 8f, y, rightMargin - connBtnW - 8f, y + connBtnH);
+                bool connHov = !isConnected && !isConnecting && _netConnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                bool discHov = isConnected && _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 FUIRenderer.DrawButton(canvas, _netConnectBounds,
                     isConnecting ? "CONNECTING..." : "CONNECT",
                     isConnected || isConnecting ? FUIRenderer.ButtonState.Disabled :
@@ -645,12 +654,12 @@ public class SettingsTabController : ITabController
                     y += rowHeight;
                 }
 
-                // Disconnect button
+                // DISCONNECT — right-aligned
                 var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
                 bool isReceiving = netMode == NetworkInputMode.Receiving;
                 float discBtnW = 110f; float discBtnH = 26f;
-                _netDisconnectBounds = new SKRect(leftMargin, y, leftMargin + discBtnW, y + discBtnH);
-                bool discHov = _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                _netDisconnectBounds = new SKRect(rightMargin - discBtnW, y, rightMargin, y + discBtnH);
+                bool discHov = isReceiving && _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
                     !isReceiving ? FUIRenderer.ButtonState.Disabled :
                     discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
@@ -676,7 +685,7 @@ public class SettingsTabController : ITabController
             }
             else
             {
-                // Role=None: just show peer count
+                // Role=None: show peer discovery count as a hint
                 if (_ctx.NetworkDiscovery is not null)
                 {
                     int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
@@ -1289,7 +1298,7 @@ public class SettingsTabController : ITabController
         // Role selector buttons (only when networking is enabled)
         if (_ctx.AppSettings.NetworkEnabled)
         {
-            var roleValues = new[] { NetworkRole.None, NetworkRole.Master, NetworkRole.Client };
+            var roleValues = new[] { NetworkRole.Master, NetworkRole.Client };
             for (int ri = 0; ri < _netRoleButtonBounds.Length; ri++)
             {
                 if (_netRoleButtonBounds[ri].Contains(pt))

@@ -274,17 +274,22 @@ internal static class FUIWidgets
             float symX = b.Right - r;
             float dashHalf = b.Height * 0.17f;
             using var dashPaint = FUIRenderer.CreateStrokePaint(
-                FUIColors.TextDim.WithAlpha((byte)(alphaOff * 155)), 1.5f);
+                FUIColors.TextBright.WithAlpha((byte)(alphaOff * 200)), 1.5f);
             canvas.DrawLine(symX - dashHalf, knobY, symX + dashHalf, knobY, dashPaint);
         }
 
         // --- Knob: raised pill button feel ---
-        // Knob fill: theme-tinted surface (slightly lighter than the track)
+        // Outer fill: mid-dark surface gives the raised edge
         var knobFillColor = FUIColors.Primary.WithAlpha(20);
         using var knobBase = FUIRenderer.CreateFillPaint(FUIColors.Background2);
         canvas.DrawCircle(knobX, knobY, knobRadius, knobBase);
         using var knobTint = FUIRenderer.CreateFillPaint(knobFillColor);
         canvas.DrawCircle(knobX, knobY, knobRadius, knobTint);
+
+        // Inner recess: dark centre gives the neumorphic inset look
+        float innerR = knobRadius * 0.55f;
+        using var innerPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
+        canvas.DrawCircle(knobX, knobY, innerR, innerPaint);
 
         // Knob border: active colour when on, framebright when off
         var knobBorderColor = knobT > 0.5f

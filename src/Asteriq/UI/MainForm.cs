@@ -1358,6 +1358,10 @@ public partial class MainForm : Form
             SyncFromTabContext();
         }
 
+        // Settings tab tick (toggle animation)
+        if (_enableAnimations)
+            _settingsController.OnTick();
+
         // Only invalidate if animations ran or something is dirty, and we're not resizing
         if ((needsUpdate || _isDirty) && !_isResizing)
         {

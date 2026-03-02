@@ -341,20 +341,21 @@ internal static class FUIWidgets
         }
     }
 
-    internal static void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
+    internal static void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered, float fontSize = 14f, bool scaleFont = true)
     {
         var bgColor = active
             ? FUIColors.Active.WithAlpha(60)
-            : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
-        var textColor = active ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+            : (hovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+        var frameColor = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var textColor = active ? FUIColors.TextBright : FUIColors.TextDim;
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var framePaint = FUIRenderer.CreateStrokePaint(active ? FUIColors.Active : FUIColors.Frame);
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, active ? 1.5f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, fontSize, scaleFont);
     }
 
     internal static void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)

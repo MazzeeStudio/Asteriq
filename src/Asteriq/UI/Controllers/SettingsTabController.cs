@@ -427,22 +427,7 @@ public class SettingsTabController : ITabController
 
             bool isSelected = _ctx.AppSettings.TrayIconType == trayIconValues[i];
             bool isHovered = iconBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-            var bgColor = isSelected
-                ? FUIColors.Active.WithAlpha(60)
-                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-            var frameColor = isSelected
-                ? FUIColors.Active
-                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-            var textColor = isSelected ? FUIColors.TextBright : FUIColors.TextDim;
-
-            using var iconBgPaint = FUIRenderer.CreateFillPaint(bgColor);
-            canvas.DrawRect(iconBounds, iconBgPaint);
-
-            using var iconBorderPaint = FUIRenderer.CreateStrokePaint(frameColor, isSelected ? 1.5f : 1f);
-            canvas.DrawRect(iconBounds, iconBorderPaint);
-
-            FUIRenderer.DrawTextCentered(canvas, trayIconLabels[i], iconBounds, textColor, 13f);
+            FUIWidgets.DrawToggleButton(canvas, iconBounds, trayIconLabels[i], isSelected, isHovered, 13f);
         }
         y += iconBtnHeight + sectionSpacing;
 
@@ -509,6 +494,8 @@ public class SettingsTabController : ITabController
         }
         y += sectionSpacing;
 
+        if (vjoyEnabled)
+        {
         // NETWORK section
         FUIRenderer.DrawText(canvas, "NETWORK", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing;
@@ -536,11 +523,11 @@ public class SettingsTabController : ITabController
         {
             y += 10f;
 
-            // Role selector  [MASTER]  [CLIENT] — right-aligned, NONE implicit when neither active
+            // Role selector  [TX]  [RX] — right-aligned, NONE implicit when neither active
             float roleBtnW = 60f;
             float roleBtnH = 22f;
             float roleBtnGap = 6f;
-            var roleLabels = new[] { "MASTER", "CLIENT" };
+            var roleLabels = new[] { "TX", "RX" };
             var currentRole = _ctx.AppSettings.NetworkRole;
             float roleLabelW = FUIRenderer.MeasureText("Role", 13f);
             FUIRenderer.DrawTextTruncated(canvas, "Role", new SKPoint(leftMargin, y + roleBtnH / 2f + 4f),
@@ -554,9 +541,7 @@ public class SettingsTabController : ITabController
                 bool isActive = (ri == 0 && currentRole == NetworkRole.Master)
                              || (ri == 1 && currentRole == NetworkRole.Client);
                 bool hov = _netRoleButtonBounds[ri].Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIRenderer.DrawButton(canvas, _netRoleButtonBounds[ri], roleLabels[ri],
-                    isActive ? FUIRenderer.ButtonState.Active :
-                    hov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                FUIWidgets.DrawToggleButton(canvas, _netRoleButtonBounds[ri], roleLabels[ri], isActive, hov, 13f);
             }
             y += roleBtnH + 10f;
 
@@ -625,7 +610,7 @@ public class SettingsTabController : ITabController
                 y += connBtnH + 6f;
 
                 // Status row
-                string statusText = isConnecting ? "Connecting..." : isConnected ? "Sending" : "Not connected";
+                string statusText = isConnecting ? "Connecting..." : isConnected ? "Connected — sending" : "Not connected";
                 var statusColor = isConnected ? FUIColors.Active : isConnecting ? FUIColors.Warning : FUIColors.TextDim;
                 FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
                     new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
@@ -697,6 +682,7 @@ public class SettingsTabController : ITabController
             }
         }
         y += sectionSpacing;
+        } // end if (vjoyEnabled) — NETWORK section
 
         // VERSION & UPDATES section
         FUIRenderer.DrawText(canvas, "VERSION & UPDATES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -1051,14 +1037,7 @@ public class SettingsTabController : ITabController
             _fontFamilyButtonBounds[i] = ffBounds;
             bool isActive = _ctx.AppSettings.FontFamily == fontFamilyValues[i];
             bool isHovered = ffBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            var ffBg = isActive ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-            var ffFrame = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-            var ffText = isActive ? FUIColors.TextBright : FUIColors.TextDim;
-            using var ffBgPaint = FUIRenderer.CreateFillPaint(ffBg);
-            canvas.DrawRect(ffBounds, ffBgPaint);
-            using var ffFramePaint = FUIRenderer.CreateStrokePaint(ffFrame, isActive ? 1.5f : 1f);
-            canvas.DrawRect(ffBounds, ffFramePaint);
-            FUIRenderer.DrawTextCentered(canvas, fontFamilyLabels[i], ffBounds, ffText, 13f, scaleFont: false);
+            FUIWidgets.DrawToggleButton(canvas, ffBounds, fontFamilyLabels[i], isActive, isHovered, 13f, scaleFont: false);
         }
         y += fontFamilyBtnHeight + sectionSpacing;
 
@@ -1325,8 +1304,7 @@ public class SettingsTabController : ITabController
                     !_ctx.IsNetworkConnecting)
                 {
                     // Route through MainForm.ConnectAsMasterAsync — sets _networkMode and starts engine
-                    var peers = _ctx.NetworkDiscovery?.KnownPeers.Values
-                        .Where(p => !p.IsStale).ToList() ?? [];
+                    var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
                     int idx = _selectedNetworkPeerIndex >= 0 && _selectedNetworkPeerIndex < peers.Count
                         ? _selectedNetworkPeerIndex : 0;
                     if (idx < peers.Count && _ctx.ConnectToPeerAsync is not null)

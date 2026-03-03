@@ -1,4 +1,4 @@
-using Asteriq.Models;
+﻿using Asteriq.Models;
 using Asteriq.Services;
 using SkiaSharp;
 using Svg.Skia;
@@ -158,7 +158,7 @@ public partial class MappingsTabController
         _mappingRowBounds.Clear();
         _mappingAddButtonBounds.Clear();
         _mappingRemoveButtonBounds.Clear();
-        _bindingsListBounds = bounds;
+        _listScroll.ListBounds = bounds;
 
         var profile = _ctx.ProfileManager.ActiveProfile;
 
@@ -176,17 +176,17 @@ public partial class MappingsTabController
         // Calculate content height based on selected category (no section headers when filtered)
         // Category 0 = Buttons, Category 1 = Axes
         int itemCount = _mappingCategory == 0 ? buttonCount : axisCount;
-        _bindingsContentHeight = itemCount * (rowHeight + rowGap);
+        _listScroll.ContentHeight = itemCount * (rowHeight + rowGap);
 
         // Clamp scroll offset
-        float maxScroll = Math.Max(0, _bindingsContentHeight - bounds.Height);
-        _bindingsScrollOffset = Math.Clamp(_bindingsScrollOffset, 0, maxScroll);
+        float maxScroll = Math.Max(0, _listScroll.ContentHeight - bounds.Height);
+        _listScroll.ScrollOffset = Math.Clamp(_listScroll.ScrollOffset, 0, maxScroll);
 
         // Set up clipping
         canvas.Save();
         canvas.ClipRect(bounds);
 
-        float y = bounds.Top - _bindingsScrollOffset;
+        float y = bounds.Top - _listScroll.ScrollOffset;
         int rowIndex = 0;
 
         // Pre-compute NET SWITCH row index for this vJoy device (only for button category)
@@ -260,17 +260,17 @@ public partial class MappingsTabController
         canvas.Restore();
 
         // Draw scroll indicator if content overflows
-        if (_bindingsContentHeight > bounds.Height)
+        if (_listScroll.ContentHeight > bounds.Height)
         {
-            DrawScrollIndicator(canvas, bounds, _bindingsScrollOffset, _bindingsContentHeight);
+            DrawScrollIndicator(canvas, bounds, _listScroll.ScrollOffset, _listScroll.ContentHeight);
         }
     }
 
     private void DrawNetSwitchBadge(SKCanvas canvas, SKRect listBounds, MappingProfile? profile)
     {
-        _switchButtonBadgeBounds = SKRect.Empty;
-        _switchButtonBadgeXBounds = SKRect.Empty;
-        _switchButtonBadgeXHovered = false;
+        _netSwitch.BadgeBounds = SKRect.Empty;
+        _netSwitch.BadgeXBounds = SKRect.Empty;
+        _netSwitch.BadgeXHovered = false;
 
         var cfg = profile?.NetworkSwitchButton;
         if (cfg is null) return;
@@ -279,7 +279,7 @@ public partial class MappingsTabController
         const float badgeGap = 6f;
         float badgeY = listBounds.Bottom + badgeGap;
         var badgeRect = new SKRect(listBounds.Left, badgeY, listBounds.Right, badgeY + badgeH);
-        _switchButtonBadgeBounds = badgeRect;
+        _netSwitch.BadgeBounds = badgeRect;
 
         FUIRenderer.DrawRoundedPanel(canvas, badgeRect,
             FUIColors.Warning.WithAlpha(FUIColors.AlphaLightTint),
@@ -293,11 +293,11 @@ public partial class MappingsTabController
         const float xSize = 16f;
         var xBounds = new SKRect(badgeRect.Right - xSize - 6f, badgeRect.MidY - xSize / 2f,
             badgeRect.Right - 6f, badgeRect.MidY + xSize / 2f);
-        _switchButtonBadgeXBounds = xBounds;
-        _switchButtonBadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        _netSwitch.BadgeXBounds = xBounds;
+        _netSwitch.BadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         using var xPaint = FUIRenderer.CreateTextPaint(
-            _switchButtonBadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
+            _netSwitch.BadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
         float xTextX = xBounds.MidX - 3f;
         canvas.DrawText("\u00D7", xTextX, xBounds.MidY + 5f, xPaint);
     }
@@ -387,7 +387,7 @@ public partial class MappingsTabController
         // Check for attention highlight (physical input was pressed that maps to this output)
         bool hasAttentionHighlight = false;
         float attentionIntensity = 0f;
-        if (_highlightedMappingRow >= 0 &&
+        if (_highlight.Row >= 0 &&
             _ctx.VJoyDevices.Count > 0 && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count)
         {
             var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
@@ -398,9 +398,9 @@ public partial class MappingsTabController
             else if (outputName.StartsWith("Axis ") && int.TryParse(outputName.Substring(5), out int axisNum))
                 outputIndex = axisNum;
 
-            if (outputIndex == _highlightedMappingRow && vjoyDevice.Id == _highlightedVJoyDevice)
+            if (outputIndex == _highlight.Row && vjoyDevice.Id == _highlight.VJoyDevice)
             {
-                var elapsed = (DateTime.Now - _highlightStartTime).TotalMilliseconds;
+                var elapsed = (DateTime.Now - _highlight.StartTime).TotalMilliseconds;
                 if (elapsed < HighlightDurationMs)
                 {
                     hasAttentionHighlight = true;
@@ -412,7 +412,7 @@ public partial class MappingsTabController
                 }
                 else
                 {
-                    _highlightedMappingRow = -1; // Clear expired highlight
+                    _highlight.Row = -1; // Clear expired highlight
                 }
             }
         }
@@ -623,29 +623,29 @@ public partial class MappingsTabController
         float leftMargin = bounds.Left + frameInset + 12;
         float checkboxSize = 12f;
         float checkboxY = checkboxAreaTop + (checkboxRowHeight - checkboxSize) / 2f;
-        _autoScrollCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _autoScrollCheckboxBounds, _autoScrollEnabled, _ctx.MousePosition);
+        _autoScroll.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
+        FUIWidgets.DrawCheckbox(canvas, _autoScroll.CheckboxBounds, _autoScroll.Enabled, _ctx.MousePosition);
 
-        var labelColor = _autoScrollCheckboxHovered ? FUIColors.TextBright : FUIColors.TextDim;
+        var labelColor = _autoScroll.CheckboxHovered ? FUIColors.TextBright : FUIColors.TextDim;
         FUIRenderer.DrawText(canvas, "AUTO-SCROLL TO MAPPING",
             new SKPoint(leftMargin + checkboxSize + 7, checkboxY + checkboxSize - 1),
             labelColor, 13f);
 
         // "No mapping" flash indicator ÔÇö centered above the checkbox row, fades out
-        if (_noMappingFlashText is not null)
+        if (_highlight.FlashText is not null)
         {
-            float elapsed = (float)(DateTime.Now - _noMappingFlashTime).TotalSeconds;
+            float elapsed = (float)(DateTime.Now - _highlight.FlashTime).TotalSeconds;
             float opacity = elapsed < 1f ? 1f : Math.Max(0f, 1f - (elapsed - 1f) / 1.5f);
             if (opacity > 0.01f)
             {
                 var noMapColor = FUIColors.Warning.WithAlpha((byte)(opacity * 220));
-                FUIRenderer.DrawTextCentered(canvas, _noMappingFlashText,
+                FUIRenderer.DrawTextCentered(canvas, _highlight.FlashText,
                     new SKRect(bounds.Left, checkboxAreaTop - 22, bounds.Right, checkboxAreaTop),
                     noMapColor, 13f);
             }
             else
             {
-                _noMappingFlashText = null;
+                _highlight.FlashText = null;
             }
         }
     }
@@ -667,11 +667,11 @@ public partial class MappingsTabController
         y += 36;
 
         // Reset net-switch bounds each frame (set later in DrawButtonSettings if applicable)
-        _switchButtonActionBounds = SKRect.Empty;
-        _switchButtonActionHovered = false;
-        _switchButtonBadgeBounds = SKRect.Empty;
-        _switchButtonBadgeXBounds = SKRect.Empty;
-        _switchButtonBadgeXHovered = false;
+        _netSwitch.ActionBounds = SKRect.Empty;
+        _netSwitch.ActionHovered = false;
+        _netSwitch.BadgeBounds = SKRect.Empty;
+        _netSwitch.BadgeXBounds = SKRect.Empty;
+        _netSwitch.BadgeXHovered = false;
 
         // Show settings for selected row
         if (_selectedMappingRow < 0)
@@ -713,7 +713,7 @@ public partial class MappingsTabController
 
         // Get current mappings for selected output
         var inputs = GetInputsForSelectedOutput();
-        bool isListening = _isListeningForInput;
+        bool isListening = _inputDetection.IsListening;
 
         float rowHeight = 40f;  // Two-line layout
         float rowGap = 4f;
@@ -777,7 +777,7 @@ public partial class MappingsTabController
         if (isListening)
         {
             // Check for timeout
-            var elapsed = (DateTime.Now - _inputListeningStartTime).TotalMilliseconds;
+            var elapsed = (DateTime.Now - _inputDetection.ListeningStartTime).TotalMilliseconds;
             if (elapsed >= InputListeningTimeoutMs)
             {
                 CancelInputListening(); // Timeout - cancel listening
@@ -1013,20 +1013,20 @@ public partial class MappingsTabController
         float checkboxGap = 12f;
 
         // Symmetrical checkbox (leftmost) - checkbox then label
-        _curveSymmetricalCheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _curveSymmetricalCheckboxBounds, _curveSymmetrical, _ctx.MousePosition);
+        _curve.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
+        FUIWidgets.DrawCheckbox(canvas, _curve.CheckboxBounds, _curve.Symmetrical, _ctx.MousePosition);
         FUIRenderer.DrawText(canvas, "Symmetrical", new SKPoint(leftMargin + checkboxSize + labelGap, textY), FUIColors.TextDim, fontSize);
 
         // Invert checkbox (rightmost) - label then checkbox
         float invertCheckX = rightMargin - checkboxSize;
-        _invertToggleBounds = new SKRect(invertCheckX, checkboxY, invertCheckX + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _invertToggleBounds, _axisInverted, _ctx.MousePosition);
+        _deadzone.InvertToggleBounds = new SKRect(invertCheckX, checkboxY, invertCheckX + checkboxSize, checkboxY + checkboxSize);
+        FUIWidgets.DrawCheckbox(canvas, _deadzone.InvertToggleBounds, _deadzone.AxisInverted, _ctx.MousePosition);
         FUIRenderer.DrawText(canvas, "Invert", new SKPoint(invertCheckX - invertLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
         // Centre checkbox (left of Invert) - label then checkbox
         float centreCheckX = invertCheckX - invertLabelWidth - labelGap - checkboxGap - checkboxSize;
-        _deadzoneCenterCheckboxBounds = new SKRect(centreCheckX, checkboxY, centreCheckX + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _deadzoneCenterCheckboxBounds, _deadzoneCenterEnabled, _ctx.MousePosition);
+        _deadzone.CenterCheckboxBounds = new SKRect(centreCheckX, checkboxY, centreCheckX + checkboxSize, checkboxY + checkboxSize);
+        FUIWidgets.DrawCheckbox(canvas, _deadzone.CenterCheckboxBounds, _deadzone.CenterEnabled, _ctx.MousePosition);
         FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - centreLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
 
         y += rowHeight + 6f;
@@ -1043,7 +1043,7 @@ public partial class MappingsTabController
                 leftMargin + i * (buttonWidth + 4) + buttonWidth, y + buttonHeight);
 
             // Store bounds for click detection
-            _curvePresetBounds[i] = presetBounds;
+            _curve.PresetBounds[i] = presetBounds;
 
             CurveType presetType = i switch
             {
@@ -1053,7 +1053,7 @@ public partial class MappingsTabController
                 _ => CurveType.Custom
             };
 
-            bool isActive = _selectedCurveType == presetType;
+            bool isActive = _curve.SelectedType == presetType;
             bool isHovered = presetBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
             var bgColor = isActive
@@ -1076,8 +1076,8 @@ public partial class MappingsTabController
 
         // Curve editor visualization
         float curveHeight = 140f;
-        _curveEditorBounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
-        DrawCurveVisualization(canvas, _curveEditorBounds);
+        _curve.Bounds = new SKRect(leftMargin, y, rightMargin, y + curveHeight);
+        DrawCurveVisualization(canvas, _curve.Bounds);
         y += curveHeight + 43f;  // tick labels end at bounds.Bottom+17; +16px gap before live indicator
 
         // Live axis movement indicator
@@ -1105,10 +1105,10 @@ public partial class MappingsTabController
                 var btnBounds = new SKRect(
                     presetStartX + col * (presetBtnWidth + 3), y - 2,
                     presetStartX + col * (presetBtnWidth + 3) + presetBtnWidth, y + 14);
-                _deadzonePresetBounds[col] = btnBounds;
+                _deadzone.PresetBounds[col] = btnBounds;
 
                 // Dim buttons if no handle selected
-                bool enabled = _selectedDeadzoneHandle >= 0;
+                bool enabled = _deadzone.SelectedHandle >= 0;
                 bool isHovered = enabled && btnBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
                 var bgColor = enabled
@@ -1126,41 +1126,41 @@ public partial class MappingsTabController
             }
 
             // Show which handle is selected (if any)
-            if (_selectedDeadzoneHandle >= 0)
+            if (_deadzone.SelectedHandle >= 0)
             {
                 string[] handleNames = { "Start", "Ctr-", "Ctr+", "End" };
-                string selectedName = handleNames[_selectedDeadzoneHandle];
+                string selectedName = handleNames[_deadzone.SelectedHandle];
                 FUIRenderer.DrawText(canvas, $"[{selectedName}]", new SKPoint(presetStartX - 45, y), FUIColors.Active, 12f);
             }
             y += 20f;
 
             // Dual deadzone slider (always shows min/max, optionally shows center handles)
             float sliderHeight = 24f;
-            _deadzoneSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
-            DrawDualDeadzoneSlider(canvas, _deadzoneSliderBounds);
+            _deadzone.SliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
+            DrawDualDeadzoneSlider(canvas, _deadzone.SliderBounds);
             y += sliderHeight + 16f;  // baseline needs +16 so text top (baseline-10) clears slider handles
 
             // Value labels - fixed positions at track edges (prevents collision)
-            if (_deadzoneCenterEnabled)
+            if (_deadzone.CenterEnabled)
             {
                 // Two-track layout - fixed positions at each track edge
                 float gap = 24f;
-                float centerX = _deadzoneSliderBounds.MidX;
+                float centerX = _deadzone.SliderBounds.MidX;
                 float leftTrackRight = centerX - gap / 2;
                 float rightTrackLeft = centerX + gap / 2;
 
                 // Min at left edge, CtrMin at right edge of left track
                 // CtrMax at left edge of right track, Max at right edge
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMin:F2}", new SKPoint(leftTrackRight - 24, y), FUIColors.TextDim, 12f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneCenterMax:F2}", new SKPoint(rightTrackLeft, y), FUIColors.TextDim, 12f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzone.Min:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzone.CenterMin:F2}", new SKPoint(leftTrackRight - 24, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzone.CenterMax:F2}", new SKPoint(rightTrackLeft, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzone.Max:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
             }
             else
             {
                 // Single track - just show start and end at edges
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMin:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-                FUIRenderer.DrawText(canvas, $"{_deadzoneMax:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzone.Min:F2}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+                FUIRenderer.DrawText(canvas, $"{_deadzone.Max:F2}", new SKPoint(rightMargin - 20, y), FUIColors.TextDim, 12f);
             }
         }
     }
@@ -1168,10 +1168,10 @@ public partial class MappingsTabController
     private void DrawDualDeadzoneSlider(SKCanvas canvas, SKRect bounds)
     {
         // Convert -1..1 values to 0..1 for display
-        float minPos = (_deadzoneMin + 1f) / 2f;
-        float centerMinPos = (_deadzoneCenterMin + 1f) / 2f;
-        float centerMaxPos = (_deadzoneCenterMax + 1f) / 2f;
-        float maxPos = (_deadzoneMax + 1f) / 2f;
+        float minPos = (_deadzone.Min + 1f) / 2f;
+        float centerMinPos = (_deadzone.CenterMin + 1f) / 2f;
+        float centerMaxPos = (_deadzone.CenterMax + 1f) / 2f;
+        float maxPos = (_deadzone.Max + 1f) / 2f;
 
         float handleRadius = 8f;
         float trackHeight = 8f;
@@ -1179,7 +1179,7 @@ public partial class MappingsTabController
 
         using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(150));
 
-        if (_deadzoneCenterEnabled)
+        if (_deadzone.CenterEnabled)
         {
             // Two physically separate tracks like JoystickGremlinEx
             // Gap must be > 2 * handleRadius so handles never overlap when both at center
@@ -1266,8 +1266,8 @@ public partial class MappingsTabController
 
     private void DrawDeadzoneHandle(SKCanvas canvas, float centerY, float x, int handleIndex, SKColor color, float radius)
     {
-        bool isDragging = _draggingDeadzoneHandle == handleIndex;
-        bool isSelected = _selectedDeadzoneHandle == handleIndex;
+        bool isDragging = _deadzone.DraggingHandle == handleIndex;
+        bool isSelected = _deadzone.SelectedHandle == handleIndex;
         float drawRadius = isDragging ? radius + 2f : radius;
 
         // Selected handles get a highlighted fill
@@ -1298,11 +1298,11 @@ public partial class MappingsTabController
             var typeBounds = new SKRect(leftMargin + i * (typeButtonWidth + 5), y,
                 leftMargin + i * (typeButtonWidth + 5) + typeButtonWidth, y + typeButtonHeight);
 
-            if (i == 0) _outputTypeBtnBounds = typeBounds;
-            else _outputTypeKeyBounds = typeBounds;
+            if (i == 0) _keyboardOutput.BtnBounds = typeBounds;
+            else _keyboardOutput.KeyBounds = typeBounds;
 
-            bool selected = (i == 0 && !_outputTypeIsKeyboard) || (i == 1 && _outputTypeIsKeyboard);
-            bool hovered = _hoveredOutputType == i;
+            bool selected = (i == 0 && !_keyboardOutput.IsKeyboard) || (i == 1 && _keyboardOutput.IsKeyboard);
+            bool hovered = _keyboardOutput.HoveredOutputType == i;
 
             var bgColor = selected
                 ? FUIColors.Active.WithAlpha(60)
@@ -1320,81 +1320,81 @@ public partial class MappingsTabController
         y += typeButtonHeight + 16;
 
         // KEY COMBO section (only when Keyboard is selected)
-        if (_outputTypeIsKeyboard)
+        if (_keyboardOutput.IsKeyboard)
         {
             FUIRenderer.DrawText(canvas, "KEY COMBO", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 20;
 
             float keyFieldHeight = 32f;
-            _keyCaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
+            _keyboardOutput.CaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
 
             // Check for key capture timeout
-            if (_isCapturingKey)
+            if (_keyboardOutput.IsCapturing)
             {
-                var elapsed = (DateTime.Now - _keyCaptureStartTime).TotalMilliseconds;
+                var elapsed = (DateTime.Now - _keyboardOutput.CaptureStartTime).TotalMilliseconds;
                 if (elapsed >= KeyCaptureTimeoutMs)
                 {
-                    _isCapturingKey = false; // Timeout - cancel capture
+                    _keyboardOutput.IsCapturing = false; // Timeout - cancel capture
                 }
             }
 
             // Draw key capture field background
-            var keyBgColor = _isCapturingKey
+            var keyBgColor = _keyboardOutput.IsCapturing
                 ? FUIColors.Active.WithAlpha(40)
-                : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+                : (_keyboardOutput.CaptureHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
             using var keyBgPaint = FUIRenderer.CreateFillPaint(keyBgColor);
-            canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyBgPaint);
+            canvas.DrawRoundRect(_keyboardOutput.CaptureBounds, 3, 3, keyBgPaint);
 
             // Draw timeout progress bar when capturing
-            if (_isCapturingKey)
+            if (_keyboardOutput.IsCapturing)
             {
-                var elapsed = (DateTime.Now - _keyCaptureStartTime).TotalMilliseconds;
+                var elapsed = (DateTime.Now - _keyboardOutput.CaptureStartTime).TotalMilliseconds;
                 float progress = Math.Min(1f, (float)(elapsed / KeyCaptureTimeoutMs));
                 float remaining = 1f - progress;
 
                 // Progress bar fills the field and shrinks from right to left
-                float progressWidth = (_keyCaptureBounds.Width - 6) * remaining;
+                float progressWidth = (_keyboardOutput.CaptureBounds.Width - 6) * remaining;
                 if (progressWidth > 0)
                 {
                     var progressRect = new SKRect(
-                        _keyCaptureBounds.Left + 3,
-                        _keyCaptureBounds.Top + 3,
-                        _keyCaptureBounds.Left + 3 + progressWidth,
-                        _keyCaptureBounds.Bottom - 3);
+                        _keyboardOutput.CaptureBounds.Left + 3,
+                        _keyboardOutput.CaptureBounds.Top + 3,
+                        _keyboardOutput.CaptureBounds.Left + 3 + progressWidth,
+                        _keyboardOutput.CaptureBounds.Bottom - 3);
                     using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
                     canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
                 }
             }
 
-            var keyFrameColor = _isCapturingKey
+            var keyFrameColor = _keyboardOutput.IsCapturing
                 ? FUIColors.Active
-                : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
+                : (_keyboardOutput.CaptureHovered ? FUIColors.Primary : FUIColors.Frame);
 
-            using var keyFramePaint = FUIRenderer.CreateStrokePaint(keyFrameColor, _isCapturingKey ? 2f : 1f);
-            canvas.DrawRoundRect(_keyCaptureBounds, 3, 3, keyFramePaint);
+            using var keyFramePaint = FUIRenderer.CreateStrokePaint(keyFrameColor, _keyboardOutput.IsCapturing ? 2f : 1f);
+            canvas.DrawRoundRect(_keyboardOutput.CaptureBounds, 3, 3, keyFramePaint);
 
             // Display key combo or prompt
-            if (_isCapturingKey)
+            if (_keyboardOutput.IsCapturing)
             {
                 byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
-                FUIRenderer.DrawTextCentered(canvas, "Press key combo...", _keyCaptureBounds, FUIColors.Warning.WithAlpha(alpha), 14f);
+                FUIRenderer.DrawTextCentered(canvas, "Press key combo...", _keyboardOutput.CaptureBounds, FUIColors.Warning.WithAlpha(alpha), 14f);
             }
-            else if (!string.IsNullOrEmpty(_selectedKeyName))
+            else if (!string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName))
             {
                 // Draw keycaps centered in the field
-                FUIWidgets.DrawKeycapsInBounds(canvas, _keyCaptureBounds, _selectedKeyName, _selectedModifiers);
+                FUIWidgets.DrawKeycapsInBounds(canvas, _keyboardOutput.CaptureBounds, _keyboardOutput.SelectedKeyName, _keyboardOutput.SelectedModifiers);
             }
             else
             {
-                FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyCaptureBounds, FUIColors.TextDim, 14f);
+                FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyboardOutput.CaptureBounds, FUIColors.TextDim, 14f);
             }
             y += keyFieldHeight + 16;
         }
 
         // Button Mode section
         // Modifier keys must stay in Normal mode ÔÇö the OS handles the modifier behaviour.
-        bool isModifierKey = _outputTypeIsKeyboard && IsModifierKeyName(_selectedKeyName);
+        bool isModifierKey = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
 
         FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y),
             isModifierKey ? FUIColors.TextDim.WithAlpha(60) : FUIColors.TextDim, 13f);
@@ -1418,12 +1418,12 @@ public partial class MappingsTabController
                 FUIRenderer.DrawRoundedPanel(canvas, modeBounds, FUIColors.Background2.WithAlpha(100), FUIColors.Frame.WithAlpha(100));
 
                 FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 12f);
-                _buttonModeBounds[i] = SKRect.Empty;
+                _buttonMode.ModeBounds[i] = SKRect.Empty;
             }
             else
             {
-                bool selected = i == (int)_selectedButtonMode;
-                bool hovered = i == _hoveredButtonMode;
+                bool selected = i == (int)_buttonMode.SelectedMode;
+                bool hovered = i == _buttonMode.HoveredMode;
 
                 SKColor bgColor = selected ? FUIColors.Active.WithAlpha(60) :
                     (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
@@ -1437,46 +1437,46 @@ public partial class MappingsTabController
                 FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
                     selected ? FUIColors.Active : FUIColors.TextPrimary, 12f);
 
-                _buttonModeBounds[i] = modeBounds;
+                _buttonMode.ModeBounds[i] = modeBounds;
             }
         }
         y += buttonHeight + 12;
 
         // Duration slider for Pulse mode
-        if (_selectedButtonMode == ButtonMode.Pulse && y + 50 < bottom)
+        if (_buttonMode.SelectedMode == ButtonMode.Pulse && y + 50 < bottom)
         {
             FUIRenderer.DrawText(canvas, "PULSE DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 18;
 
             float sliderHeight = 24f;
-            _pulseDurationSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
+            _buttonMode.PulseSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
 
             // Normalize value: 100-1000ms mapped to 0-1
-            float normalizedPulse = (_pulseDurationMs - 100f) / 900f;
-            FUIWidgets.DrawDurationSlider(canvas, _pulseDurationSliderBounds, normalizedPulse, _draggingPulseDuration);
+            float normalizedPulse = (_buttonMode.PulseDurationMs - 100f) / 900f;
+            FUIWidgets.DrawDurationSlider(canvas, _buttonMode.PulseSliderBounds, normalizedPulse, _buttonMode.DraggingPulse);
 
             // Value label
-            FUIRenderer.DrawText(canvas, $"{_pulseDurationMs}ms",
+            FUIRenderer.DrawText(canvas, $"{_buttonMode.PulseDurationMs}ms",
                 new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 13f);
 
             y += sliderHeight + 12;
         }
 
         // Duration slider for Hold mode
-        if (_selectedButtonMode == ButtonMode.HoldToActivate && y + 50 < bottom)
+        if (_buttonMode.SelectedMode == ButtonMode.HoldToActivate && y + 50 < bottom)
         {
             FUIRenderer.DrawText(canvas, "HOLD DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
             y += 18;
 
             float sliderHeight = 24f;
-            _holdDurationSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
+            _buttonMode.HoldSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
 
             // Normalize value: 200-2000ms mapped to 0-1
-            float normalizedHold = (_holdDurationMs - 200f) / 1800f;
-            FUIWidgets.DrawDurationSlider(canvas, _holdDurationSliderBounds, normalizedHold, _draggingHoldDuration);
+            float normalizedHold = (_buttonMode.HoldDurationMs - 200f) / 1800f;
+            FUIWidgets.DrawDurationSlider(canvas, _buttonMode.HoldSliderBounds, normalizedHold, _buttonMode.DraggingHold);
 
             // Value label
-            FUIRenderer.DrawText(canvas, $"{_holdDurationMs}ms",
+            FUIRenderer.DrawText(canvas, $"{_buttonMode.HoldDurationMs}ms",
                 new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 13f);
 
             y += sliderHeight + 12;
@@ -1524,18 +1524,18 @@ public partial class MappingsTabController
                 const float xSize = 16f;
                 var xBounds = new SKRect(bannerRect.Right - xSize - 6f, bannerRect.MidY - xSize / 2f,
                     bannerRect.Right - 6f, bannerRect.MidY + xSize / 2f);
-                _switchButtonBadgeBounds = bannerRect;
-                _switchButtonBadgeXBounds = xBounds;
-                _switchButtonBadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                _netSwitch.BadgeBounds = bannerRect;
+                _netSwitch.BadgeXBounds = xBounds;
+                _netSwitch.BadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 using var xPaint = FUIRenderer.CreateTextPaint(
-                    _switchButtonBadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
+                    _netSwitch.BadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
                 canvas.DrawText("\u00D7", xBounds.MidX - 3f, xBounds.MidY + 5f, xPaint);
             }
 
             // SET AS TX TOGGLE / TX TOGGLE ACTIVE — anchored to panel bottom
             var netBounds = new SKRect(leftMargin, bottom - 32, rightMargin, bottom);
-            _switchButtonActionBounds = isCurrentRowSwitchBtn ? SKRect.Empty : netBounds;
-            _switchButtonActionHovered = !isCurrentRowSwitchBtn &&
+            _netSwitch.ActionBounds = isCurrentRowSwitchBtn ? SKRect.Empty : netBounds;
+            _netSwitch.ActionHovered = !isCurrentRowSwitchBtn &&
                 netBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
             if (isCurrentRowSwitchBtn)
@@ -1546,7 +1546,7 @@ public partial class MappingsTabController
             else
             {
                 FUIRenderer.DrawButton(canvas, netBounds, "SET AS TX TOGGLE",
-                    _switchButtonActionHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                    _netSwitch.ActionHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             }
         }
     }
@@ -1606,7 +1606,7 @@ public partial class MappingsTabController
         DrawCurvePath(canvas, bounds);
 
         // Draw control points (only for custom curve)
-        if (_selectedCurveType == CurveType.Custom)
+        if (_curve.SelectedType == CurveType.Custom)
         {
             DrawCurveControlPoints(canvas, bounds);
         }
@@ -1863,7 +1863,7 @@ public partial class MappingsTabController
     private float ComputeCurveValue(float input)
     {
         // Apply curve type only - deadzone is handled separately
-        float output = _selectedCurveType switch
+        float output = _curve.SelectedType switch
         {
             CurveType.Linear => input,
             CurveType.SCurve => ApplySCurve(input),
@@ -1875,7 +1875,7 @@ public partial class MappingsTabController
         output = Math.Clamp(output, 0f, 1f);
 
         // Apply inversion
-        if (_axisInverted)
+        if (_deadzone.AxisInverted)
             output = 1f - output;
 
         return output;
@@ -1895,13 +1895,13 @@ public partial class MappingsTabController
 
     private float InterpolateControlPoints(float x)
     {
-        if (_curveControlPoints.Count < 2) return x;
+        if (_curve.ControlPoints.Count < 2) return x;
 
         // Find segment containing x
-        for (int i = 0; i < _curveControlPoints.Count - 1; i++)
+        for (int i = 0; i < _curve.ControlPoints.Count - 1; i++)
         {
-            var p1 = _curveControlPoints[i];
-            var p2 = _curveControlPoints[i + 1];
+            var p1 = _curve.ControlPoints[i];
+            var p2 = _curve.ControlPoints[i + 1];
 
             if (x >= p1.X && x <= p2.X)
             {
@@ -1910,15 +1910,15 @@ public partial class MappingsTabController
 
                 // Use Catmull-Rom spline interpolation for smooth curves
                 // Need 4 points: p0, p1, p2, p3
-                var p0 = i > 0 ? _curveControlPoints[i - 1] : new SKPoint(p1.X - (p2.X - p1.X), p1.Y - (p2.Y - p1.Y));
-                var p3 = i < _curveControlPoints.Count - 2 ? _curveControlPoints[i + 2] : new SKPoint(p2.X + (p2.X - p1.X), p2.Y + (p2.Y - p1.Y));
+                var p0 = i > 0 ? _curve.ControlPoints[i - 1] : new SKPoint(p1.X - (p2.X - p1.X), p1.Y - (p2.Y - p1.Y));
+                var p3 = i < _curve.ControlPoints.Count - 2 ? _curve.ControlPoints[i + 2] : new SKPoint(p2.X + (p2.X - p1.X), p2.Y + (p2.Y - p1.Y));
 
                 return CatmullRomInterpolate(p0.Y, p1.Y, p2.Y, p3.Y, t);
             }
         }
 
         // Extrapolate
-        return x < _curveControlPoints[0].X ? _curveControlPoints[0].Y : _curveControlPoints[^1].Y;
+        return x < _curve.ControlPoints[0].X ? _curve.ControlPoints[0].Y : _curve.ControlPoints[^1].Y;
     }
 
     /// <summary>
@@ -1944,18 +1944,18 @@ public partial class MappingsTabController
         const float PointRadius = 7f;
         const float CenterPointRadius = 3.5f; // Half size for center point
 
-        for (int i = 0; i < _curveControlPoints.Count; i++)
+        for (int i = 0; i < _curve.ControlPoints.Count; i++)
         {
-            var pt = _curveControlPoints[i];
+            var pt = _curve.ControlPoints[i];
             float x = bounds.Left + pt.X * bounds.Width;
 
             // Apply inversion to display Y position to match the curve
-            float displayY = _axisInverted ? (1f - pt.Y) : pt.Y;
+            float displayY = _deadzone.AxisInverted ? (1f - pt.Y) : pt.Y;
             float y = bounds.Bottom - displayY * bounds.Height;
 
-            bool isHovered = i == _hoveredCurvePoint;
-            bool isDragging = i == _draggingCurvePoint;
-            bool isEndpoint = i == 0 || i == _curveControlPoints.Count - 1;
+            bool isHovered = i == _curve.HoveredPoint;
+            bool isDragging = i == _curve.DraggingPoint;
+            bool isEndpoint = i == 0 || i == _curve.ControlPoints.Count - 1;
             bool isCenterPoint = Math.Abs(pt.X - 0.5f) < 0.01f && Math.Abs(pt.Y - 0.5f) < 0.01f;
 
             // Center point is smaller and not interactive
@@ -2003,7 +2003,7 @@ public partial class MappingsTabController
         float y = (bounds.Bottom - screenPt.Y) / bounds.Height;
 
         // If inverted, convert screen Y back to graph Y (uninvert)
-        if (_axisInverted)
+        if (_deadzone.AxisInverted)
             y = 1f - y;
 
         return new SKPoint(Math.Clamp(x, 0, 1), Math.Clamp(y, 0, 1));
@@ -2032,17 +2032,17 @@ public partial class MappingsTabController
 
         // Input field - double-click to listen for input
         float inputFieldHeight = 36f;
-        _inputFieldBounds = new SKRect(leftMargin, y, rightMargin, y + inputFieldHeight);
-        DrawInputField(canvas, _inputFieldBounds);
+        _inputDetection.FieldBounds = new SKRect(leftMargin, y, rightMargin, y + inputFieldHeight);
+        DrawInputField(canvas, _inputDetection.FieldBounds);
         y += inputFieldHeight + 10;
 
         // Manual entry toggle button
-        _manualEntryButtonBounds = new SKRect(leftMargin, y, leftMargin + 120, y + 24);
-        FUIWidgets.DrawToggleButton(canvas, _manualEntryButtonBounds, "Manual Entry", _manualEntryMode, _manualEntryButtonHovered);
+        _inputDetection.ManualEntryBounds = new SKRect(leftMargin, y, leftMargin + 120, y + 24);
+        FUIWidgets.DrawToggleButton(canvas, _inputDetection.ManualEntryBounds, "Manual Entry", _inputDetection.ManualEntryMode, _inputDetection.ManualEntryHovered);
         y += 34;
 
         // Manual entry dropdowns (if enabled)
-        if (_manualEntryMode)
+        if (_inputDetection.ManualEntryMode)
         {
             y = DrawManualEntrySection(canvas, bounds, y, leftMargin, rightMargin);
         }
@@ -2058,18 +2058,18 @@ public partial class MappingsTabController
             y += 38;
 
             // Key capture field (only when Keyboard is selected)
-            if (_outputTypeIsKeyboard)
+            if (_keyboardOutput.IsKeyboard)
             {
                 FUIRenderer.DrawText(canvas, "KEY", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
                 y += 20;
                 float keyFieldHeight = 32f;
-                _keyCaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
-                DrawKeyCapture(canvas, _keyCaptureBounds);
+                _keyboardOutput.CaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
+                DrawKeyCapture(canvas, _keyboardOutput.CaptureBounds);
                 y += keyFieldHeight + 10;
             }
 
             // Button mode selector (disabled for modifier keys)
-            bool editIsModifier = _outputTypeIsKeyboard && IsModifierKeyName(_selectedKeyName);
+            bool editIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
             y += 10;
             FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y),
                 editIsModifier ? FUIColors.TextDim.WithAlpha(60) : FUIColors.TextDim, 13f);
@@ -2113,31 +2113,31 @@ public partial class MappingsTabController
     private void DrawInputField(SKCanvas canvas, SKRect bounds)
     {
         // Background
-        var bgColor = _isListeningForInput
+        var bgColor = _inputDetection.IsListening
             ? FUIColors.Warning.WithAlpha(40)
-            : (_inputFieldHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            : (_inputDetection.FieldHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
-        var frameColor = _isListeningForInput
+        var frameColor = _inputDetection.IsListening
             ? FUIColors.Warning
-            : (_inputFieldHovered ? FUIColors.Primary : FUIColors.Frame);
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _isListeningForInput ? 2f : 1f);
+            : (_inputDetection.FieldHovered ? FUIColors.Primary : FUIColors.Frame);
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _inputDetection.IsListening ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
         // Text content
         float textY = bounds.MidY + 5;
-        if (_isListeningForInput)
+        if (_inputDetection.IsListening)
         {
             byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
             FUIRenderer.DrawText(canvas, "Press a button or move an axis...",
                 new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 15f);
         }
-        else if (_pendingInput is not null)
+        else if (_inputDetection.PendingInput is not null)
         {
-            FUIRenderer.DrawText(canvas, _pendingInput.ToString(),
+            FUIRenderer.DrawText(canvas, _inputDetection.PendingInput.ToString(),
                 new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 15f);
         }
         else
@@ -2147,7 +2147,7 @@ public partial class MappingsTabController
         }
 
         // Clear button if there's input
-        if (_pendingInput is not null && !_isListeningForInput)
+        if (_inputDetection.PendingInput is not null && !_inputDetection.IsListening)
         {
             var clearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
             FUIWidgets.DrawSmallIconButton(canvas, clearBounds, "X", false, true);
@@ -2159,29 +2159,29 @@ public partial class MappingsTabController
         // Device dropdown
         FUIRenderer.DrawText(canvas, "Device:", new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 13f);
         float dropdownX = leftMargin + 55;
-        _deviceDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
-        string deviceText = _ctx.Devices.Count > 0 && _selectedSourceDevice < _ctx.Devices.Count
-            ? _ctx.Devices[_selectedSourceDevice].Name
+        _inputDetection.DeviceDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
+        string deviceText = _ctx.Devices.Count > 0 && _inputDetection.SelectedSourceDevice < _ctx.Devices.Count
+            ? _ctx.Devices[_inputDetection.SelectedSourceDevice].Name
             : "No devices";
-        FUIWidgets.DrawDropdown(canvas, _deviceDropdownBounds, deviceText, _deviceDropdownOpen);
+        FUIWidgets.DrawDropdown(canvas, _inputDetection.DeviceDropdownBounds, deviceText, _inputDetection.DeviceDropdownOpen);
         y += 36;
 
         // Control dropdown
         string controlLabel = _isEditingAxis ? "Axis:" : "Button:";
         FUIRenderer.DrawText(canvas, controlLabel, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 13f);
-        _controlDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
+        _inputDetection.ControlDropdownBounds = new SKRect(dropdownX, y, rightMargin, y + 28);
         string controlText = GetControlDropdownText();
-        FUIWidgets.DrawDropdown(canvas, _controlDropdownBounds, controlText, _controlDropdownOpen);
+        FUIWidgets.DrawDropdown(canvas, _inputDetection.ControlDropdownBounds, controlText, _inputDetection.ControlDropdownOpen);
         y += 36;
 
         // Draw dropdown lists if open
-        if (_deviceDropdownOpen)
+        if (_inputDetection.DeviceDropdownOpen)
         {
-            DrawDeviceDropdownList(canvas, _deviceDropdownBounds);
+            DrawDeviceDropdownList(canvas, _inputDetection.DeviceDropdownBounds);
         }
-        else if (_controlDropdownOpen)
+        else if (_inputDetection.ControlDropdownOpen)
         {
-            DrawControlDropdownList(canvas, _controlDropdownBounds);
+            DrawControlDropdownList(canvas, _inputDetection.ControlDropdownBounds);
         }
 
         return y;
@@ -2189,20 +2189,20 @@ public partial class MappingsTabController
 
     private string GetControlDropdownText()
     {
-        if (_ctx.Devices.Count == 0 || _selectedSourceDevice >= _ctx.Devices.Count)
+        if (_ctx.Devices.Count == 0 || _inputDetection.SelectedSourceDevice >= _ctx.Devices.Count)
             return "ÔÇö";
 
-        var device = _ctx.Devices[_selectedSourceDevice];
+        var device = _ctx.Devices[_inputDetection.SelectedSourceDevice];
         if (_isEditingAxis)
         {
             int axisCount = 8; // Typical axis count
-            if (_selectedSourceControl < axisCount)
-                return $"Axis {_selectedSourceControl}";
+            if (_inputDetection.SelectedSourceControl < axisCount)
+                return $"Axis {_inputDetection.SelectedSourceControl}";
         }
         else
         {
-            if (_selectedSourceControl < 128)
-                return $"Button {_selectedSourceControl + 1}";
+            if (_inputDetection.SelectedSourceControl < 128)
+                return $"Button {_inputDetection.SelectedSourceControl + 1}";
         }
         return "ÔÇö";
     }
@@ -2228,7 +2228,7 @@ public partial class MappingsTabController
         for (int i = 0; i < _ctx.Devices.Count && y < listBounds.Bottom; i++)
         {
             var itemBounds = new SKRect(listBounds.Left, y, listBounds.Right, y + itemHeight);
-            bool hovered = i == _hoveredDeviceIndex;
+            bool hovered = i == _inputDetection.HoveredDeviceIndex;
 
             if (hovered)
             {
@@ -2268,7 +2268,7 @@ public partial class MappingsTabController
         for (int i = 0; i < controlCount && y < listBounds.Bottom; i++)
         {
             var itemBounds = new SKRect(listBounds.Left, y, listBounds.Right, y + itemHeight);
-            bool hovered = i == _hoveredControlIndex;
+            bool hovered = i == _inputDetection.HoveredControlIndex;
 
             if (hovered)
             {
@@ -2308,14 +2308,14 @@ public partial class MappingsTabController
                 canvas.DrawRect(modeBounds, disabledFramePaint);
 
                 FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 13f);
-                _buttonModeBounds[i] = SKRect.Empty;
+                _buttonMode.ModeBounds[i] = SKRect.Empty;
             }
             else
             {
-                _buttonModeBounds[i] = modeBounds;
+                _buttonMode.ModeBounds[i] = modeBounds;
 
-                bool selected = _selectedButtonMode == modes[i];
-                bool hovered = _hoveredButtonMode == i;
+                bool selected = _buttonMode.SelectedMode == modes[i];
+                bool hovered = _buttonMode.HoveredMode == i;
 
                 var bgColor = selected
                     ? FUIColors.Active.WithAlpha(60)
@@ -2342,11 +2342,11 @@ public partial class MappingsTabController
         for (int i = 0; i < 2; i++)
         {
             var typeBounds = new SKRect(x + i * (buttonWidth + 5), y, x + i * (buttonWidth + 5) + buttonWidth, y + buttonHeight);
-            if (i == 0) _outputTypeBtnBounds = typeBounds;
-            else _outputTypeKeyBounds = typeBounds;
+            if (i == 0) _keyboardOutput.BtnBounds = typeBounds;
+            else _keyboardOutput.KeyBounds = typeBounds;
 
-            bool selected = (i == 0 && !_outputTypeIsKeyboard) || (i == 1 && _outputTypeIsKeyboard);
-            bool hovered = _hoveredOutputType == i;
+            bool selected = (i == 0 && !_keyboardOutput.IsKeyboard) || (i == 1 && _keyboardOutput.IsKeyboard);
+            bool hovered = _keyboardOutput.HoveredOutputType == i;
 
             var bgColor = selected
                 ? FUIColors.Active.WithAlpha(60)
@@ -2366,31 +2366,31 @@ public partial class MappingsTabController
     private void DrawKeyCapture(SKCanvas canvas, SKRect bounds)
     {
         // Background
-        var bgColor = _isCapturingKey
+        var bgColor = _keyboardOutput.IsCapturing
             ? FUIColors.Warning.WithAlpha(40)
-            : (_keyCaptureBoundsHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            : (_keyboardOutput.CaptureHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
-        var frameColor = _isCapturingKey
+        var frameColor = _keyboardOutput.IsCapturing
             ? FUIColors.Warning
-            : (_keyCaptureBoundsHovered ? FUIColors.Primary : FUIColors.Frame);
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _isCapturingKey ? 2f : 1f);
+            : (_keyboardOutput.CaptureHovered ? FUIColors.Primary : FUIColors.Frame);
+        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _keyboardOutput.IsCapturing ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 
         // Text content
         float textY = bounds.MidY + 5;
-        if (_isCapturingKey)
+        if (_keyboardOutput.IsCapturing)
         {
             byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
             FUIRenderer.DrawText(canvas, "Press a key...",
                 new SKPoint(bounds.Left + 10, textY), FUIColors.Warning.WithAlpha(alpha), 15f);
         }
-        else if (!string.IsNullOrEmpty(_selectedKeyName))
+        else if (!string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName))
         {
-            FUIRenderer.DrawText(canvas, _selectedKeyName,
+            FUIRenderer.DrawText(canvas, _keyboardOutput.SelectedKeyName,
                 new SKPoint(bounds.Left + 10, textY), FUIColors.TextBright, 15f);
         }
         else
@@ -2400,14 +2400,14 @@ public partial class MappingsTabController
         }
 
         // Clear button if there's a key
-        if (!string.IsNullOrEmpty(_selectedKeyName) && !_isCapturingKey)
+        if (!string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName) && !_keyboardOutput.IsCapturing)
         {
-            _keyClearButtonBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
-            FUIWidgets.DrawSmallIconButton(canvas, _keyClearButtonBounds, "X", _keyClearButtonHovered, true);
+            _keyboardOutput.ClearBounds = new SKRect(bounds.Right - 28, bounds.Top + 6, bounds.Right - 6, bounds.Bottom - 6);
+            FUIWidgets.DrawSmallIconButton(canvas, _keyboardOutput.ClearBounds, "X", _keyboardOutput.ClearHovered, true);
         }
         else
         {
-            _keyClearButtonBounds = SKRect.Empty;
+            _keyboardOutput.ClearBounds = SKRect.Empty;
         }
     }
 
@@ -2695,25 +2695,25 @@ public partial class MappingsTabController
     /// </summary>
     private void DrawMappingHighlightLeadLine(SKCanvas canvas, SKRect panelBounds)
     {
-        if (_mappingHighlightControl?.Anchor is null) return;
+        if (_highlight.ControlDef?.Anchor is null) return;
 
-        float elapsed = (float)(DateTime.Now - _mappingHighlightTime).TotalSeconds;
+        float elapsed = (float)(DateTime.Now - _highlight.ControlHighlightTime).TotalSeconds;
         float opacity = elapsed < 1f ? 1f : Math.Max(0f, 1f - (elapsed - 1f) / 2f);
         if (opacity < 0.01f) return;
 
-        SKPoint anchorScreen = ViewBoxToScreen(_mappingHighlightControl.Anchor.X, _mappingHighlightControl.Anchor.Y);
+        SKPoint anchorScreen = ViewBoxToScreen(_highlight.ControlDef.Anchor.X, _highlight.ControlDef.Anchor.Y);
 
         float labelX, labelY;
         bool goesRight = true;
 
-        if (_mappingHighlightControl.LabelOffset is not null)
+        if (_highlight.ControlDef.LabelOffset is not null)
         {
             var labelScreen = ViewBoxToScreen(
-                _mappingHighlightControl.Anchor.X + _mappingHighlightControl.LabelOffset.X,
-                _mappingHighlightControl.Anchor.Y + _mappingHighlightControl.LabelOffset.Y);
+                _highlight.ControlDef.Anchor.X + _highlight.ControlDef.LabelOffset.X,
+                _highlight.ControlDef.Anchor.Y + _highlight.ControlDef.LabelOffset.Y);
             labelX = labelScreen.X;
             labelY = labelScreen.Y;
-            bool offsetGoesRight = _mappingHighlightControl.LabelOffset.X >= 0;
+            bool offsetGoesRight = _highlight.ControlDef.LabelOffset.X >= 0;
             goesRight = _ctx.SvgMirrored ? !offsetGoesRight : offsetGoesRight;
         }
         else
@@ -2724,11 +2724,11 @@ public partial class MappingsTabController
 
         var fakeInput = new ActiveInputState
         {
-            Binding = _mappingHighlightControl.Label,
+            Binding = _highlight.ControlDef.Label,
             Value = 1f,
             IsAxis = false,
-            Control = _mappingHighlightControl,
-            LastActivity = _mappingHighlightTime,
+            Control = _highlight.ControlDef,
+            LastActivity = _highlight.ControlHighlightTime,
             AppearProgress = 1f
         };
 

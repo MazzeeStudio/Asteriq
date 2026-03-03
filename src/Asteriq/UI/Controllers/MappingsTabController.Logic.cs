@@ -1,4 +1,4 @@
-using Asteriq.Models;
+﻿using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
 using SkiaSharp;
@@ -23,11 +23,11 @@ public partial class MappingsTabController
         _editingRowIndex = rowIndex;
         _selectedMappingRow = rowIndex;
         _isEditingAxis = rowIndex < 8;
-        _pendingInput = null;
-        _manualEntryMode = false;
-        _selectedButtonMode = ButtonMode.Normal;
-        _selectedSourceDevice = 0;
-        _selectedSourceControl = 0;
+        _inputDetection.PendingInput = null;
+        _inputDetection.ManualEntryMode = false;
+        _buttonMode.SelectedMode = ButtonMode.Normal;
+        _inputDetection.SelectedSourceDevice = 0;
+        _inputDetection.SelectedSourceControl = 0;
 
         // Load existing binding if present
         LoadExistingBinding(rowIndex);
@@ -52,7 +52,7 @@ public partial class MappingsTabController
             if (mapping is not null && mapping.Inputs.Count > 0)
             {
                 var input = mapping.Inputs[0];
-                _pendingInput = new DetectedInput
+                _inputDetection.PendingInput = new DetectedInput
                 {
                     DeviceGuid = Guid.TryParse(input.DeviceId, out var guid) ? guid : Guid.Empty,
                     DeviceName = input.DeviceName,
@@ -66,11 +66,11 @@ public partial class MappingsTabController
                 {
                     if (_ctx.Devices[i].InstanceGuid.ToString() == input.DeviceId)
                     {
-                        _selectedSourceDevice = i;
+                        _inputDetection.SelectedSourceDevice = i;
                         break;
                     }
                 }
-                _selectedSourceControl = input.Index;
+                _inputDetection.SelectedSourceControl = input.Index;
             }
         }
         else
@@ -83,7 +83,7 @@ public partial class MappingsTabController
             if (mapping is not null && mapping.Inputs.Count > 0)
             {
                 var input = mapping.Inputs[0];
-                _pendingInput = new DetectedInput
+                _inputDetection.PendingInput = new DetectedInput
                 {
                     DeviceGuid = Guid.TryParse(input.DeviceId, out var guid) ? guid : Guid.Empty,
                     DeviceName = input.DeviceName,
@@ -91,18 +91,18 @@ public partial class MappingsTabController
                     Index = input.Index,
                     Value = 0
                 };
-                _selectedButtonMode = mapping.Mode;
+                _buttonMode.SelectedMode = mapping.Mode;
 
                 // Set selected device in dropdown
                 for (int i = 0; i < _ctx.Devices.Count; i++)
                 {
                     if (_ctx.Devices[i].InstanceGuid.ToString() == input.DeviceId)
                     {
-                        _selectedSourceDevice = i;
+                        _inputDetection.SelectedSourceDevice = i;
                         break;
                     }
                 }
-                _selectedSourceControl = input.Index;
+                _inputDetection.SelectedSourceControl = input.Index;
             }
         }
     }
@@ -112,9 +112,9 @@ public partial class MappingsTabController
         CancelInputListening();
         _mappingEditorOpen = false;
         _editingRowIndex = -1;
-        _pendingInput = null;
-        _deviceDropdownOpen = false;
-        _controlDropdownOpen = false;
+        _inputDetection.PendingInput = null;
+        _inputDetection.DeviceDropdownOpen = false;
+        _inputDetection.ControlDropdownOpen = false;
     }
 
     /// <summary>
@@ -129,12 +129,12 @@ public partial class MappingsTabController
 
     private async Task StartListeningForInputAsync()
     {
-        if (_isListeningForInput) return;
+        if (_inputDetection.IsListening) return;
         if (!_mappingEditorOpen) return;
 
-        _isListeningForInput = true;
-        _inputListeningStartTime = DateTime.Now;
-        _pendingInput = null;
+        _inputDetection.IsListening = true;
+        _inputDetection.ListeningStartTime = DateTime.Now;
+        _inputDetection.PendingInput = null;
 
         // Determine input type based on what we're editing
         var filter = _isEditingAxis ? InputDetectionFilter.Axes : InputDetectionFilter.Buttons;
@@ -150,7 +150,7 @@ public partial class MappingsTabController
 
             if (detected is not null && _mappingEditorOpen)
             {
-                _pendingInput = detected;
+                _inputDetection.PendingInput = detected;
 
                 // Update manual entry dropdowns to match detected input
                 PhysicalDeviceInfo? sourceDevice = null;
@@ -158,12 +158,12 @@ public partial class MappingsTabController
                 {
                     if (_ctx.Devices[i].InstanceGuid == detected.DeviceGuid)
                     {
-                        _selectedSourceDevice = i;
+                        _inputDetection.SelectedSourceDevice = i;
                         sourceDevice = _ctx.Devices[i];
                         break;
                     }
                 }
-                _selectedSourceControl = detected.Index;
+                _inputDetection.SelectedSourceControl = detected.Index;
 
                 // Note: We intentionally do NOT auto-select vJoy row here.
                 // When user explicitly clicks a row to edit, their choice is respected.
@@ -176,13 +176,13 @@ public partial class MappingsTabController
         }
         finally
         {
-            _isListeningForInput = false;
+            _inputDetection.IsListening = false;
         }
     }
 
     private void SaveMapping()
     {
-        if (!_mappingEditorOpen || _pendingInput is null) return;
+        if (!_mappingEditorOpen || _inputDetection.PendingInput is null) return;
 
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null) return;
@@ -197,8 +197,8 @@ public partial class MappingsTabController
         {
             var mapping = new AxisMapping
             {
-                Name = $"{_pendingInput.DeviceName} Axis {_pendingInput.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
-                Inputs = new List<InputSource> { _pendingInput.ToInputSource() },
+                Name = $"{_inputDetection.PendingInput.DeviceName} Axis {_inputDetection.PendingInput.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
+                Inputs = new List<InputSource> { _inputDetection.PendingInput.ToInputSource() },
                 Output = new OutputTarget
                 {
                     Type = OutputType.VJoyAxis,
@@ -213,15 +213,15 @@ public partial class MappingsTabController
         {
             var mapping = new ButtonMapping
             {
-                Name = $"{_pendingInput.DeviceName} Button {_pendingInput.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
-                Inputs = new List<InputSource> { _pendingInput.ToInputSource() },
+                Name = $"{_inputDetection.PendingInput.DeviceName} Button {_inputDetection.PendingInput.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}",
+                Inputs = new List<InputSource> { _inputDetection.PendingInput.ToInputSource() },
                 Output = new OutputTarget
                 {
                     Type = OutputType.VJoyButton,
                     VJoyDevice = vjoyDevice.Id,
                     Index = outputIndex
                 },
-                Mode = _selectedButtonMode
+                Mode = _buttonMode.SelectedMode
             };
             profile.ButtonMappings.Add(mapping);
         }
@@ -233,15 +233,15 @@ public partial class MappingsTabController
 
     private void CreateBindingFromManualEntry()
     {
-        if (!_manualEntryMode || _ctx.Devices.Count == 0 || _selectedSourceDevice >= _ctx.Devices.Count) return;
+        if (!_inputDetection.ManualEntryMode || _ctx.Devices.Count == 0 || _inputDetection.SelectedSourceDevice >= _ctx.Devices.Count) return;
 
-        var device = _ctx.Devices[_selectedSourceDevice];
-        _pendingInput = new DetectedInput
+        var device = _ctx.Devices[_inputDetection.SelectedSourceDevice];
+        _inputDetection.PendingInput = new DetectedInput
         {
             DeviceGuid = device.InstanceGuid,
             DeviceName = device.Name,
             Type = _isEditingAxis ? InputType.Axis : InputType.Button,
-            Index = _selectedSourceControl,
+            Index = _inputDetection.SelectedSourceControl,
             Value = 0
         };
     }
@@ -937,10 +937,10 @@ public partial class MappingsTabController
 
     private void CancelInputListening()
     {
-        if (_isListeningForInput)
+        if (_inputDetection.IsListening)
         {
             _inputDetectionService?.Cancel();
-            _isListeningForInput = false;
+            _inputDetection.IsListening = false;
         }
     }
 
@@ -1070,12 +1070,12 @@ public partial class MappingsTabController
 
     private async Task StartInputListeningAsync(int rowIndex)
     {
-        if (_isListeningForInput) return;
+        if (_inputDetection.IsListening) return;
         if (rowIndex < 0) return;
 
-        _isListeningForInput = true;
-        _inputListeningStartTime = DateTime.Now;
-        _pendingInput = null;
+        _inputDetection.IsListening = true;
+        _inputDetection.ListeningStartTime = DateTime.Now;
+        _inputDetection.PendingInput = null;
 
         // Determine input type based on current mapping category tab
         // Category 0 = Buttons, Category 1 = Axes
@@ -1093,7 +1093,7 @@ public partial class MappingsTabController
 
             if (detected is not null && _selectedMappingRow == rowIndex)
             {
-                _pendingInput = detected;
+                _inputDetection.PendingInput = detected;
                 var inputSource = detected.ToInputSource();
 
                 // Note: We intentionally do NOT auto-select vJoy row here.
@@ -1129,7 +1129,7 @@ public partial class MappingsTabController
         }
         finally
         {
-            _isListeningForInput = false;
+            _inputDetection.IsListening = false;
         }
     }
 
@@ -1139,12 +1139,12 @@ public partial class MappingsTabController
     /// </summary>
     private async Task StartPendingKeyboardInputListeningAsync()
     {
-        if (_isListeningForInput) return;
-        if (_pendingKeyboardKey is null) return;
+        if (_inputDetection.IsListening) return;
+        if (_keyboardOutput.PendingKey is null) return;
 
-        _isListeningForInput = true;
-        _inputListeningStartTime = DateTime.Now;
-        _pendingInput = null;
+        _inputDetection.IsListening = true;
+        _inputDetection.ListeningStartTime = DateTime.Now;
+        _inputDetection.PendingInput = null;
 
         _inputDetectionService ??= new InputDetectionService(_ctx.InputService);
 
@@ -1155,7 +1155,7 @@ public partial class MappingsTabController
 
             var detected = await _inputDetectionService.WaitForInputAsync(InputDetectionFilter.Buttons, 0.15f, 15000);
 
-            if (detected is not null && _pendingKeyboardKey is not null)
+            if (detected is not null && _keyboardOutput.PendingKey is not null)
             {
                 var profile = _ctx.ProfileManager.ActiveProfile;
                 if (profile is null) return;
@@ -1166,7 +1166,7 @@ public partial class MappingsTabController
                 var existingMapping = FindExistingMappingForInput(profile, newInputSource);
                 if (existingMapping is not null)
                 {
-                    string newTarget = $"Keyboard: {FormatKeyComboForDisplay(_pendingKeyboardKey, _pendingKeyboardModifiers)}";
+                    string newTarget = $"Keyboard: {FormatKeyComboForDisplay(_keyboardOutput.PendingKey, _keyboardOutput.PendingModifiers)}";
                     if (!ConfirmDuplicateMapping(existingMapping, newTarget))
                     {
                         // User cancelled, clear pending state
@@ -1180,17 +1180,17 @@ public partial class MappingsTabController
                 // Create new button mapping with keyboard output
                 var mapping = new ButtonMapping
                 {
-                    Name = $"{detected.DeviceName} Button {detected.Index + 1} -> {FormatKeyComboForDisplay(_pendingKeyboardKey, _pendingKeyboardModifiers)}",
+                    Name = $"{detected.DeviceName} Button {detected.Index + 1} -> {FormatKeyComboForDisplay(_keyboardOutput.PendingKey, _keyboardOutput.PendingModifiers)}",
                     Inputs = new List<InputSource> { newInputSource },
                     Output = new OutputTarget
                     {
                         Type = OutputType.Keyboard,
-                        VJoyDevice = _pendingKeyboardVJoyDevice,
-                        Index = _pendingKeyboardOutputIndex,
-                        KeyName = _pendingKeyboardKey,
-                        Modifiers = _pendingKeyboardModifiers
+                        VJoyDevice = _keyboardOutput.PendingVJoyDevice,
+                        Index = _keyboardOutput.PendingOutputIndex,
+                        KeyName = _keyboardOutput.PendingKey,
+                        Modifiers = _keyboardOutput.PendingModifiers
                     },
-                    Mode = _selectedButtonMode
+                    Mode = _buttonMode.SelectedMode
                 };
                 profile.ButtonMappings.Add(mapping);
                 profile.ModifiedAt = DateTime.UtcNow;
@@ -1198,7 +1198,7 @@ public partial class MappingsTabController
                 _ctx.OnMappingsChanged();
 
                 // Update the pending input so UI can show it
-                _pendingInput = detected;
+                _inputDetection.PendingInput = detected;
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or InvalidOperationException)
@@ -1207,17 +1207,17 @@ public partial class MappingsTabController
         }
         finally
         {
-            _isListeningForInput = false;
+            _inputDetection.IsListening = false;
             ClearPendingKeyboardState();
         }
     }
 
     private void ClearPendingKeyboardState()
     {
-        _pendingKeyboardKey = null;
-        _pendingKeyboardModifiers = null;
-        _pendingKeyboardOutputIndex = -1;
-        _pendingKeyboardVJoyDevice = 0;
+        _keyboardOutput.PendingKey = null;
+        _keyboardOutput.PendingModifiers = null;
+        _keyboardOutput.PendingOutputIndex = -1;
+        _keyboardOutput.PendingVJoyDevice = 0;
     }
 
     private void SaveMappingForRow(int rowIndex, DetectedInput input, bool isAxis)
@@ -1276,24 +1276,24 @@ public partial class MappingsTabController
                 existingMapping.Inputs.Add(newInputSource);
 
                 // Update with current panel settings
-                existingMapping.Output.Type = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
-                if (_outputTypeIsKeyboard)
+                existingMapping.Output.Type = _keyboardOutput.IsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
+                if (_keyboardOutput.IsKeyboard)
                 {
-                    existingMapping.Output.KeyName = _selectedKeyName;
-                    existingMapping.Output.Modifiers = _selectedModifiers?.ToList();
+                    existingMapping.Output.KeyName = _keyboardOutput.SelectedKeyName;
+                    existingMapping.Output.Modifiers = _keyboardOutput.SelectedModifiers?.ToList();
                 }
                 else
                 {
                     existingMapping.Output.KeyName = null;
                     existingMapping.Output.Modifiers = null;
                 }
-                existingMapping.Mode = _selectedButtonMode;
+                existingMapping.Mode = _buttonMode.SelectedMode;
                 existingMapping.Name = $"vJoy {vjoyDevice.Id} Button {outputIndex + 1} ({existingMapping.Inputs.Count} inputs)";
             }
             else
             {
                 // Create new mapping using current panel settings
-                var outputType = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
+                var outputType = _keyboardOutput.IsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
                 var outputTarget = new OutputTarget
                 {
                     Type = outputType,
@@ -1301,14 +1301,14 @@ public partial class MappingsTabController
                     Index = outputIndex
                 };
 
-                if (_outputTypeIsKeyboard)
+                if (_keyboardOutput.IsKeyboard)
                 {
-                    outputTarget.KeyName = _selectedKeyName;
-                    outputTarget.Modifiers = _selectedModifiers?.ToList();
+                    outputTarget.KeyName = _keyboardOutput.SelectedKeyName;
+                    outputTarget.Modifiers = _keyboardOutput.SelectedModifiers?.ToList();
                 }
 
-                string mappingName = _outputTypeIsKeyboard && !string.IsNullOrEmpty(_selectedKeyName)
-                    ? $"{input.DeviceName} Button {input.Index + 1} -> {FormatKeyComboForDisplay(_selectedKeyName, _selectedModifiers)}"
+                string mappingName = _keyboardOutput.IsKeyboard && !string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName)
+                    ? $"{input.DeviceName} Button {input.Index + 1} -> {FormatKeyComboForDisplay(_keyboardOutput.SelectedKeyName, _keyboardOutput.SelectedModifiers)}"
                     : $"{input.DeviceName} Button {input.Index + 1} -> vJoy {vjoyDevice.Id} Button {outputIndex + 1}";
 
                 var mapping = new ButtonMapping
@@ -1316,7 +1316,7 @@ public partial class MappingsTabController
                     Name = mappingName,
                     Inputs = new List<InputSource> { newInputSource },
                     Output = outputTarget,
-                    Mode = _selectedButtonMode
+                    Mode = _buttonMode.SelectedMode
                 };
                 profile.ButtonMappings.Add(mapping);
             }
@@ -1325,7 +1325,7 @@ public partial class MappingsTabController
         profile.ModifiedAt = DateTime.UtcNow;
         _ctx.ProfileManager.SaveActiveProfile();
         _ctx.OnMappingsChanged();
-        _pendingInput = null;
+        _inputDetection.PendingInput = null;
     }
 
     private void RemoveInputSourceAtIndex(int inputIndex)
@@ -1403,15 +1403,15 @@ public partial class MappingsTabController
     private void LoadAxisSettingsForRow()
     {
         // Reset to defaults
-        _selectedCurveType = CurveType.Linear;
-        _curveControlPoints = new List<SKPoint> { new(0, 0), new(1, 1) };
-        _curveSymmetrical = false;
-        _deadzoneMin = -1.0f;
-        _deadzoneCenterMin = 0.0f;
-        _deadzoneCenterMax = 0.0f;
-        _deadzoneMax = 1.0f;
-        _deadzoneCenterEnabled = false;
-        _axisInverted = false;
+        _curve.SelectedType = CurveType.Linear;
+        _curve.ControlPoints = new List<SKPoint> { new(0, 0), new(1, 1) };
+        _curve.Symmetrical = false;
+        _deadzone.Min = -1.0f;
+        _deadzone.CenterMin = 0.0f;
+        _deadzone.CenterMax = 0.0f;
+        _deadzone.Max = 1.0f;
+        _deadzone.CenterEnabled = false;
+        _deadzone.AxisInverted = false;
 
         // Only for axis category
         if (_mappingCategory != 1) return;
@@ -1422,26 +1422,26 @@ public partial class MappingsTabController
 
         // Load curve settings from mapping
         var curve = axisMapping.Curve;
-        _selectedCurveType = curve.Type;
-        _curveSymmetrical = curve.Symmetrical;
-        _axisInverted = axisMapping.Invert;
+        _curve.SelectedType = curve.Type;
+        _curve.Symmetrical = curve.Symmetrical;
+        _deadzone.AxisInverted = axisMapping.Invert;
 
         // Load deadzone settings
-        _deadzoneMin = curve.DeadzoneLow;
-        _deadzoneCenterMin = curve.DeadzoneCenterLow;
-        _deadzoneCenterMax = curve.DeadzoneCenterHigh;
-        _deadzoneMax = curve.DeadzoneHigh;
-        _deadzoneCenterEnabled = curve.DeadzoneCenterLow != 0 || curve.DeadzoneCenterHigh != 0;
+        _deadzone.Min = curve.DeadzoneLow;
+        _deadzone.CenterMin = curve.DeadzoneCenterLow;
+        _deadzone.CenterMax = curve.DeadzoneCenterHigh;
+        _deadzone.Max = curve.DeadzoneHigh;
+        _deadzone.CenterEnabled = curve.DeadzoneCenterLow != 0 || curve.DeadzoneCenterHigh != 0;
 
         // Load control points for custom curve
         if (curve.Type == CurveType.Custom && curve.ControlPoints is not null && curve.ControlPoints.Count >= 2)
         {
-            _curveControlPoints = curve.ControlPoints.Select(p => new SKPoint(p.Input, p.Output)).ToList();
+            _curve.ControlPoints = curve.ControlPoints.Select(p => new SKPoint(p.Input, p.Output)).ToList();
         }
         else
         {
             // Generate default control points based on curve type
-            _curveControlPoints = curve.Type switch
+            _curve.ControlPoints = curve.Type switch
             {
                 CurveType.SCurve => new List<SKPoint> { new(0, 0), new(0.25f, 0.1f), new(0.75f, 0.9f), new(1, 1) },
                 CurveType.Exponential => new List<SKPoint> { new(0, 0), new(0.5f, 0.25f), new(1, 1) },
@@ -1460,20 +1460,20 @@ public partial class MappingsTabController
         if (axisMapping is null) return;
 
         // Save curve settings to mapping
-        axisMapping.Curve.Type = _selectedCurveType;
-        axisMapping.Curve.Symmetrical = _curveSymmetrical;
-        axisMapping.Invert = _axisInverted;
+        axisMapping.Curve.Type = _curve.SelectedType;
+        axisMapping.Curve.Symmetrical = _curve.Symmetrical;
+        axisMapping.Invert = _deadzone.AxisInverted;
 
         // Save deadzone settings
-        axisMapping.Curve.DeadzoneLow = _deadzoneMin;
-        axisMapping.Curve.DeadzoneCenterLow = _deadzoneCenterEnabled ? _deadzoneCenterMin : 0f;
-        axisMapping.Curve.DeadzoneCenterHigh = _deadzoneCenterEnabled ? _deadzoneCenterMax : 0f;
-        axisMapping.Curve.DeadzoneHigh = _deadzoneMax;
+        axisMapping.Curve.DeadzoneLow = _deadzone.Min;
+        axisMapping.Curve.DeadzoneCenterLow = _deadzone.CenterEnabled ? _deadzone.CenterMin : 0f;
+        axisMapping.Curve.DeadzoneCenterHigh = _deadzone.CenterEnabled ? _deadzone.CenterMax : 0f;
+        axisMapping.Curve.DeadzoneHigh = _deadzone.Max;
 
         // Save control points for custom curve
-        if (_selectedCurveType == CurveType.Custom)
+        if (_curve.SelectedType == CurveType.Custom)
         {
-            axisMapping.Curve.ControlPoints = _curveControlPoints
+            axisMapping.Curve.ControlPoints = _curve.ControlPoints
                 .Select(p => new CurvePoint(p.X, p.Y))
                 .ToList();
         }
@@ -1490,13 +1490,13 @@ public partial class MappingsTabController
     private void LoadOutputTypeStateForRow()
     {
         // Reset state
-        _outputTypeIsKeyboard = false;
-        _selectedKeyName = "";
-        _selectedModifiers = null;
-        _isCapturingKey = false;
-        _selectedButtonMode = ButtonMode.Normal;
-        _pulseDurationMs = 100;
-        _holdDurationMs = 500;
+        _keyboardOutput.IsKeyboard = false;
+        _keyboardOutput.SelectedKeyName = "";
+        _keyboardOutput.SelectedModifiers = null;
+        _keyboardOutput.IsCapturing = false;
+        _buttonMode.SelectedMode = ButtonMode.Normal;
+        _buttonMode.PulseDurationMs = 100;
+        _buttonMode.HoldDurationMs = 500;
 
         // Only for button category
         if (_mappingCategory != 0) return;
@@ -1515,12 +1515,12 @@ public partial class MappingsTabController
 
         if (mapping is not null)
         {
-            _outputTypeIsKeyboard = mapping.Output.Type == OutputType.Keyboard;
-            _selectedKeyName = mapping.Output.KeyName ?? "";
-            _selectedModifiers = mapping.Output.Modifiers?.ToList();
-            _selectedButtonMode = mapping.Mode;
-            _pulseDurationMs = mapping.PulseDurationMs;
-            _holdDurationMs = mapping.HoldDurationMs;
+            _keyboardOutput.IsKeyboard = mapping.Output.Type == OutputType.Keyboard;
+            _keyboardOutput.SelectedKeyName = mapping.Output.KeyName ?? "";
+            _keyboardOutput.SelectedModifiers = mapping.Output.Modifiers?.ToList();
+            _buttonMode.SelectedMode = mapping.Mode;
+            _buttonMode.PulseDurationMs = mapping.PulseDurationMs;
+            _buttonMode.HoldDurationMs = mapping.HoldDurationMs;
         }
     }
 
@@ -1544,7 +1544,7 @@ public partial class MappingsTabController
 
         if (mapping is not null)
         {
-            mapping.Mode = _selectedButtonMode;
+            mapping.Mode = _buttonMode.SelectedMode;
             profile.ModifiedAt = DateTime.UtcNow;
             _ctx.ProfileManager.SaveActiveProfile();
         }
@@ -1571,15 +1571,15 @@ public partial class MappingsTabController
         if (mapping is not null)
         {
             // Update output type and clear/set key name
-            mapping.Output.Type = _outputTypeIsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
-            if (!_outputTypeIsKeyboard)
+            mapping.Output.Type = _keyboardOutput.IsKeyboard ? OutputType.Keyboard : OutputType.VJoyButton;
+            if (!_keyboardOutput.IsKeyboard)
             {
                 mapping.Output.KeyName = null;
                 mapping.Output.Modifiers = null;
             }
-            else if (!string.IsNullOrEmpty(_selectedKeyName))
+            else if (!string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName))
             {
-                mapping.Output.KeyName = _selectedKeyName;
+                mapping.Output.KeyName = _keyboardOutput.SelectedKeyName;
             }
             profile.ModifiedAt = DateTime.UtcNow;
             _ctx.ProfileManager.SaveActiveProfile();
@@ -1603,14 +1603,14 @@ public partial class MappingsTabController
             m.Output.VJoyDevice == vjoyDevice.Id &&
             m.Output.Index == outputIndex);
 
-        if (mapping is null && !string.IsNullOrEmpty(_selectedKeyName))
+        if (mapping is null && !string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName))
         {
             // No existing mapping - need to capture a physical input first
             // Store the keyboard key and start listening for physical input
-            _pendingKeyboardKey = _selectedKeyName;
-            _pendingKeyboardModifiers = _selectedModifiers?.ToList();
-            _pendingKeyboardOutputIndex = outputIndex;
-            _pendingKeyboardVJoyDevice = vjoyDevice.Id;
+            _keyboardOutput.PendingKey = _keyboardOutput.SelectedKeyName;
+            _keyboardOutput.PendingModifiers = _keyboardOutput.SelectedModifiers?.ToList();
+            _keyboardOutput.PendingOutputIndex = outputIndex;
+            _keyboardOutput.PendingVJoyDevice = vjoyDevice.Id;
 
             // Start async input detection for pending keyboard binding
             _ = StartPendingKeyboardInputListeningAsync();
@@ -1620,12 +1620,12 @@ public partial class MappingsTabController
         if (mapping is not null)
         {
             // Update existing mapping
-            if (!string.IsNullOrEmpty(_selectedKeyName))
+            if (!string.IsNullOrEmpty(_keyboardOutput.SelectedKeyName))
             {
                 mapping.Output.Type = OutputType.Keyboard;
             }
-            mapping.Output.KeyName = _selectedKeyName;
-            mapping.Output.Modifiers = _selectedModifiers?.ToList();
+            mapping.Output.KeyName = _keyboardOutput.SelectedKeyName;
+            mapping.Output.Modifiers = _keyboardOutput.SelectedModifiers?.ToList();
             profile.ModifiedAt = DateTime.UtcNow;
             _ctx.ProfileManager.SaveActiveProfile();
         }
@@ -1660,10 +1660,10 @@ public partial class MappingsTabController
             _ctx.OnMappingsChanged();
 
             // Reset UI state
-            _selectedKeyName = "";
-            _selectedModifiers = null;
-            _outputTypeIsKeyboard = false;
-            _selectedButtonMode = ButtonMode.Normal;
+            _keyboardOutput.SelectedKeyName = "";
+            _keyboardOutput.SelectedModifiers = null;
+            _keyboardOutput.IsKeyboard = false;
+            _buttonMode.SelectedMode = ButtonMode.Normal;
         }
     }
 
@@ -1697,9 +1697,9 @@ public partial class MappingsTabController
             _ctx.ProfileManager.SaveActiveProfile();
 
             // Update UI state
-            _selectedKeyName = "";
-            _selectedModifiers = null;
-            _outputTypeIsKeyboard = false;
+            _keyboardOutput.SelectedKeyName = "";
+            _keyboardOutput.SelectedModifiers = null;
+            _keyboardOutput.IsKeyboard = false;
         }
     }
 
@@ -1722,8 +1722,8 @@ public partial class MappingsTabController
 
         if (mapping is not null)
         {
-            mapping.PulseDurationMs = _pulseDurationMs;
-            mapping.HoldDurationMs = _holdDurationMs;
+            mapping.PulseDurationMs = _buttonMode.PulseDurationMs;
+            mapping.HoldDurationMs = _buttonMode.HoldDurationMs;
             profile.ModifiedAt = DateTime.UtcNow;
             _ctx.ProfileManager.SaveActiveProfile();
         }
@@ -1734,7 +1734,7 @@ public partial class MappingsTabController
     /// </summary>
     private void MakeCurveSymmetrical()
     {
-        if (_curveControlPoints.Count < 2) return;
+        if (_curve.ControlPoints.Count < 2) return;
 
         // Create a new symmetrical set of points
         var newPoints = new List<SKPoint>();
@@ -1743,7 +1743,7 @@ public partial class MappingsTabController
         newPoints.Add(new SKPoint(0, 0));
 
         // For each point in the left half (X < 0.5), create its mirror
-        var leftHalf = _curveControlPoints
+        var leftHalf = _curve.ControlPoints
             .Where(p => p.X > 0 && p.X < 0.5f)
             .OrderBy(p => p.X)
             .ToList();
@@ -1754,7 +1754,7 @@ public partial class MappingsTabController
         }
 
         // Add center point if there's one
-        var centerPoint = _curveControlPoints.FirstOrDefault(p => Math.Abs(p.X - 0.5f) < 0.02f);
+        var centerPoint = _curve.ControlPoints.FirstOrDefault(p => Math.Abs(p.X - 0.5f) < 0.02f);
         if (centerPoint.X > 0.4f && centerPoint.X < 0.6f)
         {
             newPoints.Add(new SKPoint(0.5f, 0.5f)); // Center is always (0.5, 0.5) for perfect symmetry
@@ -1775,7 +1775,7 @@ public partial class MappingsTabController
         // Always include end point
         newPoints.Add(new SKPoint(1, 1));
 
-        _curveControlPoints = newPoints;
+        _curve.ControlPoints = newPoints;
     }
 
     private void AddCurveControlPoint(SKPoint graphPt)
@@ -1785,49 +1785,49 @@ public partial class MappingsTabController
 
         // Find insertion position (maintain sorted order by X)
         int insertIndex = 0;
-        for (int i = 0; i < _curveControlPoints.Count; i++)
+        for (int i = 0; i < _curve.ControlPoints.Count; i++)
         {
-            if (_curveControlPoints[i].X < graphPt.X)
+            if (_curve.ControlPoints[i].X < graphPt.X)
                 insertIndex = i + 1;
         }
 
-        _curveControlPoints.Insert(insertIndex, graphPt);
+        _curve.ControlPoints.Insert(insertIndex, graphPt);
 
         // If symmetrical mode is enabled, also add the mirror point
-        if (_curveSymmetrical)
+        if (_curve.Symmetrical)
         {
             float mirrorX = 1f - graphPt.X;
             float mirrorY = 1f - graphPt.Y;
 
             // Don't add if mirror point would be too close to existing point
-            bool tooClose = _curveControlPoints.Any(p => Math.Abs(p.X - mirrorX) < 0.04f);
+            bool tooClose = _curve.ControlPoints.Any(p => Math.Abs(p.X - mirrorX) < 0.04f);
             if (!tooClose && mirrorX > 0.01f && mirrorX < 0.99f)
             {
                 // Find insertion position for mirror point
                 int mirrorInsertIndex = 0;
-                for (int i = 0; i < _curveControlPoints.Count; i++)
+                for (int i = 0; i < _curve.ControlPoints.Count; i++)
                 {
-                    if (_curveControlPoints[i].X < mirrorX)
+                    if (_curve.ControlPoints[i].X < mirrorX)
                         mirrorInsertIndex = i + 1;
                 }
 
-                _curveControlPoints.Insert(mirrorInsertIndex, new SKPoint(mirrorX, mirrorY));
+                _curve.ControlPoints.Insert(mirrorInsertIndex, new SKPoint(mirrorX, mirrorY));
             }
         }
 
-        _selectedCurveType = CurveType.Custom;
+        _curve.SelectedType = CurveType.Custom;
         _ctx.InvalidateCanvas();
     }
 
     private void RemoveCurveControlPoint(int pointIndex)
     {
-        if (pointIndex < 0 || pointIndex >= _curveControlPoints.Count)
+        if (pointIndex < 0 || pointIndex >= _curve.ControlPoints.Count)
             return;
 
-        var pt = _curveControlPoints[pointIndex];
+        var pt = _curve.ControlPoints[pointIndex];
 
         // Don't remove endpoints (0,0) or (1,1)
-        bool isEndpoint = pointIndex == 0 || pointIndex == _curveControlPoints.Count - 1;
+        bool isEndpoint = pointIndex == 0 || pointIndex == _curve.ControlPoints.Count - 1;
         if (isEndpoint)
             return;
 
@@ -1837,26 +1837,26 @@ public partial class MappingsTabController
             return;
 
         // Remove the point
-        _curveControlPoints.RemoveAt(pointIndex);
+        _curve.ControlPoints.RemoveAt(pointIndex);
 
         // If symmetrical mode is enabled, also remove the mirror point
-        if (_curveSymmetrical)
+        if (_curve.Symmetrical)
         {
             float mirrorX = 1f - pt.X;
 
             // Find and remove the mirror point
-            for (int i = _curveControlPoints.Count - 1; i >= 0; i--)
+            for (int i = _curve.ControlPoints.Count - 1; i >= 0; i--)
             {
-                var mirrorPt = _curveControlPoints[i];
+                var mirrorPt = _curve.ControlPoints[i];
                 // Skip endpoints and center
-                if (i == 0 || i == _curveControlPoints.Count - 1)
+                if (i == 0 || i == _curve.ControlPoints.Count - 1)
                     continue;
                 if (Math.Abs(mirrorPt.X - 0.5f) < 0.01f && Math.Abs(mirrorPt.Y - 0.5f) < 0.01f)
                     continue;
 
                 if (Math.Abs(mirrorPt.X - mirrorX) < 0.02f)
                 {
-                    _curveControlPoints.RemoveAt(i);
+                    _curve.ControlPoints.RemoveAt(i);
                     break;
                 }
             }
@@ -2066,8 +2066,8 @@ public partial class MappingsTabController
 
         if (inp is null)
         {
-            _noMappingFlashText = "Assign a physical button first";
-            _noMappingFlashTime = DateTime.Now;
+            _highlight.FlashText = "Assign a physical button first";
+            _highlight.FlashTime = DateTime.Now;
             _ctx.MarkDirty();
             return;
         }

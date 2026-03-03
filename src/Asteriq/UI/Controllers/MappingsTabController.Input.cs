@@ -1,4 +1,4 @@
-using Asteriq.Models;
+﻿using Asteriq.Models;
 using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
@@ -9,9 +9,9 @@ public partial class MappingsTabController
     {
         const float HitRadius = 12f;
 
-        for (int i = 0; i < _curveControlPoints.Count; i++)
+        for (int i = 0; i < _curve.ControlPoints.Count; i++)
         {
-            var pt = _curveControlPoints[i];
+            var pt = _curve.ControlPoints[i];
 
             // Skip center point - it's not selectable
             bool isCenterPoint = Math.Abs(pt.X - 0.5f) < 0.01f && Math.Abs(pt.Y - 0.5f) < 0.01f;
@@ -21,7 +21,7 @@ public partial class MappingsTabController
             float x = bounds.Left + pt.X * bounds.Width;
 
             // Apply inversion to display Y position to match the visual
-            float displayY = _axisInverted ? (1f - pt.Y) : pt.Y;
+            float displayY = _deadzone.AxisInverted ? (1f - pt.Y) : pt.Y;
             float y = bounds.Bottom - displayY * bounds.Height;
 
             float dist = MathF.Sqrt(MathF.Pow(screenPt.X - x, 2) + MathF.Pow(screenPt.Y - y, 2));
@@ -34,16 +34,16 @@ public partial class MappingsTabController
     private int FindDeadzoneHandleAt(SKPoint screenPt)
     {
         const float HitRadius = 12f;
-        var bounds = _deadzoneSliderBounds;
+        var bounds = _deadzone.SliderBounds;
         if (bounds.Width <= 0) return -1;
 
         // Convert deadzone values to 0..1 range
-        float minPos = (_deadzoneMin + 1f) / 2f;
-        float centerMinPos = (_deadzoneCenterMin + 1f) / 2f;
-        float centerMaxPos = (_deadzoneCenterMax + 1f) / 2f;
-        float maxPos = (_deadzoneMax + 1f) / 2f;
+        float minPos = (_deadzone.Min + 1f) / 2f;
+        float centerMinPos = (_deadzone.CenterMin + 1f) / 2f;
+        float centerMaxPos = (_deadzone.CenterMax + 1f) / 2f;
+        float maxPos = (_deadzone.Max + 1f) / 2f;
 
-        if (_deadzoneCenterEnabled)
+        if (_deadzone.CenterEnabled)
         {
             // Two separate tracks - must calculate handle positions on each track
             // Gap must match DrawDualDeadzoneSlider
@@ -99,13 +99,13 @@ public partial class MappingsTabController
 
     private void UpdateDraggedDeadzoneHandle(SKPoint screenPt)
     {
-        if (_draggingDeadzoneHandle < 0) return;
-        var bounds = _deadzoneSliderBounds;
+        if (_deadzone.DraggingHandle < 0) return;
+        var bounds = _deadzone.SliderBounds;
         if (bounds.Width <= 0) return;
 
         float value;
 
-        if (_deadzoneCenterEnabled)
+        if (_deadzone.CenterEnabled)
         {
             // Two-track layout - convert screen position to value based on which track
             // Gap must match DrawDualDeadzoneSlider
@@ -122,31 +122,31 @@ public partial class MappingsTabController
             float rightTrackRight = bounds.Right;
             float rightTrackWidth = rightTrackRight - rightTrackLeft;
 
-            switch (_draggingDeadzoneHandle)
+            switch (_deadzone.DraggingHandle)
             {
                 case 0: // Min handle on left track
                     float normLeft0 = Math.Clamp((screenPt.X - leftTrackLeft) / leftTrackWidth, 0f, 1f);
                     value = normLeft0 - 1f; // Maps 0..1 to -1..0
-                    value = Math.Clamp(value, -1f, _deadzoneCenterMin - 0.02f);
-                    _deadzoneMin = value;
+                    value = Math.Clamp(value, -1f, _deadzone.CenterMin - 0.02f);
+                    _deadzone.Min = value;
                     break;
                 case 1: // CenterMin handle on left track (right edge)
                     float normLeft1 = Math.Clamp((screenPt.X - leftTrackLeft) / leftTrackWidth, 0f, 1f);
                     value = normLeft1 - 1f; // Maps 0..1 to -1..0
-                    value = Math.Clamp(value, _deadzoneMin + 0.02f, 0f);
-                    _deadzoneCenterMin = value;
+                    value = Math.Clamp(value, _deadzone.Min + 0.02f, 0f);
+                    _deadzone.CenterMin = value;
                     break;
                 case 2: // CenterMax handle on right track (left edge)
                     float normRight2 = Math.Clamp((screenPt.X - rightTrackLeft) / rightTrackWidth, 0f, 1f);
                     value = normRight2; // Maps 0..1 to 0..1
-                    value = Math.Clamp(value, 0f, _deadzoneMax - 0.02f);
-                    _deadzoneCenterMax = value;
+                    value = Math.Clamp(value, 0f, _deadzone.Max - 0.02f);
+                    _deadzone.CenterMax = value;
                     break;
                 case 3: // Max handle on right track
                     float normRight3 = Math.Clamp((screenPt.X - rightTrackLeft) / rightTrackWidth, 0f, 1f);
                     value = normRight3; // Maps 0..1 to 0..1
-                    value = Math.Clamp(value, _deadzoneCenterMax + 0.02f, 1f);
-                    _deadzoneMax = value;
+                    value = Math.Clamp(value, _deadzone.CenterMax + 0.02f, 1f);
+                    _deadzone.Max = value;
                     break;
             }
         }
@@ -156,15 +156,15 @@ public partial class MappingsTabController
             float normalized = (screenPt.X - bounds.Left) / bounds.Width;
             value = normalized * 2f - 1f;
 
-            switch (_draggingDeadzoneHandle)
+            switch (_deadzone.DraggingHandle)
             {
                 case 0: // Min handle
-                    value = Math.Clamp(value, -1f, _deadzoneMax - 0.1f);
-                    _deadzoneMin = value;
+                    value = Math.Clamp(value, -1f, _deadzone.Max - 0.1f);
+                    _deadzone.Min = value;
                     break;
                 case 3: // Max handle
-                    value = Math.Clamp(value, _deadzoneMin + 0.1f, 1f);
-                    _deadzoneMax = value;
+                    value = Math.Clamp(value, _deadzone.Min + 0.1f, 1f);
+                    _deadzone.Max = value;
                     break;
             }
         }
@@ -172,25 +172,25 @@ public partial class MappingsTabController
 
     private void UpdateDraggedCurvePoint(SKPoint screenPt)
     {
-        if (_draggingCurvePoint < 0 || _draggingCurvePoint >= _curveControlPoints.Count)
+        if (_curve.DraggingPoint < 0 || _curve.DraggingPoint >= _curve.ControlPoints.Count)
             return;
 
-        var graphPt = CurveScreenToGraph(screenPt, _curveEditorBounds);
+        var graphPt = CurveScreenToGraph(screenPt, _curve.Bounds);
 
         // Constrain endpoints to X edges
-        if (_draggingCurvePoint == 0)
+        if (_curve.DraggingPoint == 0)
             graphPt.X = 0;
-        else if (_draggingCurvePoint == _curveControlPoints.Count - 1)
+        else if (_curve.DraggingPoint == _curve.ControlPoints.Count - 1)
             graphPt.X = 1;
         else
         {
             // Interior points: constrain X between neighbors
-            float minX = _curveControlPoints[_draggingCurvePoint - 1].X + 0.02f;
-            float maxX = _curveControlPoints[_draggingCurvePoint + 1].X - 0.02f;
+            float minX = _curve.ControlPoints[_curve.DraggingPoint - 1].X + 0.02f;
+            float maxX = _curve.ControlPoints[_curve.DraggingPoint + 1].X - 0.02f;
             // Ensure minX <= maxX (neighbors might be very close)
             if (minX > maxX)
             {
-                float midX = (_curveControlPoints[_draggingCurvePoint - 1].X + _curveControlPoints[_draggingCurvePoint + 1].X) / 2f;
+                float midX = (_curve.ControlPoints[_curve.DraggingPoint - 1].X + _curve.ControlPoints[_curve.DraggingPoint + 1].X) / 2f;
                 graphPt.X = midX;
             }
             else
@@ -199,12 +199,12 @@ public partial class MappingsTabController
             }
         }
 
-        _curveControlPoints[_draggingCurvePoint] = graphPt;
+        _curve.ControlPoints[_curve.DraggingPoint] = graphPt;
 
         // If symmetrical mode is enabled, mirror the change
-        if (_curveSymmetrical)
+        if (_curve.Symmetrical)
         {
-            UpdateSymmetricalPoint(_draggingCurvePoint, graphPt);
+            UpdateSymmetricalPoint(_curve.DraggingPoint, graphPt);
         }
     }
 
@@ -226,23 +226,23 @@ public partial class MappingsTabController
         if (mirrorIndex >= 0 && mirrorIndex != pointIndex)
         {
             // Update mirror point, but constrain to valid range
-            if (mirrorIndex > 0 && mirrorIndex < _curveControlPoints.Count - 1)
+            if (mirrorIndex > 0 && mirrorIndex < _curve.ControlPoints.Count - 1)
             {
                 // Interior point - constrain X between neighbors
-                float minX = _curveControlPoints[mirrorIndex - 1].X + 0.02f;
-                float maxX = _curveControlPoints[mirrorIndex + 1].X - 0.02f;
+                float minX = _curve.ControlPoints[mirrorIndex - 1].X + 0.02f;
+                float maxX = _curve.ControlPoints[mirrorIndex + 1].X - 0.02f;
                 mirrorPt = new SKPoint(Math.Clamp(mirrorPt.X, minX, maxX), mirrorPt.Y);
             }
             else if (mirrorIndex == 0)
             {
                 mirrorPt = new SKPoint(0, mirrorPt.Y);
             }
-            else if (mirrorIndex == _curveControlPoints.Count - 1)
+            else if (mirrorIndex == _curve.ControlPoints.Count - 1)
             {
                 mirrorPt = new SKPoint(1, mirrorPt.Y);
             }
 
-            _curveControlPoints[mirrorIndex] = mirrorPt;
+            _curve.ControlPoints[mirrorIndex] = mirrorPt;
         }
     }
 
@@ -253,18 +253,18 @@ public partial class MappingsTabController
     private int FindMirrorPointIndex(int sourceIndex, float targetX)
     {
         // Special cases for endpoints
-        if (sourceIndex == 0) return _curveControlPoints.Count - 1;
-        if (sourceIndex == _curveControlPoints.Count - 1) return 0;
+        if (sourceIndex == 0) return _curve.ControlPoints.Count - 1;
+        if (sourceIndex == _curve.ControlPoints.Count - 1) return 0;
 
         // For interior points, find the one closest to the mirror X position
         int bestIndex = -1;
         float bestDist = float.MaxValue;
 
-        for (int i = 0; i < _curveControlPoints.Count; i++)
+        for (int i = 0; i < _curve.ControlPoints.Count; i++)
         {
             if (i == sourceIndex) continue;
 
-            float dist = Math.Abs(_curveControlPoints[i].X - targetX);
+            float dist = Math.Abs(_curve.ControlPoints[i].X - targetX);
             if (dist < bestDist)
             {
                 bestDist = dist;
@@ -278,11 +278,11 @@ public partial class MappingsTabController
     private bool HandleCurvePresetClick(SKPoint pt)
     {
         // Check each stored preset button bound
-        for (int i = 0; i < _curvePresetBounds.Length; i++)
+        for (int i = 0; i < _curve.PresetBounds.Length; i++)
         {
-            if (_curvePresetBounds[i].Contains(pt))
+            if (_curve.PresetBounds[i].Contains(pt))
             {
-                _selectedCurveType = i switch
+                _curve.SelectedType = i switch
                 {
                     0 => CurveType.Linear,
                     1 => CurveType.SCurve,
@@ -291,10 +291,10 @@ public partial class MappingsTabController
                 };
 
                 // Reset control points when switching to custom
-                if (_selectedCurveType == CurveType.Custom && _curveControlPoints.Count == 2)
+                if (_curve.SelectedType == CurveType.Custom && _curve.ControlPoints.Count == 2)
                 {
                     // Add a middle point for custom curve
-                    _curveControlPoints = new List<SKPoint>
+                    _curve.ControlPoints = new List<SKPoint>
                     {
                         new(0, 0),
                         new(0.5f, 0.5f),
@@ -309,19 +309,19 @@ public partial class MappingsTabController
         }
 
         // Check invert checkbox
-        if (_invertToggleBounds.Contains(pt))
+        if (_deadzone.InvertToggleBounds.Contains(pt))
         {
-            _axisInverted = !_axisInverted;
+            _deadzone.AxisInverted = !_deadzone.AxisInverted;
             SaveAxisSettingsForRow();  // Persist invert change
             _ctx.InvalidateCanvas();
             return true;
         }
 
         // Check symmetrical checkbox (only for Custom curve)
-        if (!_curveSymmetricalCheckboxBounds.IsEmpty && _curveSymmetricalCheckboxBounds.Contains(pt))
+        if (!_curve.CheckboxBounds.IsEmpty && _curve.CheckboxBounds.Contains(pt))
         {
-            _curveSymmetrical = !_curveSymmetrical;
-            if (_curveSymmetrical)
+            _curve.Symmetrical = !_curve.Symmetrical;
+            if (_curve.Symmetrical)
             {
                 // When enabling symmetry, mirror existing points around center
                 MakeCurveSymmetrical();
@@ -341,16 +341,16 @@ public partial class MappingsTabController
     private bool HandleDeadzonePresetClick(SKPoint pt)
     {
         // Centre checkbox click
-        if (_deadzoneCenterCheckboxBounds.Contains(pt))
+        if (_deadzone.CenterCheckboxBounds.Contains(pt))
         {
-            _deadzoneCenterEnabled = !_deadzoneCenterEnabled;
+            _deadzone.CenterEnabled = !_deadzone.CenterEnabled;
             // When disabling center, reset center values and clear selection if center handle was selected
-            if (!_deadzoneCenterEnabled)
+            if (!_deadzone.CenterEnabled)
             {
-                _deadzoneCenterMin = 0.0f;
-                _deadzoneCenterMax = 0.0f;
-                if (_selectedDeadzoneHandle == 1 || _selectedDeadzoneHandle == 2)
-                    _selectedDeadzoneHandle = -1;
+                _deadzone.CenterMin = 0.0f;
+                _deadzone.CenterMax = 0.0f;
+                if (_deadzone.SelectedHandle == 1 || _deadzone.SelectedHandle == 2)
+                    _deadzone.SelectedHandle = -1;
             }
             SaveAxisSettingsForRow();  // Persist center deadzone change
             _ctx.InvalidateCanvas();
@@ -358,30 +358,30 @@ public partial class MappingsTabController
         }
 
         // Preset buttons - apply to selected handle
-        if (_selectedDeadzoneHandle >= 0)
+        if (_deadzone.SelectedHandle >= 0)
         {
             // Preset values: 0%, 2%, 5%, 10%
             float[] presetValues = { 0.0f, 0.02f, 0.05f, 0.10f };
 
-            for (int i = 0; i < _deadzonePresetBounds.Length; i++)
+            for (int i = 0; i < _deadzone.PresetBounds.Length; i++)
             {
-                if (!_deadzonePresetBounds[i].IsEmpty && _deadzonePresetBounds[i].Contains(pt))
+                if (!_deadzone.PresetBounds[i].IsEmpty && _deadzone.PresetBounds[i].Contains(pt))
                 {
                     float presetVal = presetValues[i];
 
-                    switch (_selectedDeadzoneHandle)
+                    switch (_deadzone.SelectedHandle)
                     {
                         case 0: // Min (Start) - set distance from -1
-                            _deadzoneMin = -1.0f + presetVal;
+                            _deadzone.Min = -1.0f + presetVal;
                             break;
                         case 1: // CenterMin - set negative offset from 0
-                            _deadzoneCenterMin = -presetVal;
+                            _deadzone.CenterMin = -presetVal;
                             break;
                         case 2: // CenterMax - set positive offset from 0
-                            _deadzoneCenterMax = presetVal;
+                            _deadzone.CenterMax = presetVal;
                             break;
                         case 3: // Max (End) - set distance from 1
-                            _deadzoneMax = 1.0f - presetVal;
+                            _deadzone.Max = 1.0f - presetVal;
                             break;
                     }
                     SaveAxisSettingsForRow();  // Persist deadzone preset change
@@ -395,24 +395,24 @@ public partial class MappingsTabController
 
     private void UpdatePulseDurationFromMouse(float mouseX)
     {
-        if (_pulseDurationSliderBounds.Width <= 0) return;
+        if (_buttonMode.PulseSliderBounds.Width <= 0) return;
 
-        float normalized = (mouseX - _pulseDurationSliderBounds.Left) / _pulseDurationSliderBounds.Width;
+        float normalized = (mouseX - _buttonMode.PulseSliderBounds.Left) / _buttonMode.PulseSliderBounds.Width;
         normalized = Math.Clamp(normalized, 0f, 1f);
 
         // Map 0-1 to 100-1000ms
-        _pulseDurationMs = (int)(100f + normalized * 900f);
+        _buttonMode.PulseDurationMs = (int)(100f + normalized * 900f);
     }
 
     private void UpdateHoldDurationFromMouse(float mouseX)
     {
-        if (_holdDurationSliderBounds.Width <= 0) return;
+        if (_buttonMode.HoldSliderBounds.Width <= 0) return;
 
-        float normalized = (mouseX - _holdDurationSliderBounds.Left) / _holdDurationSliderBounds.Width;
+        float normalized = (mouseX - _buttonMode.HoldSliderBounds.Left) / _buttonMode.HoldSliderBounds.Width;
         normalized = Math.Clamp(normalized, 0f, 1f);
 
         // Map 0-1 to 200-2000ms
-        _holdDurationMs = (int)(200f + normalized * 1800f);
+        _buttonMode.HoldDurationMs = (int)(200f + normalized * 1800f);
     }
 
 }

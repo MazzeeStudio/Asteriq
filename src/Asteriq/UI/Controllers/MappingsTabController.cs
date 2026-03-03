@@ -1041,12 +1041,10 @@ public partial class MappingsTabController : ITabController
     {
         public bool IsListening;
         public SKRect FieldBounds;
-        public bool FieldHovered;
         public DetectedInput? PendingInput;
         public DateTime ListeningStartTime = DateTime.MinValue;
         public bool ManualEntryMode;
         public SKRect ManualEntryBounds;
-        public bool ManualEntryHovered;
         public int SelectedSourceDevice;
         public int SelectedSourceControl;
         public SKRect DeviceDropdownBounds;

@@ -47,7 +47,7 @@ public partial class SCBindingsTabController
             else
             {
                 // No last profile for this environment - load first non-legacy profile
-                var firstNamed = _scExportProfiles.FirstOrDefault(p => p.ProfileName != "asteriq");
+                var firstNamed = _profileMgmt.ExportProfiles.FirstOrDefault(p => p.ProfileName != "asteriq");
                 if (firstNamed is not null)
                 {
                     var first = _scExportProfileService?.LoadProfile(firstNamed.ProfileName);
@@ -78,7 +78,7 @@ public partial class SCBindingsTabController
             UpdateConflictingBindings();
             UpdateSharedCells();
 
-            System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstallations.Count} installations found");
+            System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstall.Installations.Count} installations found");
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException)
         {
@@ -120,41 +120,41 @@ public partial class SCBindingsTabController
     {
         if (_scInstallationService is null) return;
 
-        _scInstallations = _scInstallationService.Installations.ToList();
+        _scInstall.Installations = _scInstallationService.Installations.ToList();
 
         // Restore preferred environment selection (e.g. LIVE, PTU)
         var preferredEnv = _ctx.AppSettings.PreferredSCEnvironment;
         if (!string.IsNullOrEmpty(preferredEnv))
         {
-            int preferredIndex = _scInstallations.FindIndex(i =>
+            int preferredIndex = _scInstall.Installations.FindIndex(i =>
                 string.Equals(i.Environment, preferredEnv, StringComparison.OrdinalIgnoreCase));
-            _selectedSCInstallation = preferredIndex >= 0 ? preferredIndex : 0;
+            _scInstall.SelectedInstallation = preferredIndex >= 0 ? preferredIndex : 0;
         }
-        else if (_selectedSCInstallation >= _scInstallations.Count)
+        else if (_scInstall.SelectedInstallation >= _scInstall.Installations.Count)
         {
-            _selectedSCInstallation = 0;
+            _scInstall.SelectedInstallation = 0;
         }
 
     }
 
     private void StartSchemaLoad()
     {
-        if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
-            LoadSCSchema(_scInstallations[_selectedSCInstallation]);
+        if (_scInstall.Installations.Count > 0 && _scInstall.SelectedInstallation < _scInstall.Installations.Count)
+            LoadSCSchema(_scInstall.Installations[_scInstall.SelectedInstallation]);
     }
 
     private void LoadSCSchema(SCInstallation installation, bool autoLoadProfileForEnvironment = false, bool applyDefaultsAfterLoad = false)
     {
         if (_scProfileCacheService is null || _scSchemaService is null) return;
 
-        int version = ++_schemaLoadVersion;
-        _scLoading = true;
-        _scLoadingMessage = "Loading...";
-        _scActions = null;
+        int version = ++_scInstall.SchemaLoadVersion;
+        _scInstall.Loading = true;
+        _scInstall.LoadingMessage = "Loading...";
+        _scInstall.Actions = null;
         _scFilteredActions = null;
-        _scActionMaps.Clear();
+        _searchFilter.ActionMaps.Clear();
         _scAvailableProfiles = new();      // clear stale profiles from previous installation immediately
-        _scProfileDropdownOpen = false;    // close dropdown so it doesn't show stale data
+        _profileMgmt.DropdownOpen = false;    // close dropdown so it doesn't show stale data
         _scImportDropdownOpen = false;
         _ctx.InvalidateCanvas();
 
@@ -207,17 +207,17 @@ public partial class SCBindingsTabController
             }
             finally
             {
-                // Guarantee _scLoading is cleared even if an unexpected exception escapes the catch above.
+                // Guarantee _scInstall.Loading is cleared even if an unexpected exception escapes the catch above.
                 // BeginInvoke queues onto the UI thread; if an uncaught exception later faults the task
                 // it becomes an unobserved task exception rather than leaving the UI stuck at "Loading...".
                 _ctx.OwnerForm.BeginInvoke(() =>
                 {
-                    if (version != _schemaLoadVersion) return; // A newer load was started; discard this result
+                    if (version != _scInstall.SchemaLoadVersion) return; // A newer load was started; discard this result
 
-                    _scLoading = false;
-                    _scLoadingMessage = loadError is not null ? $"Load failed: {loadError}" : "";
-                    _scActions = actions;
-                    _scActionMaps = actionMaps;
+                    _scInstall.Loading = false;
+                    _scInstall.LoadingMessage = loadError is not null ? $"Load failed: {loadError}" : "";
+                    _scInstall.Actions = actions;
+                    _searchFilter.ActionMaps = actionMaps;
                     _scAvailableProfiles = availableProfiles;
 
                     if (actions is not null)
@@ -282,8 +282,8 @@ public partial class SCBindingsTabController
     {
         _ctx.OwnerForm.BeginInvoke(() =>
         {
-            if (version != _schemaLoadVersion) return;
-            _scLoadingMessage = message;
+            if (version != _scInstall.SchemaLoadVersion) return;
+            _scInstall.LoadingMessage = message;
             _ctx.InvalidateCanvas();
         });
     }
@@ -292,14 +292,14 @@ public partial class SCBindingsTabController
     {
         if (_scExportProfileService is null) return;
         // Exclude profiles with empty names - these are save artifacts from unnamed profiles
-        _scExportProfiles = _scExportProfileService.ListProfiles()
+        _profileMgmt.ExportProfiles = _scExportProfileService.ListProfiles()
             .Where(p => !string.IsNullOrEmpty(p.ProfileName))
             .ToList();
     }
 
     private void ExportToSC()
     {
-        if (_scExportService is null || _scInstallations.Count == 0)
+        if (_scExportService is null || _scInstall.Installations.Count == 0)
         {
             SetStatus("No SC installation available", SCStatusKind.Error);
             return;
@@ -316,7 +316,7 @@ public partial class SCBindingsTabController
 
         try
         {
-            var installation = _scInstallations[_selectedSCInstallation];
+            var installation = _scInstall.Installations[_scInstall.SelectedInstallation];
 
             // Validate profile
             var validation = _scExportService.Validate(_scExportProfile);
@@ -343,10 +343,10 @@ public partial class SCBindingsTabController
             // TX TOGGLE bindings share a vJoy button with the network switch — exclude them
             // from the export so SC never sees that button, rather than blocking the whole export.
             List<SCActionBinding>? excluded = null;
-            if (_networkConflictBindingKeys.Count > 0)
+            if (_conflicts.NetworkConflictKeys.Count > 0)
             {
                 excluded = _scExportProfile.Bindings
-                    .Where(b => _networkConflictBindingKeys.Contains(b.Key))
+                    .Where(b => _conflicts.NetworkConflictKeys.Contains(b.Key))
                     .ToList();
                 excluded.ForEach(b => _scExportProfile.Bindings.Remove(b));
             }
@@ -445,7 +445,7 @@ public partial class SCBindingsTabController
 
     private void DeleteSCExportProfile()
     {
-        if (_scExportProfileService is null || _scExportProfiles.Count == 0) return;
+        if (_scExportProfileService is null || _profileMgmt.ExportProfiles.Count == 0) return;
 
         using var confirmDialog = new FUIConfirmDialog(
             "Delete Profile",
@@ -459,9 +459,9 @@ public partial class SCBindingsTabController
             RefreshSCExportProfiles();
 
             // Load another profile or create default
-            if (_scExportProfiles.Count > 0)
+            if (_profileMgmt.ExportProfiles.Count > 0)
             {
-                var nextProfile = _scExportProfileService.LoadProfile(_scExportProfiles[0].ProfileName);
+                var nextProfile = _scExportProfileService.LoadProfile(_profileMgmt.ExportProfiles[0].ProfileName);
                 if (nextProfile is not null)
                 {
                     _scExportProfile = nextProfile;
@@ -501,7 +501,7 @@ public partial class SCBindingsTabController
             if (CurrentEnvironment is not null)
                 _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, profileName);
             _ctx.AppSettings.LastSCExportProfile = profileName;
-            _scProfileDropdownOpen = false;
+            _profileMgmt.DropdownOpen = false;
             UpdateConflictingBindings();
             UpdateSharedCells();
             SetStatus($"Loaded profile '{profileName}'");
@@ -609,10 +609,10 @@ public partial class SCBindingsTabController
 
     private void ClearColumnBindings()
     {
-        if (_scGridColumns is null || _scHighlightedColumn < 0 || _scHighlightedColumn >= _scGridColumns.Count)
+        if (_grid.Columns is null || _colImport.HighlightedColumn < 0 || _colImport.HighlightedColumn >= _grid.Columns.Count)
             return;
 
-        var col = _scGridColumns[_scHighlightedColumn];
+        var col = _grid.Columns[_colImport.HighlightedColumn];
         int bindingCount = _scExportProfile.Bindings.Count(b =>
             b.DeviceType == SCDeviceType.Joystick &&
             b.PhysicalDeviceId is null &&
@@ -671,7 +671,7 @@ public partial class SCBindingsTabController
         {
             _scExportProfile.ClearBindings();
 
-            if (_scActions is not null)
+            if (_scInstall.Actions is not null)
             {
                 // Schema already loaded — apply defaults immediately
                 ApplyDefaultBindingsToProfile();
@@ -679,10 +679,10 @@ public partial class SCBindingsTabController
                 UpdateSharedCells();
                 SetStatus("Reset to defaults");
             }
-            else if (_scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count)
+            else if (_scInstall.Installations.Count > 0 && _scInstall.SelectedInstallation < _scInstall.Installations.Count)
             {
                 // Schema not yet loaded — trigger load and apply defaults once it completes
-                LoadSCSchema(_scInstallations[_selectedSCInstallation], applyDefaultsAfterLoad: true);
+                LoadSCSchema(_scInstall.Installations[_scInstall.SelectedInstallation], applyDefaultsAfterLoad: true);
             }
             else
             {

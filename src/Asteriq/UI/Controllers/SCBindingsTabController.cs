@@ -21,21 +21,25 @@ public partial class SCBindingsTabController : ITabController
     private readonly SCExportProfileService _scExportProfileService;
     private readonly DirectInputService? _directInputService;
 
-    // SC state
-    private List<SCInstallation> _scInstallations = new();
-    private int _selectedSCInstallation = 0;
+    // ── Grouped state objects ──────────────────────────────────────────────────
+    private readonly SCInstallationState _scInstall = new();
+    private readonly GridLayoutState _grid = new();
+    private readonly CellInteractionState _cell = new();
+    private readonly InputListeningState _scListening = new();
+    private readonly ColumnImportState _colImport = new();
+    private readonly ConflictState _conflicts = new();
+    private readonly DeviceOrderState _deviceOrder = new();
+    private readonly ProfileMgmtState _profileMgmt = new();
+    private readonly SearchFilterState _searchFilter = new();
+    private readonly ScrollState _scroll = new();
+
+    // ── Flat fields (not grouped) ──────────────────────────────────────────────
     private SCExportProfile _scExportProfile = new();
-    private List<SCAction>? _scActions;
     private string? _scExportStatus;
     private DateTime _scExportStatusTime;
     private SCStatusKind _scStatusKind = SCStatusKind.Info;
 
     private enum SCStatusKind { Info, Success, Warning, Error }
-
-    // Async schema loading state
-    private bool _scLoading = false;
-    private string _scLoadingMessage = "";
-    private int _schemaLoadVersion = 0;
 
     // Dirty tracking: true when the profile name has been edited but not yet saved
     private bool _scProfileDirty = false;
@@ -43,11 +47,7 @@ public partial class SCBindingsTabController : ITabController
     // In-memory schema cache: avoids re-parsing XML when switching back to an already-loaded environment
     private static readonly Dictionary<string, List<SCAction>> s_schemaCache = new();
 
-    // SC UI bounds
-    private SKRect _scInstallationSelectorBounds;
-    private bool _scInstallationDropdownOpen;
-    private SKRect _scInstallationDropdownBounds;
-    private int _hoveredSCInstallation = -1;
+    // SC UI bounds (export panel)
     private SKRect _scExportButtonBounds;
     private bool _scExportButtonHovered;
     private bool _scExportFilenameBoxFocused;
@@ -60,129 +60,19 @@ public partial class SCBindingsTabController : ITabController
     private bool _scClearAllButtonHovered;
     private SKRect _scResetDefaultsButtonBounds;
     private bool _scResetDefaultsButtonHovered;
+
     // SC table state
     private List<SCAction>? _scFilteredActions;
-    private string _scActionMapFilter = "";
     private int _scSelectedActionIndex = -1;
     private int _scHoveredActionIndex = -1;
     private float _scBindingsScrollOffset = 0;
     private float _scBindingsContentHeight = 0;
     private SKRect _scBindingsListBounds;
     private List<SKRect> _scActionRowBounds = new();
-    private SKRect _scActionMapFilterBounds;
-    private bool _scActionMapFilterDropdownOpen;
-    private SKRect _scActionMapFilterDropdownBounds;
-    private int _scHoveredActionMapFilter = -1;
-    private float _scActionMapFilterScrollOffset = 0;
-    private float _scActionMapFilterMaxScroll = 0;
-    private List<string> _scActionMaps = new();
-
-    // SC grid column state
-    private float _scGridActionColWidth = 300f;
-    private float _scGridDeviceColMinWidth = 160f;
-    private Dictionary<string, float> _scGridDeviceColWidths = new();
-    private float _scGridHorizontalScroll = 0f;
-    private float _scGridTotalWidth = 0f;
-    private List<SCGridColumn>? _scGridColumns;
-    private float _scDeviceColsStart = 0f;
-    private float _scVisibleDeviceWidth = 0f;
-
-    // SC cell interaction state
-    private (int actionIndex, int colIndex) _scSelectedCell = (-1, -1);
-    private (int actionIndex, int colIndex) _scHoveredCell = (-1, -1);
-    private bool _scIsListeningForInput = false;
-    private DateTime _scListeningStartTime;
-    private DateTime _scLastCellClickTime;
-    private const int SCListeningTimeoutMs = 5000;
-    private SCGridColumn? _scListeningColumn;
-    private HashSet<string> _scConflictingBindings = new();
-    private HashSet<string> _scDuplicateActionBindings = new();
-
-    // Network switch button conflict detection — keys are excluded from export (not blocking)
-    private HashSet<string> _networkConflictBindingKeys = new();
-    private int _scHighlightedColumn = -1;
-
-    // Shared cells: key = "{actionKey}|{secondaryVJoyDeviceId}", value = (primaryVJoyDevice, primaryInputName, secondaryInputName)
-    private Dictionary<string, (uint PrimaryVJoyDevice, string PrimaryInputName, string SecondaryInputName)> _scSharedCells = new();
-
-    // Modifier keys detected from Mappings profile (vkCode → SC modifier name, e.g. {0xA3: "rctrl"})
-    private Dictionary<int, string> _scModifierKeys = new();
-
-    // Physical button names (e.g. "button31") that are mapped to keyboard modifier keys.
-    // Used during joystick listen mode: pressing one of these is treated as the modifier half of a
-    // compound binding, NOT as the target button.  Built by UpdateModifierKeys().
-    private HashSet<string> _scModifierPhysicalButtonNames = new();
-
-    // Maps physical button name → list of SC modifier names (e.g. "button31" → ["rctrl"])
-    private Dictionary<string, List<string>> _scModifierButtonToModifiers = new();
-
-    // Modifier(s) established by the first press (the modifier button) while waiting for the target
-    private List<string>? _scPendingJoystickModifiers;
-
-    // "Show JS ref" checkbox
-    private SKRect _scShowJSRefCheckboxBounds;
-    private bool _scShowJSRefCheckboxHovered;
-
-    // Column actions panel — Import From Profile
-    private int _scColImportProfileIndex = -1;
-    private bool _scColImportProfileDropdownOpen;
-    private SKRect _scColImportProfileSelectorBounds;
-    private SKRect _scColImportProfileDropdownBounds;
-    private int _scColImportProfileHoveredIndex = -1;
-    private SCExportProfile? _scColImportLoadedProfile;
-    private List<(string Label, uint VJoyDeviceId)> _scColImportSourceColumns = new();
-    private int _scColImportColumnIndex = -1;
-    private bool _scColImportColumnDropdownOpen;
-    private SKRect _scColImportColumnSelectorBounds;
-    private SKRect _scColImportColumnDropdownBounds;
-    private int _scColImportColumnHoveredIndex = -1;
-    private SKRect _scColImportButtonBounds;
-    private bool _scColImportButtonHovered;
-    private SKRect _scClearColumnButtonBounds;
-    private bool _scClearColumnButtonHovered;
-
-    // SC scrollbar state
-    private bool _scIsDraggingVScroll = false;
-    private bool _scIsDraggingHScroll = false;
-    private float _scScrollDragStartY = 0;
-    private float _scScrollDragStartX = 0;
-    private float _scScrollDragStartOffset = 0;
-    private SKRect _scVScrollbarBounds;
-    private SKRect _scHScrollbarBounds;
-    private SKRect _scVScrollThumbBounds;
-    private SKRect _scHScrollThumbBounds;
-    private SKRect _scColumnHeadersBounds;
-
-    // SC search/filter state
-    private string _scSearchText = "";
-    private SKRect _scSearchBoxBounds;
-    private bool _scSearchBoxFocused = false;
-    private SKRect _scShowBoundOnlyBounds;
-    private bool _scShowBoundOnlyHovered = false;
 
     // SC category collapse state
     private HashSet<string> _scCollapsedCategories = new();
     private Dictionary<string, SKRect> _scCategoryHeaderBounds = new();
-
-    // Conflict links panel — shown below ASSIGN/CLEAR when the selected cell has conflicts
-    private List<(string ActionMap, string ActionName)> _scConflictLinks = new();
-    private List<SKRect> _scConflictLinkBounds = new();
-    private int _scConflictLinkHovered = -1;
-    // Scroll-to + highlight animation for clicked conflict link
-    private int _scConflictHighlightActionIndex = -1;
-    private DateTime _scConflictHighlightStartTime;
-
-    // Device Order panel (vJoy slot ↔ SC joystick instance mapping)
-    private int _scDeviceOrderOpenRow = -1;      // which row's dropdown is open (-1 = none)
-    private SKRect[] _scDeviceOrderSelectorBounds = Array.Empty<SKRect>();
-    private SKRect _scDeviceOrderDropdownBounds = SKRect.Empty;
-    private int _scDeviceOrderHoveredIndex = -1; // hovered item in the open dropdown
-    private SKRect _scDeviceOrderAutoDetectBounds = SKRect.Empty;
-    private bool _scDeviceOrderAutoDetectHovered;
-    // Mutual-exclusive expand state: true = Device Order expanded, false = Control Profiles expanded
-    private bool _scDeviceOrderExpanded = false;
-    private SKRect _scDeviceOrderHeaderBounds;
-    private SKRect _scControlProfilesHeaderBounds;
 
     // SC binding assignment state (right-panel ASSIGN/CLEAR buttons)
     private SKRect _scAssignInputButtonBounds;
@@ -190,27 +80,21 @@ public partial class SCBindingsTabController : ITabController
     private SKRect _scClearBindingButtonBounds;
     private bool _scClearBindingButtonHovered;
 
-    // SC export profile management
-    private List<SCExportProfileInfo> _scExportProfiles = new();
-    private SKRect _scProfileDropdownBounds;
-    private bool _scProfileDropdownOpen;
-    private SKRect _scProfileDropdownListBounds;
-    private int _scHoveredProfileIndex = -1;
-    private SKRect _scNewProfileButtonBounds;
-    private bool _scNewProfileButtonHovered;
-    private SKRect _scSaveProfileButtonBounds;
-    private bool _scSaveProfileButtonHovered;
-    private SKRect _scDeleteProfileButtonBounds = default;
-    private SKRect _scProfileEditBounds;
-    private bool _scProfileEditHovered;
-    // Inline delete button that appears on hover in the profile dropdown list
-    private SKRect _scDropdownDeleteButtonBounds;
-    private string _scDropdownDeleteProfileName = "";
+    private const int SCListeningTimeoutMs = 5000;
+
+    // Modifier keys detected from Mappings profile (vkCode → SC modifier name, e.g. {0xA3: "rctrl"})
+    private Dictionary<int, string> _scModifierKeys = new();
+
+    // Physical button names (e.g. "button31") that are mapped to keyboard modifier keys.
+    private HashSet<string> _scModifierPhysicalButtonNames = new();
+
+    // Maps physical button name → list of SC modifier names (e.g. "button31" → ["rctrl"])
+    private Dictionary<string, List<string>> _scModifierButtonToModifiers = new();
 
     // Public properties for MainForm mouse dispatch
-    public bool IsDraggingVScroll => _scIsDraggingVScroll;
-    public bool IsDraggingHScroll => _scIsDraggingHScroll;
-    public bool IsSearchBoxFocused => _scSearchBoxFocused;
+    public bool IsDraggingVScroll => _scroll.IsDraggingVScroll;
+    public bool IsDraggingHScroll => _scroll.IsDraggingHScroll;
+    public bool IsSearchBoxFocused => _searchFilter.SearchBoxFocused;
     public bool IsExportFilenameBoxFocused => _scExportFilenameBoxFocused;
 
     public SCBindingsTabController(
@@ -263,8 +147,8 @@ public partial class SCBindingsTabController : ITabController
     /// Returns the environment string of the currently selected SC installation, or null if none.
     /// </summary>
     private string? CurrentEnvironment =>
-        _scInstallations.Count > 0 && _selectedSCInstallation < _scInstallations.Count
-            ? _scInstallations[_selectedSCInstallation].Environment
+        _scInstall.Installations.Count > 0 && _scInstall.SelectedInstallation < _scInstall.Installations.Count
+            ? _scInstall.Installations[_scInstall.SelectedInstallation].Environment
             : null;
 
     // Windows API for detecting held keys
@@ -328,7 +212,7 @@ public partial class SCBindingsTabController : ITabController
     public void OnMouseDown(MouseEventArgs e)
     {
         // When listening for mouse input, let the detection tick handle the press
-        if (_scIsListeningForInput && _scListeningColumn is { IsMouse: true })
+        if (_scListening.IsListening && _cell.ListeningColumn is { IsMouse: true })
             return;
 
         if (e.Button == MouseButtons.Right)
@@ -345,60 +229,60 @@ public partial class SCBindingsTabController : ITabController
     public void OnMouseMove(MouseEventArgs e)
     {
         // Handle scrollbar dragging
-        if (_scIsDraggingVScroll)
+        if (_scroll.IsDraggingVScroll)
         {
-            float deltaY = e.Y - _scScrollDragStartY;
+            float deltaY = e.Y - _scroll.DragStartY;
             float maxScroll = Math.Max(0, _scBindingsContentHeight - _scBindingsListBounds.Height);
-            float trackHeight = _scVScrollbarBounds.Height - _scVScrollThumbBounds.Height;
+            float trackHeight = _scroll.VScrollBounds.Height - _scroll.VThumbBounds.Height;
             if (trackHeight > 0 && maxScroll > 0)
             {
                 float scrollDelta = (deltaY / trackHeight) * maxScroll;
-                _scBindingsScrollOffset = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxScroll);
+                _scBindingsScrollOffset = Math.Clamp(_scroll.DragStartOffset + scrollDelta, 0, maxScroll);
             }
             _ctx.MarkDirty();
             return;
         }
 
-        if (_scIsDraggingHScroll)
+        if (_scroll.IsDraggingHScroll)
         {
-            float deltaX = e.X - _scScrollDragStartX;
-            float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
-            float trackWidth = _scHScrollbarBounds.Width - _scHScrollThumbBounds.Width;
+            float deltaX = e.X - _scroll.DragStartX;
+            float maxHScroll = Math.Max(0, _grid.TotalWidth - _grid.VisibleDeviceWidth);
+            float trackWidth = _scroll.HScrollBounds.Width - _scroll.HThumbBounds.Width;
             if (trackWidth > 0 && maxHScroll > 0)
             {
                 float scrollDelta = (deltaX / trackWidth) * maxHScroll;
-                _scGridHorizontalScroll = Math.Clamp(_scScrollDragStartOffset + scrollDelta, 0, maxHScroll);
+                _grid.HorizontalScroll = Math.Clamp(_scroll.DragStartOffset + scrollDelta, 0, maxHScroll);
             }
             _ctx.MarkDirty();
             return;
         }
 
         // Installation dropdown hover
-        if (_scInstallationDropdownOpen && _scInstallationDropdownBounds.Contains(e.X, e.Y))
+        if (_scInstall.DropdownOpen && _scInstall.DropdownBounds.Contains(e.X, e.Y))
         {
             float itemHeight = 28f;
-            int itemIndex = (int)((e.Y - _scInstallationDropdownBounds.Top - 2) / itemHeight);
-            _hoveredSCInstallation = itemIndex >= 0 && itemIndex < _scInstallations.Count ? itemIndex : -1;
+            int itemIndex = (int)((e.Y - _scInstall.DropdownBounds.Top - 2) / itemHeight);
+            _scInstall.HoveredInstallation = itemIndex >= 0 && itemIndex < _scInstall.Installations.Count ? itemIndex : -1;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
         }
         else
         {
-            _hoveredSCInstallation = -1;
+            _scInstall.HoveredInstallation = -1;
         }
 
         // Reset hover states
         _scHoveredActionIndex = -1;
-        _scHoveredActionMapFilter = -1;
-        _scHoveredCell = (-1, -1);
+        _searchFilter.HoveredFilter = -1;
+        _cell.HoveredCell = (-1, -1);
 
         // Action map filter dropdown hover
-        if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+        if (_searchFilter.FilterDropdownOpen && _searchFilter.FilterDropdownBounds.Contains(e.X, e.Y))
         {
             float itemHeight = 24f;
-            float relativeY = e.Y - _scActionMapFilterDropdownBounds.Top - 2 + _scActionMapFilterScrollOffset;
+            float relativeY = e.Y - _searchFilter.FilterDropdownBounds.Top - 2 + _searchFilter.FilterScrollOffset;
             int itemIndex = (int)(relativeY / itemHeight) - 1;
-            _scHoveredActionMapFilter = itemIndex >= -1 && itemIndex < _scActionMaps.Count ? itemIndex : -1;
+            _searchFilter.HoveredFilter = itemIndex >= -1 && itemIndex < _searchFilter.ActionMaps.Count ? itemIndex : -1;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
@@ -445,7 +329,7 @@ public partial class SCBindingsTabController : ITabController
                     int hoveredCol = GetHoveredColumnIndex(e.X);
                     if (hoveredCol >= 0)
                     {
-                        _scHoveredCell = (i, hoveredCol);
+                        _cell.HoveredCell = (i, hoveredCol);
                     }
 
                     _ctx.OwnerForm.Cursor = Cursors.Hand;
@@ -457,18 +341,18 @@ public partial class SCBindingsTabController : ITabController
         }
 
         // Text input fields - IBeam cursor
-        if (_scSearchBoxBounds.Contains(e.X, e.Y))
+        if (_searchFilter.SearchBoxBounds.Contains(e.X, e.Y))
         {
             _ctx.OwnerForm.Cursor = Cursors.IBeam;
         }
 
         // Panel header hover (collapsed panel expand buttons)
-        bool overDevOrderHeader = !_scDeviceOrderExpanded
-            && !_scDeviceOrderHeaderBounds.IsEmpty
-            && _scDeviceOrderHeaderBounds.Contains(e.X, e.Y);
-        bool overCPHeader = _scDeviceOrderExpanded
-            && !_scControlProfilesHeaderBounds.IsEmpty
-            && _scControlProfilesHeaderBounds.Contains(e.X, e.Y);
+        bool overDevOrderHeader = !_deviceOrder.IsExpanded
+            && !_deviceOrder.HeaderBounds.IsEmpty
+            && _deviceOrder.HeaderBounds.Contains(e.X, e.Y);
+        bool overCPHeader = _deviceOrder.IsExpanded
+            && !_deviceOrder.ControlProfilesHeaderBounds.IsEmpty
+            && _deviceOrder.ControlProfilesHeaderBounds.Contains(e.X, e.Y);
         if (overDevOrderHeader || overCPHeader)
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
@@ -476,15 +360,15 @@ public partial class SCBindingsTabController : ITabController
         }
 
         // Device Order auto-detect button hover
-        _scDeviceOrderAutoDetectHovered = !_scDeviceOrderAutoDetectBounds.IsEmpty
-            && _scDeviceOrderAutoDetectBounds.Contains(e.X, e.Y);
-        if (_scDeviceOrderAutoDetectHovered)
+        _deviceOrder.AutoDetectHovered = !_deviceOrder.AutoDetectBounds.IsEmpty
+            && _deviceOrder.AutoDetectBounds.Contains(e.X, e.Y);
+        if (_deviceOrder.AutoDetectHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Device Order row selector hover
-        for (int i = 0; i < _scDeviceOrderSelectorBounds.Length; i++)
+        for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
         {
-            if (!_scDeviceOrderSelectorBounds[i].IsEmpty && _scDeviceOrderSelectorBounds[i].Contains(e.X, e.Y))
+            if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(e.X, e.Y))
             {
                 _ctx.OwnerForm.Cursor = Cursors.Hand;
                 break;
@@ -492,116 +376,116 @@ public partial class SCBindingsTabController : ITabController
         }
 
         // Device Order open dropdown hover
-        if (_scDeviceOrderOpenRow >= 0 && !_scDeviceOrderDropdownBounds.IsEmpty
-            && _scDeviceOrderDropdownBounds.Contains(e.X, e.Y))
+        if (_deviceOrder.OpenRow >= 0 && !_deviceOrder.DropdownBounds.IsEmpty
+            && _deviceOrder.DropdownBounds.Contains(e.X, e.Y))
         {
             float itemH = 28f;
-            int idx = (int)((e.Y - _scDeviceOrderDropdownBounds.Top) / itemH);
+            int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
             int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
             int newHovered = idx >= 0 && idx < vjoyCount ? idx : -1;
-            if (newHovered != _scDeviceOrderHoveredIndex)
+            if (newHovered != _deviceOrder.HoveredIndex)
             {
-                _scDeviceOrderHoveredIndex = newHovered;
+                _deviceOrder.HoveredIndex = newHovered;
                 _ctx.MarkDirty();
             }
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-        else if (_scDeviceOrderOpenRow >= 0 && _scDeviceOrderHoveredIndex >= 0)
+        else if (_deviceOrder.OpenRow >= 0 && _deviceOrder.HoveredIndex >= 0)
         {
-            _scDeviceOrderHoveredIndex = -1;
+            _deviceOrder.HoveredIndex = -1;
             _ctx.MarkDirty();
         }
 
         // Conflict link hover tracking
         {
-            int prevHovered = _scConflictLinkHovered;
-            _scConflictLinkHovered = -1;
-            for (int ci = 0; ci < _scConflictLinkBounds.Count; ci++)
+            int prevHovered = _conflicts.ConflictLinkHovered;
+            _conflicts.ConflictLinkHovered = -1;
+            for (int ci = 0; ci < _conflicts.ConflictLinkBounds.Count; ci++)
             {
-                if (!_scConflictLinkBounds[ci].IsEmpty && _scConflictLinkBounds[ci].Contains(e.X, e.Y))
+                if (!_conflicts.ConflictLinkBounds[ci].IsEmpty && _conflicts.ConflictLinkBounds[ci].Contains(e.X, e.Y))
                 {
-                    _scConflictLinkHovered = ci;
+                    _conflicts.ConflictLinkHovered = ci;
                     _ctx.OwnerForm.Cursor = Cursors.Hand;
                     break;
                 }
             }
-            if (_scConflictLinkHovered != prevHovered)
+            if (_conflicts.ConflictLinkHovered != prevHovered)
                 _ctx.MarkDirty();
         }
 
         // Buttons and selectors
         if (_scExportButtonBounds.Contains(e.X, e.Y) ||
-            _scInstallationSelectorBounds.Contains(e.X, e.Y) ||
-            _scProfileDropdownBounds.Contains(e.X, e.Y) ||
-            (_scProfileEditBounds != SKRect.Empty && _scProfileEditBounds.Contains(e.X, e.Y)) ||
-            _scNewProfileButtonBounds.Contains(e.X, e.Y) ||
-            _scSaveProfileButtonBounds.Contains(e.X, e.Y) ||
-            (_scDeleteProfileButtonBounds != default && _scDeleteProfileButtonBounds.Contains(e.X, e.Y)) ||
-            _scActionMapFilterBounds.Contains(e.X, e.Y) ||
+            _scInstall.SelectorBounds.Contains(e.X, e.Y) ||
+            _profileMgmt.DropdownBounds.Contains(e.X, e.Y) ||
+            (_profileMgmt.ProfileEditBounds != SKRect.Empty && _profileMgmt.ProfileEditBounds.Contains(e.X, e.Y)) ||
+            _profileMgmt.NewProfileBounds.Contains(e.X, e.Y) ||
+            _profileMgmt.SaveProfileBounds.Contains(e.X, e.Y) ||
+            (_profileMgmt.DeleteProfileBounds != default && _profileMgmt.DeleteProfileBounds.Contains(e.X, e.Y)) ||
+            _searchFilter.FilterBounds.Contains(e.X, e.Y) ||
             _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
             _scClearBindingButtonBounds.Contains(e.X, e.Y) ||
             _scClearAllButtonBounds.Contains(e.X, e.Y) ||
             _scResetDefaultsButtonBounds.Contains(e.X, e.Y) ||
-            _scShowBoundOnlyBounds.Contains(e.X, e.Y) ||
-            (!_scVScrollbarBounds.IsEmpty && _scVScrollbarBounds.Contains(e.X, e.Y)) ||
-            (!_scHScrollbarBounds.IsEmpty && _scHScrollbarBounds.Contains(e.X, e.Y)) ||
-            (!_scShowJSRefCheckboxBounds.IsEmpty && _scShowJSRefCheckboxBounds.Contains(e.X, e.Y)) ||
-            (!_scColImportButtonBounds.IsEmpty && _scColImportButtonBounds.Contains(e.X, e.Y)) ||
-            (!_scClearColumnButtonBounds.IsEmpty && _scClearColumnButtonBounds.Contains(e.X, e.Y)) ||
-            (!_scColImportProfileSelectorBounds.IsEmpty && _scColImportProfileSelectorBounds.Contains(e.X, e.Y)) ||
-            (!_scColImportColumnSelectorBounds.IsEmpty && _scColImportColumnSelectorBounds.Contains(e.X, e.Y)))
+            _searchFilter.ShowBoundOnlyBounds.Contains(e.X, e.Y) ||
+            (!_scroll.VScrollBounds.IsEmpty && _scroll.VScrollBounds.Contains(e.X, e.Y)) ||
+            (!_scroll.HScrollBounds.IsEmpty && _scroll.HScrollBounds.Contains(e.X, e.Y)) ||
+            (!_searchFilter.ShowJSRefBounds.IsEmpty && _searchFilter.ShowJSRefBounds.Contains(e.X, e.Y)) ||
+            (!_colImport.ImportButtonBounds.IsEmpty && _colImport.ImportButtonBounds.Contains(e.X, e.Y)) ||
+            (!_colImport.ClearColumnBounds.IsEmpty && _colImport.ClearColumnBounds.Contains(e.X, e.Y)) ||
+            (!_colImport.ProfileSelectorBounds.IsEmpty && _colImport.ProfileSelectorBounds.Contains(e.X, e.Y)) ||
+            (!_colImport.ColumnSelectorBounds.IsEmpty && _colImport.ColumnSelectorBounds.Contains(e.X, e.Y)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
-        bool showColumnActions = _scHighlightedColumn >= 0
-            && _scGridColumns is not null
-            && _scHighlightedColumn < _scGridColumns.Count
-            && _scGridColumns[_scHighlightedColumn].IsJoystick
-            && !_scGridColumns[_scHighlightedColumn].IsPhysical
-            && !_scGridColumns[_scHighlightedColumn].IsReadOnly;
+        bool showColumnActions = _colImport.HighlightedColumn >= 0
+            && _grid.Columns is not null
+            && _colImport.HighlightedColumn < _grid.Columns.Count
+            && _grid.Columns[_colImport.HighlightedColumn].IsJoystick
+            && !_grid.Columns[_colImport.HighlightedColumn].IsPhysical
+            && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
 
         // Import profile dropdown hover
-        if (showColumnActions && _scColImportProfileDropdownOpen
-            && !_scColImportProfileDropdownBounds.IsEmpty
-            && _scColImportProfileDropdownBounds.Contains(e.X, e.Y))
+        if (showColumnActions && _colImport.ProfileDropdownOpen
+            && !_colImport.ProfileDropdownBounds.IsEmpty
+            && _colImport.ProfileDropdownBounds.Contains(e.X, e.Y))
         {
             float itemH = 28f;
-            int idx = (int)((e.Y - _scColImportProfileDropdownBounds.Top) / itemH);
+            int idx = (int)((e.Y - _colImport.ProfileDropdownBounds.Top) / itemH);
             var (savedProfiles, xmlFiles) = GetColImportSources();
             int totalSources = savedProfiles.Count + xmlFiles.Count;
             int newHovered = idx >= 0 && idx < totalSources ? idx : -1;
-            if (newHovered != _scColImportProfileHoveredIndex)
+            if (newHovered != _colImport.ProfileHoveredIndex)
             {
-                _scColImportProfileHoveredIndex = newHovered;
+                _colImport.ProfileHoveredIndex = newHovered;
                 _ctx.MarkDirty();
             }
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-        else if (_scColImportProfileHoveredIndex >= 0)
+        else if (_colImport.ProfileHoveredIndex >= 0)
         {
-            _scColImportProfileHoveredIndex = -1;
+            _colImport.ProfileHoveredIndex = -1;
             _ctx.MarkDirty();
         }
 
         // Import column dropdown hover
-        if (showColumnActions && _scColImportColumnDropdownOpen
-            && !_scColImportColumnDropdownBounds.IsEmpty
-            && _scColImportColumnDropdownBounds.Contains(e.X, e.Y))
+        if (showColumnActions && _colImport.ColumnDropdownOpen
+            && !_colImport.ColumnDropdownBounds.IsEmpty
+            && _colImport.ColumnDropdownBounds.Contains(e.X, e.Y))
         {
             float itemH = 28f;
-            int idx = (int)((e.Y - _scColImportColumnDropdownBounds.Top) / itemH);
-            int newHovered = idx >= 0 && idx < _scColImportSourceColumns.Count ? idx : -1;
-            if (newHovered != _scColImportColumnHoveredIndex)
+            int idx = (int)((e.Y - _colImport.ColumnDropdownBounds.Top) / itemH);
+            int newHovered = idx >= 0 && idx < _colImport.SourceColumns.Count ? idx : -1;
+            if (newHovered != _colImport.ColumnHoveredIndex)
             {
-                _scColImportColumnHoveredIndex = newHovered;
+                _colImport.ColumnHoveredIndex = newHovered;
                 _ctx.MarkDirty();
             }
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-        else if (_scColImportColumnHoveredIndex >= 0)
+        else if (_colImport.ColumnHoveredIndex >= 0)
         {
-            _scColImportColumnHoveredIndex = -1;
+            _colImport.ColumnHoveredIndex = -1;
             _ctx.MarkDirty();
         }
 
@@ -612,23 +496,23 @@ public partial class SCBindingsTabController : ITabController
         }
 
         // Profile dropdown list items when open
-        if (_scProfileDropdownOpen && _scProfileDropdownListBounds.Contains(e.X, e.Y))
+        if (_profileMgmt.DropdownOpen && _profileMgmt.DropdownListBounds.Contains(e.X, e.Y))
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Listening timeout
-        if (_scIsListeningForInput && (DateTime.Now - _scListeningStartTime).TotalMilliseconds > SCListeningTimeoutMs)
+        if (_scListening.IsListening && (DateTime.Now - _scListening.StartTime).TotalMilliseconds > SCListeningTimeoutMs)
         {
-            _scIsListeningForInput = false;
-            _scListeningColumn = null;
+            _scListening.IsListening = false;
+            _cell.ListeningColumn = null;
         }
     }
 
     public void OnMouseUp(MouseEventArgs e)
     {
-        if (_scIsDraggingVScroll || _scIsDraggingHScroll)
+        if (_scroll.IsDraggingVScroll || _scroll.IsDraggingHScroll)
         {
-            _scIsDraggingVScroll = false;
-            _scIsDraggingHScroll = false;
+            _scroll.IsDraggingVScroll = false;
+            _scroll.IsDraggingHScroll = false;
             _ctx.MarkDirty();
         }
     }
@@ -636,10 +520,10 @@ public partial class SCBindingsTabController : ITabController
     public void OnMouseWheel(MouseEventArgs e)
     {
         // Action map filter dropdown scroll
-        if (_scActionMapFilterDropdownOpen && _scActionMapFilterDropdownBounds.Contains(e.X, e.Y))
+        if (_searchFilter.FilterDropdownOpen && _searchFilter.FilterDropdownBounds.Contains(e.X, e.Y))
         {
             float scrollAmount = -e.Delta / 4f;
-            _scActionMapFilterScrollOffset = Math.Clamp(_scActionMapFilterScrollOffset + scrollAmount, 0, _scActionMapFilterMaxScroll);
+            _searchFilter.FilterScrollOffset = Math.Clamp(_searchFilter.FilterScrollOffset + scrollAmount, 0, _searchFilter.FilterMaxScroll);
             _ctx.MarkDirty();
             return;
         }
@@ -651,10 +535,10 @@ public partial class SCBindingsTabController : ITabController
 
             if (Control.ModifierKeys.HasFlag(Keys.Shift))
             {
-                float maxHScroll = Math.Max(0, _scGridTotalWidth - _scVisibleDeviceWidth);
+                float maxHScroll = Math.Max(0, _grid.TotalWidth - _grid.VisibleDeviceWidth);
                 if (maxHScroll > 0)
                 {
-                    _scGridHorizontalScroll = Math.Clamp(_scGridHorizontalScroll + scrollAmount, 0, maxHScroll);
+                    _grid.HorizontalScroll = Math.Clamp(_grid.HorizontalScroll + scrollAmount, 0, maxHScroll);
                 }
             }
             else
@@ -669,7 +553,7 @@ public partial class SCBindingsTabController : ITabController
 
     public bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        if (_scSearchBoxFocused)
+        if (_searchFilter.SearchBoxFocused)
             return HandleSearchBoxKey(keyData);
         if (_scExportFilenameBoxFocused)
             return HandleExportFilenameBoxKey(keyData);
@@ -678,14 +562,14 @@ public partial class SCBindingsTabController : ITabController
 
     public void OnMouseLeave()
     {
-        _hoveredSCInstallation = -1;
+        _scInstall.HoveredInstallation = -1;
         _scHoveredActionIndex = -1;
-        _scHoveredCell = (-1, -1);
+        _cell.HoveredCell = (-1, -1);
     }
 
     public void OnTick()
     {
-        if (_scIsListeningForInput)
+        if (_scListening.IsListening)
         {
             CheckSCBindingInput();
         }
@@ -694,11 +578,160 @@ public partial class SCBindingsTabController : ITabController
     public void OnActivated()
     {
         // Defer schema load to first tab activation so BeginInvoke runs with a valid form handle.
-        if (_scActions is null && !_scLoading)
+        if (_scInstall.Actions is null && !_scInstall.Loading)
             StartSchemaLoad();
 
         UpdateModifierKeys();
     }
 
     public void OnDeactivated() { }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // State classes — each groups logically-related fields for one sub-feature.
+    // All fields are public so partial files can access them via the instance.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private sealed class SCInstallationState
+    {
+        public List<SCInstallation> Installations = new();
+        public int SelectedInstallation;
+        public List<SCAction>? Actions;
+        public bool Loading;
+        public string LoadingMessage = "";
+        public int SchemaLoadVersion;
+        public SKRect SelectorBounds;
+        public bool DropdownOpen;
+        public SKRect DropdownBounds;
+        public int HoveredInstallation = -1;
+    }
+
+    private sealed class GridLayoutState
+    {
+        public float ActionColWidth = 300f;
+        public float DeviceColMinWidth = 160f;
+        public Dictionary<string, float> DeviceColWidths = new();
+        public float HorizontalScroll;
+        public float TotalWidth;
+        public List<SCGridColumn>? Columns;
+        public float DeviceColsStart;
+        public float VisibleDeviceWidth;
+        public SKRect ColumnHeadersBounds;
+    }
+
+    private sealed class CellInteractionState
+    {
+        public (int actionIndex, int colIndex) SelectedCell = (-1, -1);
+        public (int actionIndex, int colIndex) HoveredCell = (-1, -1);
+        public DateTime LastCellClickTime;
+        public SCGridColumn? ListeningColumn;
+    }
+
+    private sealed class InputListeningState
+    {
+        public bool IsListening;
+        public DateTime StartTime;
+        public List<string>? PendingModifiers;
+        // Baseline fields (populated when listening starts)
+        public Dictionary<Guid, float[]>? AxisBaseline;
+        public Dictionary<Guid, bool[]>? ButtonBaseline;
+        public Dictionary<Guid, int[]>? HatBaseline;
+        public int BaselineFrames;
+    }
+
+    private sealed class ColumnImportState
+    {
+        public int HighlightedColumn = -1;
+        public int ProfileIndex = -1;
+        public bool ProfileDropdownOpen;
+        public SKRect ProfileSelectorBounds;
+        public SKRect ProfileDropdownBounds;
+        public int ProfileHoveredIndex = -1;
+        public SCExportProfile? LoadedProfile;
+        public List<(string Label, uint VJoyDeviceId)> SourceColumns = new();
+        public int ColumnIndex = -1;
+        public bool ColumnDropdownOpen;
+        public SKRect ColumnSelectorBounds;
+        public SKRect ColumnDropdownBounds;
+        public int ColumnHoveredIndex = -1;
+        public SKRect ImportButtonBounds;
+        public bool ImportButtonHovered;
+        public SKRect ClearColumnBounds;
+        public bool ClearColumnHovered;
+    }
+
+    private sealed class ConflictState
+    {
+        public HashSet<string> ConflictingBindings = new();
+        public HashSet<string> DuplicateActionBindings = new();
+        public Dictionary<string, (uint PrimaryVJoyDevice, string PrimaryInputName, string SecondaryInputName)> SharedCells = new();
+        public List<(string ActionMap, string ActionName)> ConflictLinks = new();
+        public List<SKRect> ConflictLinkBounds = new();
+        public int ConflictLinkHovered = -1;
+        public int HighlightActionIndex = -1;
+        public DateTime HighlightStartTime;
+        public HashSet<string> NetworkConflictKeys = new();
+    }
+
+    private sealed class DeviceOrderState
+    {
+        public int OpenRow = -1;
+        public SKRect[] SelectorBounds = Array.Empty<SKRect>();
+        public SKRect DropdownBounds = SKRect.Empty;
+        public int HoveredIndex = -1;
+        public SKRect AutoDetectBounds = SKRect.Empty;
+        public bool AutoDetectHovered;
+        public bool IsExpanded;
+        public SKRect HeaderBounds;
+        public SKRect ControlProfilesHeaderBounds;
+    }
+
+    private sealed class ProfileMgmtState
+    {
+        public List<SCExportProfileInfo> ExportProfiles = new();
+        public SKRect DropdownBounds;
+        public bool DropdownOpen;
+        public SKRect DropdownListBounds;
+        public int HoveredProfileIndex = -1;
+        public SKRect NewProfileBounds;
+        public bool NewProfileHovered;
+        public SKRect SaveProfileBounds;
+        public bool SaveProfileHovered;
+        public SKRect DeleteProfileBounds;
+        public SKRect ProfileEditBounds;
+        public bool ProfileEditHovered;
+        public SKRect DropdownDeleteBounds;
+        public string DropdownDeleteProfileName = "";
+    }
+
+    private sealed class SearchFilterState
+    {
+        public string SearchText = "";
+        public SKRect SearchBoxBounds;
+        public bool SearchBoxFocused;
+        public SKRect ShowBoundOnlyBounds;
+        public bool ShowBoundOnlyHovered;
+        public string ActionMapFilter = "";
+        public SKRect FilterBounds;
+        public bool FilterDropdownOpen;
+        public SKRect FilterDropdownBounds;
+        public int HoveredFilter = -1;
+        public float FilterScrollOffset;
+        public float FilterMaxScroll;
+        public List<string> ActionMaps = new();
+        public SKRect ShowJSRefBounds;
+        public bool ShowJSRefHovered;
+    }
+
+    private sealed class ScrollState
+    {
+        public bool IsDraggingVScroll;
+        public bool IsDraggingHScroll;
+        public float DragStartY;
+        public float DragStartX;
+        public float DragStartOffset;
+        public SKRect VScrollBounds;
+        public SKRect HScrollBounds;
+        public SKRect VThumbBounds;
+        public SKRect HThumbBounds;
+    }
 }

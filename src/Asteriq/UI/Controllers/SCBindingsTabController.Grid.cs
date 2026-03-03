@@ -116,23 +116,23 @@ public partial class SCBindingsTabController
 
     private void CalculateDeviceColumnWidths()
     {
-        _scGridDeviceColWidths.Clear();
+        _grid.DeviceColWidths.Clear();
 
-        if (_scActions is null) return;
+        if (_scInstall.Actions is null) return;
 
         var columns = GetSCGridColumns();
         float padding = 12f; // Cell padding
 
         foreach (var col in columns)
         {
-            float maxWidth = _scGridDeviceColMinWidth;
+            float maxWidth = _grid.DeviceColMinWidth;
 
             // Determine device type for this column
             SCDeviceType? deviceType = col.IsKeyboard ? SCDeviceType.Keyboard :
                                         col.IsMouse ? SCDeviceType.Mouse :
                                         col.IsJoystick ? SCDeviceType.Joystick : null;
 
-            foreach (var action in _scActions)
+            foreach (var action in _scInstall.Actions)
             {
                 // Check profile bindings for this column
                 if (deviceType.HasValue)
@@ -171,33 +171,33 @@ public partial class SCBindingsTabController
                 }
             }
 
-            _scGridDeviceColWidths[col.Id] = maxWidth;
+            _grid.DeviceColWidths[col.Id] = maxWidth;
         }
     }
 
     private void RefreshFilteredActions()
     {
-        if (_scActions is null || _scSchemaService is null)
+        if (_scInstall.Actions is null || _scSchemaService is null)
         {
             _scFilteredActions = null;
             return;
         }
 
         // Start with joystick-relevant actions
-        var actions = _scSchemaService.FilterJoystickActions(_scActions);
+        var actions = _scSchemaService.FilterJoystickActions(_scInstall.Actions);
 
         // Apply action map filter if set (use category name for filtering)
         // Use GetCategoryNameForAction to respect action-level overrides (e.g., Emergency)
-        if (!string.IsNullOrEmpty(_scActionMapFilter))
+        if (!string.IsNullOrEmpty(_searchFilter.ActionMapFilter))
         {
             actions = actions.Where(a =>
-                SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == _scActionMapFilter).ToList();
+                SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == _searchFilter.ActionMapFilter).ToList();
         }
 
         // Apply search filter if set - search multiple fields like SCVirtStick
-        if (!string.IsNullOrEmpty(_scSearchText))
+        if (!string.IsNullOrEmpty(_searchFilter.SearchText))
         {
-            var searchLower = _scSearchText.ToLowerInvariant();
+            var searchLower = _searchFilter.SearchText.ToLowerInvariant();
             actions = actions.Where(a => ActionMatchesSearch(a, searchLower)).ToList();
         }
 
@@ -279,13 +279,13 @@ public partial class SCBindingsTabController
     /// </summary>
     private void UpdateSharedCells()
     {
-        _scSharedCells.Clear();
+        _conflicts.SharedCells.Clear();
         foreach (var binding in _scExportProfile.Bindings)
         {
             foreach (var shared in binding.SharedWith)
             {
                 string key = $"{binding.ActionKey}|{shared.VJoySlot}";
-                _scSharedCells[key] = (binding.VJoyDevice, binding.InputName, shared.InputName);
+                _conflicts.SharedCells[key] = (binding.VJoyDevice, binding.InputName, shared.InputName);
             }
         }
     }
@@ -304,17 +304,17 @@ public partial class SCBindingsTabController
 
     private void UpdateDuplicateActionBindings()
     {
-        _scDuplicateActionBindings = _scExportProfile.GetDuplicateJoystickActionKeys();
+        _conflicts.DuplicateActionBindings = _scExportProfile.GetDuplicateJoystickActionKeys();
     }
 
     /// <summary>
     /// Checks whether any SC binding uses the same physical vJoy button as the NET SWITCH button.
-    /// Updates <c>_networkConflictBindingKeys</c> and <c>_exportBlockedByNetworkConflict</c>.
+    /// Updates <c>_conflicts.NetworkConflictKeys</c> and <c>_exportBlockedByNetworkConflict</c>.
     /// Called by <c>UpdateConflictingBindings</c> and by MappingsTabController via TabContext callback.
     /// </summary>
     internal void CheckNetworkSwitchConflicts()
     {
-        _networkConflictBindingKeys.Clear();
+        _conflicts.NetworkConflictKeys.Clear();
 
         var switchCfg = _ctx.ProfileManager.ActiveProfile?.NetworkSwitchButton;
         if (switchCfg is null) return;
@@ -342,7 +342,7 @@ public partial class SCBindingsTabController
             if (binding.VJoyDevice != switchVJoyDevice) continue;
             if (!binding.InputName.Equals(switchInputName, StringComparison.OrdinalIgnoreCase)) continue;
 
-            _networkConflictBindingKeys.Add(binding.Key);
+            _conflicts.NetworkConflictKeys.Add(binding.Key);
         }
 
         _ctx.MarkDirty();
@@ -353,7 +353,7 @@ public partial class SCBindingsTabController
 
     private void UpdateConflictingBindings()
     {
-        _scConflictingBindings.Clear();
+        _conflicts.ConflictingBindings.Clear();
 
         // Track which inputs are used and by which actions
         // Key: "js1_button5" or "phys:path_button5" etc., Value: list of binding keys that use it
@@ -399,7 +399,7 @@ public partial class SCBindingsTabController
                 // Mark all actions using this input as conflicting
                 foreach (var actionKey in kvp.Value)
                 {
-                    _scConflictingBindings.Add(actionKey);
+                    _conflicts.ConflictingBindings.Add(actionKey);
                 }
             }
         }
@@ -410,11 +410,11 @@ public partial class SCBindingsTabController
 
     private void ApplyDefaultBindingsToProfile()
     {
-        if (_scActions is null) return;
+        if (_scInstall.Actions is null) return;
 
         int kbCount = 0, moCount = 0, jsCount = 0;
 
-        foreach (var action in _scActions)
+        foreach (var action in _scInstall.Actions)
         {
             foreach (var defaultBinding in action.DefaultBindings)
             {
@@ -762,7 +762,7 @@ public partial class SCBindingsTabController
     private void HandleSharedCellClick(SCAction action, SCGridColumn col)
     {
         string sharedKey = $"{action.Key}|{col.VJoyDeviceId}";
-        if (!_scSharedCells.TryGetValue(sharedKey, out var linkInfo))
+        if (!_conflicts.SharedCells.TryGetValue(sharedKey, out var linkInfo))
             return;
 
         var primaryBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
@@ -1100,17 +1100,17 @@ public partial class SCBindingsTabController
     /// </summary>
     private void UpdateConflictLinks()
     {
-        _scConflictLinks.Clear();
-        _scConflictLinkBounds.Clear();
-        _scConflictLinkHovered = -1;
+        _conflicts.ConflictLinks.Clear();
+        _conflicts.ConflictLinkBounds.Clear();
+        _conflicts.ConflictLinkHovered = -1;
 
         if (_scSelectedActionIndex < 0 || _scFilteredActions is null
-            || _scSelectedCell.colIndex < 0 || _scGridColumns is null
-            || _scSelectedCell.colIndex >= _scGridColumns.Count)
+            || _cell.SelectedCell.colIndex < 0 || _grid.Columns is null
+            || _cell.SelectedCell.colIndex >= _grid.Columns.Count)
             return;
 
         var selectedAction = _scFilteredActions[_scSelectedActionIndex];
-        var col = _scGridColumns[_scSelectedCell.colIndex];
+        var col = _grid.Columns[_cell.SelectedCell.colIndex];
 
         // Find the binding for the selected cell.
         // For shared/rerouted cells there is no direct binding on the secondary column —
@@ -1130,7 +1130,7 @@ public partial class SCBindingsTabController
         if (selectedBinding is null && col.IsJoystick && !col.IsPhysical)
         {
             string sharedKey = $"{selectedAction.Key}|{col.VJoyDeviceId}";
-            if (_scSharedCells.TryGetValue(sharedKey, out var sharedInfo))
+            if (_conflicts.SharedCells.TryGetValue(sharedKey, out var sharedInfo))
             {
                 selectedBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
                     b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
@@ -1139,7 +1139,7 @@ public partial class SCBindingsTabController
             }
         }
 
-        if (selectedBinding is null || !_scConflictingBindings.Contains(selectedBinding.Key))
+        if (selectedBinding is null || !_conflicts.ConflictingBindings.Contains(selectedBinding.Key))
             return;
 
         // Find all other bindings with the same device + inputName + modifier set.
@@ -1151,7 +1151,7 @@ public partial class SCBindingsTabController
                 selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
 
         foreach (var conflict in conflicts)
-            _scConflictLinks.Add((conflict.ActionMap, conflict.ActionName));
+            _conflicts.ConflictLinks.Add((conflict.ActionMap, conflict.ActionName));
     }
 
     /// <summary>
@@ -1193,9 +1193,9 @@ public partial class SCBindingsTabController
 
         // Select the row and start the highlight pulse
         _scSelectedActionIndex = actionIndex;
-        _scSelectedCell = (actionIndex, _scSelectedCell.colIndex);
-        _scConflictHighlightActionIndex = actionIndex;
-        _scConflictHighlightStartTime = DateTime.Now;
+        _cell.SelectedCell = (actionIndex, _cell.SelectedCell.colIndex);
+        _conflicts.HighlightActionIndex = actionIndex;
+        _conflicts.HighlightStartTime = DateTime.Now;
         UpdateConflictLinks();
         _ctx.MarkDirty();
     }

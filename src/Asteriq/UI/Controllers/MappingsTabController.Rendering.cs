@@ -2038,7 +2038,7 @@ public partial class MappingsTabController
 
         // Manual entry toggle button
         _inputDetection.ManualEntryBounds = new SKRect(leftMargin, y, leftMargin + 120, y + 24);
-        FUIWidgets.DrawToggleButton(canvas, _inputDetection.ManualEntryBounds, "Manual Entry", _inputDetection.ManualEntryMode, _inputDetection.ManualEntryHovered);
+        FUIWidgets.DrawToggleButton(canvas, _inputDetection.ManualEntryBounds, "Manual Entry", _inputDetection.ManualEntryMode, false);
         y += 34;
 
         // Manual entry dropdowns (if enabled)
@@ -2115,7 +2115,7 @@ public partial class MappingsTabController
         // Background
         var bgColor = _inputDetection.IsListening
             ? FUIColors.Warning.WithAlpha(40)
-            : (_inputDetection.FieldHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            : FUIColors.Background2;
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
@@ -2123,7 +2123,7 @@ public partial class MappingsTabController
         // Frame
         var frameColor = _inputDetection.IsListening
             ? FUIColors.Warning
-            : (_inputDetection.FieldHovered ? FUIColors.Primary : FUIColors.Frame);
+            : FUIColors.Frame;
         using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, _inputDetection.IsListening ? 2f : 1f);
         canvas.DrawRect(bounds, framePaint);
 

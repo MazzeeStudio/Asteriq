@@ -420,7 +420,6 @@ public partial class SCBindingsTabController : ITabController
             (_profileMgmt.ProfileEditBounds != SKRect.Empty && _profileMgmt.ProfileEditBounds.Contains(e.X, e.Y)) ||
             _profileMgmt.NewProfileBounds.Contains(e.X, e.Y) ||
             _profileMgmt.SaveProfileBounds.Contains(e.X, e.Y) ||
-            (_profileMgmt.DeleteProfileBounds != default && _profileMgmt.DeleteProfileBounds.Contains(e.X, e.Y)) ||
             _searchFilter.FilterBounds.Contains(e.X, e.Y) ||
             _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
             _scClearBindingButtonBounds.Contains(e.X, e.Y) ||
@@ -696,7 +695,6 @@ public partial class SCBindingsTabController : ITabController
         public bool NewProfileHovered;
         public SKRect SaveProfileBounds;
         public bool SaveProfileHovered;
-        public SKRect DeleteProfileBounds;
         public SKRect ProfileEditBounds;
         public bool ProfileEditHovered;
         public SKRect DropdownDeleteBounds;

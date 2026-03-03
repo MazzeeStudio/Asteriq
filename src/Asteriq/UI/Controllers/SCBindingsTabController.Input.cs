@@ -440,12 +440,6 @@ public partial class SCBindingsTabController
             return;
         }
 
-        if (_profileMgmt.DeleteProfileBounds.Contains(point) && _profileMgmt.ExportProfiles.Count > 0)
-        {
-            DeleteSCExportProfile();
-            return;
-        }
-
         // Search box click
         if (_searchFilter.SearchBoxBounds.Contains(point))
         {

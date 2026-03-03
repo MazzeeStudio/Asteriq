@@ -12,62 +12,28 @@ public class DevicesTabController : ITabController
     // Device list hover/selection (local to this tab)
     private int _hoveredDevice = -1;
 
-    // Device category tabs (D1 Physical, D2 Virtual)
-    private int _deviceCategory = 0;
-    private int _hoveredDeviceCategory = -1;
-    private SKRect _deviceCategoryD1Bounds;
-    private SKRect _deviceCategoryD2Bounds;
-
-    // Device list drag-to-reorder state
-    private bool _isDraggingDevice = false;
-    private int _dragDeviceIndex = -1;
-    private int _dragDropTargetIndex = -1;
-    private SKPoint _dragStartPoint;
-    private SKPoint _dragCurrentPoint;
-    private List<SKRect> _deviceItemBounds = new();
-
-    // Device Actions panel buttons
-    private SKRect _map1to1ButtonBounds;
-    private bool _map1to1ButtonHovered;
-    private SKRect _clearMappingsButtonBounds;
-    private bool _clearMappingsButtonHovered;
-    private SKRect _removeDeviceButtonBounds;
-    private bool _removeDeviceButtonHovered;
-
-    // Forwarding buttons
-    private SKRect _startForwardingButtonBounds;
-    private SKRect _stopForwardingButtonBounds;
-    private bool _startForwardingButtonHovered;
-    private bool _stopForwardingButtonHovered;
-
-    // SVG double-click detection
-    private DateTime _lastSvgControlClick = DateTime.MinValue;
-    private string? _lastClickedControlId;
-
-    // Silhouette picker (D3 panel, virtual device selected)
-    private SKRect _silhouettePrevButtonBounds;
-    private SKRect _silhouetteNextButtonBounds;
-    private bool _silhouettePrevHovered;
-    private bool _silhouetteNextHovered;
-
-    // Remove vJoy device button (D3 panel, virtual device selected)
-    private SKRect _removeVJoyButtonBounds;
-    private bool _removeVJoyButtonHovered;
+    // State groups
+    private readonly DeviceCategoryState _devCat = new();
+    private readonly DeviceDragState _drag = new();
+    private readonly DeviceActionsState _actions = new();
+    private readonly ForwardingButtonsState _forwarding = new();
+    private readonly SilhouettePickerState _silhouette = new();
+    private readonly SVGClickState _svgClick = new();
 
     /// <summary>
     /// The active device category (0 = physical, 1 = virtual/vJoy).
     /// </summary>
-    public int DeviceCategory => _deviceCategory;
+    public int DeviceCategory => _devCat.Active;
 
     /// <summary>
     /// True if a device drag-to-reorder is in progress (checked by MainForm for mouse dispatch).
     /// </summary>
-    public bool IsDraggingDevice => _isDraggingDevice;
+    public bool IsDraggingDevice => _drag.IsDragging;
 
     /// <summary>
     /// True if a drag has been initiated (mouse down on device item, but may not have exceeded threshold yet).
     /// </summary>
-    public bool HasPendingDrag => _dragDeviceIndex >= 0;
+    public bool HasPendingDrag => _drag.DeviceIndex >= 0;
 
     public DevicesTabController(TabContext ctx)
     {
@@ -117,9 +83,9 @@ public class DevicesTabController : ITabController
         if (e.Button != MouseButtons.Left) return;
 
         // Device category tab clicks (D1 Physical / D2 Virtual)
-        if (_hoveredDeviceCategory >= 0)
+        if (_devCat.Hovered >= 0)
         {
-            _deviceCategory = _hoveredDeviceCategory;
+            _devCat.Active = _devCat.Hovered;
             _ctx.SelectedDevice = -1;
             _ctx.CurrentInputState = null;
             _ctx.SelectFirstDeviceInCategory?.Invoke();
@@ -127,7 +93,7 @@ public class DevicesTabController : ITabController
         }
 
         // Device list clicks - initiate potential drag on physical devices
-        if (_deviceCategory == 0 && _hoveredDevice >= 0 && _hoveredDevice < _ctx.Devices.Count)
+        if (_devCat.Active == 0 && _hoveredDevice >= 0 && _hoveredDevice < _ctx.Devices.Count)
         {
             _ctx.SelectedDevice = _hoveredDevice;
             _ctx.CurrentInputState = null;
@@ -135,9 +101,9 @@ public class DevicesTabController : ITabController
             _ctx.ActiveInputTracker.Clear();
 
             // Start potential drag
-            _dragDeviceIndex = _hoveredDevice;
-            _dragStartPoint = new SKPoint(e.X, e.Y);
-            _dragCurrentPoint = _dragStartPoint;
+            _drag.DeviceIndex = _hoveredDevice;
+            _drag.StartPoint = new SKPoint(e.X, e.Y);
+            _drag.CurrentPoint = _drag.StartPoint;
         }
         else if (_hoveredDevice >= 0 && _hoveredDevice < _ctx.Devices.Count)
         {
@@ -149,28 +115,28 @@ public class DevicesTabController : ITabController
         }
 
         // Device action button clicks
-        if (_map1to1ButtonHovered && !_map1to1ButtonBounds.IsEmpty)
+        if (_actions.Map1to1Hovered && !_actions.Map1to1Bounds.IsEmpty)
         {
             _ctx.CreateOneToOneMappings?.Invoke();
             return;
         }
-        if (_clearMappingsButtonHovered && !_clearMappingsButtonBounds.IsEmpty)
+        if (_actions.ClearMappingsHovered && !_actions.ClearMappingsBounds.IsEmpty)
         {
             _ctx.ClearDeviceMappings?.Invoke();
             return;
         }
-        if (_removeDeviceButtonHovered && !_removeDeviceButtonBounds.IsEmpty)
+        if (_actions.RemoveDeviceHovered && !_actions.RemoveDeviceBounds.IsEmpty)
         {
             _ctx.RemoveDisconnectedDevice?.Invoke();
             return;
         }
 
         // Silhouette picker clicks (D3 panel, virtual device selected)
-        if (_silhouettePrevHovered) { StepSilhouette(-1); return; }
-        if (_silhouetteNextHovered) { StepSilhouette(+1); return; }
+        if (_silhouette.PrevHovered) { StepSilhouette(-1); return; }
+        if (_silhouette.NextHovered) { StepSilhouette(+1); return; }
 
         // Remove vJoy device
-        if (_removeVJoyButtonHovered && !_removeVJoyButtonBounds.IsEmpty)
+        if (_silhouette.RemoveVJoyHovered && !_silhouette.RemoveVJoyBounds.IsEmpty)
         {
             uint vjoyId = GetSelectedVJoyId();
             if (vjoyId > 0) RemoveVJoyDevice(vjoyId);
@@ -178,12 +144,12 @@ public class DevicesTabController : ITabController
         }
 
         // Forwarding button clicks
-        if (_startForwardingButtonHovered && !_startForwardingButtonBounds.IsEmpty)
+        if (_forwarding.StartHovered && !_forwarding.StartBounds.IsEmpty)
         {
             StartForwarding();
             return;
         }
-        if (_stopForwardingButtonHovered && !_stopForwardingButtonBounds.IsEmpty)
+        if (_forwarding.StopHovered && !_forwarding.StopBounds.IsEmpty)
         {
             StopForwarding();
             return;
@@ -192,46 +158,46 @@ public class DevicesTabController : ITabController
         // SVG control clicks
         if (_ctx.HoveredControlId is not null)
         {
-            bool isDoubleClick = _lastClickedControlId == _ctx.HoveredControlId &&
-                                 (DateTime.Now - _lastSvgControlClick).TotalMilliseconds < 500;
+            bool isDoubleClick = _svgClick.LastControlId == _ctx.HoveredControlId &&
+                                 (DateTime.Now - _svgClick.LastClickTime).TotalMilliseconds < 500;
 
             if (isDoubleClick)
             {
                 _ctx.OpenMappingDialogForControl?.Invoke(_ctx.HoveredControlId);
-                _lastClickedControlId = null;
+                _svgClick.LastControlId = null;
             }
             else
             {
                 _ctx.SelectedControlId = _ctx.HoveredControlId;
                 _ctx.LeadLineProgress = 0f;
-                _lastClickedControlId = _ctx.HoveredControlId;
-                _lastSvgControlClick = DateTime.Now;
+                _svgClick.LastControlId = _ctx.HoveredControlId;
+                _svgClick.LastClickTime = DateTime.Now;
             }
         }
         else if (_ctx.SilhouetteBounds.Contains(e.X, e.Y))
         {
             _ctx.SelectedControlId = null;
-            _lastClickedControlId = null;
+            _svgClick.LastControlId = null;
         }
     }
 
     public void OnMouseMove(MouseEventArgs e)
     {
         // Handle device list drag-to-reorder (physical devices only)
-        if (_deviceCategory == 0 && _dragDeviceIndex >= 0)
+        if (_devCat.Active == 0 && _drag.DeviceIndex >= 0)
         {
             var currentPoint = new SKPoint(e.X, e.Y);
-            float dragDistance = SKPoint.Distance(currentPoint, _dragStartPoint);
+            float dragDistance = SKPoint.Distance(currentPoint, _drag.StartPoint);
 
-            if (!_isDraggingDevice && dragDistance > 5)
+            if (!_drag.IsDragging && dragDistance > 5)
             {
-                _isDraggingDevice = true;
+                _drag.IsDragging = true;
                 _ctx.OwnerForm.Cursor = Cursors.SizeAll;
             }
 
-            if (_isDraggingDevice)
+            if (_drag.IsDragging)
             {
-                _dragCurrentPoint = currentPoint;
+                _drag.CurrentPoint = currentPoint;
 
                 float dragItemHeight = 60f;
                 float dragItemGap = FUIRenderer.ItemSpacing;
@@ -243,22 +209,22 @@ public class DevicesTabController : ITabController
                 int targetIndex = (int)(relativeY / (dragItemHeight + dragItemGap));
                 targetIndex = Math.Clamp(targetIndex, 0, physicalDevices.Count);
 
-                _dragDropTargetIndex = targetIndex;
+                _drag.DropTargetIndex = targetIndex;
                 _ctx.MarkDirty();
                 return;
             }
         }
 
         // Device category tabs hover detection
-        _hoveredDeviceCategory = -1;
-        if (_deviceCategoryD1Bounds.Contains(e.X, e.Y))
+        _devCat.Hovered = -1;
+        if (_devCat.D1Bounds.Contains(e.X, e.Y))
         {
-            _hoveredDeviceCategory = 0;
+            _devCat.Hovered = 0;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-        else if (_deviceCategoryD2Bounds.Contains(e.X, e.Y))
+        else if (_devCat.D2Bounds.Contains(e.X, e.Y))
         {
-            _hoveredDeviceCategory = 1;
+            _devCat.Hovered = 1;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
@@ -277,7 +243,7 @@ public class DevicesTabController : ITabController
             float itemHeight = 60f;
             float itemGap = FUIRenderer.ItemSpacing;
 
-            var filteredDevices = _deviceCategory == 0
+            var filteredDevices = _devCat.Active == 0
                 ? _ctx.Devices.Where(d => !d.IsVirtual).ToList()
                 : _ctx.Devices.Where(d => d.IsVirtual).ToList();
 
@@ -300,33 +266,33 @@ public class DevicesTabController : ITabController
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Device action button hover detection
-        _map1to1ButtonHovered = !_map1to1ButtonBounds.IsEmpty && _map1to1ButtonBounds.Contains(e.X, e.Y);
-        _clearMappingsButtonHovered = !_clearMappingsButtonBounds.IsEmpty && _clearMappingsButtonBounds.Contains(e.X, e.Y);
-        _removeDeviceButtonHovered = !_removeDeviceButtonBounds.IsEmpty && _removeDeviceButtonBounds.Contains(e.X, e.Y);
-        _removeVJoyButtonHovered = !_removeVJoyButtonBounds.IsEmpty && _removeVJoyButtonBounds.Contains(e.X, e.Y);
+        _actions.Map1to1Hovered = !_actions.Map1to1Bounds.IsEmpty && _actions.Map1to1Bounds.Contains(e.X, e.Y);
+        _actions.ClearMappingsHovered = !_actions.ClearMappingsBounds.IsEmpty && _actions.ClearMappingsBounds.Contains(e.X, e.Y);
+        _actions.RemoveDeviceHovered = !_actions.RemoveDeviceBounds.IsEmpty && _actions.RemoveDeviceBounds.Contains(e.X, e.Y);
+        _silhouette.RemoveVJoyHovered = !_silhouette.RemoveVJoyBounds.IsEmpty && _silhouette.RemoveVJoyBounds.Contains(e.X, e.Y);
 
-        if (_map1to1ButtonHovered || _clearMappingsButtonHovered || _removeDeviceButtonHovered || _removeVJoyButtonHovered)
+        if (_actions.Map1to1Hovered || _actions.ClearMappingsHovered || _actions.RemoveDeviceHovered || _silhouette.RemoveVJoyHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Forwarding button hover detection
-        _startForwardingButtonHovered = !_startForwardingButtonBounds.IsEmpty && _startForwardingButtonBounds.Contains(e.X, e.Y);
-        _stopForwardingButtonHovered = !_stopForwardingButtonBounds.IsEmpty && _stopForwardingButtonBounds.Contains(e.X, e.Y);
+        _forwarding.StartHovered = !_forwarding.StartBounds.IsEmpty && _forwarding.StartBounds.Contains(e.X, e.Y);
+        _forwarding.StopHovered = !_forwarding.StopBounds.IsEmpty && _forwarding.StopBounds.Contains(e.X, e.Y);
 
-        if (_startForwardingButtonHovered || _stopForwardingButtonHovered)
+        if (_forwarding.StartHovered || _forwarding.StopHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Silhouette picker hover detection (D3 panel, virtual device selected)
-        _silhouettePrevHovered = false;
-        _silhouetteNextHovered = false;
+        _silhouette.PrevHovered = false;
+        _silhouette.NextHovered = false;
         var (_, silhouetteHasPrev, silhouetteHasNext) = GetSilhouettePickerState();
-        if (!_silhouettePrevButtonBounds.IsEmpty && _silhouettePrevButtonBounds.Contains(e.X, e.Y) && silhouetteHasPrev)
+        if (!_silhouette.PrevBounds.IsEmpty && _silhouette.PrevBounds.Contains(e.X, e.Y) && silhouetteHasPrev)
         {
-            _silhouettePrevHovered = true;
+            _silhouette.PrevHovered = true;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-        else if (!_silhouetteNextButtonBounds.IsEmpty && _silhouetteNextButtonBounds.Contains(e.X, e.Y) && silhouetteHasNext)
+        else if (!_silhouette.NextBounds.IsEmpty && _silhouette.NextBounds.Contains(e.X, e.Y) && silhouetteHasNext)
         {
-            _silhouetteNextHovered = true;
+            _silhouette.NextHovered = true;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
@@ -349,16 +315,16 @@ public class DevicesTabController : ITabController
     public void OnMouseUp(MouseEventArgs e)
     {
         // Complete device drag-to-reorder
-        if (_isDraggingDevice && _dragDeviceIndex >= 0 && _dragDeviceIndex < _ctx.Devices.Count)
+        if (_drag.IsDragging && _drag.DeviceIndex >= 0 && _drag.DeviceIndex < _ctx.Devices.Count)
         {
             var filteredDevices = _ctx.Devices.Where(d => !d.IsVirtual).ToList();
 
-            var draggedDevice = _ctx.Devices[_dragDeviceIndex];
+            var draggedDevice = _ctx.Devices[_drag.DeviceIndex];
             int sourceFilteredIndex = filteredDevices.IndexOf(draggedDevice);
 
-            if (sourceFilteredIndex >= 0 && _dragDropTargetIndex >= 0 && _dragDropTargetIndex != sourceFilteredIndex)
+            if (sourceFilteredIndex >= 0 && _drag.DropTargetIndex >= 0 && _drag.DropTargetIndex != sourceFilteredIndex)
             {
-                int targetFilteredIndex = _dragDropTargetIndex;
+                int targetFilteredIndex = _drag.DropTargetIndex;
                 if (targetFilteredIndex > sourceFilteredIndex)
                     targetFilteredIndex--;
 
@@ -367,7 +333,7 @@ public class DevicesTabController : ITabController
                 {
                     var targetDevice = filteredDevices[targetFilteredIndex];
                     targetActualIndex = _ctx.Devices.IndexOf(targetDevice);
-                    if (_dragDropTargetIndex > sourceFilteredIndex)
+                    if (_drag.DropTargetIndex > sourceFilteredIndex)
                         targetActualIndex++;
                 }
                 else
@@ -393,19 +359,19 @@ public class DevicesTabController : ITabController
                 _ctx.SaveDeviceOrder?.Invoke();
             }
 
-            _isDraggingDevice = false;
-            _dragDeviceIndex = -1;
-            _dragDropTargetIndex = -1;
+            _drag.IsDragging = false;
+            _drag.DeviceIndex = -1;
+            _drag.DropTargetIndex = -1;
             _ctx.OwnerForm.Cursor = Cursors.Default;
             _ctx.MarkDirty();
             return;
         }
 
         // Reset potential drag state even if we didn't actually drag
-        if (_dragDeviceIndex >= 0)
+        if (_drag.DeviceIndex >= 0)
         {
-            _dragDeviceIndex = -1;
-            _dragDropTargetIndex = -1;
+            _drag.DeviceIndex = -1;
+            _drag.DropTargetIndex = -1;
         }
     }
 
@@ -416,10 +382,10 @@ public class DevicesTabController : ITabController
     public void OnMouseLeave()
     {
         _hoveredDevice = -1;
-        _hoveredDeviceCategory = -1;
-        _silhouettePrevHovered = false;
-        _silhouetteNextHovered = false;
-        _removeVJoyButtonHovered = false;
+        _devCat.Hovered = -1;
+        _silhouette.PrevHovered = false;
+        _silhouette.NextHovered = false;
+        _silhouette.RemoveVJoyHovered = false;
         _ctx.HoveredControlId = null;
     }
 
@@ -458,11 +424,11 @@ public class DevicesTabController : ITabController
 
         float titleBarHeight = 32f;
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
-        string categoryCode = _deviceCategory == 0 ? "D1" : "D2";
-        string categoryName = _deviceCategory == 0 ? "DEVICES" : "DEVICES";
+        string categoryCode = _devCat.Active == 0 ? "D1" : "D2";
+        string categoryName = _devCat.Active == 0 ? "DEVICES" : "DEVICES";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
-        var filteredDevices = _deviceCategory == 0
+        var filteredDevices = _devCat.Active == 0
             ? _ctx.Devices.Where(d => !d.IsVirtual).ToList()
             : _ctx.Devices.Where(d => d.IsVirtual).ToList();
 
@@ -471,10 +437,10 @@ public class DevicesTabController : ITabController
 
         if (filteredDevices.Count == 0)
         {
-            string emptyMsg = _deviceCategory == 0
+            string emptyMsg = _devCat.Active == 0
                 ? "No physical devices detected"
                 : "No virtual devices detected";
-            string helpMsg = _deviceCategory == 0
+            string helpMsg = _devCat.Active == 0
                 ? "Connect a joystick or gamepad"
                 : "Install vJoy or start a virtual device";
             FUIRenderer.DrawText(canvas, emptyMsg,
@@ -484,7 +450,7 @@ public class DevicesTabController : ITabController
         }
         else
         {
-            _deviceItemBounds.Clear();
+            _drag.ItemBounds.Clear();
 
             for (int i = 0; i < filteredDevices.Count && itemY + itemHeight < contentBounds.Bottom - 40; i++)
             {
@@ -492,15 +458,15 @@ public class DevicesTabController : ITabController
 
                 var itemBounds = new SKRect(contentBounds.Left + pad - 10, itemY,
                     contentBounds.Left + pad - 10 + contentBounds.Width - pad, itemY + itemHeight);
-                _deviceItemBounds.Add(itemBounds);
+                _drag.ItemBounds.Add(itemBounds);
 
-                if (_isDraggingDevice && actualIndex == _dragDeviceIndex)
+                if (_drag.IsDragging && actualIndex == _drag.DeviceIndex)
                 {
                     itemY += itemHeight + itemGap;
                     continue;
                 }
 
-                if (_isDraggingDevice && i == _dragDropTargetIndex)
+                if (_drag.IsDragging && i == _drag.DropTargetIndex)
                 {
                     using var dropPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active, 2f);
                     canvas.DrawLine(itemBounds.Left, itemY - 2, itemBounds.Right, itemY - 2, dropPaint);
@@ -515,19 +481,19 @@ public class DevicesTabController : ITabController
                 itemY += itemHeight + itemGap;
             }
 
-            if (_isDraggingDevice && _dragDeviceIndex >= 0 && _dragDeviceIndex < _ctx.Devices.Count)
+            if (_drag.IsDragging && _drag.DeviceIndex >= 0 && _drag.DeviceIndex < _ctx.Devices.Count)
             {
-                var draggedDevice = _ctx.Devices[_dragDeviceIndex];
+                var draggedDevice = _ctx.Devices[_drag.DeviceIndex];
                 string status = draggedDevice.IsConnected ? "ONLINE" : "DISCONNECTED";
                 string assignment = draggedDevice.IsVirtual
                     ? GetPrimaryDeviceForVJoyDevice(draggedDevice)
                     : GetVJoyAssignmentForDevice(draggedDevice);
 
                 canvas.Save();
-                canvas.Translate(_dragCurrentPoint.X - _dragStartPoint.X, _dragCurrentPoint.Y - _dragStartPoint.Y);
+                canvas.Translate(_drag.CurrentPoint.X - _drag.StartPoint.X, _drag.CurrentPoint.Y - _drag.StartPoint.Y);
                 using var ghostPaint = new SKPaint { Color = SKColors.White.WithAlpha(180) };
                 FUIWidgets.DrawDeviceListItem(canvas, contentBounds.Left + pad - 10,
-                    _deviceItemBounds.Count > 0 ? _deviceItemBounds[0].Top + (_dragDeviceIndex * (itemHeight + itemGap)) : contentBounds.Top + 50,
+                    _drag.ItemBounds.Count > 0 ? _drag.ItemBounds[0].Top + (_drag.DeviceIndex * (itemHeight + itemGap)) : contentBounds.Top + 50,
                     contentBounds.Width - pad, draggedDevice.Name, status, true, false, assignment);
                 canvas.Restore();
             }
@@ -551,12 +517,12 @@ public class DevicesTabController : ITabController
         float startY = y + height - totalTabsHeight - 10f;
 
         var d1Bounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
-        _deviceCategoryD1Bounds = d1Bounds;
-        FUIWidgets.DrawVerticalSideTab(canvas, d1Bounds, "DEVICES_01", _deviceCategory == 0, _hoveredDeviceCategory == 0);
+        _devCat.D1Bounds = d1Bounds;
+        FUIWidgets.DrawVerticalSideTab(canvas, d1Bounds, "DEVICES_01", _devCat.Active == 0, _devCat.Hovered == 0);
 
         var d2Bounds = new SKRect(x, startY, x + width, startY + tabHeight);
-        _deviceCategoryD2Bounds = d2Bounds;
-        FUIWidgets.DrawVerticalSideTab(canvas, d2Bounds, "DEVICES_02", _deviceCategory == 1, _hoveredDeviceCategory == 1);
+        _devCat.D2Bounds = d2Bounds;
+        FUIWidgets.DrawVerticalSideTab(canvas, d2Bounds, "DEVICES_02", _devCat.Active == 1, _devCat.Hovered == 1);
     }
 
     private void DrawDeviceDetailsPanel(SKCanvas canvas, SKRect bounds)
@@ -749,9 +715,9 @@ public class DevicesTabController : ITabController
         float buttonHeight = 32f;
         float buttonGap = 8f;
 
-        bool hasPhysicalDevice = _deviceCategory == 0 && _ctx.SelectedDevice >= 0 &&
+        bool hasPhysicalDevice = _devCat.Active == 0 && _ctx.SelectedDevice >= 0 &&
                                   _ctx.SelectedDevice < _ctx.Devices.Count && !_ctx.Devices[_ctx.SelectedDevice].IsVirtual;
-        bool hasVirtualDevice = _deviceCategory == 1 && _ctx.SelectedDevice >= 0 &&
+        bool hasVirtualDevice = _devCat.Active == 1 && _ctx.SelectedDevice >= 0 &&
                                  _ctx.SelectedDevice < _ctx.Devices.Count && _ctx.Devices[_ctx.SelectedDevice].IsVirtual;
 
         if (hasPhysicalDevice)
@@ -776,45 +742,45 @@ public class DevicesTabController : ITabController
 
             if (isDisconnected)
             {
-                _map1to1ButtonBounds = SKRect.Empty;
+                _actions.Map1to1Bounds = SKRect.Empty;
 
-                _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                var clearState = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState, isDanger: true);
+                _actions.ClearMappingsBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                var clearState = _actions.ClearMappingsHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _actions.ClearMappingsBounds, "CLEAR MAPPINGS", clearState, isDanger: true);
                 y += buttonHeight + buttonGap;
 
-                _removeDeviceButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                var removeState = _removeDeviceButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                FUIRenderer.DrawButton(canvas, _removeDeviceButtonBounds, "REMOVE DEVICE", removeState, isDanger: true);
+                _actions.RemoveDeviceBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                var removeState = _actions.RemoveDeviceHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _actions.RemoveDeviceBounds, "REMOVE DEVICE", removeState, isDanger: true);
             }
             else
             {
-                _removeDeviceButtonBounds = SKRect.Empty;
+                _actions.RemoveDeviceBounds = SKRect.Empty;
 
                 if (_ctx.VJoyService.IsInitialized)
                 {
-                    _map1to1ButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                    var mapState = _map1to1ButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                    FUIRenderer.DrawButton(canvas, _map1to1ButtonBounds, "MAP 1:1 TO VJOY", mapState);
+                    _actions.Map1to1Bounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                    var mapState = _actions.Map1to1Hovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                    FUIRenderer.DrawButton(canvas, _actions.Map1to1Bounds, "MAP 1:1 TO VJOY", mapState);
                     y += buttonHeight + buttonGap;
 
-                    _clearMappingsButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
-                    var clearState2 = _clearMappingsButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-                    FUIRenderer.DrawButton(canvas, _clearMappingsButtonBounds, "CLEAR MAPPINGS", clearState2, isDanger: true);
+                    _actions.ClearMappingsBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
+                    var clearState2 = _actions.ClearMappingsHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                    FUIRenderer.DrawButton(canvas, _actions.ClearMappingsBounds, "CLEAR MAPPINGS", clearState2, isDanger: true);
                 }
                 else
                 {
-                    _map1to1ButtonBounds = SKRect.Empty;
-                    _clearMappingsButtonBounds = SKRect.Empty;
+                    _actions.Map1to1Bounds = SKRect.Empty;
+                    _actions.ClearMappingsBounds = SKRect.Empty;
                 }
             }
         }
         else if (hasVirtualDevice)
         {
-            _map1to1ButtonBounds = SKRect.Empty;
-            _clearMappingsButtonBounds = SKRect.Empty;
-            _removeDeviceButtonBounds = SKRect.Empty;
-            _removeVJoyButtonBounds = SKRect.Empty;
+            _actions.Map1to1Bounds = SKRect.Empty;
+            _actions.ClearMappingsBounds = SKRect.Empty;
+            _actions.RemoveDeviceBounds = SKRect.Empty;
+            _silhouette.RemoveVJoyBounds = SKRect.Empty;
 
             uint vjoyId = GetSelectedVJoyId();
             var vjoyInfo = vjoyId > 0 ? _ctx.VJoyDevices.FirstOrDefault(v => v.Id == vjoyId) : null;
@@ -874,30 +840,30 @@ public class DevicesTabController : ITabController
 
             var (silhouetteLabel, hasPrev, hasNext) = GetSilhouettePickerState();
 
-            _silhouettePrevButtonBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
-            FUIWidgets.DrawArrowButton(canvas, _silhouettePrevButtonBounds, "<", _silhouettePrevHovered, hasPrev);
+            _silhouette.PrevBounds = new SKRect(leftMargin, y, leftMargin + arrowButtonSize, y + arrowButtonSize);
+            FUIWidgets.DrawArrowButton(canvas, _silhouette.PrevBounds, "<", _silhouette.PrevHovered, hasPrev);
 
             var labelBounds = new SKRect(leftMargin + arrowButtonSize, y, rightMargin - arrowButtonSize, y + arrowButtonSize);
             FUIRenderer.DrawTextCentered(canvas, silhouetteLabel, labelBounds, FUIColors.TextBright, 13f);
 
-            _silhouetteNextButtonBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
-            FUIWidgets.DrawArrowButton(canvas, _silhouetteNextButtonBounds, ">", _silhouetteNextHovered, hasNext);
+            _silhouette.NextBounds = new SKRect(rightMargin - arrowButtonSize, y, rightMargin, y + arrowButtonSize);
+            FUIWidgets.DrawArrowButton(canvas, _silhouette.NextBounds, ">", _silhouette.NextHovered, hasNext);
             y += arrowButtonSize + buttonGap * 2;
 
             // Remove vJoy device button
             float removeWidth = contentBounds.Width - pad * 2;
-            _removeVJoyButtonBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + removeWidth, y + buttonHeight);
-            var removeVJoyState = _removeVJoyButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            FUIRenderer.DrawButton(canvas, _removeVJoyButtonBounds, "REMOVE VJOY DEVICE", removeVJoyState, isDanger: true);
+            _silhouette.RemoveVJoyBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + removeWidth, y + buttonHeight);
+            var removeVJoyState = _silhouette.RemoveVJoyHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+            FUIRenderer.DrawButton(canvas, _silhouette.RemoveVJoyBounds, "REMOVE VJOY DEVICE", removeVJoyState, isDanger: true);
         }
         else
         {
-            _map1to1ButtonBounds = SKRect.Empty;
-            _clearMappingsButtonBounds = SKRect.Empty;
-            _removeDeviceButtonBounds = SKRect.Empty;
-            _removeVJoyButtonBounds = SKRect.Empty;
-            _silhouettePrevButtonBounds = SKRect.Empty;
-            _silhouetteNextButtonBounds = SKRect.Empty;
+            _actions.Map1to1Bounds = SKRect.Empty;
+            _actions.ClearMappingsBounds = SKRect.Empty;
+            _actions.RemoveDeviceBounds = SKRect.Empty;
+            _silhouette.RemoveVJoyBounds = SKRect.Empty;
+            _silhouette.PrevBounds = SKRect.Empty;
+            _silhouette.NextBounds = SKRect.Empty;
 
             FUIRenderer.DrawText(canvas, "Select a device",
                 new SKPoint(contentBounds.Left + pad, y + 20), FUIColors.TextDim, 13f);
@@ -951,19 +917,19 @@ public class DevicesTabController : ITabController
 
         if (_ctx.IsForwarding)
         {
-            _stopForwardingButtonBounds = new SKRect(contentBounds.Left + pad, buttonY,
+            _forwarding.StopBounds = new SKRect(contentBounds.Left + pad, buttonY,
                 contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
-            _startForwardingButtonBounds = SKRect.Empty;
-            FUIRenderer.DrawButton(canvas, _stopForwardingButtonBounds, "STOP FORWARDING",
+            _forwarding.StartBounds = SKRect.Empty;
+            FUIRenderer.DrawButton(canvas, _forwarding.StopBounds, "STOP FORWARDING",
                 FUIRenderer.ButtonState.Active, isDanger: true);
         }
         else
         {
-            _startForwardingButtonBounds = new SKRect(contentBounds.Left + pad, buttonY,
+            _forwarding.StartBounds = new SKRect(contentBounds.Left + pad, buttonY,
                 contentBounds.Left + pad + buttonWidth, buttonY + buttonHeight);
-            _stopForwardingButtonBounds = SKRect.Empty;
-            FUIRenderer.DrawButton(canvas, _startForwardingButtonBounds, "START FORWARDING",
-                _startForwardingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            _forwarding.StopBounds = SKRect.Empty;
+            FUIRenderer.DrawButton(canvas, _forwarding.StartBounds, "START FORWARDING",
+                _forwarding.StartHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
     }
 
@@ -1206,7 +1172,7 @@ public class DevicesTabController : ITabController
     /// </summary>
     private uint GetSelectedVJoyId()
     {
-        if (_deviceCategory != 1 || _ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count)
+        if (_devCat.Active != 1 || _ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count)
             return 0;
         var device = _ctx.Devices[_ctx.SelectedDevice];
         if (!device.IsVirtual) return 0;
@@ -1346,4 +1312,61 @@ public class DevicesTabController : ITabController
     }
 
     #endregion
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // State classes — each groups logically-related fields for one sub-feature.
+    // All fields are public so caller code can access them via the instance.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private sealed class DeviceCategoryState
+    {
+        public int Active;
+        public int Hovered = -1;
+        public SKRect D1Bounds;
+        public SKRect D2Bounds;
+    }
+
+    private sealed class DeviceDragState
+    {
+        public bool IsDragging;
+        public int DeviceIndex = -1;
+        public int DropTargetIndex = -1;
+        public SKPoint StartPoint;
+        public SKPoint CurrentPoint;
+        public List<SKRect> ItemBounds = new();
+    }
+
+    private sealed class DeviceActionsState
+    {
+        public SKRect Map1to1Bounds;
+        public bool Map1to1Hovered;
+        public SKRect ClearMappingsBounds;
+        public bool ClearMappingsHovered;
+        public SKRect RemoveDeviceBounds;
+        public bool RemoveDeviceHovered;
+    }
+
+    private sealed class ForwardingButtonsState
+    {
+        public SKRect StartBounds;
+        public SKRect StopBounds;
+        public bool StartHovered;
+        public bool StopHovered;
+    }
+
+    private sealed class SilhouettePickerState
+    {
+        public SKRect PrevBounds;
+        public SKRect NextBounds;
+        public bool PrevHovered;
+        public bool NextHovered;
+        public SKRect RemoveVJoyBounds;
+        public bool RemoveVJoyHovered;
+    }
+
+    private sealed class SVGClickState
+    {
+        public DateTime LastClickTime = DateTime.MinValue;
+        public string? LastControlId;
+    }
 }

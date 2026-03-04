@@ -1899,6 +1899,7 @@ public partial class MainForm : Form
     private const int DWMWCP_ROUND = 2;
 
     private const int TrayIconSize = 16;
+    private static readonly Padding TrayItemPadding = new(0, 5, 10, 5); // 5px top/bottom, 10px right
 
     private void InitializeTrayMenu()
     {
@@ -1910,6 +1911,7 @@ public partial class MainForm : Form
             Renderer         = new DarkContextMenuRenderer(),
             Font             = new Font("Segoe UI", 9.5f),
             ImageScalingSize = new Size(TrayIconSize, TrayIconSize),
+            Padding          = new Padding(0, 4, 0, 4),  // top/bottom breathing room
         };
 
         // Windows 11: rounded corners, no DWM border highlight
@@ -1927,7 +1929,8 @@ public partial class MainForm : Form
         // ── Open Asteriq ─────────────────────────────────────────
         var openItem = new ToolStripMenuItem("Open Asteriq")
         {
-            Image = TrayMenuIcons.Open(TrayIconSize, textColor),
+            Image   = TrayMenuIcons.Open(TrayIconSize, textColor),
+            Padding = TrayItemPadding,
         };
         openItem.Click += (s, e) => ShowAndActivateWindow();
         menu.Items.Add(openItem);
@@ -1937,8 +1940,9 @@ public partial class MainForm : Form
         // ── Start / Stop Forwarding ───────────────────────────────
         var forwardingItem = new ToolStripMenuItem("Start Forwarding")
         {
-            Image = TrayMenuIcons.Play(TrayIconSize, dimColor),
-            Name  = "forwarding",
+            Image   = TrayMenuIcons.Play(TrayIconSize, dimColor),
+            Name    = "forwarding",
+            Padding = TrayItemPadding,
         };
         forwardingItem.Click += (s, e) =>
         {
@@ -1956,8 +1960,9 @@ public partial class MainForm : Form
         {
             var connectItem = new ToolStripMenuItem("Connect to...")
             {
-                Image = TrayMenuIcons.Network(TrayIconSize, dimColor),
-                Name  = "connect",
+                Image   = TrayMenuIcons.Network(TrayIconSize, dimColor),
+                Name    = "connect",
+                Padding = TrayItemPadding,
             };
             menu.Items.Add(connectItem);
 
@@ -1970,7 +1975,8 @@ public partial class MainForm : Form
         // ── Exit ─────────────────────────────────────────────────
         var exitItem = new ToolStripMenuItem("Exit Asteriq")
         {
-            Image = TrayMenuIcons.Exit(TrayIconSize, dimColor),
+            Image   = TrayMenuIcons.Exit(TrayIconSize, dimColor),
+            Padding = TrayItemPadding,
         };
         exitItem.Click += (s, e) =>
         {

@@ -661,14 +661,14 @@ public class SettingsTabController : ITabController
                     new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
                 y += rowHeight;
 
-                // Send Profile button — only when connected
+                // Send Profile button — only when connected (right-aligned like REGENERATE)
                 float spW = 130f; float spH = 26f;
                 _netSendProfileBounds = isConnected
-                    ? new SKRect(leftMargin, y, leftMargin + spW, y + spH)
+                    ? new SKRect(rightMargin - spW, y, rightMargin, y + spH)
                     : SKRect.Empty;
                 bool spHov = isConnected && _netSendProfileBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 FUIRenderer.DrawButton(canvas,
-                    new SKRect(leftMargin, y, leftMargin + spW, y + spH),
+                    new SKRect(rightMargin - spW, y, rightMargin, y + spH),
                     "SEND PROFILE",
                     !isConnected ? FUIRenderer.ButtonState.Disabled
                     : spHov ? FUIRenderer.ButtonState.Hover

@@ -408,7 +408,7 @@ public partial class SCBindingsTabController
 
     private void CreateNewSCExportProfile()
     {
-        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "New Control Profile", "Profile Name:",
+        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "New Profile", "Profile Name:",
             "New Profile", "Create");
         if (newName is not null)
         {
@@ -584,6 +584,24 @@ public partial class SCBindingsTabController
         SetStatus($"Imported {importResult.Bindings.Count} bindings ({jsCount} JS, {kbCount} KB, {moCount} Mouse)", SCStatusKind.Success);
 
         System.Diagnostics.Debug.WriteLine($"[SCBindings] Imported {importResult.Bindings.Count} bindings from {mappingFile.FilePath}");
+    }
+
+    private void BrowseAndImportSCConfig()
+    {
+        using var dlg = new OpenFileDialog
+        {
+            Title       = "Import SC Control Profile",
+            Filter      = "SC Profile XML (*.xml)|*.xml|All Files (*.*)|*.*",
+            Multiselect = false,
+        };
+        if (dlg.ShowDialog(_ctx.OwnerForm) != DialogResult.OK) return;
+
+        var mappingFile = new SCMappingFile
+        {
+            FilePath = dlg.FileName,
+            FileName = Path.GetFileName(dlg.FileName),
+        };
+        ImportSCProfile(mappingFile);
     }
 
     private void EditSCProfileName()

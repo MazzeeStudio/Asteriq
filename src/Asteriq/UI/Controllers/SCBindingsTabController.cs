@@ -708,6 +708,8 @@ public partial class SCBindingsTabController : ITabController
         public bool NewProfileHovered;
         public SKRect SaveProfileBounds;
         public bool SaveProfileHovered;
+        public SKRect ImportProfileBounds;
+        public bool ImportProfileHovered;
         public SKRect ProfileEditBounds;
         public bool ProfileEditHovered;
         public SKRect DropdownDeleteBounds;

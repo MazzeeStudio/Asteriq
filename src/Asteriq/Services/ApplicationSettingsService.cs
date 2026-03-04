@@ -187,6 +187,26 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool ClientOnlyMode
+    {
+        get => _cachedSettings.ClientOnlyMode;
+        set
+        {
+            _cachedSettings.ClientOnlyMode = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public string SettingsRightPanel
+    {
+        get => _cachedSettings.SettingsRightPanel;
+        set
+        {
+            _cachedSettings.SettingsRightPanel = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public DateTime? LastUpdateCheck
     {
         get => _cachedSettings.LastUpdateCheck;
@@ -337,6 +357,8 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public Dictionary<string, string> LastSCExportProfileByEnvironment { get; set; } = new();
         public string? PreferredSCEnvironment { get; set; }
         public bool SkipDriverSetup { get; set; }
+        public bool ClientOnlyMode { get; set; } = false;
+        public string SettingsRightPanel { get; set; } = "network";
         public DateTime? LastUpdateCheck { get; set; }
         /// <summary>Per-vJoy-slot silhouette override. Key = vJoy ID, Value = device map filename key.</summary>
         public Dictionary<uint, string> VJoySilhouetteOverrides { get; set; } = new();

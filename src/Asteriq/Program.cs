@@ -278,6 +278,12 @@ static class Program
             return true; // All required drivers are installed
         }
 
+        // Client-only mode: user has no local HOTAS, skip driver check entirely
+        if (appSettings.ClientOnlyMode && !forceShow)
+        {
+            return true;
+        }
+
         // If user previously chose "Don't show again" and this isn't a forced show, skip the modal
         if (appSettings.SkipDriverSetup && !forceShow)
         {

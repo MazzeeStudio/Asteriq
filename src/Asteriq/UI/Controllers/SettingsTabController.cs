@@ -30,6 +30,7 @@ public class SettingsTabController : ITabController
     private SKRect _bgVignetteSliderBounds;
     private SKRect _autoLoadToggleBounds;
     private SKRect _closeToTrayToggleBounds;
+    private SKRect _clientOnlyToggleBounds;
     private SKRect _checkUpdatesToggleBounds;
     private SKRect[] _trayIconTypeButtonBounds = new SKRect[2];
     private string? _draggingBgSlider;
@@ -66,9 +67,15 @@ public class SettingsTabController : ITabController
     // Toggle knob animation positions (0 = off, 1 = on); initialized from current settings
     private float _autoLoadT;
     private float _closeToTrayT;
+    private float _clientOnlyT;
     private float _networkEnabledT;
     private float _checkUpdatesT;
     private const float ToggleLerpSpeed = 0.14f;  // per 60Hz tick ≈ ~120 ms transition
+
+    // Settings right panel accordion state
+    private bool _settingsRightPanelIsVisual;
+    private SKRect _visualPanelHeaderBounds;
+    private SKRect _networkPanelHeaderBounds;
 
     public SettingsTabController(TabContext ctx)
     {
@@ -76,8 +83,10 @@ public class SettingsTabController : ITabController
         // Snap to current settings on first construction — no animation on startup
         _autoLoadT      = ctx.AppSettings.AutoLoadLastProfile ? 1f : 0f;
         _closeToTrayT   = ctx.AppSettings.CloseToTray ? 1f : 0f;
+        _clientOnlyT    = ctx.AppSettings.ClientOnlyMode ? 1f : 0f;
         _networkEnabledT = ctx.AppSettings.NetworkEnabled ? 1f : 0f;
         _checkUpdatesT  = ctx.AppSettings.AutoCheckUpdates ? 1f : 0f;
+        _settingsRightPanelIsVisual = ctx.AppSettings.SettingsRightPanel == "visual" || !ctx.AppSettings.NetworkEnabled;
     }
 
     public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
@@ -104,7 +113,7 @@ public class SettingsTabController : ITabController
 
         DrawProfileManagementPanel(canvas, leftBounds, frameInset);
         DrawSystemSettingsSubPanel(canvas, centerBounds, frameInset);
-        DrawVisualSettingsSubPanel(canvas, rightBounds, frameInset);
+        DrawRightPanel(canvas, rightBounds, frameInset);
         DrawSupportPanel(canvas, supportBounds, frameInset);
     }
 
@@ -155,7 +164,7 @@ public class SettingsTabController : ITabController
         }
 
         // Toggles
-        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) || _networkEnabledToggleBounds.Contains(pt))
+        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) || _clientOnlyToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) || _networkEnabledToggleBounds.Contains(pt))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -212,6 +221,13 @@ public class SettingsTabController : ITabController
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
+
+        // Right panel accordion headers
+        if ((!_visualPanelHeaderBounds.IsEmpty && _visualPanelHeaderBounds.Contains(pt))
+            || (!_networkPanelHeaderBounds.IsEmpty && _networkPanelHeaderBounds.Contains(pt)))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+        }
     }
 
     public void OnMouseUp(MouseEventArgs e)
@@ -231,6 +247,7 @@ public class SettingsTabController : ITabController
     {
         _autoLoadT      = LerpToggle(_autoLoadT,      _ctx.AppSettings.AutoLoadLastProfile);
         _closeToTrayT   = LerpToggle(_closeToTrayT,   _ctx.AppSettings.CloseToTray);
+        _clientOnlyT    = LerpToggle(_clientOnlyT,    _ctx.AppSettings.ClientOnlyMode);
         _networkEnabledT = LerpToggle(_networkEnabledT, _ctx.AppSettings.NetworkEnabled);
         _checkUpdatesT  = LerpToggle(_checkUpdatesT,  _ctx.AppSettings.AutoCheckUpdates);
 
@@ -282,12 +299,12 @@ public class SettingsTabController : ITabController
         canvas.Save();
         canvas.ClipRect(new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom - frameInset));
 
-        y = FUIRenderer.DrawPanelHeader(canvas, "PROFILE MANAGEMENT", leftMargin, y);
+        y = FUIRenderer.DrawPanelHeader(canvas, "CONFIGURATION MANAGEMENT", leftMargin, y);
 
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is not null)
         {
-            y = FUIRenderer.DrawSectionHeader(canvas, "ACTIVE PROFILE", leftMargin, y);
+            y = FUIRenderer.DrawSectionHeader(canvas, "ACTIVE CONFIGURATION", leftMargin, y);
 
             float nameBoxHeight = 32f;
             _profileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
@@ -349,7 +366,7 @@ public class SettingsTabController : ITabController
         }
         else
         {
-            FUIRenderer.DrawText(canvas, "No profile active", new SKPoint(leftMargin, y), FUIColors.TextDim, 15f);
+            FUIRenderer.DrawText(canvas, "No configuration active", new SKPoint(leftMargin, y), FUIColors.TextDim, 15f);
             y += 40f;
         }
 
@@ -363,7 +380,7 @@ public class SettingsTabController : ITabController
         _duplicateProfileButtonBounds = new SKRect(rightMargin - buttonWidth, y, rightMargin, y + buttonHeight);
         bool newHovered = _newProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         bool dupHovered = _duplicateProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawButton(canvas, _newProfileButtonBounds, "New Profile",
+        FUIRenderer.DrawButton(canvas, _newProfileButtonBounds, "New Configuration",
             newHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         FUIRenderer.DrawButton(canvas, _duplicateProfileButtonBounds,
             profile is not null ? "Duplicate" : "---",
@@ -385,7 +402,7 @@ public class SettingsTabController : ITabController
         {
             _deleteProfileButtonBounds = new SKRect(leftMargin, y, rightMargin, y + buttonHeight);
             bool deleteHovered = _deleteProfileButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            FUIRenderer.DrawButton(canvas, _deleteProfileButtonBounds, "Delete Profile",
+            FUIRenderer.DrawButton(canvas, _deleteProfileButtonBounds, "Delete Configuration",
                 deleteHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal, isDanger: true);
             y += buttonHeight + 20f;
 
@@ -430,7 +447,7 @@ public class SettingsTabController : ITabController
         float toggleHeight = 24f;
         float autoLoadLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float autoLoadLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
-        FUIRenderer.DrawTextTruncated(canvas, "Auto-load profile", new SKPoint(leftMargin, autoLoadLabelY),
+        FUIRenderer.DrawTextTruncated(canvas, "Auto-load configuration", new SKPoint(leftMargin, autoLoadLabelY),
             autoLoadLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float toggleY = y + (rowHeight - toggleHeight) / 2;
         _autoLoadToggleBounds = new SKRect(rightMargin - toggleWidth, toggleY, rightMargin, toggleY + toggleHeight);
@@ -445,6 +462,16 @@ public class SettingsTabController : ITabController
         float closeToTrayToggleY = y + (rowHeight - toggleHeight) / 2;
         _closeToTrayToggleBounds = new SKRect(rightMargin - toggleWidth, closeToTrayToggleY, rightMargin, closeToTrayToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _closeToTrayT, _ctx.MousePosition);
+        y += rowHeight + sectionSpacing;
+
+        // Client Only Mode toggle
+        float clientOnlyLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float clientOnlyLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Client Only Mode", new SKPoint(leftMargin, clientOnlyLabelY),
+            clientOnlyLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float clientOnlyToggleY = y + (rowHeight - toggleHeight) / 2;
+        _clientOnlyToggleBounds = new SKRect(rightMargin - toggleWidth, clientOnlyToggleY, rightMargin, clientOnlyToggleY + toggleHeight);
+        FUIWidgets.DrawToggleSwitch(canvas, _clientOnlyToggleBounds, _clientOnlyT, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Tray icon type selection
@@ -537,13 +564,10 @@ public class SettingsTabController : ITabController
         }
         y += sectionSpacing;
 
-        if (vjoyEnabled)
-        {
-        // NETWORK section
+        // NETWORK enable toggle (always shown — not gated on vJoy)
         FUIRenderer.DrawText(canvas, "NETWORK", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing;
 
-        // Enable network forwarding toggle
         float netLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float netLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
         FUIRenderer.DrawTextTruncated(canvas, "Enable network forwarding", new SKPoint(leftMargin, netLabelY),
@@ -551,173 +575,7 @@ public class SettingsTabController : ITabController
         float netToggleY = y + (rowHeight - toggleHeight) / 2;
         _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT, _ctx.MousePosition);
-        y += rowHeight + 4f;
-
-        // Machine name + port on one compact row
-        string machineName = string.IsNullOrEmpty(_ctx.AppSettings.NetworkMachineName)
-            ? Environment.MachineName
-            : _ctx.AppSettings.NetworkMachineName;
-        FUIRenderer.DrawTextTruncated(canvas, $"Machine: {machineName}  ·  Port: {_ctx.AppSettings.NetworkListenPort}",
-            new SKPoint(leftMargin, y + 10f), contentWidth, FUIColors.TextDim, 13f);
-        y += 20f;
-
-        // Role + advanced network UI — only when networking is enabled
-        if (_ctx.AppSettings.NetworkEnabled)
-        {
-            y += 10f;
-
-            // Role selector  [TX]  [RX] — right-aligned, NONE implicit when neither active
-            float roleBtnW = 60f;
-            float roleBtnH = 22f;
-            float roleBtnGap = 6f;
-            var roleLabels = new[] { "TX", "RX" };
-            var currentRole = _ctx.AppSettings.NetworkRole;
-            float roleLabelW = FUIRenderer.MeasureText("Role", 13f);
-            FUIRenderer.DrawTextTruncated(canvas, "Role", new SKPoint(leftMargin, y + roleBtnH / 2f + 4f),
-                roleLabelW + 4f, FUIColors.TextDim, 13f);
-            float rolePairW = roleBtnW * 2 + roleBtnGap;
-            float rolePairX = rightMargin - rolePairW;
-            for (int ri = 0; ri < 2; ri++)
-            {
-                float rx = rolePairX + ri * (roleBtnW + roleBtnGap);
-                _netRoleButtonBounds[ri] = new SKRect(rx, y, rx + roleBtnW, y + roleBtnH);
-                bool isActive = (ri == 0 && currentRole == NetworkRole.Master)
-                             || (ri == 1 && currentRole == NetworkRole.Client);
-                bool hov = _netRoleButtonBounds[ri].Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIWidgets.DrawToggleButton(canvas, _netRoleButtonBounds[ri], roleLabels[ri], isActive, hov, 13f);
-            }
-            y += roleBtnH + 10f;
-
-            // ── Master-specific UI ─────────────────────────────────────────
-            if (currentRole == NetworkRole.Master)
-            {
-                // Code display + REGENERATE right-aligned
-                string code = _ctx.AppSettings.NetworkMasterCode;
-                FUIRenderer.DrawTextTruncated(canvas, $"Your code:  {code}",
-                    new SKPoint(leftMargin, y + 12f), contentWidth - 110f, FUIColors.TextBright, 13f);
-
-                float regenW = 100f; float regenH = 24f;
-                _netRegenerateBounds = new SKRect(rightMargin - regenW, y, rightMargin, y + regenH);
-                bool regenHov = _netRegenerateBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIRenderer.DrawButton(canvas, _netRegenerateBounds, "REGENERATE",
-                    regenHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-                y += regenH + 6f;
-
-                // Peer list — each row has its own CONNECT / DISCONNECT button
-                var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
-                var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
-                bool isConnecting = _ctx.IsNetworkConnecting;
-                string? connectedIp = _ctx.ConnectedPeerIp;
-                _peerActionBounds.Clear();
-
-                if (peers.Count > 0)
-                {
-                    for (int pi = 0; pi < peers.Count; pi++)
-                    {
-                        var p = peers[pi];
-                        bool thisConnected = netMode == NetworkInputMode.Remote && connectedIp == p.IpAddress;
-
-                        string peerLabel = $"  {p.MachineName}  {p.IpAddress}";
-                        var pColor = thisConnected ? FUIColors.Active
-                                   : p.IsStale    ? FUIColors.TextDim : FUIColors.TextPrimary;
-
-                        float tglY = y + (rowHeight - toggleHeight) / 2f;
-                        var toggleRect = new SKRect(rightMargin - toggleWidth, tglY, rightMargin, tglY + toggleHeight);
-                        _peerActionBounds.Add((toggleRect, p.IpAddress));
-
-                        // Hover tint on the whole row
-                        bool rowHov = toggleRect.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y)
-                            || new SKRect(leftMargin, y, rightMargin - toggleWidth - 6f, y + rowHeight)
-                                .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                        if (rowHov)
-                        {
-                            using var hpaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(12));
-                            canvas.DrawRect(new SKRect(leftMargin, y, rightMargin, y + rowHeight), hpaint);
-                        }
-                        FUIRenderer.DrawTextTruncated(canvas, peerLabel, new SKPoint(leftMargin, y + 12f),
-                            contentWidth - toggleWidth - 8f, pColor, 13f);
-
-                        float knobT = _peerToggleT.TryGetValue(p.IpAddress, out float t) ? t
-                                    : (thisConnected ? 1f : 0f);
-                        FUIWidgets.DrawToggleSwitch(canvas, toggleRect, knobT, _ctx.MousePosition);
-
-                        y += rowHeight;
-                    }
-                }
-                else
-                {
-                    FUIRenderer.DrawTextTruncated(canvas, "No clients discovered yet",
-                        new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
-                    y += rowHeight;
-                }
-
-                // Status row
-                bool isConnected = netMode == NetworkInputMode.Remote;
-                string statusText = isConnecting ? "Connecting..." : isConnected ? "Connected — sending" : "Not connected";
-                var statusColor = isConnected ? FUIColors.Active : isConnecting ? FUIColors.Warning : FUIColors.TextDim;
-                FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
-                    new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
-                y += rowHeight;
-
-            }
-            // ── Client-specific UI ─────────────────────────────────────────
-            else if (currentRole == NetworkRole.Client)
-            {
-                var trusted = _ctx.AppSettings.TrustedMaster;
-                if (trusted is not null)
-                {
-                    FUIRenderer.DrawTextTruncated(canvas, $"Trusted master:  {trusted.MachineName}",
-                        new SKPoint(leftMargin, y + 12f), contentWidth - 110f, FUIColors.TextPrimary, 13f);
-                    float forgetW = 90f; float forgetH = 24f;
-                    _netForgetBounds = new SKRect(rightMargin - forgetW, y, rightMargin, y + forgetH);
-                    bool forgetHov = _netForgetBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                    FUIRenderer.DrawButton(canvas, _netForgetBounds, "FORGET",
-                        forgetHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                        isDanger: true);
-                    y += forgetH + 6f;
-                }
-                else
-                {
-                    FUIRenderer.DrawTextTruncated(canvas, "No trusted master — waiting for connection",
-                        new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
-                    y += rowHeight;
-                }
-
-                // DISCONNECT — right-aligned
-                var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
-                bool isReceiving = netMode == NetworkInputMode.Receiving;
-                float discBtnW = 110f; float discBtnH = 26f;
-                _netDisconnectBounds = new SKRect(rightMargin - discBtnW, y, rightMargin, y + discBtnH);
-                bool discHov = isReceiving && _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
-                    !isReceiving ? FUIRenderer.ButtonState.Disabled :
-                    discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal,
-                    isDanger: true);
-                y += discBtnH + 6f;
-
-                // Status + packet counter
-                string statusText = isReceiving ? $"Connected to {trusted?.MachineName ?? "master"}" : "Waiting for master";
-                var statusColor = isReceiving ? FUIColors.Active : FUIColors.TextDim;
-                FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
-                    new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
-                y += rowHeight;
-
-            }
-            else
-            {
-                // Role=None: show peer discovery count as a hint
-                if (_ctx.NetworkDiscovery is not null)
-                {
-                    int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
-                    var peerColor = peerCount > 0 ? FUIColors.Active : FUIColors.TextDim;
-                    FUIRenderer.DrawTextTruncated(canvas, $"Peers visible: {peerCount}",
-                        new SKPoint(leftMargin, y + 12f), contentWidth, peerColor, 13f);
-                    y += rowHeight;
-                }
-            }
-        }
-        y += sectionSpacing;
-        } // end if (vjoyEnabled) — NETWORK section
+        y += rowHeight + sectionSpacing;
 
         // VERSION & UPDATES section
         FUIRenderer.DrawText(canvas, "VERSION & UPDATES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -1112,6 +970,244 @@ public class SettingsTabController : ITabController
         }
     }
 
+    private const float RightPanelCollapsedH = 40f;
+
+    private void DrawRightPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        bool networkEnabled = _ctx.AppSettings.NetworkEnabled;
+
+        if (!networkEnabled)
+        {
+            // No accordion — just show VISUAL panel full-height
+            _visualPanelHeaderBounds = SKRect.Empty;
+            _networkPanelHeaderBounds = SKRect.Empty;
+            DrawVisualSettingsSubPanel(canvas, bounds, frameInset);
+            return;
+        }
+
+        // Accordion: one panel expanded, other collapsed to a header strip
+        const float gap = 8f;
+        SKRect visualBounds, networkBounds;
+
+        if (_settingsRightPanelIsVisual)
+        {
+            // VISUAL expanded (top), NETWORK collapsed (bottom)
+            float netTop = bounds.Bottom - RightPanelCollapsedH;
+            visualBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, netTop - gap);
+            networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, bounds.Bottom);
+        }
+        else
+        {
+            // NETWORK expanded (bottom fills), VISUAL collapsed (top)
+            float visBottom = bounds.Top + RightPanelCollapsedH;
+            visualBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
+            networkBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, bounds.Bottom);
+        }
+
+        if (_settingsRightPanelIsVisual)
+        {
+            // VISUAL expanded
+            DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
+            // Draw `-` indicator on the visual panel header (on top of the chrome)
+            _visualPanelHeaderBounds = new SKRect(visualBounds.Left, visualBounds.Top, visualBounds.Right, visualBounds.Top + RightPanelCollapsedH);
+            bool visHdrHov = _visualPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            float visIndW = FUIRenderer.MeasureText("-", 13f);
+            float visIndX = visualBounds.Right - FUIRenderer.FrameInset - visIndW;
+            FUIRenderer.DrawText(canvas, "-", new SKPoint(visIndX, visualBounds.Top + FUIRenderer.FrameInset + 18f),
+                visHdrHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
+            DrawNetworkPanelCollapsed(canvas, networkBounds);
+        }
+        else
+        {
+            DrawVisualPanelCollapsed(canvas, visualBounds);
+            DrawNetworkSettingsPanel(canvas, networkBounds, frameInset);
+        }
+    }
+
+    private void DrawVisualPanelCollapsed(SKCanvas canvas, SKRect bounds)
+    {
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        bool hovered = bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        _visualPanelHeaderBounds = bounds;
+        FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "VISUAL");
+        float indW = FUIRenderer.MeasureText("+", 13f);
+        FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
+            hovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(180), 13f, true);
+    }
+
+    private void DrawNetworkPanelCollapsed(SKCanvas canvas, SKRect bounds)
+    {
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        bool hovered = bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        _networkPanelHeaderBounds = bounds;
+        FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "NETWORK");
+        float indW = FUIRenderer.MeasureText("+", 13f);
+        FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
+            hovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(180), 13f, true);
+    }
+
+    private void DrawNetworkSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    {
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
+        float contentWidth = m.ContentWidth;
+        const float rowH = 26f;      // info rows
+        const float btnH = 24f;      // action button height
+        const float toggleW = 48f;
+        const float sectionGap = 8f; // gap between logical groups
+
+        // Clip content to prevent overflow when panel is compressed
+        canvas.Save();
+        canvas.ClipRect(bounds.Inset(2f, 2f));
+
+        _networkPanelHeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH);
+        bool headerHovered = _networkPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "NETWORK");
+        float indW = FUIRenderer.MeasureText("-", 13f);
+        FUIRenderer.DrawText(canvas, "-", new SKPoint(rightMargin - indW, y - 18f),
+            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
+
+        // Machine name + port
+        string machineName = string.IsNullOrEmpty(_ctx.AppSettings.NetworkMachineName)
+            ? Environment.MachineName
+            : _ctx.AppSettings.NetworkMachineName;
+        FUIRenderer.DrawTextTruncated(canvas, $"Machine: {machineName}  ·  Port: {_ctx.AppSettings.NetworkListenPort}",
+            new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, FUIColors.TextDim, 13f);
+        y += rowH + sectionGap;
+
+        // Role selector  [TX]  [RX]
+        float roleBtnW = 60f;
+        float roleBtnGap = 6f;
+        var currentRole = _ctx.AppSettings.NetworkRole;
+        FUIRenderer.DrawTextTruncated(canvas, "Role", new SKPoint(leftMargin, y + btnH / 2f + 4f),
+            FUIRenderer.MeasureText("Role", 13f) + 4f, FUIColors.TextDim, 13f);
+        float rolePairX = rightMargin - (roleBtnW * 2 + roleBtnGap);
+        for (int ri = 0; ri < 2; ri++)
+        {
+            float rx = rolePairX + ri * (roleBtnW + roleBtnGap);
+            _netRoleButtonBounds[ri] = new SKRect(rx, y, rx + roleBtnW, y + btnH);
+            bool isActive = (ri == 0 && currentRole == NetworkRole.Master)
+                         || (ri == 1 && currentRole == NetworkRole.Client);
+            bool hov = _netRoleButtonBounds[ri].Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIWidgets.DrawToggleButton(canvas, _netRoleButtonBounds[ri], new[] { "TX", "RX" }[ri], isActive, hov, 13f);
+        }
+        y += btnH + sectionGap * 1.5f;
+
+        // ── Master-specific UI ─────────────────────────────────────────
+        if (currentRole == NetworkRole.Master)
+        {
+            string code = _ctx.AppSettings.NetworkMasterCode;
+            FUIRenderer.DrawTextTruncated(canvas, $"Your code:  {code}",
+                new SKPoint(leftMargin, y + btnH / 2f + 4f), contentWidth - 110f, FUIColors.TextBright, 13f);
+            _netRegenerateBounds = new SKRect(rightMargin - 100f, y, rightMargin, y + btnH);
+            bool regenHov = _netRegenerateBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIRenderer.DrawButton(canvas, _netRegenerateBounds, "REGENERATE",
+                regenHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            y += btnH + sectionGap;
+
+            var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+            var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
+            bool isConnecting = _ctx.IsNetworkConnecting;
+            string? connectedIp = _ctx.ConnectedPeerIp;
+            _peerActionBounds.Clear();
+
+            if (peers.Count > 0)
+            {
+                for (int pi = 0; pi < peers.Count; pi++)
+                {
+                    var p = peers[pi];
+                    bool thisConnected = netMode == NetworkInputMode.Remote && connectedIp == p.IpAddress;
+                    var pColor = thisConnected ? FUIColors.Active
+                               : p.IsStale    ? FUIColors.TextDim : FUIColors.TextPrimary;
+                    string peerLabel = $"  {p.MachineName}  {p.IpAddress}";
+
+                    float tglY = y + (rowH - btnH) / 2f;
+                    var toggleRect = new SKRect(rightMargin - toggleW, tglY, rightMargin, tglY + btnH);
+                    _peerActionBounds.Add((toggleRect, p.IpAddress));
+
+                    bool rowHov = toggleRect.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y)
+                        || new SKRect(leftMargin, y, rightMargin - toggleW - 6f, y + rowH)
+                            .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                    if (rowHov)
+                    {
+                        using var hpaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(12));
+                        canvas.DrawRect(new SKRect(leftMargin, y, rightMargin, y + rowH), hpaint);
+                    }
+                    FUIRenderer.DrawTextTruncated(canvas, peerLabel, new SKPoint(leftMargin, y + rowH / 2f + 4f),
+                        contentWidth - toggleW - 8f, pColor, 13f);
+                    float knobT = _peerToggleT.TryGetValue(p.IpAddress, out float t) ? t : (thisConnected ? 1f : 0f);
+                    FUIWidgets.DrawToggleSwitch(canvas, toggleRect, knobT, _ctx.MousePosition);
+                    y += rowH + 8f;
+                }
+            }
+            else
+            {
+                FUIRenderer.DrawTextTruncated(canvas, "No clients discovered yet",
+                    new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, FUIColors.TextDim, 13f);
+                y += rowH;
+            }
+
+            bool isConnected = netMode == NetworkInputMode.Remote;
+            string statusText = isConnecting ? "Connecting..." : isConnected ? "Connected — sending" : "Not connected";
+            var statusColor = isConnected ? FUIColors.Active : isConnecting ? FUIColors.Warning : FUIColors.TextDim;
+            y += sectionGap;
+            FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
+                new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, statusColor, 13f);
+        }
+        // ── Client-specific UI ─────────────────────────────────────────
+        else if (currentRole == NetworkRole.Client)
+        {
+            var trusted = _ctx.AppSettings.TrustedMaster;
+            var netMode2 = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
+            bool isReceiving = netMode2 == NetworkInputMode.Receiving;
+
+            if (trusted is not null)
+            {
+                FUIRenderer.DrawTextTruncated(canvas, $"Trusted:  {trusted.MachineName}",
+                    new SKPoint(leftMargin, y + btnH / 2f + 4f), contentWidth - 100f, FUIColors.TextPrimary, 13f);
+                _netForgetBounds = new SKRect(rightMargin - 90f, y, rightMargin, y + btnH);
+                bool forgetHov = _netForgetBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                FUIRenderer.DrawButton(canvas, _netForgetBounds, "FORGET",
+                    forgetHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal, isDanger: true);
+                y += btnH + sectionGap;
+            }
+            else
+            {
+                FUIRenderer.DrawTextTruncated(canvas, "No trusted master — waiting for connection",
+                    new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, FUIColors.TextDim, 13f);
+                y += rowH + sectionGap;
+            }
+
+            _netDisconnectBounds = new SKRect(rightMargin - 110f, y, rightMargin, y + btnH);
+            bool discHov = isReceiving && _netDisconnectBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIRenderer.DrawButton(canvas, _netDisconnectBounds, "DISCONNECT",
+                !isReceiving ? FUIRenderer.ButtonState.Disabled :
+                discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal, isDanger: true);
+            y += btnH + sectionGap;
+
+            string statusText2 = isReceiving ? $"Connected to {trusted?.MachineName ?? "master"}" : "Waiting for master";
+            var statusColor2 = isReceiving ? FUIColors.Active : FUIColors.TextDim;
+            FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText2}",
+                new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, statusColor2, 13f);
+        }
+        else
+        {
+            if (_ctx.NetworkDiscovery is not null)
+            {
+                int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
+                var peerColor = peerCount > 0 ? FUIColors.Active : FUIColors.TextDim;
+                FUIRenderer.DrawTextTruncated(canvas, $"Peers visible: {peerCount}",
+                    new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, peerColor, 13f);
+            }
+        }
+
+        canvas.Restore();
+    }
+
     #endregion
 
     #region Click Handling
@@ -1195,6 +1291,14 @@ public class SettingsTabController : ITabController
             return;
         }
 
+        // Client Only Mode toggle
+        if (_clientOnlyToggleBounds.Contains(pt))
+        {
+            _ctx.AppSettings.ClientOnlyMode = !_ctx.AppSettings.ClientOnlyMode;
+            _ctx.MarkDirty();
+            return;
+        }
+
         // Check for updates automatically toggle
         if (_checkUpdatesToggleBounds.Contains(pt))
         {
@@ -1208,9 +1312,32 @@ public class SettingsTabController : ITabController
         {
             _ctx.AppSettings.NetworkEnabled = !_ctx.AppSettings.NetworkEnabled;
             if (_ctx.AppSettings.NetworkEnabled)
+            {
                 _ctx.StartNetworking?.Invoke();
+                // Switch right panel to NETWORK so user can configure immediately
+                _settingsRightPanelIsVisual = false;
+                _ctx.AppSettings.SettingsRightPanel = "network";
+            }
             else
+            {
                 _ctx.ShutdownNetworking?.Invoke();
+            }
+            _ctx.InvalidateCanvas();
+            return;
+        }
+
+        // Right panel accordion header clicks
+        if (!_visualPanelHeaderBounds.IsEmpty && _visualPanelHeaderBounds.Contains(pt))
+        {
+            _settingsRightPanelIsVisual = true;
+            _ctx.AppSettings.SettingsRightPanel = "visual";
+            _ctx.InvalidateCanvas();
+            return;
+        }
+        if (!_networkPanelHeaderBounds.IsEmpty && _networkPanelHeaderBounds.Contains(pt))
+        {
+            _settingsRightPanelIsVisual = false;
+            _ctx.AppSettings.SettingsRightPanel = "network";
             _ctx.InvalidateCanvas();
             return;
         }
@@ -1379,7 +1506,7 @@ public class SettingsTabController : ITabController
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null) return;
 
-        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "Rename Profile", "Profile Name:", profile.Name);
+        var newName = FUIInputDialog.Show(_ctx.OwnerForm, "Rename Configuration", "Configuration Name:", profile.Name);
         if (newName is null || newName == profile.Name)
             return;
 

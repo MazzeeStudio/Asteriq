@@ -443,10 +443,31 @@ public class DevicesTabController : ITabController
             string helpMsg = _devCat.Active == 0
                 ? "Connect a joystick or gamepad"
                 : "Install vJoy or start a virtual device";
-            FUIRenderer.DrawText(canvas, emptyMsg,
-                new SKPoint(contentBounds.Left + pad, itemY + 20), FUIColors.TextDim, 15f);
-            FUIRenderer.DrawText(canvas, helpMsg,
-                new SKPoint(contentBounds.Left + pad, itemY + 38), FUIColors.TextDisabled, 13f);
+            bool showClientHint = _devCat.Active == 0 && !_ctx.AppSettings.ClientOnlyMode;
+
+            const float boxPad = 12f;
+            const float lineH = 20f;
+            float boxH = boxPad + lineH + lineH + (showClientHint ? lineH * 2 + lineH * 0.5f : 0) + boxPad;
+            var boxRect = new SKRect(contentBounds.Left + pad, itemY + 4f,
+                contentBounds.Right - pad, itemY + 4f + boxH);
+
+            using (var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(22)))
+                canvas.DrawRoundRect(boxRect, 4f, 4f, fillPaint);
+            using (var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Warning.WithAlpha(90)))
+                canvas.DrawRoundRect(boxRect, 4f, 4f, borderPaint);
+
+            float tx = boxRect.Left + boxPad;
+            float ty = boxRect.Top + boxPad + lineH - 3f;
+            FUIRenderer.DrawText(canvas, emptyMsg, new SKPoint(tx, ty), FUIColors.Warning, 14f);
+            ty += lineH;
+            FUIRenderer.DrawText(canvas, helpMsg, new SKPoint(tx, ty), FUIColors.TextPrimary, 12f);
+            if (showClientHint)
+            {
+                ty += lineH * 1.5f;
+                FUIRenderer.DrawText(canvas, "Using Asteriq as a network client only?", new SKPoint(tx, ty), FUIColors.TextPrimary, 12f);
+                ty += lineH;
+                FUIRenderer.DrawText(canvas, "Enable Client Mode in Settings.", new SKPoint(tx, ty), FUIColors.TextPrimary, 12f);
+            }
         }
         else
         {
@@ -909,7 +930,7 @@ public class DevicesTabController : ITabController
         itemY += statusItemHeight + itemGap;
 
         string profileName = _ctx.ProfileManager.ActiveProfile?.Name ?? "NONE";
-        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "PROFILE", profileName.ToUpper(), FUIColors.TextPrimary);
+        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "CONFIG", profileName.ToUpper(), FUIColors.TextPrimary);
 
         float buttonHeight = 36f;
         float buttonWidth = contentBounds.Width - pad * 2;
@@ -945,7 +966,7 @@ public class DevicesTabController : ITabController
         if (profile is null)
         {
             FUIMessageBox.ShowWarning(_ctx.OwnerForm,
-                "No active profile found.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
+                "No active configuration found.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
                 "Cannot Start Forwarding");
             return;
         }
@@ -953,7 +974,7 @@ public class DevicesTabController : ITabController
         if (profile.AxisMappings.Count == 0 && profile.ButtonMappings.Count == 0 && profile.HatMappings.Count == 0)
         {
             FUIMessageBox.ShowWarning(_ctx.OwnerForm,
-                $"Profile '{profile.Name}' has no mappings.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
+                $"Configuration '{profile.Name}' has no mappings.\n\nTo create mappings:\n1. Select a physical device\n2. Click 'MAP 1:1 TO VJOY'",
                 "Cannot Start Forwarding");
             return;
         }

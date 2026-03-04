@@ -458,11 +458,12 @@ public partial class MainForm
     }
 
     // Returns semantic tab indices (0=DEVICES,1=MAPPINGS,2=BINDINGS,3=SETTINGS) that are
-    // currently visible. MAPPINGS is hidden when vJoy is not available.
-    private int[] GetVisibleTabIndices() =>
-        _vjoyService.IsInitialized
-            ? new[] { 0, 1, 2, 3 }
-            : new[] { 0, 2, 3 };
+    // currently visible. Client-only mode hides Devices and Mappings.
+    private int[] GetVisibleTabIndices()
+    {
+        if (_appSettings.ClientOnlyMode) return new[] { 2, 3 };
+        return _vjoyService.IsInitialized ? new[] { 0, 1, 2, 3 } : new[] { 0, 2, 3 };
+    }
 
     private string? HitTestSvg(SKPoint screenPoint)
     {

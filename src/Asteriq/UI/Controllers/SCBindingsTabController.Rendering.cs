@@ -832,11 +832,12 @@ public partial class SCBindingsTabController
 
         y += dropdownHeight + 6f;
 
-        // Buttons row: + New, Save (aligned right) — widths sized to text + 16px (8px each side)
+        // Buttons row: [Import]  [+ New]  [Save] — all text-width sized, right-aligned
         const float textBtnPad = 16f;
         float textBtnHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum
         float saveBtnWidth = FUIRenderer.MeasureText("Save", 14f) + textBtnPad;
         float newBtnWidth = FUIRenderer.MeasureText("+ New", 14f) + textBtnPad;
+        float importBtnWidth = FUIRenderer.MeasureText("Import", 14f) + textBtnPad;
 
         // Save button (rightmost)
         _profileMgmt.SaveProfileBounds = new SKRect(rightMargin - saveBtnWidth, y, rightMargin, y + textBtnHeight);
@@ -850,6 +851,13 @@ public partial class SCBindingsTabController
         _profileMgmt.NewProfileHovered = _profileMgmt.NewProfileBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _profileMgmt.NewProfileBounds, "+ New",
             _profileMgmt.NewProfileHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+
+        // Import button (left of + New)
+        float importBtnX = newBtnX - buttonGap - importBtnWidth;
+        _profileMgmt.ImportProfileBounds = new SKRect(importBtnX, y, importBtnX + importBtnWidth, y + textBtnHeight);
+        _profileMgmt.ImportProfileHovered = _profileMgmt.ImportProfileBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _profileMgmt.ImportProfileBounds, "Import",
+            _profileMgmt.ImportProfileHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         y += textBtnHeight + 10f;
 

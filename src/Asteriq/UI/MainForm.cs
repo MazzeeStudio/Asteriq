@@ -231,6 +231,14 @@ public partial class MainForm : Form
         // Apply correct MinimumSize now that font settings are loaded
         ApplyFontScaleToWindowSize();
 
+        // Snap to a visible tab on startup (e.g. client-only mode hides Devices/Mappings)
+        SnapToValidTab();
+
+        // If we landed on the SC Bindings tab at startup, trigger OnActivated once the
+        // form handle exists (BeginInvoke inside StartSchemaLoad needs a valid HWND).
+        if (_activeTab == 2)
+            Shown += (_, _) => _scBindingsController.OnActivated();
+
         // Start network services if enabled in settings
         if (_appSettings.NetworkEnabled)
             InitializeNetworking();
@@ -366,6 +374,18 @@ public partial class MainForm : Form
         _svgScale = _tabContext.SvgScale;
         _svgOffset = _tabContext.SvgOffset;
         _svgMirrored = _tabContext.SvgMirrored;
+    }
+
+    /// <summary>
+    /// If the current active tab is not in the visible tab set, snap to a sensible default.
+    /// Client-only mode opens to KEYBINDINGS (2); otherwise falls back to SETTINGS (3).
+    /// Called on startup and after settings changes that affect tab visibility.
+    /// </summary>
+    private void SnapToValidTab()
+    {
+        var visible = GetVisibleTabIndices();
+        if (!visible.Contains(_activeTab))
+            _activeTab = _appSettings.ClientOnlyMode ? 2 : 3;
     }
 
     private void InitializeVJoy()

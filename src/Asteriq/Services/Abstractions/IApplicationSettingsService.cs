@@ -92,6 +92,18 @@ public interface IApplicationSettingsService
     bool SkipDriverSetup { get; set; }
 
     /// <summary>
+    /// Hide Devices and Mappings tabs; skip vJoy driver check.
+    /// For users who only receive input over the network and have no local HOTAS.
+    /// </summary>
+    bool ClientOnlyMode { get; set; }
+
+    /// <summary>
+    /// Which panel is expanded in the Settings right panel accordion ("visual" or "network").
+    /// Default "network" so network config is visible when networking is enabled.
+    /// </summary>
+    string SettingsRightPanel { get; set; }
+
+    /// <summary>
     /// Timestamp of the last successful update check
     /// </summary>
     DateTime? LastUpdateCheck { get; set; }

@@ -2581,9 +2581,9 @@ public partial class MappingsTabController
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null)
         {
-            FUIRenderer.DrawText(canvas, "No profile selected",
+            FUIRenderer.DrawText(canvas, "No configuration selected",
                 new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 15f);
-            FUIRenderer.DrawText(canvas, "Select or create a profile to add mappings",
+            FUIRenderer.DrawText(canvas, "Select or create a configuration to add mappings",
                 new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 14f);
             return;
         }

@@ -450,6 +450,12 @@ public partial class SCBindingsTabController
             return;
         }
 
+        if (_profileMgmt.ImportProfileBounds.Contains(point))
+        {
+            BrowseAndImportSCConfig();
+            return;
+        }
+
         // Search box click
         if (_searchFilter.SearchBoxBounds.Contains(point))
         {

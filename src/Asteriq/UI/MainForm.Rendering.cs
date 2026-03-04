@@ -90,6 +90,9 @@ public partial class MainForm
             ? bounds.Right - pad - rightPanelWidth - gap
             : bounds.Right - pad;
 
+        // Ensure active tab is valid (e.g. ClientOnly mode may have hidden it mid-session)
+        SnapToValidTab();
+
         // Content based on active tab
         if (_activeTab == 1) // MAPPINGS tab
         {
@@ -328,9 +331,18 @@ public partial class MainForm
     private void DrawProfileDropdown(SKCanvas canvas, float x, float y)
     {
         float itemHeight = 28f;  // 4px aligned
-        float width = 150f;
         float padding = 8f;
-        int itemCount = Math.Max(_profiles.Count + 3, 4); // +3 for "New Profile", "Import", "Export", minimum 4
+        const float textPad = 12f; // equal left/right text padding
+        string[] actionLabels = ["+ New Configuration", "↓ Import...", "↑ Export..."];
+        float widestAction = actionLabels.Max(s => FUIRenderer.MeasureText(s, 14f));
+        float widestProfile = _profiles.Count > 0
+            ? _profiles.Max(p => {
+                string n = p.Name.Length > 14 ? p.Name.Substring(0, 13) + "…" : p.Name;
+                return FUIRenderer.MeasureText(n, 14f);
+              })
+            : 0f;
+        float width = Math.Max(widestAction, widestProfile) + textPad * 2 + 8f; // +8 for accent bar
+        int itemCount = Math.Max(_profiles.Count + 3, 4); // +3 for "New Configuration", "Import", "Export", minimum 4
         float height = itemHeight * itemCount + padding * 2 + 2; // Extra for separator
 
         _profileDropdownBounds = new SKRect(x, y, x + width, y + height);
@@ -410,8 +422,8 @@ public partial class MainForm
 
         itemY += 4;
 
-        // "New Profile" option
-        DrawDropdownItem(canvas, x, itemY, width, itemHeight, "+ New Profile",
+        // "New Configuration" option
+        DrawDropdownItem(canvas, x, itemY, width, itemHeight, "+ New Configuration",
             _hoveredProfileIndex == _profiles.Count, false, true);
         itemY += itemHeight;
 

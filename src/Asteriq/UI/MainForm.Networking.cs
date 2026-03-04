@@ -223,8 +223,20 @@ public partial class MainForm : Form
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes
         await _networkInput.DisconnectAsync().ConfigureAwait(false);
         _networkMode = NetworkInputMode.Local;
+
+        // If we were in client (receiving) mode, reset that state now.
+        // ConnectionLost won't fire on a clean explicit disconnect so we reset here.
+        if (_isClientConnected)
+        {
+            _isClientConnected = false;
+            _connectedMasterName = "";
+            _tabContext.IsClientConnected = false;
+        }
+
         _tabContext.NetworkMode = _networkMode;
         _tabContext.ConnectedPeerIp = null;
+        _tabContext.RemoteControlProfiles = new();
+        _tabContext.RemoteControlProfilesMasterName = "";
         _logger.LogInformation("[Disconnect] Disconnected — mode=Local");
         BeginInvoke(MarkDirty);
     }

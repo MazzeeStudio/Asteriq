@@ -246,6 +246,9 @@ public partial class SCBindingsTabController
                     if (confirmed)
                     {
                         _scExportProfileService?.DeleteProfile(nameToDelete);
+                        // If the deleted profile was active, clear the active profile name
+                        if (_scExportProfile.ProfileName == nameToDelete)
+                            _scExportProfile.ProfileName = "";
                         RefreshSCExportProfiles();
                         _ctx.InvalidateCanvas();
                     }

@@ -69,6 +69,13 @@ public interface INetworkInputService : IDisposable
     void SendVJoyState(VJoyOutputSnapshot snapshot);
 
     /// <summary>
+    /// Send the given control profile to the connected client.
+    /// The client will save and activate it automatically.
+    /// No-op when not connected as master.
+    /// </summary>
+    void SendProfile(MappingProfile profile);
+
+    /// <summary>
     /// Accept the pending trust request (called after the user approves in the trust dialog).
     /// </summary>
     void AcceptPairing();
@@ -77,6 +84,12 @@ public interface INetworkInputService : IDisposable
     /// Reject the pending trust request (called after the user dismisses the trust dialog).
     /// </summary>
     void RejectPairing();
+
+    /// <summary>
+    /// Fired on the receive thread when a profile packet arrives from the master.
+    /// Caller must marshal to the UI thread before touching UI state.
+    /// </summary>
+    event EventHandler<MappingProfile>? ProfileReceived;
 
     /// <summary>
     /// Fired on the background receive thread when the TCP connection is lost unexpectedly.

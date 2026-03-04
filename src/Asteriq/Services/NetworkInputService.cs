@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Asteriq.Models;
 using Asteriq.Services.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -32,7 +34,15 @@ public sealed class NetworkInputService : INetworkInputService
         public const byte Hello       = 5; // master→client: {nameLen,name,port[2],codeLen,code}
         public const byte HelloAccept = 6; // client→master: empty
         public const byte HelloReject = 7; // client→master: empty
+        public const byte Profile     = 8; // master→client: UTF-8 JSON MappingProfile
     }
+
+    // Compact JSON options for profile transmission (no indentation to minimise payload size)
+    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters           = { new JsonStringEnumConverter() },
+    };
 
     // ── Services ─────────────────────────────────────────────────────────────
     private readonly IVJoyService _vjoy;
@@ -63,6 +73,7 @@ public sealed class NetworkInputService : INetworkInputService
     public event EventHandler? ConnectionLost;
     public event EventHandler<string>? ClientConnected;
     public event EventHandler<TrustRequestEventArgs>? TrustRequested;
+    public event EventHandler<MappingProfile>? ProfileReceived;
 
     private int _packetsReceived;
 
@@ -304,6 +315,23 @@ public sealed class NetworkInputService : INetworkInputService
         }
     }
 
+    public void SendProfile(MappingProfile profile)
+    {
+        if (_mode != NetworkInputMode.Remote || _stream is null) return;
+
+        var payload = JsonSerializer.SerializeToUtf8Bytes(profile, s_jsonOptions);
+        lock (_sendLock)
+        {
+            try   { WritePacketSync(_stream, MsgType.Profile, payload); }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "SendProfile failed — connection lost");
+                _mode = NetworkInputMode.Local;
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
     // ── Receive loop (client side) ────────────────────────────────────────────
 
     private async Task RunReceiveLoopAsync(NetworkStream stream, CancellationToken ct)
@@ -344,6 +372,12 @@ public sealed class NetworkInputService : INetworkInputService
 
                     case MsgType.Ping:
                         await WritePacketAsync(stream, MsgType.Pong, [], ct).ConfigureAwait(false);
+                        break;
+
+                    case MsgType.Profile:
+                        var received = JsonSerializer.Deserialize<MappingProfile>(payload, s_jsonOptions);
+                        if (received is not null)
+                            ProfileReceived?.Invoke(this, received);
                         break;
                 }
             }
@@ -548,7 +582,7 @@ public sealed class NetworkInputService : INetworkInputService
 
         byte type   = header[4];
         uint length = BitConverter.ToUInt32(header, 5);
-        if (length > 65536)
+        if (length > 524288) // 512 KB — enough for any profile JSON
             throw new InvalidDataException($"Payload too large: {length}");
 
         var payload = new byte[length];

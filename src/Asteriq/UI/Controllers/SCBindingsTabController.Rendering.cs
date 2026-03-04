@@ -856,13 +856,14 @@ public partial class SCBindingsTabController
         // Compute profile dropdown list bounds so the draw-last pass can render it on top of all panels
         if (_profileMgmt.DropdownOpen)
         {
-            int asteriqCount = _profileMgmt.ExportProfiles.Count(p => p.ProfileName != _scExportProfile.ProfileName);
+            int asteriqCount = _profileMgmt.ExportProfiles.Count;
             int scFileCount  = _scAvailableProfiles.Count;
             int remoteCount  = _ctx.RemoteControlProfiles.Count;
-            // Accurate height: 8px padding + rows (24px each) + per-section separator+header (26px: 4+6+16)
-            const float sepHeaderH = 26f;
+            // Accurate height: 8px padding + rows (24px each) + per-section header (16px for sec1, 26px for others: 4+6+16)
+            const float sec1HeaderH = 16f;
+            const float sepHeaderH  = 26f;
             float listHeight = 8f
-                + asteriqCount * 24f
+                + (asteriqCount > 0 ? sec1HeaderH + asteriqCount * 24f : 0f)
                 + (scFileCount > 0 ? sepHeaderH + scFileCount * 24f : 0f)
                 + (remoteCount > 0 ? sepHeaderH + remoteCount * 24f : 0f);
             listHeight = Math.Min(Math.Max(listHeight, 36f), 280f);
@@ -1223,25 +1224,40 @@ public partial class SCBindingsTabController
         _profileMgmt.HoveredProfileIndex = -1;
         _profileMgmt.DropdownDeleteProfileName = "";
 
-        // Section 1: Asteriq profiles — active profile is shown in the header, skip it here
+        // Section 1: Asteriq saved profiles (all of them, including the active one)
+        if (_profileMgmt.ExportProfiles.Count > 0)
+        {
+            FUIRenderer.DrawText(canvas, "SAVED PROFILES", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
+            y += 16f;
+        }
+
         for (int i = 0; i < _profileMgmt.ExportProfiles.Count && y + rowHeight <= bounds.Bottom; i++)
         {
             var profile = _profileMgmt.ExportProfiles[i];
-            if (profile.ProfileName == _scExportProfile.ProfileName) continue;
-
-            var rowBounds = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
+            bool isActive  = profile.ProfileName == _scExportProfile.ProfileName;
+            var rowBounds  = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
             bool isHovered = rowBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-            // FUI hover style with accent bar
+            // Active profile: always show accent bar (even when not hovered)
+            if (isActive)
+            {
+                using var activeAccentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
+                canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), activeAccentPaint);
+            }
+
+            // FUI hover style
             if (isHovered)
             {
                 _profileMgmt.HoveredProfileIndex = i;
                 using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                 canvas.DrawRect(rowBounds, hoverPaint);
-                using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
-                canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
+                if (!isActive)
+                {
+                    using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
+                    canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
+                }
 
-                // Delete (×) button — only shown on hover
+                // Delete (×) button — shown on hover for all profiles including active
                 _profileMgmt.DropdownDeleteBounds = new SKRect(rowBounds.Right - 22, rowBounds.Top + 4, rowBounds.Right - 4, rowBounds.Bottom - 4);
                 _profileMgmt.DropdownDeleteProfileName = profile.ProfileName;
                 bool delHovered = _profileMgmt.DropdownDeleteBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
@@ -1249,7 +1265,7 @@ public partial class SCBindingsTabController
                     delHovered ? FUIColors.TextBright : FUIColors.TextDim, 14f);
             }
 
-            var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
+            var textColor = isHovered ? FUIColors.TextBright : (isActive ? FUIColors.Active : FUIColors.TextPrimary);
             float maxTextWidth = rowBounds.Width - (isHovered ? 56f : 40f); // extra room for × on hover
             string displayName = FUIWidgets.TruncateTextToWidth(profile.ProfileName, maxTextWidth, 10f);
             FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);

@@ -124,6 +124,7 @@ public partial class MainForm : Form
                 {
                     _isForwarding = true;
                     _trayIcon.SetActive(true);
+                    BeginInvoke(UpdateTrayMenu);
                 }
             }
         }
@@ -144,6 +145,7 @@ public partial class MainForm : Form
             // encoder always sends correctly-sized packets from the very first input tick.
             PreInitializeAllNetworkSnapshots();
             StartNetworkHeartbeat();
+            BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", $"Connected to {peer.MachineName}"));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -187,6 +189,7 @@ public partial class MainForm : Form
                 {
                     _isForwarding = true;
                     _trayIcon.SetActive(true);
+                    BeginInvoke(UpdateTrayMenu);
                 }
             }
         }
@@ -272,6 +275,7 @@ public partial class MainForm : Form
         StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes on disconnect
         _networkMode = NetworkInputMode.Local;
+        BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", "Network connection lost", ToolTipIcon.Warning));
         BeginInvoke(() =>
         {
             // If we were in client mode, unlock tabs
@@ -318,6 +322,7 @@ public partial class MainForm : Form
 
     private void EnterClientMode(string masterName)
     {
+        _trayIcon.ShowBalloonTip("Asteriq", $"Receiving input from {masterName}");
         _isClientConnected   = true;
         _connectedMasterName = masterName;
         _networkMode         = NetworkInputMode.Receiving;

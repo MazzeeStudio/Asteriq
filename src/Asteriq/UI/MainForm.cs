@@ -1894,15 +1894,50 @@ public partial class MainForm : Form
 
     #region System Tray
 
+    // Windows 11 rounded-corner preference (DWM attr 33)
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    private const int DWMWCP_ROUND = 2;
+
+    private const int TrayIconSize = 16;
+
     private void InitializeTrayMenu()
     {
+        var textColor = SkiaColorToGdi(FUIColors.TextPrimary);
+        var dimColor  = SkiaColorToGdi(FUIColors.TextDim);
+
         var menu = new ContextMenuStrip
         {
-            Renderer = new DarkContextMenuRenderer()
+            Renderer         = new DarkContextMenuRenderer(),
+            Font             = new Font("Segoe UI", 9.5f),
+            ImageScalingSize = new Size(TrayIconSize, TrayIconSize),
         };
 
-        // Start/Stop Forwarding (will be updated dynamically)
-        var forwardingItem = new ToolStripMenuItem("Start Forwarding");
+        // Apply Windows 11 rounded corners when the menu handle is created
+        menu.Opened += (s, e) =>
+        {
+            if (s is ContextMenuStrip strip && strip.IsHandleCreated)
+            {
+                int pref = DWMWCP_ROUND;
+                DwmSetWindowAttribute(strip.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int));
+            }
+        };
+
+        // ── Open Asteriq ─────────────────────────────────────────
+        var openItem = new ToolStripMenuItem("Open Asteriq")
+        {
+            Image = TrayMenuIcons.Open(TrayIconSize, textColor),
+        };
+        openItem.Click += (s, e) => ShowAndActivateWindow();
+        menu.Items.Add(openItem);
+
+        menu.Items.Add(new ToolStripSeparator());
+
+        // ── Start / Stop Forwarding ───────────────────────────────
+        var forwardingItem = new ToolStripMenuItem("Start Forwarding")
+        {
+            Image = TrayMenuIcons.Play(TrayIconSize, dimColor),
+            Name  = "forwarding",
+        };
         forwardingItem.Click += (s, e) =>
         {
             if (_isForwarding)
@@ -1913,17 +1948,28 @@ public partial class MainForm : Form
         };
         menu.Items.Add(forwardingItem);
 
+        // ── Connect to... (only when networking is available) ─────
+        bool hasNetwork = _networkDiscovery is not NullNetworkDiscoveryService;
+        if (hasNetwork)
+        {
+            var connectItem = new ToolStripMenuItem("Connect to...")
+            {
+                Image = TrayMenuIcons.Network(TrayIconSize, dimColor),
+                Name  = "connect",
+            };
+            menu.Items.Add(connectItem);
+
+            // Rebuild peer submenu each time the menu opens
+            menu.Opening += (s, e) => RefreshPeerSubmenu(connectItem);
+        }
+
         menu.Items.Add(new ToolStripSeparator());
 
-        // Open
-        var openItem = new ToolStripMenuItem("Open");
-        openItem.Click += (s, e) => ShowAndActivateWindow();
-        menu.Items.Add(openItem);
-
-        menu.Items.Add(new ToolStripSeparator());
-
-        // Exit
-        var exitItem = new ToolStripMenuItem("Exit");
+        // ── Exit ─────────────────────────────────────────────────
+        var exitItem = new ToolStripMenuItem("Exit Asteriq")
+        {
+            Image = TrayMenuIcons.Exit(TrayIconSize, dimColor),
+        };
         exitItem.Click += (s, e) =>
         {
             _forceClose = true;
@@ -1932,9 +1978,46 @@ public partial class MainForm : Form
         menu.Items.Add(exitItem);
 
         _trayIcon.ContextMenuStrip = menu;
-
-        // Double-click to open
         _trayIcon.DoubleClick += (s, e) => ShowAndActivateWindow();
+    }
+
+    private void RefreshPeerSubmenu(ToolStripMenuItem connectItem)
+    {
+        connectItem.DropDownItems.Clear();
+
+        var peers     = _networkDiscovery.KnownPeers.Values.ToList();
+        var textColor = SkiaColorToGdi(FUIColors.TextPrimary);
+        var dimColor  = SkiaColorToGdi(FUIColors.TextDim);
+
+        if (peers.Count == 0)
+        {
+            connectItem.DropDownItems.Add(new ToolStripMenuItem("No peers discovered") { Enabled = false });
+            return;
+        }
+
+        foreach (var peer in peers)
+        {
+            bool isConnected = _tabContext.ConnectedPeerIp == peer.IpAddress;
+            string label     = isConnected
+                ? $"Disconnect from {peer.MachineName}"
+                : peer.MachineName;
+
+            var peerItem = new ToolStripMenuItem(label)
+            {
+                Image = TrayMenuIcons.Monitor(TrayIconSize, isConnected ? SkiaColorToGdi(FUIColors.Active) : dimColor),
+            };
+
+            var captured = peer;
+            peerItem.Click += (s, e) =>
+            {
+                if (_tabContext.ConnectedPeerIp == captured.IpAddress)
+                    _ = SwitchToLocalAsync();
+                else
+                    _ = ConnectAsMasterAsync(captured);
+            };
+
+            connectItem.DropDownItems.Add(peerItem);
+        }
     }
 
     // (StartForwarding / StopForwarding moved to MainForm.Networking.cs)
@@ -1943,13 +2026,22 @@ public partial class MainForm : Form
     {
         if (_trayIcon.ContextMenuStrip is null) return;
 
-        // Update the forwarding menu item text
-        var forwardingItem = _trayIcon.ContextMenuStrip.Items[0] as ToolStripMenuItem;
-        if (forwardingItem is not null)
+        var forwardingItem = _trayIcon.ContextMenuStrip.Items["forwarding"] as ToolStripMenuItem;
+        if (forwardingItem is null) return;
+
+        if (_isForwarding)
         {
-            forwardingItem.Text = _isForwarding ? "Stop Forwarding" : "Start Forwarding";
+            forwardingItem.Text  = "Stop Forwarding";
+            forwardingItem.Image = TrayMenuIcons.Stop(TrayIconSize, SkiaColorToGdi(FUIColors.Active));
+        }
+        else
+        {
+            forwardingItem.Text  = "Start Forwarding";
+            forwardingItem.Image = TrayMenuIcons.Play(TrayIconSize, SkiaColorToGdi(FUIColors.TextDim));
         }
     }
+
+    private static Color SkiaColorToGdi(SkiaSharp.SKColor c) => Color.FromArgb(c.Red, c.Green, c.Blue);
 
     #endregion
 

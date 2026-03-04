@@ -7,6 +7,8 @@ namespace Asteriq.UI;
 /// </summary>
 public class DarkContextMenuRenderer : ToolStripProfessionalRenderer
 {
+    private const int IconColumnWidth = 32;
+
     public DarkContextMenuRenderer() : base(new DarkContextMenuColorTable())
     {
         RoundedEdges = false;
@@ -18,113 +20,110 @@ public class DarkContextMenuRenderer : ToolStripProfessionalRenderer
 
         if (e.Item.Selected || e.Item.Pressed)
         {
-            // Highlighted item - use active color
-            var skColor = FUIColors.Active;
+            var skColor     = FUIColors.Active;
             var activeColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+
+            // Subtle tinted fill across the full row
             using var brush = new SolidBrush(Color.FromArgb(40, activeColor));
             e.Graphics.FillRectangle(brush, rect);
 
-            // Left border accent
-            using var borderBrush = new SolidBrush(activeColor);
-            e.Graphics.FillRectangle(borderBrush, 0, 0, 2, rect.Height);
+            // Left border accent (inside the icon column)
+            using var accentBrush = new SolidBrush(activeColor);
+            e.Graphics.FillRectangle(accentBrush, 0, 0, 2, rect.Height);
         }
     }
 
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {
-        // Use FUI text colors
-        var skColor = e.Item.Enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
-        e.TextColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+        var skColor  = e.Item.Enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
+        e.TextColor  = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
         base.OnRenderItemText(e);
     }
 
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
-        var skColor = FUIColors.FrameDim;
+        var skColor        = FUIColors.FrameDim;
         var separatorColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
-
-        var rect = new Rectangle(e.Item.ContentRectangle.Left + 30,
-            e.Item.ContentRectangle.Height / 2,
-            e.Item.ContentRectangle.Width - 30,
-            1);
+        int y              = e.Item.ContentRectangle.Height / 2;
 
         using var pen = new Pen(separatorColor);
-        e.Graphics.DrawLine(pen, rect.Left, rect.Top, rect.Right, rect.Top);
+        e.Graphics.DrawLine(pen,
+            IconColumnWidth + 4, y,
+            e.Item.Width - 8,    y);
     }
 
     protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
     {
-        if (e.Item is null)
-            return;
-
-        var skColor = e.Item.Enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
-        e.ArrowColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+        if (e.Item is null) return;
+        var skColor   = e.Item.Enabled ? FUIColors.TextDim : FUIColors.TextDisabled;
+        e.ArrowColor  = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
         base.OnRenderArrow(e);
     }
 
     protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
     {
-        // Don't render image margin background - keep it consistent
+        // Draw the icon column background in the same dark colour as the rest of the menu.
+        // This prevents the default light-grey gradient WinForms paints here.
+        var skColor = FUIColors.Background1;
+        using var brush = new SolidBrush(Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue));
+        e.Graphics.FillRectangle(brush,
+            new Rectangle(0, 0, IconColumnWidth, e.AffectedBounds.Height));
+    }
+
+    protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+    {
+        if (e.Image is null) return;
+
+        // Centre the icon inside the icon column
+        int iconSize = e.Image.Width;
+        int x        = (IconColumnWidth - iconSize) / 2;
+        int y        = (e.Item.Height  - iconSize) / 2;
+
+        e.Graphics.DrawImage(e.Image, x, y, iconSize, iconSize);
     }
 }
 
 /// <summary>
-/// Color table for dark-themed context menus.
+/// Colour table for dark-themed context menus.
 /// </summary>
 public class DarkContextMenuColorTable : ProfessionalColorTable
 {
-    public override Color MenuBorder
+    private static Color Bg1()
     {
-        get
-        {
-            var skColor = FUIColors.Frame;
-            return Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
-        }
+        var c = FUIColors.Background1;
+        return Color.FromArgb(c.Red, c.Green, c.Blue);
     }
 
-    public override Color MenuItemBorder
-    {
-        get
-        {
-            var skColor = FUIColors.Active;
-            return Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
-        }
-    }
+    // Make the border invisible by matching the background colour exactly.
+    public override Color MenuBorder              => Bg1();
+    public override Color MenuItemBorder          => Color.Transparent;
 
     public override Color MenuItemSelected
     {
         get
         {
-            var skColor = FUIColors.Active;
-            return Color.FromArgb(30, skColor.Red, skColor.Green, skColor.Blue);
+            var c = FUIColors.Active;
+            return Color.FromArgb(30, c.Red, c.Green, c.Blue);
         }
     }
 
     public override Color MenuItemSelectedGradientBegin => MenuItemSelected;
-    public override Color MenuItemSelectedGradientEnd => MenuItemSelected;
+    public override Color MenuItemSelectedGradientEnd   => MenuItemSelected;
+    public override Color MenuItemPressedGradientBegin  => MenuItemSelected;
+    public override Color MenuItemPressedGradientEnd    => MenuItemSelected;
 
-    public override Color MenuItemPressedGradientBegin => MenuItemSelected;
-    public override Color MenuItemPressedGradientEnd => MenuItemSelected;
+    public override Color ToolStripDropDownBackground   => Bg1();
 
-    public override Color ToolStripDropDownBackground
-    {
-        get
-        {
-            var skColor = FUIColors.Background1;
-            return Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
-        }
-    }
-
-    public override Color ImageMarginGradientBegin => ToolStripDropDownBackground;
-    public override Color ImageMarginGradientMiddle => ToolStripDropDownBackground;
-    public override Color ImageMarginGradientEnd => ToolStripDropDownBackground;
+    public override Color ImageMarginGradientBegin      => Bg1();
+    public override Color ImageMarginGradientMiddle     => Bg1();
+    public override Color ImageMarginGradientEnd        => Bg1();
 
     public override Color SeparatorDark
     {
         get
         {
-            var skColor = FUIColors.FrameDim;
-            return Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+            var c = FUIColors.FrameDim;
+            return Color.FromArgb(c.Red, c.Green, c.Blue);
         }
     }
 

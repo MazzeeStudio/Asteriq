@@ -52,6 +52,11 @@ public class DarkContextMenuRenderer : ToolStripProfessionalRenderer
             e.Item.Width - 8,    y);
     }
 
+    protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+    {
+        // Intentionally empty — let DWM own the window edge entirely.
+    }
+
     protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
     {
         if (e.Item is null) return;

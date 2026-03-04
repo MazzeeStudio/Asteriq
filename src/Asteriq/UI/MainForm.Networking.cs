@@ -43,17 +43,10 @@ public partial class MainForm : Form
         if (_networkDiscovery is NetworkDiscoveryService nds)
             nds.Configure(machineName, port);
 
-        _networkInput.ConnectionLost  += OnNetworkConnectionLost;
-        _networkInput.ClientConnected += OnClientConnected;
-        _networkInput.TrustRequested  += OnTrustRequested;
-        _networkInput.ProfileReceived += OnProfileReceived;
-
-        _tabContext.SendProfileToClient = () =>
-        {
-            var profile = _profileManager.ActiveProfile;
-            if (profile is not null)
-                _networkInput.SendProfile(profile);
-        };
+        _networkInput.ConnectionLost      += OnNetworkConnectionLost;
+        _networkInput.ClientConnected     += OnClientConnected;
+        _networkInput.TrustRequested      += OnTrustRequested;
+        _networkInput.ProfileListReceived += OnProfileListReceived;
 
         _ = _networkDiscovery.StartAsync();
         _ = _networkInput.StartListenerAsync(port);
@@ -63,10 +56,10 @@ public partial class MainForm : Form
 
     private void ShutdownNetworking()
     {
-        _networkInput.ConnectionLost  -= OnNetworkConnectionLost;
-        _networkInput.ClientConnected -= OnClientConnected;
-        _networkInput.TrustRequested  -= OnTrustRequested;
-        _networkInput.ProfileReceived -= OnProfileReceived;
+        _networkInput.ConnectionLost      -= OnNetworkConnectionLost;
+        _networkInput.ClientConnected     -= OnClientConnected;
+        _networkInput.TrustRequested      -= OnTrustRequested;
+        _networkInput.ProfileListReceived -= OnProfileListReceived;
 
         _ = _networkDiscovery.StopAsync();
         _ = _networkInput.DisconnectAsync();
@@ -154,6 +147,7 @@ public partial class MainForm : Form
             // encoder always sends correctly-sized packets from the very first input tick.
             PreInitializeAllNetworkSnapshots();
             StartNetworkHeartbeat();
+            _tabContext.SendProfileListToClient?.Invoke();
             BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", $"Connected to {peer.MachineName}"));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -296,6 +290,8 @@ public partial class MainForm : Form
             _tabContext.NetworkMode = _networkMode;
             _tabContext.IsClientConnected = _isClientConnected;
             _tabContext.ConnectedPeerIp = null;
+            _tabContext.RemoteControlProfiles = new();
+            _tabContext.RemoteControlProfilesMasterName = "";
             MarkDirty();
         });
     }
@@ -329,15 +325,15 @@ public partial class MainForm : Form
         BeginInvoke(() => EnterClientMode(masterName));
     }
 
-    private void OnProfileReceived(object? sender, Models.MappingProfile profile)
+    private void OnProfileListReceived(object? sender, ProfileListReceivedEventArgs e)
     {
         // Arrives on background receive thread — marshal to UI
         BeginInvoke(() =>
         {
-            _profileRepository.SaveProfile(profile);
-            _profileManager.ActivateProfile(profile);
-            _trayIcon.ShowBalloonTip("Asteriq",
-                $"Profile \"{profile.Name}\" received from {_connectedMasterName}");
+            _tabContext.RemoteControlProfiles = e.Profiles.ToList();
+            _tabContext.RemoteControlProfilesMasterName = _connectedMasterName;
+            _logger.LogInformation("Received {Count} control profile(s) from {Master}",
+                e.Profiles.Count, _connectedMasterName);
             MarkDirty();
         });
     }

@@ -87,6 +87,26 @@ public class SCXmlExportService
     }
 
     /// <summary>
+    /// Serialises the profile to UTF-8 XML bytes (no BOM, no XML declaration) for network transmission.
+    /// </summary>
+    public byte[] ExportToBytes(SCExportProfile profile)
+    {
+        var doc = Export(profile);
+        var settings = new XmlWriterSettings
+        {
+            Indent             = true,
+            IndentChars        = "  ",
+            Encoding           = new UTF8Encoding(false),
+            OmitXmlDeclaration = true,
+        };
+        using var ms = new System.IO.MemoryStream();
+        using var writer = XmlWriter.Create(ms, settings);
+        doc.Save(writer);
+        writer.Flush();
+        return ms.ToArray();
+    }
+
+    /// <summary>
     /// Exports to SC's Mappings folder for a specific installation
     /// </summary>
     public string ExportToInstallation(SCExportProfile profile, SCInstallation installation)

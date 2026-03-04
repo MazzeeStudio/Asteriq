@@ -113,6 +113,19 @@ public partial class SCBindingsTabController : ITabController
         _scExportService = scExportService;
         _scExportProfileService = scExportProfileService;
         _directInputService = directInputService;
+
+        _ctx.SendProfileListToClient = () =>
+        {
+            if (_ctx.NetworkInput is null) return;
+            var list = new List<(string Name, byte[] XmlBytes)>();
+            foreach (var info in _scExportProfileService.ListProfiles())
+            {
+                var profile = _scExportProfileService.LoadProfile(info.ProfileName);
+                if (profile is null) continue;
+                list.Add((info.ProfileName, _scExportService.ExportToBytes(profile)));
+            }
+            _ctx.NetworkInput.SendProfileList(list);
+        };
     }
 
     /// <summary>

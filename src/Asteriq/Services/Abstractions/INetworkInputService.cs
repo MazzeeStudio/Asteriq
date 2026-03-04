@@ -69,11 +69,11 @@ public interface INetworkInputService : IDisposable
     void SendVJoyState(VJoyOutputSnapshot snapshot);
 
     /// <summary>
-    /// Send the given control profile to the connected client.
-    /// The client will save and activate it automatically.
-    /// No-op when not connected as master.
+    /// Send all saved SC control profiles (as exported XML bytes) to the connected client.
+    /// The client caches the list and can apply any profile locally from its own dropdown.
+    /// No-op when Mode != Remote or not connected.
     /// </summary>
-    void SendProfile(MappingProfile profile);
+    void SendProfileList(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles);
 
     /// <summary>
     /// Accept the pending trust request (called after the user approves in the trust dialog).
@@ -86,10 +86,10 @@ public interface INetworkInputService : IDisposable
     void RejectPairing();
 
     /// <summary>
-    /// Fired on the receive thread when a profile packet arrives from the master.
+    /// Fired on the receive thread when the master sends a list of SC control profiles.
     /// Caller must marshal to the UI thread before touching UI state.
     /// </summary>
-    event EventHandler<MappingProfile>? ProfileReceived;
+    event EventHandler<ProfileListReceivedEventArgs>? ProfileListReceived;
 
     /// <summary>
     /// Fired on the background receive thread when the TCP connection is lost unexpectedly.
@@ -130,5 +130,19 @@ public sealed class TrustRequestEventArgs : EventArgs
         PeerName  = peerName;
         Code      = code;
         IpAddress = ipAddress;
+    }
+}
+
+/// <summary>
+/// Event args carrying the list of SC control profiles received from the master.
+/// Each entry is a (Name, XmlBytes) pair — the client can apply any of these locally.
+/// </summary>
+public sealed class ProfileListReceivedEventArgs : EventArgs
+{
+    public IReadOnlyList<(string Name, byte[] XmlBytes)> Profiles { get; }
+
+    public ProfileListReceivedEventArgs(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles)
+    {
+        Profiles = profiles;
     }
 }

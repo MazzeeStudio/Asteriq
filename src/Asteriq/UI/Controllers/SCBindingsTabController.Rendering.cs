@@ -856,10 +856,13 @@ public partial class SCBindingsTabController
         // Compute profile dropdown list bounds so the draw-last pass can render it on top of all panels
         if (_profileMgmt.DropdownOpen)
         {
-            int asteriqCount = _profileMgmt.ExportProfiles.Count(p => p.ProfileName != _scExportProfile.ProfileName);
-            int scFileCount = _scAvailableProfiles.Count;
-            int totalItems = asteriqCount + (scFileCount > 0 ? scFileCount + 1 : 0); // +1 for separator
-            float listHeight = Math.Min(totalItems * 24f + (scFileCount > 0 ? 16f : 0f) + 8f, 240f);
+            int asteriqCount  = _profileMgmt.ExportProfiles.Count(p => p.ProfileName != _scExportProfile.ProfileName);
+            int scFileCount   = _scAvailableProfiles.Count;
+            int remoteCount   = _ctx.RemoteControlProfiles.Count;
+            int totalItems    = asteriqCount
+                + (scFileCount > 0 ? scFileCount + 1 : 0)     // +1 for separator/header
+                + (remoteCount > 0 ? remoteCount + 1 : 0);    // +1 for separator/header
+            float listHeight  = Math.Min(totalItems * 24f + (scFileCount > 0 ? 16f : 0f) + (remoteCount > 0 ? 16f : 0f) + 8f, 280f);
             _profileMgmt.DropdownListBounds = new SKRect(leftMargin, _profileMgmt.DropdownBounds.Bottom + 2, rightMargin, _profileMgmt.DropdownBounds.Bottom + 2 + listHeight);
         }
 
@@ -1300,6 +1303,50 @@ public partial class SCBindingsTabController
                 float maxTextWidth = rowBounds.Width - 20f;
                 string displayName = scFile.DisplayName;
                 displayName = FUIWidgets.TruncateTextToWidth(displayName, maxTextWidth, 10f);
+                FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);
+
+                y += rowHeight;
+            }
+        }
+
+        // Section 3: Remote SC control profiles received from TX master
+        var remoteProfiles = _ctx.RemoteControlProfiles;
+        if (remoteProfiles.Count > 0 && y + rowHeight <= bounds.Bottom)
+        {
+            // Separator (same style as Section 2)
+            y += 4f;
+            float sepY2 = y;
+            using var sepPaint2 = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
+            canvas.DrawLine(bounds.Left + 12, sepY2, bounds.Right - 12, sepY2, sepPaint2);
+            using var accentLinePaint2 = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(120));
+            canvas.DrawLine(bounds.Left + 8, sepY2, bounds.Left + 12, sepY2, accentLinePaint2);
+            canvas.DrawLine(bounds.Right - 12, sepY2, bounds.Right - 8, sepY2, accentLinePaint2);
+            y += 6f;
+
+            string masterLabel = string.IsNullOrEmpty(_ctx.RemoteControlProfilesMasterName)
+                ? "FROM MASTER"
+                : $"FROM {_ctx.RemoteControlProfilesMasterName.ToUpperInvariant()}";
+            FUIRenderer.DrawText(canvas, masterLabel, new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
+            y += 16f;
+
+            int remoteIndexOffset = _profileMgmt.ExportProfiles.Count + 2000;
+            for (int i = 0; i < remoteProfiles.Count && y + rowHeight <= bounds.Bottom; i++)
+            {
+                var (remoteName, _) = remoteProfiles[i];
+                var rowBounds = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
+                bool isHovered = rowBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+                if (isHovered)
+                {
+                    _profileMgmt.HoveredProfileIndex = remoteIndexOffset + i;
+                    using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+                    canvas.DrawRect(rowBounds, hoverPaint);
+                    using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
+                    canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
+                }
+
+                var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
+                string displayName = FUIWidgets.TruncateTextToWidth(remoteName, rowBounds.Width - 20f, 10f);
                 FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);
 
                 y += rowHeight;

@@ -711,4 +711,34 @@ public partial class SCBindingsTabController
         int end = maxLength - start - 3;  // 3 for "..."
         return path.Substring(0, start) + "..." + path.Substring(path.Length - end);
     }
+
+    /// <summary>
+    /// Writes remote profile XML bytes to a temp file and imports it via the normal import path.
+    /// </summary>
+    private void ApplyRemoteControlProfile((string Name, byte[] XmlBytes) remoteProfile)
+    {
+        try
+        {
+            var dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Asteriq", "ReceivedProfiles");
+            System.IO.Directory.CreateDirectory(dir);
+
+            var safeName = string.Concat(remoteProfile.Name.Select(
+                c => System.IO.Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+            var filePath = System.IO.Path.Combine(dir, safeName + ".xml");
+            System.IO.File.WriteAllBytes(filePath, remoteProfile.XmlBytes);
+
+            ImportSCProfile(new SCMappingFile
+            {
+                FileName    = safeName + ".xml",
+                FilePath    = filePath,
+                ProfileName = remoteProfile.Name,
+            });
+        }
+        catch (IOException ex)
+        {
+            SetStatus($"Failed to apply remote profile: {ex.Message}", SCStatusKind.Error);
+        }
+    }
 }

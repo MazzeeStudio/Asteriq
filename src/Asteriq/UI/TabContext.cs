@@ -118,10 +118,17 @@ public class TabContext
     /// </summary>
     public Func<Task>? NetworkDisconnectAsync { get; set; }
     /// <summary>
-    /// Send the active control profile to the connected Rx client.
-    /// Only valid when connected as master (Mode == Remote).
+    /// Send all saved SC control profiles to the connected Rx client.
+    /// Set by SCBindingsTabController; called by MainForm after master connect succeeds.
     /// </summary>
-    public Action? SendProfileToClient { get; set; }
+    public Action? SendProfileListToClient { get; set; }
+    /// <summary>
+    /// SC control profiles received from the connected TX master.
+    /// Shown as a special section in the SC Bindings profile dropdown on the RX machine.
+    /// </summary>
+    public List<(string Name, byte[] XmlBytes)> RemoteControlProfiles { get; set; } = new();
+    /// <summary>Machine name of the TX master that sent RemoteControlProfiles.</summary>
+    public string RemoteControlProfilesMasterName { get; set; } = "";
     /// <summary>
     /// Called when the NET SWITCH button assignment changes.
     /// SCBindingsTabController sets this to its CheckNetworkSwitchConflicts method.

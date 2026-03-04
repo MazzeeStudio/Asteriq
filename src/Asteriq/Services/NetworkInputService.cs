@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Asteriq.Models;
 using Asteriq.Services.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -34,15 +32,8 @@ public sealed class NetworkInputService : INetworkInputService
         public const byte Hello       = 5; // master→client: {nameLen,name,port[2],codeLen,code}
         public const byte HelloAccept = 6; // client→master: empty
         public const byte HelloReject = 7; // client→master: empty
-        public const byte Profile     = 8; // master→client: UTF-8 JSON MappingProfile
+        public const byte ProfileList  = 8; // master→client: [count:4][nameLen:2][name][xmlLen:4][xml] × count
     }
-
-    // Compact JSON options for profile transmission (no indentation to minimise payload size)
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters           = { new JsonStringEnumConverter() },
-    };
 
     // ── Services ─────────────────────────────────────────────────────────────
     private readonly IVJoyService _vjoy;
@@ -73,7 +64,7 @@ public sealed class NetworkInputService : INetworkInputService
     public event EventHandler? ConnectionLost;
     public event EventHandler<string>? ClientConnected;
     public event EventHandler<TrustRequestEventArgs>? TrustRequested;
-    public event EventHandler<MappingProfile>? ProfileReceived;
+    public event EventHandler<ProfileListReceivedEventArgs>? ProfileListReceived;
 
     private int _packetsReceived;
 
@@ -315,17 +306,32 @@ public sealed class NetworkInputService : INetworkInputService
         }
     }
 
-    public void SendProfile(MappingProfile profile)
+    public void SendProfileList(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles)
     {
         if (_mode != NetworkInputMode.Remote || _stream is null) return;
 
-        var payload = JsonSerializer.SerializeToUtf8Bytes(profile, s_jsonOptions);
+        // Payload: [count:4][nameLen:2][name UTF-8][xmlLen:4][xml UTF-8] × count
+        using var ms = new System.IO.MemoryStream();
+        var countBytes = BitConverter.GetBytes((uint)profiles.Count);
+        ms.Write(countBytes, 0, 4);
+        foreach (var (name, xml) in profiles)
+        {
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
+            var nameLenBytes = BitConverter.GetBytes((ushort)Math.Min(nameBytes.Length, ushort.MaxValue));
+            ms.Write(nameLenBytes, 0, 2);
+            ms.Write(nameBytes, 0, Math.Min(nameBytes.Length, ushort.MaxValue));
+            var xmlLenBytes = BitConverter.GetBytes((uint)xml.Length);
+            ms.Write(xmlLenBytes, 0, 4);
+            ms.Write(xml, 0, xml.Length);
+        }
+        var payload = ms.ToArray();
+
         lock (_sendLock)
         {
-            try   { WritePacketSync(_stream, MsgType.Profile, payload); }
+            try   { WritePacketSync(_stream, MsgType.ProfileList, payload); }
             catch (IOException ex)
             {
-                _logger.LogWarning(ex, "SendProfile failed — connection lost");
+                _logger.LogWarning(ex, "SendProfileList failed — connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
@@ -374,10 +380,10 @@ public sealed class NetworkInputService : INetworkInputService
                         await WritePacketAsync(stream, MsgType.Pong, [], ct).ConfigureAwait(false);
                         break;
 
-                    case MsgType.Profile:
-                        var received = JsonSerializer.Deserialize<MappingProfile>(payload, s_jsonOptions);
-                        if (received is not null)
-                            ProfileReceived?.Invoke(this, received);
+                    case MsgType.ProfileList:
+                        var profileList = DecodeProfileList(payload);
+                        if (profileList.Count > 0)
+                            ProfileListReceived?.Invoke(this, new ProfileListReceivedEventArgs(profileList));
                         break;
                 }
             }
@@ -424,6 +430,28 @@ public sealed class NetworkInputService : INetworkInputService
         }
         _acquiredDevices.Clear();
         _failedDevices.Clear();        // reset so next session can retry (vJoy config may have changed)
+    }
+
+    private static List<(string Name, byte[] XmlBytes)> DecodeProfileList(byte[] payload)
+    {
+        var result = new List<(string, byte[])>();
+        if (payload.Length < 4) return result;
+
+        int pos = 0;
+        uint count = BitConverter.ToUInt32(payload, pos); pos += 4;
+        for (uint i = 0; i < count && pos + 6 <= payload.Length; i++)
+        {
+            ushort nameLen = BitConverter.ToUInt16(payload, pos); pos += 2;
+            if (pos + nameLen > payload.Length) break;
+            var name = System.Text.Encoding.UTF8.GetString(payload, pos, nameLen); pos += nameLen;
+            if (pos + 4 > payload.Length) break;
+            uint xmlLen = BitConverter.ToUInt32(payload, pos); pos += 4;
+            if (pos + xmlLen > payload.Length) break;
+            var xml = new byte[xmlLen];
+            Array.Copy(payload, pos, xml, 0, (int)xmlLen); pos += (int)xmlLen;
+            result.Add((name, xml));
+        }
+        return result;
     }
 
     // ── Ping keepalive (master side) ──────────────────────────────────────────
@@ -582,7 +610,7 @@ public sealed class NetworkInputService : INetworkInputService
 
         byte type   = header[4];
         uint length = BitConverter.ToUInt32(header, 5);
-        if (length > 524288) // 512 KB — enough for any profile JSON
+        if (length > 4194304) // 4 MB — covers a full profile list (many SC XMLs)
             throw new InvalidDataException($"Payload too large: {length}");
 
         var payload = new byte[length];

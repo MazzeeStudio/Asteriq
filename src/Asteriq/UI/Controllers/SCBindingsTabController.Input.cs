@@ -256,20 +256,27 @@ public partial class SCBindingsTabController
                 // Click on dropdown item
                 if (_profileMgmt.HoveredProfileIndex >= 0)
                 {
-                    // SC files use offset: _profileMgmt.ExportProfiles.Count + 1000 + i
-                    int scFileIndexOffset = _profileMgmt.ExportProfiles.Count + 1000;
-                    if (_profileMgmt.HoveredProfileIndex >= scFileIndexOffset)
+                    int scFileIndexOffset    = _profileMgmt.ExportProfiles.Count + 1000;
+                    int remoteIndexOffset    = _profileMgmt.ExportProfiles.Count + 2000;
+
+                    if (_profileMgmt.HoveredProfileIndex >= remoteIndexOffset)
                     {
-                        // SC mapping file - import it
+                        // Remote profile from TX master — write to temp file and import
+                        int remoteIdx = _profileMgmt.HoveredProfileIndex - remoteIndexOffset;
+                        var remotes = _ctx.RemoteControlProfiles;
+                        if (remoteIdx >= 0 && remoteIdx < remotes.Count)
+                            ApplyRemoteControlProfile(remotes[remoteIdx]);
+                    }
+                    else if (_profileMgmt.HoveredProfileIndex >= scFileIndexOffset)
+                    {
+                        // SC mapping file — import it
                         int scFileIndex = _profileMgmt.HoveredProfileIndex - scFileIndexOffset;
                         if (scFileIndex >= 0 && scFileIndex < _scAvailableProfiles.Count)
-                        {
                             ImportSCProfile(_scAvailableProfiles[scFileIndex]);
-                        }
                     }
                     else if (_profileMgmt.HoveredProfileIndex < _profileMgmt.ExportProfiles.Count)
                     {
-                        // Asteriq profile - load it
+                        // Asteriq saved profile — load it
                         LoadSCExportProfile(_profileMgmt.ExportProfiles[_profileMgmt.HoveredProfileIndex].ProfileName);
                     }
                 }

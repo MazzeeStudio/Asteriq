@@ -53,7 +53,6 @@ public class SettingsTabController : ITabController
     private SKRect _netRegenerateBounds;
     private SKRect _netDisconnectBounds;   // RX (client) role only
     private SKRect _netForgetBounds;
-    private SKRect _netSendProfileBounds;  // TX (master) role, only when connected
     // Per-peer toggle bounds (TX role) — rebuilt every frame; one entry per discovered peer
     private readonly List<(SKRect Toggle, string IpAddress)> _peerActionBounds = [];
     private readonly Dictionary<string, float> _peerToggleT = new();  // per-peer knob animation (0=off, 0.5=connecting, 1=on)
@@ -192,8 +191,7 @@ public class SettingsTabController : ITabController
         }
         if ((!_netRegenerateBounds.IsEmpty  && _netRegenerateBounds.Contains(pt))
             || (!_netDisconnectBounds.IsEmpty && _netDisconnectBounds.Contains(pt))
-            || (!_netForgetBounds.IsEmpty    && _netForgetBounds.Contains(pt))
-            || (!_netSendProfileBounds.IsEmpty && _netSendProfileBounds.Contains(pt)))
+            || (!_netForgetBounds.IsEmpty    && _netForgetBounds.Contains(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -661,19 +659,6 @@ public class SettingsTabController : ITabController
                     new SKPoint(leftMargin, y + 12f), contentWidth, statusColor, 13f);
                 y += rowHeight;
 
-                // Send Profile button — only when connected (right-aligned like REGENERATE)
-                float spW = 130f; float spH = 26f;
-                _netSendProfileBounds = isConnected
-                    ? new SKRect(rightMargin - spW, y, rightMargin, y + spH)
-                    : SKRect.Empty;
-                bool spHov = isConnected && _netSendProfileBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                FUIRenderer.DrawButton(canvas,
-                    new SKRect(rightMargin - spW, y, rightMargin, y + spH),
-                    "SEND PROFILE",
-                    !isConnected ? FUIRenderer.ButtonState.Disabled
-                    : spHov ? FUIRenderer.ButtonState.Hover
-                    : FUIRenderer.ButtonState.Normal);
-                y += spH + 6f;
             }
             // ── Client-specific UI ─────────────────────────────────────────
             else if (currentRole == NetworkRole.Client)
@@ -1252,14 +1237,6 @@ public class SettingsTabController : ITabController
                     // Clear the code — getter in ApplicationSettingsService auto-generates a new one
                     _ctx.AppSettings.NetworkMasterCode = "";
                     _ctx.InvalidateCanvas();
-                    return;
-                }
-
-                // Send profile to connected client
-                if (!_netSendProfileBounds.IsEmpty && _netSendProfileBounds.Contains(pt)
-                    && _ctx.NetworkMode == NetworkInputMode.Remote)
-                {
-                    _ctx.SendProfileToClient?.Invoke();
                     return;
                 }
 

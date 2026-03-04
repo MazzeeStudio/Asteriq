@@ -1912,13 +1912,15 @@ public partial class MainForm : Form
             ImageScalingSize = new Size(TrayIconSize, TrayIconSize),
         };
 
-        // Apply Windows 11 rounded corners when the menu handle is created
+        // Windows 11: rounded corners, no DWM border highlight
         menu.Opened += (s, e) =>
         {
             if (s is ContextMenuStrip strip && strip.IsHandleCreated)
             {
-                int pref = DWMWCP_ROUND;
-                DwmSetWindowAttribute(strip.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int));
+                int pref    = DWMWCP_ROUND;
+                int noBorder = unchecked((int)0xFFFFFFFE); // DWMWA_COLOR_NONE
+                DwmSetWindowAttribute(strip.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref,     sizeof(int));
+                DwmSetWindowAttribute(strip.Handle, DWMWA_BORDER_COLOR,             ref noBorder, sizeof(int));
             }
         };
 

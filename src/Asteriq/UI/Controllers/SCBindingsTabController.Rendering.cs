@@ -856,13 +856,16 @@ public partial class SCBindingsTabController
         // Compute profile dropdown list bounds so the draw-last pass can render it on top of all panels
         if (_profileMgmt.DropdownOpen)
         {
-            int asteriqCount  = _profileMgmt.ExportProfiles.Count(p => p.ProfileName != _scExportProfile.ProfileName);
-            int scFileCount   = _scAvailableProfiles.Count;
-            int remoteCount   = _ctx.RemoteControlProfiles.Count;
-            int totalItems    = asteriqCount
-                + (scFileCount > 0 ? scFileCount + 1 : 0)     // +1 for separator/header
-                + (remoteCount > 0 ? remoteCount + 1 : 0);    // +1 for separator/header
-            float listHeight  = Math.Min(totalItems * 24f + (scFileCount > 0 ? 16f : 0f) + (remoteCount > 0 ? 16f : 0f) + 8f, 280f);
+            int asteriqCount = _profileMgmt.ExportProfiles.Count(p => p.ProfileName != _scExportProfile.ProfileName);
+            int scFileCount  = _scAvailableProfiles.Count;
+            int remoteCount  = _ctx.RemoteControlProfiles.Count;
+            // Accurate height: 8px padding + rows (24px each) + per-section separator+header (26px: 4+6+16)
+            const float sepHeaderH = 26f;
+            float listHeight = 8f
+                + asteriqCount * 24f
+                + (scFileCount > 0 ? sepHeaderH + scFileCount * 24f : 0f)
+                + (remoteCount > 0 ? sepHeaderH + remoteCount * 24f : 0f);
+            listHeight = Math.Min(Math.Max(listHeight, 36f), 280f);
             _profileMgmt.DropdownListBounds = new SKRect(leftMargin, _profileMgmt.DropdownBounds.Bottom + 2, rightMargin, _profileMgmt.DropdownBounds.Bottom + 2 + listHeight);
         }
 

@@ -255,6 +255,10 @@ public sealed class NetworkInputService : INetworkInputService
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
+        // Set Local FIRST — loops check this to distinguish clean shutdown from connection loss.
+        // If we set it after stream disposal the receive loop may fire ConnectionLost spuriously.
+        _mode = NetworkInputMode.Local;
+
         if (_stream is not null)
         {
             try
@@ -278,7 +282,6 @@ public sealed class NetworkInputService : INetworkInputService
         _stream = null;
         _client?.Dispose();
         _client = null;
-        _mode = NetworkInputMode.Local;
         _acquiredDevices.Clear();
         Interlocked.Exchange(ref _packetsReceived, 0);
 
@@ -391,9 +394,14 @@ public sealed class NetworkInputService : INetworkInputService
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Receive loop error — connection lost");
-            _mode = NetworkInputMode.Local;
-            ConnectionLost?.Invoke(this, EventArgs.Empty);
+            // _mode is set to Local by DisconnectAsync() before stream disposal,
+            // so if it's already Local here this is a clean shutdown — don't fire ConnectionLost.
+            if (_mode != NetworkInputMode.Local)
+            {
+                _logger.LogWarning(ex, "Receive loop error — connection lost");
+                _mode = NetworkInputMode.Local;
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
         }
         finally
         {
@@ -474,9 +482,12 @@ public sealed class NetworkInputService : INetworkInputService
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Ping failed — connection lost");
-            _mode = NetworkInputMode.Local;
-            ConnectionLost?.Invoke(this, EventArgs.Empty);
+            if (_mode != NetworkInputMode.Local)
+            {
+                _logger.LogWarning(ex, "Ping failed — connection lost");
+                _mode = NetworkInputMode.Local;
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 

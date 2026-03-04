@@ -43,13 +43,12 @@ public class DarkContextMenuRenderer : ToolStripProfessionalRenderer
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
         var skColor        = FUIColors.FrameDim;
-        var separatorColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
-        int y              = e.Item.ContentRectangle.Height / 2;
+        // Half-alpha to make separator dimmer than other frame elements
+        var separatorColor = Color.FromArgb(90, skColor.Red, skColor.Green, skColor.Blue);
+        int y              = e.Item.Height / 2;
 
         using var pen = new Pen(separatorColor);
-        e.Graphics.DrawLine(pen,
-            IconColumnWidth + 4, y,
-            e.Item.Width - 8,    y);
+        e.Graphics.DrawLine(pen, 0, y, e.Item.Width, y);
     }
 
     protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)

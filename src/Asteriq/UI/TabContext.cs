@@ -118,6 +118,11 @@ public class TabContext
     /// </summary>
     public Func<Task>? NetworkDisconnectAsync { get; set; }
     /// <summary>
+    /// Send the active control profile to the connected Rx client.
+    /// Only valid when connected as master (Mode == Remote).
+    /// </summary>
+    public Action? SendProfileToClient { get; set; }
+    /// <summary>
     /// Called when the NET SWITCH button assignment changes.
     /// SCBindingsTabController sets this to its CheckNetworkSwitchConflicts method.
     /// </summary>

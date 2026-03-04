@@ -46,6 +46,14 @@ public partial class MainForm : Form
         _networkInput.ConnectionLost  += OnNetworkConnectionLost;
         _networkInput.ClientConnected += OnClientConnected;
         _networkInput.TrustRequested  += OnTrustRequested;
+        _networkInput.ProfileReceived += OnProfileReceived;
+
+        _tabContext.SendProfileToClient = () =>
+        {
+            var profile = _profileManager.ActiveProfile;
+            if (profile is not null)
+                _networkInput.SendProfile(profile);
+        };
 
         _ = _networkDiscovery.StartAsync();
         _ = _networkInput.StartListenerAsync(port);
@@ -58,6 +66,7 @@ public partial class MainForm : Form
         _networkInput.ConnectionLost  -= OnNetworkConnectionLost;
         _networkInput.ClientConnected -= OnClientConnected;
         _networkInput.TrustRequested  -= OnTrustRequested;
+        _networkInput.ProfileReceived -= OnProfileReceived;
 
         _ = _networkDiscovery.StopAsync();
         _ = _networkInput.DisconnectAsync();
@@ -318,6 +327,19 @@ public partial class MainForm : Form
     {
         // Fired on the background receive thread — marshal to UI thread
         BeginInvoke(() => EnterClientMode(masterName));
+    }
+
+    private void OnProfileReceived(object? sender, Models.MappingProfile profile)
+    {
+        // Arrives on background receive thread — marshal to UI
+        BeginInvoke(() =>
+        {
+            _profileRepository.SaveProfile(profile);
+            _profileManager.ActivateProfile(profile);
+            _trayIcon.ShowBalloonTip("Asteriq",
+                $"Profile \"{profile.Name}\" received from {_connectedMasterName}");
+            MarkDirty();
+        });
     }
 
     private void EnterClientMode(string masterName)

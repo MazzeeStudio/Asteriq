@@ -26,10 +26,12 @@ internal sealed class NullNetworkInputService : INetworkInputService
     public event EventHandler? ConnectionLost { add { } remove { } }
     public event EventHandler<string>? ClientConnected { add { } remove { } }
     public event EventHandler<TrustRequestEventArgs>? TrustRequested { add { } remove { } }
+    public event EventHandler<MappingProfile>? ProfileReceived { add { } remove { } }
     public Task StartListenerAsync(int port, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task ConnectToAsync(NetworkPeer peer, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public void SendVJoyState(VJoyOutputSnapshot snapshot) { }
+    public void SendProfile(MappingProfile profile) { }
     public void AcceptPairing() { }
     public void RejectPairing() { }
     public void Dispose() { }

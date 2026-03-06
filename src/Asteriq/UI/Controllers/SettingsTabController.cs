@@ -7,7 +7,7 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public class SettingsTabController : ITabController
+public class SettingsTabController : ITabController, IDisposable
 {
     private readonly TabContext _ctx;
 
@@ -89,7 +89,13 @@ public class SettingsTabController : ITabController
     private float _inverseT;
     private string? _hidHideInstalledVersion;
     private string? _hidHideLatestVersion;
+    private string? _hidHideInstallerUrl;
     private bool _hidHideVersionChecked;
+    private HidHideInstallPhase _hidHideInstallPhase;
+    private int _hidHideDownloadProgress;
+    private CancellationTokenSource? _hidHideDownloadCts;
+
+    private enum HidHideInstallPhase { Idle, Downloading, Launching, Error }
 
     public SettingsTabController(TabContext ctx)
     {
@@ -1142,11 +1148,12 @@ public class SettingsTabController : ITabController
         {
             _hidHideVersionChecked = true;
             _hidHideInstalledVersion = _ctx.HidHide.GetInstalledVersion();
-            _ = _ctx.HidHide.GetLatestVersionAsync().ContinueWith(t =>
+            _ = _ctx.HidHide.GetLatestReleaseAsync().ContinueWith(t =>
             {
                 if (!t.IsFaulted && t.Result is not null)
                 {
-                    _hidHideLatestVersion = t.Result;
+                    _hidHideLatestVersion = t.Result.Version;
+                    _hidHideInstallerUrl  = t.Result.InstallerUrl;
                     _ctx.InvalidateCanvas();
                 }
             }, TaskScheduler.Default);
@@ -1212,13 +1219,43 @@ public class SettingsTabController : ITabController
     }
 
     private void DrawHidHideDownloadButton(SKCanvas canvas, float leftMargin, float rightMargin,
-        ref float y, float rowH, string label)
+        ref float y, float rowH, string idleLabel)
     {
         _hidHideUpdateButtonBounds = new SKRect(leftMargin, y, rightMargin, y + rowH);
-        bool hovered = _hidHideUpdateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawButton(canvas, _hidHideUpdateButtonBounds, label,
-            hovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+
+        string label;
+        FUIRenderer.ButtonState state;
+        switch (_hidHideInstallPhase)
+        {
+            case HidHideInstallPhase.Downloading:
+                label = $"Downloading... {_hidHideDownloadProgress}%";
+                state = FUIRenderer.ButtonState.Disabled;
+                break;
+            case HidHideInstallPhase.Launching:
+                label = "Installing...";
+                state = FUIRenderer.ButtonState.Disabled;
+                break;
+            case HidHideInstallPhase.Error:
+                label = "Download failed — retry";
+                state = _hidHideUpdateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y)
+                    ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                break;
+            default:
+                label = idleLabel;
+                state = _hidHideUpdateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y)
+                    ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                break;
+        }
+
+        FUIRenderer.DrawButton(canvas, _hidHideUpdateButtonBounds, label, state);
         y += rowH;
+    }
+
+    public void Dispose()
+    {
+        _hidHideDownloadCts?.Cancel();
+        _hidHideDownloadCts?.Dispose();
+        _hidHideDownloadCts = null;
     }
 
     private bool IsHidHideUpdateAvailable()
@@ -1229,6 +1266,54 @@ public class SettingsTabController : ITabController
             Version.TryParse(_hidHideLatestVersion, out var latest))
             return latest > installed;
         return false;
+    }
+
+    private void StartHidHideInstall()
+    {
+        string? url = _hidHideInstallerUrl;
+        if (string.IsNullOrEmpty(url) || _ctx.HidHide is null)
+            return;
+
+        _hidHideInstallPhase = HidHideInstallPhase.Downloading;
+        _hidHideDownloadProgress = 0;
+        _ctx.InvalidateCanvas();
+
+        _hidHideDownloadCts?.Cancel();
+        _hidHideDownloadCts = new CancellationTokenSource();
+        var ct = _hidHideDownloadCts.Token;
+
+        var progress = new Progress<int>(pct =>
+        {
+            _hidHideDownloadProgress = pct;
+            _ctx.InvalidateCanvas();
+        });
+
+        _ = _ctx.HidHide.DownloadInstallerAsync(url, progress, ct).ContinueWith(t =>
+        {
+            if (t.IsCanceled)
+            {
+                _hidHideInstallPhase = HidHideInstallPhase.Idle;
+                _ctx.InvalidateCanvas();
+                return;
+            }
+
+            string? installerPath = t.IsFaulted ? null : t.Result;
+            if (installerPath is null)
+            {
+                _hidHideInstallPhase = HidHideInstallPhase.Error;
+                _ctx.InvalidateCanvas();
+                return;
+            }
+
+            _hidHideInstallPhase = HidHideInstallPhase.Launching;
+            _ctx.InvalidateCanvas();
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = installerPath,
+                UseShellExecute = true  // triggers UAC elevation if needed
+            });
+        }, TaskScheduler.Default);
     }
 
     private void DrawNetworkSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1528,8 +1613,9 @@ public class SettingsTabController : ITabController
         {
             _settingsRightPanelActive = "hidhide";
             _ctx.AppSettings.SettingsRightPanel = "hidhide";
-            _hidHideStateLoaded = false;   // force toggle state reload
+            _hidHideStateLoaded = false;    // force toggle state reload
             _hidHideVersionChecked = false; // force version re-check
+            _hidHideInstallPhase = HidHideInstallPhase.Idle;
             _ctx.InvalidateCanvas();
             return;
         }
@@ -1537,13 +1623,10 @@ public class SettingsTabController : ITabController
         // HidHide panel clicks
         if (_settingsRightPanelActive == "hidhide")
         {
-            if (!_hidHideUpdateButtonBounds.IsEmpty && _hidHideUpdateButtonBounds.Contains(pt))
+            if (!_hidHideUpdateButtonBounds.IsEmpty && _hidHideUpdateButtonBounds.Contains(pt)
+                && _hidHideInstallPhase is HidHideInstallPhase.Idle or HidHideInstallPhase.Error)
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "https://github.com/nefarius/HidHide/releases/latest",
-                    UseShellExecute = true
-                });
+                StartHidHideInstall();
                 return;
             }
         }

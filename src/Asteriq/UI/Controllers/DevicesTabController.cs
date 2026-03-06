@@ -19,8 +19,6 @@ public class DevicesTabController : ITabController
     private readonly ForwardingButtonsState _forwarding = new();
     private readonly SilhouettePickerState _silhouette = new();
     private readonly SVGClickState _svgClick = new();
-    private readonly RightPanelTabState _rightTab = new();
-    private readonly HidHideConfigState _hidHideConfig = new();
 
     /// <summary>
     /// The active device category (0 = physical, 1 = virtual/vJoy).
@@ -65,30 +63,18 @@ public class DevicesTabController : ITabController
         var detailsBounds = new SKRect(centerStart, contentTop, centerEnd, contentBottom);
         DrawDeviceDetailsPanel(canvas, detailsBounds);
 
-        // Right panel: side tabs (ACTIONS / HIDHIDE) + content
+        // Right panel: Split into Device Actions (top) and Status (bottom)
         if (layout.ShowRightPanel)
         {
             float rightPanelX = bounds.Right - pad - layout.RightPanelWidth;
-            float sideTabWidth = 28f;
-            float contentX = rightPanelX + sideTabWidth;
+            float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
             float panelGap = FUIRenderer.SpaceSM;
 
-            DrawRightPanelSideTabs(canvas, rightPanelX, contentTop, sideTabWidth, contentBottom - contentTop);
+            var deviceActionsBounds = new SKRect(rightPanelX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
+            DrawDeviceActionsPanel(canvas, deviceActionsBounds);
 
-            if (_rightTab.Active == 0)
-            {
-                float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
-                var deviceActionsBounds = new SKRect(contentX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
-                DrawDeviceActionsPanel(canvas, deviceActionsBounds);
-
-                var statusBounds = new SKRect(contentX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
-                DrawStatusPanel(canvas, statusBounds);
-            }
-            else
-            {
-                var hidHideBounds = new SKRect(contentX, contentTop, bounds.Right - pad, contentBottom);
-                DrawHidHideConfigPanel(canvas, hidHideBounds);
-            }
+            var statusBounds = new SKRect(rightPanelX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
+            DrawStatusPanel(canvas, statusBounds);
         }
     }
 
@@ -103,27 +89,6 @@ public class DevicesTabController : ITabController
             _ctx.SelectedDevice = -1;
             _ctx.CurrentInputState = null;
             _ctx.SelectFirstDeviceInCategory?.Invoke();
-            return;
-        }
-
-        // Right panel tab clicks (ACTIONS / HIDHIDE)
-        if (_rightTab.Hovered >= 0)
-        {
-            _rightTab.Active = _rightTab.Hovered;
-            if (_rightTab.Active == 1) _hidHideConfig.StateLoaded = false;
-            _ctx.MarkDirty();
-            return;
-        }
-
-        // HidHide config toggle clicks
-        if (_hidHideConfig.CloakingToggleHovered && !_hidHideConfig.CloakingToggleBounds.IsEmpty)
-        {
-            ToggleCloaking();
-            return;
-        }
-        if (_hidHideConfig.InverseToggleHovered && !_hidHideConfig.InverseToggleBounds.IsEmpty)
-        {
-            ToggleInverseMode();
             return;
         }
 
@@ -267,27 +232,6 @@ public class DevicesTabController : ITabController
             _devCat.Hovered = 1;
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
-
-        // Right panel tab hover detection
-        _rightTab.Hovered = -1;
-        if (_rightTab.Tab0Bounds.Contains(e.X, e.Y))
-        {
-            _rightTab.Hovered = 0;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
-        else if (_rightTab.Tab1Bounds.Contains(e.X, e.Y))
-        {
-            _rightTab.Hovered = 1;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
-
-        // HidHide config toggle hover detection
-        _hidHideConfig.CloakingToggleHovered = !_hidHideConfig.CloakingToggleBounds.IsEmpty &&
-            _hidHideConfig.CloakingToggleBounds.Contains(e.X, e.Y);
-        _hidHideConfig.InverseToggleHovered = !_hidHideConfig.InverseToggleBounds.IsEmpty &&
-            _hidHideConfig.InverseToggleBounds.Contains(e.X, e.Y);
-        if (_hidHideConfig.CloakingToggleHovered || _hidHideConfig.InverseToggleHovered)
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Device list hover detection - use same responsive layout as Draw
         float sideTabPad = FUIRenderer.SpaceSM;
@@ -777,105 +721,6 @@ public class DevicesTabController : ITabController
         canvas.Restore();
     }
 
-    private void DrawRightPanelSideTabs(SKCanvas canvas, float x, float y, float width, float height)
-    {
-        float tabHeight = 80f;
-        float tabGap = 4f;
-        float totalTabsHeight = tabHeight * 2 + tabGap;
-        float startY = y + height - totalTabsHeight - 10f;
-
-        // Tab 1 (top): HIDHIDE
-        var tab1Bounds = new SKRect(x, startY, x + width, startY + tabHeight);
-        _rightTab.Tab1Bounds = tab1Bounds;
-        FUIWidgets.DrawVerticalSideTab(canvas, tab1Bounds, "HIDHIDE", _rightTab.Active == 1, _rightTab.Hovered == 1);
-
-        // Tab 0 (bottom): ACTIONS
-        var tab0Bounds = new SKRect(x, startY + tabHeight + tabGap, x + width, startY + tabHeight * 2 + tabGap);
-        _rightTab.Tab0Bounds = tab0Bounds;
-        FUIWidgets.DrawVerticalSideTab(canvas, tab0Bounds, "ACTIONS", _rightTab.Active == 0, _rightTab.Hovered == 0);
-    }
-
-    private void DrawHidHideConfigPanel(SKCanvas canvas, SKRect bounds)
-    {
-        float pad = FUIRenderer.PanelPadding;
-        float frameInset = 5f;
-
-        FUIRenderer.DrawPanelShadow(canvas, bounds, 3f, 3f, 10f);
-
-        var contentBounds = new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
-                                        bounds.Right - frameInset, bounds.Bottom - frameInset);
-        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
-        canvas.DrawRect(contentBounds, bgPaint);
-
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 35f, 10f);
-
-        float titleBarHeight = 32f;
-        var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
-        FUIRenderer.DrawPanelTitle(canvas, titleBounds, "H1", "HIDHIDE");
-
-        float y = contentBounds.Top + titleBarHeight + pad;
-        bool available = _ctx.HidHide?.IsAvailable() ?? false;
-
-        if (!available)
-        {
-            _hidHideConfig.CloakingToggleBounds = SKRect.Empty;
-            _hidHideConfig.InverseToggleBounds = SKRect.Empty;
-            FUIRenderer.DrawText(canvas, "HidHide not installed",
-                new SKPoint(contentBounds.Left + pad, y + 16), FUIColors.Warning, 13f);
-            FUIRenderer.DrawText(canvas, "Install HidHide to use",
-                new SKPoint(contentBounds.Left + pad, y + 38), FUIColors.TextDim, 12f);
-            FUIRenderer.DrawText(canvas, "device hiding features.",
-                new SKPoint(contentBounds.Left + pad, y + 54), FUIColors.TextDim, 12f);
-            return;
-        }
-
-        // Refresh cached state when panel opens
-        if (!_hidHideConfig.StateLoaded)
-        {
-            _hidHideConfig.IsCloaking = _ctx.HidHide!.IsCloakingEnabled();
-            _hidHideConfig.IsInverse = _ctx.HidHide.IsInverseMode();
-            _hidHideConfig.StateLoaded = true;
-        }
-
-        float toggleWidth = 44f;
-        float toggleHeight = 24f;
-        float toggleX = contentBounds.Right - pad - toggleWidth;
-        float sectionGap = 14f;
-
-        // CLOAKING
-        FUIRenderer.DrawText(canvas, "CLOAKING", new SKPoint(contentBounds.Left + pad, y),
-            FUIColors.TextDim, 11f);
-        y += 14f;
-        float textY = y + toggleHeight / 2f;
-        FUIRenderer.DrawText(canvas, _hidHideConfig.IsCloaking ? "Active" : "Inactive",
-            new SKPoint(contentBounds.Left + pad, textY),
-            _hidHideConfig.IsCloaking ? FUIColors.Active : FUIColors.TextPrimary, 13f);
-        _hidHideConfig.CloakingToggleBounds = new SKRect(toggleX, y, toggleX + toggleWidth, y + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _hidHideConfig.CloakingToggleBounds,
-            _hidHideConfig.IsCloaking ? 1f : 0f, _ctx.MousePosition);
-        y += toggleHeight + sectionGap;
-
-        using var divPaint = FUIRenderer.CreateStrokePaint(FUIColors.FrameDim.WithAlpha(60));
-        canvas.DrawLine(contentBounds.Left + pad, y, contentBounds.Right - pad, y, divPaint);
-        y += sectionGap;
-
-        // INVERSE MODE
-        FUIRenderer.DrawText(canvas, "INVERSE MODE", new SKPoint(contentBounds.Left + pad, y),
-            FUIColors.TextDim, 11f);
-        y += 14f;
-        textY = y + toggleHeight / 2f;
-        FUIRenderer.DrawText(canvas, _hidHideConfig.IsInverse ? "Enabled" : "Disabled",
-            new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextPrimary, 13f);
-        _hidHideConfig.InverseToggleBounds = new SKRect(toggleX, y, toggleX + toggleWidth, y + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _hidHideConfig.InverseToggleBounds,
-            _hidHideConfig.IsInverse ? 1f : 0f, _ctx.MousePosition);
-        y += toggleHeight + 8f;
-
-        FUIRenderer.DrawText(canvas,
-            _hidHideConfig.IsInverse ? "Whitelisted apps are blocked." : "Whitelisted apps can see devices.",
-            new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim.WithAlpha(160), 11f);
-    }
-
     private void DrawDeviceActionsPanel(SKCanvas canvas, SKRect bounds)
     {
         float pad = FUIRenderer.PanelPadding;
@@ -1296,24 +1141,6 @@ public class DevicesTabController : ITabController
         _ctx.MarkDirty();
     }
 
-    private void ToggleCloaking()
-    {
-        if (_ctx.HidHide is null) return;
-        if (_hidHideConfig.IsCloaking) _ctx.HidHide.DisableCloaking();
-        else _ctx.HidHide.EnableCloaking();
-        _hidHideConfig.IsCloaking = _ctx.HidHide.IsCloakingEnabled();
-        _ctx.MarkDirty();
-    }
-
-    private void ToggleInverseMode()
-    {
-        if (_ctx.HidHide is null) return;
-        if (_hidHideConfig.IsInverse) _ctx.HidHide.DisableInverseMode();
-        else _ctx.HidHide.EnableInverseMode();
-        _hidHideConfig.IsInverse = _ctx.HidHide.IsInverseMode();
-        _ctx.MarkDirty();
-    }
-
     /// <summary>
     /// Updates the HidHide whitelist for all detected SC game executables based on the current mode.
     ///
@@ -1698,24 +1525,5 @@ public class DevicesTabController : ITabController
     {
         public DateTime LastClickTime = DateTime.MinValue;
         public string? LastControlId;
-    }
-
-    private sealed class RightPanelTabState
-    {
-        public int Active;     // 0 = ACTIONS, 1 = HIDHIDE
-        public int Hovered = -1;
-        public SKRect Tab0Bounds;
-        public SKRect Tab1Bounds;
-    }
-
-    private sealed class HidHideConfigState
-    {
-        public SKRect CloakingToggleBounds;
-        public bool CloakingToggleHovered;
-        public SKRect InverseToggleBounds;
-        public bool InverseToggleHovered;
-        public bool IsCloaking;
-        public bool IsInverse;
-        public bool StateLoaded;
     }
 }

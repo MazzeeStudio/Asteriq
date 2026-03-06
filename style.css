@@ -256,11 +256,34 @@ img {
 
 .hero-actions {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     gap: 1rem;
     flex-wrap: wrap;
     margin-bottom: 2rem;
+}
+
+.hero-download {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.hero-download-alt {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+.hero-download-alt a {
+    color: var(--text-label);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.hero-download-alt a:hover {
+    color: var(--accent-hi);
+    text-decoration: underline;
 }
 
 .btn-hero-primary {
@@ -915,6 +938,14 @@ footer {
     .hero-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .hero-download {
+        align-items: stretch;
+    }
+
+    .hero-download-alt {
+        text-align: center;
     }
 
     .btn-hero-primary,

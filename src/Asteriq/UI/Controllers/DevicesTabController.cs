@@ -803,7 +803,8 @@ public class DevicesTabController : ITabController
                     _actions.ClearMappingsBounds = SKRect.Empty;
                 }
 
-                // HidHide — hide/unhide toggle
+                // HidHide — hide/unhide toggle (extra gap to separate from action buttons above)
+                y += 16f;
                 if (_ctx.HidHide is not null && _ctx.DeviceMatching is not null && _ctx.HidHide.IsAvailable())
                 {
                     // Refresh cached hide state when device selection changes.

@@ -795,6 +795,7 @@ public class DevicesTabController : ITabController
                     _actions.ClearMappingsBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
                     var clearState2 = _actions.ClearMappingsHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
                     FUIRenderer.DrawButton(canvas, _actions.ClearMappingsBounds, "CLEAR MAPPINGS", clearState2, isDanger: true);
+                    y += buttonHeight + buttonGap;
                 }
                 else
                 {
@@ -814,7 +815,6 @@ public class DevicesTabController : ITabController
                         _actions.CheckedDeviceGuid = device.InstanceGuid;
                     }
 
-                    y += buttonGap;
                     float toggleWidth = 44f;
                     float toggleHeight = 24f;
                     float toggleX = contentBounds.Right - pad - toggleWidth;

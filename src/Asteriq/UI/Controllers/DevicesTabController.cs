@@ -823,7 +823,7 @@ public class DevicesTabController : ITabController
                     float toggleHeight = 24f;
                     float toggleX = contentBounds.Right - pad - toggleWidth;
                     float textY = y + toggleHeight / 2f;
-                    FUIRenderer.DrawText(canvas, "HIDE FROM GAMES",
+                    FUIRenderer.DrawText(canvas, "HIDE",
                         new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextDim, 12f);
                     _actions.HideToggleBounds = new SKRect(toggleX, y, toggleX + toggleWidth, y + toggleHeight);
                     FUIWidgets.DrawToggleSwitch(canvas, _actions.HideToggleBounds, _actions.IsHidden ? 1f : 0f, _ctx.MousePosition);

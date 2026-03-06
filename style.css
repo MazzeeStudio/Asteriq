@@ -122,19 +122,22 @@ img {
 }
 
 .nav-link {
+    display: inline-block;
+    padding: 0.5rem 1.4rem;
     font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--accent-hi);
-    opacity: 0.7;
+    color: var(--text-muted, #6080a0);
+    border: 1px solid rgba(96, 128, 160, 0.3);
     text-decoration: none;
-    transition: opacity 0.2s;
+    white-space: nowrap;
+    transition: color 0.2s, border-color 0.2s;
 }
 
 .nav-link:hover {
     color: var(--accent-hi);
-    opacity: 1;
+    border-color: rgba(0, 180, 240, 0.45);
     text-decoration: none;
 }
 

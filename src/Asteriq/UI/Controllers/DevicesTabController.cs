@@ -1111,6 +1111,8 @@ public class DevicesTabController : ITabController
 
             foreach (var path in toUnhide)
                 _ctx.HidHide.UnhideDevice(path);
+
+            UpdateSCWhitelist(isHiding: false);
         }
         else
         {
@@ -1124,8 +1126,11 @@ public class DevicesTabController : ITabController
             if (!_ctx.HidHide.IsCloakingEnabled())
                 _ctx.HidHide.EnableCloaking();
 
+            // Ensure Asteriq can still see hidden devices (handles both normal and inverse mode)
             _ctx.HidHide.EnsureSelfCanSeeDevices();
-            WhitelistSCExecutables();
+
+            // Ensure SC executables are blocked from hidden devices (mode-aware)
+            UpdateSCWhitelist(isHiding: true);
         }
 
         // Refresh cached state using the same VID/PID-against-hidden-list approach
@@ -1137,17 +1142,39 @@ public class DevicesTabController : ITabController
     }
 
     /// <summary>
-    /// Adds all detected SC game executables to the HidHide whitelist so they can see real devices.
+    /// Updates the HidHide whitelist for all detected SC game executables based on the current mode.
+    ///
+    /// Normal mode  — whitelisted apps CAN see hidden devices.
+    ///   Hiding:   REMOVE SC from whitelist so it cannot see the hidden physical device.
+    ///   Unhiding: no-op (SC was never whitelisted; devices visible to all again).
+    ///
+    /// Inverse mode — whitelisted apps are BLOCKED from hidden devices.
+    ///   Hiding:   ADD SC to whitelist so it is blocked from the hidden physical device.
+    ///   Unhiding: REMOVE SC from whitelist (no longer need to block it).
     /// </summary>
-    private void WhitelistSCExecutables()
+    private void UpdateSCWhitelist(bool isHiding)
     {
         if (_ctx.HidHide is null || _ctx.SCInstallation is null) return;
+
+        bool isInverse = _ctx.HidHide.IsInverseMode();
 
         foreach (var installation in _ctx.SCInstallation.Installations)
         {
             var exePath = Path.Combine(installation.InstallPath, "Bin64", "StarCitizen.exe");
-            if (File.Exists(exePath))
-                _ctx.HidHide.WhitelistApp(exePath);
+            if (!File.Exists(exePath)) continue;
+
+            if (isInverse)
+            {
+                // Inverse: whitelist = blocked. Add on hide so SC can't see device; remove on unhide.
+                if (isHiding) _ctx.HidHide.WhitelistApp(exePath);
+                else _ctx.HidHide.UnwhitelistApp(exePath);
+            }
+            else
+            {
+                // Normal: whitelist = allowed. Remove SC so it can't bypass the hide.
+                // On unhide there's nothing to undo — SC was never in the whitelist.
+                if (isHiding) _ctx.HidHide.UnwhitelistApp(exePath);
+            }
         }
     }
 

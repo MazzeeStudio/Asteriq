@@ -104,4 +104,16 @@ public interface IHidHideService
     /// Unhide all currently hidden devices
     /// </summary>
     int UnhideAllDevices();
+
+    /// <summary>
+    /// Get the file version of the installed HidHide CLI executable.
+    /// Returns null if HidHide is not installed.
+    /// </summary>
+    string? GetInstalledVersion();
+
+    /// <summary>
+    /// Fetch the latest HidHide release tag from GitHub.
+    /// Returns the version string (without "v" prefix) or null on failure.
+    /// </summary>
+    Task<string?> GetLatestVersionAsync(CancellationToken ct = default);
 }

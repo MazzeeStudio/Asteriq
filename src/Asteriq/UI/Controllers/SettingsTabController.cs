@@ -81,11 +81,15 @@ public class SettingsTabController : ITabController
     // HidHide panel state
     private SKRect _hidHideCloakingToggleBounds;
     private SKRect _hidHideInverseToggleBounds;
+    private SKRect _hidHideUpdateButtonBounds;
     private bool _hidHideCloaking;
     private bool _hidHideInverse;
     private bool _hidHideStateLoaded;
     private float _cloakingT;
     private float _inverseT;
+    private string? _hidHideInstalledVersion;
+    private string? _hidHideLatestVersion;
+    private bool _hidHideVersionChecked;
 
     public SettingsTabController(TabContext ctx)
     {
@@ -1133,6 +1137,21 @@ public class SettingsTabController : ITabController
 
         bool available = _ctx.HidHide?.IsAvailable() ?? false;
 
+        // Kick off version check once per panel open
+        if (!_hidHideVersionChecked && _ctx.HidHide is not null)
+        {
+            _hidHideVersionChecked = true;
+            _hidHideInstalledVersion = _ctx.HidHide.GetInstalledVersion();
+            _ = _ctx.HidHide.GetLatestVersionAsync().ContinueWith(t =>
+            {
+                if (!t.IsFaulted && t.Result is not null)
+                {
+                    _hidHideLatestVersion = t.Result;
+                    _ctx.InvalidateCanvas();
+                }
+            }, TaskScheduler.Default);
+        }
+
         if (!available)
         {
             _hidHideCloakingToggleBounds = SKRect.Empty;
@@ -1140,13 +1159,32 @@ public class SettingsTabController : ITabController
             FUIRenderer.DrawText(canvas, "HidHide not installed.",
                 new SKPoint(leftMargin, y + rowH / 2f + 4f), FUIColors.Warning, 13f);
             y += rowH + sectionGap;
-            FUIRenderer.DrawText(canvas, "Install HidHide to enable",
-                new SKPoint(leftMargin, y + rowH / 2f + 4f), FUIColors.TextDim, 12f);
-            y += rowH;
-            FUIRenderer.DrawText(canvas, "device hiding features.",
-                new SKPoint(leftMargin, y + rowH / 2f + 4f), FUIColors.TextDim, 12f);
+            // Show download button
+            DrawHidHideDownloadButton(canvas, leftMargin, rightMargin, ref y, rowH,
+                _hidHideLatestVersion is not null ? $"Download v{_hidHideLatestVersion}" : "Download HidHide");
             canvas.Restore();
             return;
+        }
+
+        // Version row
+        if (_hidHideInstalledVersion is not null)
+        {
+            FUIRenderer.DrawText(canvas, $"v{_hidHideInstalledVersion}",
+                new SKPoint(leftMargin, y + rowH / 2f + 4f), FUIColors.TextDim, 12f);
+            y += rowH;
+
+            bool updateAvailable = IsHidHideUpdateAvailable();
+            if (updateAvailable)
+            {
+                DrawHidHideDownloadButton(canvas, leftMargin, rightMargin, ref y, rowH,
+                    $"Update to v{_hidHideLatestVersion}");
+                y += sectionGap;
+            }
+            else
+            {
+                _hidHideUpdateButtonBounds = SKRect.Empty;
+                y += sectionGap;
+            }
         }
 
         // CLOAKING toggle
@@ -1171,6 +1209,26 @@ public class SettingsTabController : ITabController
             FUIColors.TextDim.WithAlpha(160), 11f);
 
         canvas.Restore();
+    }
+
+    private void DrawHidHideDownloadButton(SKCanvas canvas, float leftMargin, float rightMargin,
+        ref float y, float rowH, string label)
+    {
+        _hidHideUpdateButtonBounds = new SKRect(leftMargin, y, rightMargin, y + rowH);
+        bool hovered = _hidHideUpdateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIRenderer.DrawButton(canvas, _hidHideUpdateButtonBounds, label,
+            hovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        y += rowH;
+    }
+
+    private bool IsHidHideUpdateAvailable()
+    {
+        if (_hidHideInstalledVersion is null || _hidHideLatestVersion is null)
+            return false;
+        if (Version.TryParse(_hidHideInstalledVersion, out var installed) &&
+            Version.TryParse(_hidHideLatestVersion, out var latest))
+            return latest > installed;
+        return false;
     }
 
     private void DrawNetworkSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -1470,12 +1528,26 @@ public class SettingsTabController : ITabController
         {
             _settingsRightPanelActive = "hidhide";
             _ctx.AppSettings.SettingsRightPanel = "hidhide";
-            _hidHideStateLoaded = false; // force reload when opening
+            _hidHideStateLoaded = false;   // force toggle state reload
+            _hidHideVersionChecked = false; // force version re-check
             _ctx.InvalidateCanvas();
             return;
         }
 
-        // HidHide panel toggle clicks
+        // HidHide panel clicks
+        if (_settingsRightPanelActive == "hidhide")
+        {
+            if (!_hidHideUpdateButtonBounds.IsEmpty && _hidHideUpdateButtonBounds.Contains(pt))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://github.com/nefarius/HidHide/releases/latest",
+                    UseShellExecute = true
+                });
+                return;
+            }
+        }
+
         if (_settingsRightPanelActive == "hidhide" && _ctx.HidHide?.IsAvailable() == true)
         {
             if (!_hidHideCloakingToggleBounds.IsEmpty && _hidHideCloakingToggleBounds.Contains(pt))

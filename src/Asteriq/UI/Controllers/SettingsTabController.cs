@@ -997,17 +997,35 @@ public class SettingsTabController : ITabController, IDisposable
 
     private void DrawRightPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        bool networkEnabled = _ctx.AppSettings.NetworkEnabled;
+        bool networkEnabled  = _ctx.AppSettings.NetworkEnabled;
+        bool hidHideInstalled = _ctx.HidHide?.IsAvailable() == true;
         const float gap = 8f;
+
+        // If HidHide was uninstalled while the panel was active, fall back to visual
+        if (!hidHideInstalled && _settingsRightPanelActive == "hidhide")
+        {
+            _settingsRightPanelActive = "visual";
+            _hidHidePanelHeaderBounds = SKRect.Empty;
+        }
 
         // Load HidHide state fresh when the panel first opens
         if (_settingsRightPanelActive == "hidhide" && !_hidHideStateLoaded)
         {
-            _hidHideCloaking = _ctx.HidHide?.IsAvailable() == true && _ctx.HidHide.IsCloakingEnabled();
-            _hidHideInverse  = _ctx.HidHide?.IsAvailable() == true && _ctx.HidHide.IsInverseMode();
+            _hidHideCloaking = _ctx.HidHide!.IsCloakingEnabled();
+            _hidHideInverse  = _ctx.HidHide!.IsInverseMode();
             _cloakingT = _hidHideCloaking ? 1f : 0f;
             _inverseT  = _hidHideInverse  ? 1f : 0f;
             _hidHideStateLoaded = true;
+        }
+
+        if (!networkEnabled && !hidHideInstalled)
+        {
+            // 1-panel: VISUAL only
+            _networkPanelHeaderBounds = SKRect.Empty;
+            _hidHidePanelHeaderBounds = SKRect.Empty;
+            DrawVisualSettingsSubPanel(canvas, bounds, frameInset);
+            _visualPanelHeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH);
+            return;
         }
 
         if (!networkEnabled)
@@ -1016,7 +1034,7 @@ public class SettingsTabController : ITabController, IDisposable
             _networkPanelHeaderBounds = SKRect.Empty;
             if (_settingsRightPanelActive == "hidhide")
             {
-                float visBottom = bounds.Top + RightPanelCollapsedH;
+                float visBottom   = bounds.Top + RightPanelCollapsedH;
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
                 var hidHideBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, bounds.Bottom);
                 DrawVisualPanelCollapsed(canvas, visualBounds);
@@ -1034,6 +1052,34 @@ public class SettingsTabController : ITabController, IDisposable
                 FUIRenderer.DrawText(canvas, "-", new SKPoint(visualBounds.Right - FUIRenderer.FrameInset - indW, visualBounds.Top + FUIRenderer.FrameInset + 18f),
                     visHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
                 DrawHidHidePanelCollapsed(canvas, hidHideBounds);
+            }
+            return;
+        }
+
+        if (!hidHideInstalled)
+        {
+            // 2-panel accordion: VISUAL + NETWORK
+            _hidHidePanelHeaderBounds = SKRect.Empty;
+            if (_settingsRightPanelActive == "network")
+            {
+                float visBottom   = bounds.Top + RightPanelCollapsedH;
+                var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
+                var networkBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, bounds.Bottom);
+                DrawVisualPanelCollapsed(canvas, visualBounds);
+                DrawNetworkSettingsPanel(canvas, networkBounds, frameInset);
+            }
+            else
+            {
+                float netTop      = bounds.Bottom - RightPanelCollapsedH;
+                var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, netTop - gap);
+                var networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, bounds.Bottom);
+                DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
+                _visualPanelHeaderBounds = new SKRect(visualBounds.Left, visualBounds.Top, visualBounds.Right, visualBounds.Top + RightPanelCollapsedH);
+                bool visHov = _visualPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                float indW = FUIRenderer.MeasureText("-", 13f);
+                FUIRenderer.DrawText(canvas, "-", new SKPoint(visualBounds.Right - FUIRenderer.FrameInset - indW, visualBounds.Top + FUIRenderer.FrameInset + 18f),
+                    visHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
+                DrawNetworkPanelCollapsed(canvas, networkBounds);
             }
             return;
         }

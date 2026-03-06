@@ -121,6 +121,21 @@ img {
     text-decoration: none;
 }
 
+.nav-link {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.nav-link:hover {
+    color: var(--accent-hi);
+    text-decoration: none;
+}
+
 .btn-nav-download {
     display: inline-block;
     background: rgba(0, 144, 204, 0.12);

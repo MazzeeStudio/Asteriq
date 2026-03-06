@@ -540,7 +540,7 @@ public class DriverSetupForm : FUIBaseDialog
 
             int choice = FUIMessageBox.Show(this,
                 "Failed to download the vJoy installer.\n\nOpen the GitHub releases page to download manually?",
-                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open GitHub", "Cancel");
+                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
             if (choice == 0) OpenUrl(_driverSetup.GetVJoyReleasesUrl());
             return;
         }
@@ -590,7 +590,7 @@ public class DriverSetupForm : FUIBaseDialog
 
             int choice = FUIMessageBox.Show(this,
                 "Failed to download the HidHide installer.\n\nOpen the GitHub releases page to download manually?",
-                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open GitHub", "Cancel");
+                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
             if (choice == 0) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
             return;
         }

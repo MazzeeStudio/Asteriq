@@ -88,6 +88,8 @@ public partial class MainForm : Form
     private readonly INetworkDiscoveryService _networkDiscovery;
     private readonly INetworkInputService _networkInput;
     private readonly ILogger<MainForm> _logger;
+    private readonly IHidHideService _hidHideService;
+    private readonly DeviceMatchingService _deviceMatching;
 
     // Tab controllers
     private SettingsTabController _settingsController = null!;
@@ -186,6 +188,8 @@ public partial class MainForm : Form
         SCXmlExportService scExportService,
         SCExportProfileService scExportProfileService,
         ILogger<MainForm> logger,
+        IHidHideService hidHideService,
+        DeviceMatchingService deviceMatchingService,
         DirectInput.DirectInputService? directInputService = null,
         INetworkDiscoveryService? networkDiscovery = null,
         INetworkInputService? networkInput = null)
@@ -206,6 +210,8 @@ public partial class MainForm : Form
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         _driverSetupManager = driverSetupManager ?? throw new ArgumentNullException(nameof(driverSetupManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _hidHideService = hidHideService ?? throw new ArgumentNullException(nameof(hidHideService));
+        _deviceMatching = deviceMatchingService ?? throw new ArgumentNullException(nameof(deviceMatchingService));
         _directInputService = directInputService; // nullable — unavailable in tests or headless environments
         _networkDiscovery = networkDiscovery ?? new NullNetworkDiscoveryService();
         _networkInput = networkInput ?? new NullNetworkInputService();
@@ -297,6 +303,9 @@ public partial class MainForm : Form
         _tabContext.GetSvgForDeviceMap = GetSvgForDeviceMap;
         _tabContext.OpenDriverSetup = OpenDriverSetupDialog;
         _tabContext.RefreshVJoyDevices = RefreshVJoyDevicesInternal;
+        _tabContext.HidHide = _hidHideService;
+        _tabContext.DeviceMatching = _deviceMatching;
+        _tabContext.SCInstallation = scInstallationService;
 
         // Network forwarding
         _tabContext.NetworkDiscovery = _networkDiscovery;

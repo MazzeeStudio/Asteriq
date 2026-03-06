@@ -130,6 +130,11 @@ public class DevicesTabController : ITabController
             _ctx.RemoveDisconnectedDevice?.Invoke();
             return;
         }
+        if (_actions.HideToggleHovered && !_actions.HideToggleBounds.IsEmpty)
+        {
+            ToggleDeviceHide();
+            return;
+        }
 
         // Silhouette picker clicks (D3 panel, virtual device selected)
         if (_silhouette.PrevHovered) { StepSilhouette(-1); return; }
@@ -269,9 +274,11 @@ public class DevicesTabController : ITabController
         _actions.Map1to1Hovered = !_actions.Map1to1Bounds.IsEmpty && _actions.Map1to1Bounds.Contains(e.X, e.Y);
         _actions.ClearMappingsHovered = !_actions.ClearMappingsBounds.IsEmpty && _actions.ClearMappingsBounds.Contains(e.X, e.Y);
         _actions.RemoveDeviceHovered = !_actions.RemoveDeviceBounds.IsEmpty && _actions.RemoveDeviceBounds.Contains(e.X, e.Y);
+        _actions.HideToggleHovered = !_actions.HideToggleBounds.IsEmpty && _actions.HideToggleBounds.Contains(e.X, e.Y);
         _silhouette.RemoveVJoyHovered = !_silhouette.RemoveVJoyBounds.IsEmpty && _silhouette.RemoveVJoyBounds.Contains(e.X, e.Y);
 
-        if (_actions.Map1to1Hovered || _actions.ClearMappingsHovered || _actions.RemoveDeviceHovered || _silhouette.RemoveVJoyHovered)
+        if (_actions.Map1to1Hovered || _actions.ClearMappingsHovered || _actions.RemoveDeviceHovered ||
+            _actions.HideToggleHovered || _silhouette.RemoveVJoyHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Forwarding button hover detection
@@ -794,6 +801,33 @@ public class DevicesTabController : ITabController
                     _actions.Map1to1Bounds = SKRect.Empty;
                     _actions.ClearMappingsBounds = SKRect.Empty;
                 }
+
+                // HidHide — hide/unhide toggle
+                if (_ctx.HidHide is not null && _ctx.DeviceMatching is not null && _ctx.HidHide.IsAvailable())
+                {
+                    // Refresh cached hide state when device selection changes
+                    if (_actions.CheckedDeviceGuid != device.InstanceGuid)
+                    {
+                        var matches = _ctx.DeviceMatching.FindMatchingHidDevices(device);
+                        var hiddenPaths = new HashSet<string>(_ctx.HidHide.GetHiddenDevices(), StringComparer.OrdinalIgnoreCase);
+                        _actions.IsHidden = matches.Count > 0 && matches.All(m => hiddenPaths.Contains(m.DeviceInstancePath));
+                        _actions.CheckedDeviceGuid = device.InstanceGuid;
+                    }
+
+                    y += buttonGap;
+                    float toggleWidth = 44f;
+                    float toggleHeight = 24f;
+                    float toggleX = contentBounds.Right - pad - toggleWidth;
+                    float textY = y + toggleHeight / 2f;
+                    FUIRenderer.DrawText(canvas, "HIDE FROM GAMES",
+                        new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextDim, 12f);
+                    _actions.HideToggleBounds = new SKRect(toggleX, y, toggleX + toggleWidth, y + toggleHeight);
+                    FUIWidgets.DrawToggleSwitch(canvas, _actions.HideToggleBounds, _actions.IsHidden ? 1f : 0f, _ctx.MousePosition);
+                }
+                else
+                {
+                    _actions.HideToggleBounds = SKRect.Empty;
+                }
             }
         }
         else if (hasVirtualDevice)
@@ -801,6 +835,7 @@ public class DevicesTabController : ITabController
             _actions.Map1to1Bounds = SKRect.Empty;
             _actions.ClearMappingsBounds = SKRect.Empty;
             _actions.RemoveDeviceBounds = SKRect.Empty;
+            _actions.HideToggleBounds = SKRect.Empty;
             _silhouette.RemoveVJoyBounds = SKRect.Empty;
 
             uint vjoyId = GetSelectedVJoyId();
@@ -882,6 +917,7 @@ public class DevicesTabController : ITabController
             _actions.Map1to1Bounds = SKRect.Empty;
             _actions.ClearMappingsBounds = SKRect.Empty;
             _actions.RemoveDeviceBounds = SKRect.Empty;
+            _actions.HideToggleBounds = SKRect.Empty;
             _silhouette.RemoveVJoyBounds = SKRect.Empty;
             _silhouette.PrevBounds = SKRect.Empty;
             _silhouette.NextBounds = SKRect.Empty;
@@ -1046,6 +1082,58 @@ public class DevicesTabController : ITabController
     #endregion
 
     #region vJoy Device Management
+
+    /// <summary>
+    /// Toggles HidHide hiding for the currently selected physical device.
+    /// When hiding: enables cloaking, ensures Asteriq can see devices, whitelists SC executables.
+    /// </summary>
+    private void ToggleDeviceHide()
+    {
+        if (_ctx.HidHide is null || _ctx.DeviceMatching is null) return;
+        if (_ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count) return;
+
+        var device = _ctx.Devices[_ctx.SelectedDevice];
+        var matches = _ctx.DeviceMatching.FindMatchingHidDevices(device);
+        if (matches.Count == 0) return;
+
+        if (_actions.IsHidden)
+        {
+            foreach (var match in matches)
+                _ctx.HidHide.UnhideDevice(match.DeviceInstancePath);
+        }
+        else
+        {
+            foreach (var match in matches)
+                _ctx.HidHide.HideDevice(match.DeviceInstancePath);
+
+            if (!_ctx.HidHide.IsCloakingEnabled())
+                _ctx.HidHide.EnableCloaking();
+
+            _ctx.HidHide.EnsureSelfCanSeeDevices();
+            WhitelistSCExecutables();
+        }
+
+        // Refresh cached state
+        var hiddenPaths = new HashSet<string>(_ctx.HidHide.GetHiddenDevices(), StringComparer.OrdinalIgnoreCase);
+        _actions.IsHidden = matches.Count > 0 && matches.All(m => hiddenPaths.Contains(m.DeviceInstancePath));
+        _actions.CheckedDeviceGuid = device.InstanceGuid;
+        _ctx.MarkDirty();
+    }
+
+    /// <summary>
+    /// Adds all detected SC game executables to the HidHide whitelist so they can see real devices.
+    /// </summary>
+    private void WhitelistSCExecutables()
+    {
+        if (_ctx.HidHide is null || _ctx.SCInstallation is null) return;
+
+        foreach (var installation in _ctx.SCInstallation.Installations)
+        {
+            var exePath = Path.Combine(installation.InstallPath, "Bin64", "StarCitizen.exe");
+            if (File.Exists(exePath))
+                _ctx.HidHide.WhitelistApp(exePath);
+        }
+    }
 
     /// <summary>
     /// Removes a vJoy device using vJoyConfig.exe CLI, then refreshes the device lists.
@@ -1365,6 +1453,11 @@ public class DevicesTabController : ITabController
         public bool ClearMappingsHovered;
         public SKRect RemoveDeviceBounds;
         public bool RemoveDeviceHovered;
+        public SKRect HideToggleBounds;
+        public bool HideToggleHovered;
+        // Cached hide state — refreshed when selected device changes
+        public bool IsHidden;
+        public Guid CheckedDeviceGuid;
     }
 
     private sealed class ForwardingButtonsState

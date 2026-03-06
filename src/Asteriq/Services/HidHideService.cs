@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Text.Json;
 using Asteriq.Models;
 using Asteriq.Services.Abstractions;
@@ -337,6 +338,40 @@ public class HidHideService : IHidHideService
         }
 
         return unhiddenCount;
+    }
+
+    private const string HidHideGitHubApiUrl = "https://api.github.com/repos/nefarius/HidHide/releases/latest";
+
+    /// <summary>
+    /// Get the file version of the installed HidHide CLI executable.
+    /// </summary>
+    public string? GetInstalledVersion()
+    {
+        if (!File.Exists(_cliPath))
+            return null;
+
+        var info = FileVersionInfo.GetVersionInfo(_cliPath);
+        return info.FileVersion;
+    }
+
+    /// <summary>
+    /// Fetch the latest HidHide release tag from GitHub.
+    /// </summary>
+    public async Task<string?> GetLatestVersionAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("User-Agent", "Asteriq");
+            var json = await http.GetStringAsync(HidHideGitHubApiUrl, ct);
+            using var doc = JsonDocument.Parse(json);
+            var tag = doc.RootElement.GetProperty("tag_name").GetString();
+            return tag?.TrimStart('v');
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return null;
+        }
     }
 
     private string RunCommand(string arguments)

@@ -30,7 +30,7 @@
         <div class="hero-content">
             <span class="hero-eyebrow">HOTAS Management for Star Citizen</span>
             <h1 class="hero-headline">One app.<br><em>Not three.</em></h1>
-            <p class="hero-sub">Replace JoystickGremlin, your vJoy configurator, and the HidHide GUI with a single application. Everything — device assignment, axis curves, SC bindings, and input forwarding — in one place.</p>
+            <p class="hero-sub">Everything your HOTAS setup needs in one application. Assign devices, tune axis curves, configure Star Citizen bindings, and forward input across your network.</p>
             <div class="hero-actions">
                 <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.zip" class="btn-hero-primary">
                     Download Latest Release
@@ -80,8 +80,8 @@
                     <p>Assignments are tracked by hardware identity, not port order. Replug your HOTAS in any order and the configuration stays exactly where you left it.</p>
                 </div>
                 <div class="value-card">
-                    <h3>Read-only SC integration</h3>
-                    <p>Asteriq reads your Star Citizen bindings to display and edit them, but never touches your existing actionmaps.xml. Export only — your SC config is always safe.</p>
+                    <h3>Safe SC integration</h3>
+                    <p>Asteriq loads your Star Citizen bindings for viewing and editing, and exports control profiles directly to your Star Citizen directory.</p>
                 </div>
             </div>
         </div>
@@ -136,7 +136,7 @@
                     <div class="feature-text">
                         <h3>Device Management</h3>
                         <p>Each physical controller is assigned to a specific vJoy slot — that slot is what Star Citizen sees. Assignments are tied to the device's hardware identity, so nothing shifts if you replug cables in a different order.</p>
-                        <p>If HidHide is installed, Asteriq can hide your physical devices from other applications whilst forwarding. This prevents SC from seeing both the real hardware and the virtual devices at the same time.</p>
+                        <p>Asteriq displays HidHide driver status in the Settings panel. To prevent Star Citizen from seeing both your physical hardware and the virtual devices simultaneously, install HidHide and configure device visibility within HidHide directly.</p>
                     </div>
                     <div class="feature-image">
                         <img src="screenshots/detail-device-actions.png" alt="Device Actions panel showing vJoy slot 3 assigned to a VPC MongoosT-50CM3 with 6 axes and 60 buttons" loading="lazy">
@@ -158,7 +158,7 @@
                     <div class="feature-text">
                         <h3>Star Citizen Bindings</h3>
                         <p>The SC Bindings tab loads your Star Citizen control profile and lays out every action against its bound inputs across all your devices. A single action can be bound to different inputs on each joystick — throttle, stick, and rudder pedals all in one grid.</p>
-                        <p>When two actions share the same physical input, Asteriq flags the conflict so you can resolve it before it causes problems in-game. Assign directly in the grid, then export to actionmaps.xml. Your original SC config is never touched.</p>
+                        <p>When two actions share the same physical input, Asteriq flags the conflict so you can resolve it before it causes problems in-game. Assign directly in the grid, then export your profile. Your original SC files are never modified.</p>
                     </div>
                     <div class="feature-image">
                         <img src="screenshots/detail-sc-profiles.png" alt="SC Bindings side panel showing Control Profiles dropdown and a conflict warning listing four conflicting actions" loading="lazy">
@@ -225,7 +225,7 @@
                         <span class="step-num">2</span>
                         <div class="step-body">
                             <strong>Install drivers if you need them</strong>
-                            <p>Virtual joystick forwarding requires the <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> driver. If you also want SC to only see the virtual devices and not your physical hardware, install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> as well. Asteriq runs without either, but most people will want at least vJoy.</p>
+                            <p>Virtual joystick forwarding requires the <a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> driver. If you want Star Citizen to see only the virtual devices and not your physical hardware, install <a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> and configure device visibility within HidHide directly. Asteriq runs without either driver, but most people will want at least vJoy.</p>
                         </div>
                     </li>
                     <li>

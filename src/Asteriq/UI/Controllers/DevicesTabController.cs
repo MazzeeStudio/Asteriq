@@ -806,12 +806,16 @@ public class DevicesTabController : ITabController
                 // HidHide — hide/unhide toggle
                 if (_ctx.HidHide is not null && _ctx.DeviceMatching is not null && _ctx.HidHide.IsAvailable())
                 {
-                    // Refresh cached hide state when device selection changes
+                    // Refresh cached hide state when device selection changes.
+                    // Match against GetHiddenDevices() via VID/PID so hidden devices are detected
+                    // even if they no longer appear in GetGamingDevices().
                     if (_actions.CheckedDeviceGuid != device.InstanceGuid)
                     {
-                        var matches = _ctx.DeviceMatching.FindMatchingHidDevices(device);
-                        var hiddenPaths = new HashSet<string>(_ctx.HidHide.GetHiddenDevices(), StringComparer.OrdinalIgnoreCase);
-                        _actions.IsHidden = matches.Count > 0 && matches.All(m => hiddenPaths.Contains(m.DeviceInstancePath));
+                        var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+                        var pattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
+                        var hiddenPaths = _ctx.HidHide.GetHiddenDevices();
+                        _actions.IsHidden = pattern is not null &&
+                            hiddenPaths.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
                         _actions.CheckedDeviceGuid = device.InstanceGuid;
                     }
 
@@ -1093,16 +1097,27 @@ public class DevicesTabController : ITabController
         if (_ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count) return;
 
         var device = _ctx.Devices[_ctx.SelectedDevice];
-        var matches = _ctx.DeviceMatching.FindMatchingHidDevices(device);
-        if (matches.Count == 0) return;
+        var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+        var vidPidPattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
 
         if (_actions.IsHidden)
         {
-            foreach (var match in matches)
-                _ctx.HidHide.UnhideDevice(match.DeviceInstancePath);
+            // Unhide: filter the current hidden-device list by this device's VID/PID.
+            // This works even if GetGamingDevices() omits hidden devices.
+            var hiddenPaths = _ctx.HidHide.GetHiddenDevices();
+            var toUnhide = vidPidPattern is not null
+                ? hiddenPaths.Where(p => p.Contains(vidPidPattern, StringComparison.OrdinalIgnoreCase)).ToList()
+                : new List<string>();
+
+            foreach (var path in toUnhide)
+                _ctx.HidHide.UnhideDevice(path);
         }
         else
         {
+            // Hide: query gaming devices to get the full instance path list
+            var matches = _ctx.DeviceMatching.FindMatchingHidDevices(device);
+            if (matches.Count == 0) return;
+
             foreach (var match in matches)
                 _ctx.HidHide.HideDevice(match.DeviceInstancePath);
 
@@ -1113,9 +1128,10 @@ public class DevicesTabController : ITabController
             WhitelistSCExecutables();
         }
 
-        // Refresh cached state
-        var hiddenPaths = new HashSet<string>(_ctx.HidHide.GetHiddenDevices(), StringComparer.OrdinalIgnoreCase);
-        _actions.IsHidden = matches.Count > 0 && matches.All(m => hiddenPaths.Contains(m.DeviceInstancePath));
+        // Refresh cached state using the same VID/PID-against-hidden-list approach
+        var newHiddenPaths = _ctx.HidHide.GetHiddenDevices();
+        _actions.IsHidden = vidPidPattern is not null &&
+            newHiddenPaths.Any(p => p.Contains(vidPidPattern, StringComparison.OrdinalIgnoreCase));
         _actions.CheckedDeviceGuid = device.InstanceGuid;
         _ctx.MarkDirty();
     }

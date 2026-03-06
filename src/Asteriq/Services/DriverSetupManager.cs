@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Asteriq.Services.Abstractions;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ public class DriverSetupManager
     private const string VJOY_RELEASES_URL = "https://github.com/jshafer817/vJoy/releases";
     private const string VJOY_DOWNLOAD_URL = "https://github.com/jshafer817/vJoy/releases/download/v2.1.9.1/vJoySetup.exe";
     private const string HIDHIDE_RELEASES_URL = "https://github.com/nefarius/HidHide/releases";
-    private const string HIDHIDE_DOWNLOAD_URL = "https://github.com/nefarius/HidHide/releases/download/v1.5.230/HidHide_1.5.230_x64.exe";
+    private const string HIDHIDE_API_URL = "https://api.github.com/repos/nefarius/HidHide/releases/latest";
 
     private readonly ILogger<DriverSetupManager> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -211,7 +212,7 @@ public class DriverSetupManager
     }
 
     /// <summary>
-    /// Download HidHide installer
+    /// Download HidHide installer (resolves latest release asset from GitHub API)
     /// </summary>
     public async Task<string?> DownloadHidHideInstallerAsync(IProgress<int>? progress = null, CancellationToken cancellationToken = default)
     {
@@ -220,10 +221,24 @@ public class DriverSetupManager
 
         try
         {
-            _logger.LogInformation("Downloading HidHide installer from {Url}", HIDHIDE_DOWNLOAD_URL);
-
             using var httpClient = _httpClientFactory.CreateClient("Asteriq");
-            using var response = await httpClient.GetAsync(HIDHIDE_DOWNLOAD_URL, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            // Resolve the latest release asset URL dynamically so a version bump never breaks the download
+            _logger.LogInformation("Resolving latest HidHide release from {Url}", HIDHIDE_API_URL);
+            var release = await httpClient.GetFromJsonAsync<GitHubRelease>(HIDHIDE_API_URL, cancellationToken);
+            var downloadUrl = release?.Assets
+                ?.FirstOrDefault(a => a.Name.EndsWith("_x64.exe", StringComparison.OrdinalIgnoreCase))
+                ?.BrowserDownloadUrl;
+
+            if (string.IsNullOrEmpty(downloadUrl))
+            {
+                _logger.LogError("Could not find a HidHide x64 installer asset in the latest release");
+                return null;
+            }
+
+            _logger.LogInformation("Downloading HidHide installer from {Url}", downloadUrl);
+
+            using var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
@@ -253,7 +268,7 @@ public class DriverSetupManager
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
         {
-            _logger.LogError(ex, "Failed to download HidHide installer from {Url}", HIDHIDE_DOWNLOAD_URL);
+            _logger.LogError(ex, "Failed to download HidHide installer from {Url}", HIDHIDE_API_URL);
             return null;
         }
     }
@@ -349,6 +364,15 @@ public class DriverSetupManager
     }
 
     #endregion
+
+    // Minimal GitHub API response shapes
+    private sealed record GitHubRelease(
+        [property: System.Text.Json.Serialization.JsonPropertyName("tag_name")] string TagName,
+        [property: System.Text.Json.Serialization.JsonPropertyName("assets")] List<GitHubAsset>? Assets);
+
+    private sealed record GitHubAsset(
+        [property: System.Text.Json.Serialization.JsonPropertyName("name")] string Name,
+        [property: System.Text.Json.Serialization.JsonPropertyName("browser_download_url")] string BrowserDownloadUrl);
 }
 
 /// <summary>

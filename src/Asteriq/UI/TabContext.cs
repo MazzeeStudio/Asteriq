@@ -135,6 +135,11 @@ public class TabContext
     /// </summary>
     public Action? CheckNetworkSwitchConflicts { get; set; }
 
+    // HidHide device hiding (set after construction by MainForm)
+    public IHidHideService? HidHide { get; set; }
+    public DeviceMatchingService? DeviceMatching { get; set; }
+    public ISCInstallationService? SCInstallation { get; set; }
+
     public TabContext(
         IInputService inputService,
         IProfileManager profileManager,

@@ -1,4 +1,5 @@
 using Asteriq.Models;
+using Asteriq.Services.Abstractions;
 
 namespace Asteriq.Services;
 
@@ -7,9 +8,9 @@ namespace Asteriq.Services;
 /// </summary>
 public class DeviceMatchingService
 {
-    private readonly HidHideService _hidHide;
+    private readonly IHidHideService _hidHide;
 
-    public DeviceMatchingService(HidHideService hidHide)
+    public DeviceMatchingService(IHidHideService hidHide)
     {
         _hidHide = hidHide;
     }

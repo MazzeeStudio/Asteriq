@@ -98,7 +98,7 @@ public class FUIMessageBox : FUIBaseDialog
                 maxWidth = Math.Max(maxWidth, detailPaint.MeasureText(line) + 40f); // 20px box padding each side
 
         float width = Math.Max(340f, maxWidth + 80f);
-        float height = 120f + lines.Length * 22f + 50f; // title bar + message + buttons
+        float height = 76f + lines.Length * 22f + 44f; // 36 title + 24 gap + message + 16 gap + 44 buttons
 
         if (_detailLines is { Length: > 0 })
             height += _detailLines.Length * 18f + 44f; // 12px gap + 10px pad top + lines + 10px pad bottom + 12px gap

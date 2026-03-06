@@ -112,8 +112,19 @@ public interface IHidHideService
     string? GetInstalledVersion();
 
     /// <summary>
-    /// Fetch the latest HidHide release tag from GitHub.
-    /// Returns the version string (without "v" prefix) or null on failure.
+    /// Fetch the latest HidHide release info from GitHub.
+    /// Returns null on failure or if no release is found.
     /// </summary>
-    Task<string?> GetLatestVersionAsync(CancellationToken ct = default);
+    Task<HidHideRelease?> GetLatestReleaseAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Download the HidHide installer to a temp file.
+    /// Returns the path to the downloaded file, or null on failure.
+    /// Progress reports 0–100.
+    /// </summary>
+    Task<string?> DownloadInstallerAsync(string downloadUrl, IProgress<int>? progress = null,
+        CancellationToken ct = default);
 }
+
+/// <summary>Latest HidHide release info fetched from GitHub.</summary>
+public record HidHideRelease(string Version, string? InstallerUrl);

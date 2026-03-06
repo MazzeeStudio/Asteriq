@@ -355,9 +355,9 @@ public class HidHideService : IHidHideService
     }
 
     /// <summary>
-    /// Fetch the latest HidHide release tag from GitHub.
+    /// Fetch the latest HidHide release info from GitHub.
     /// </summary>
-    public async Task<string?> GetLatestVersionAsync(CancellationToken ct = default)
+    public async Task<HidHideRelease?> GetLatestReleaseAsync(CancellationToken ct = default)
     {
         try
         {
@@ -365,11 +365,78 @@ public class HidHideService : IHidHideService
             http.DefaultRequestHeaders.Add("User-Agent", "Asteriq");
             var json = await http.GetStringAsync(HidHideGitHubApiUrl, ct);
             using var doc = JsonDocument.Parse(json);
+
             var tag = doc.RootElement.GetProperty("tag_name").GetString();
-            return tag?.TrimStart('v');
+            if (string.IsNullOrEmpty(tag))
+                return null;
+
+            string version = tag.TrimStart('v');
+
+            // Find the installer asset — prefer .exe, fall back to .msi
+            string? installerUrl = null;
+            if (doc.RootElement.TryGetProperty("assets", out var assets))
+            {
+                foreach (var asset in assets.EnumerateArray())
+                {
+                    var name = asset.GetProperty("name").GetString() ?? "";
+                    if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+                        name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+                    {
+                        installerUrl = asset.GetProperty("browser_download_url").GetString();
+                        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                            break; // prefer .exe
+                    }
+                }
+            }
+
+            return new HidHideRelease(version, installerUrl);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Download the HidHide installer to a temp file, reporting 0–100 progress.
+    /// Returns the path to the downloaded file, or null on failure.
+    /// </summary>
+    public async Task<string?> DownloadInstallerAsync(string downloadUrl, IProgress<int>? progress = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            string ext = Path.GetExtension(downloadUrl.Split('?')[0]);
+            if (string.IsNullOrEmpty(ext)) ext = ".exe";
+            string tempPath = Path.Combine(Path.GetTempPath(), $"HidHide_update{ext}");
+
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("User-Agent", "Asteriq");
+            using var response = await http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+
+            long? total = response.Content.Headers.ContentLength;
+            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var file = File.Create(tempPath);
+
+            var buffer = new byte[81920];
+            long downloaded = 0;
+            int read;
+            while ((read = await stream.ReadAsync(buffer, ct)) > 0)
+            {
+                await file.WriteAsync(buffer.AsMemory(0, read), ct);
+                downloaded += read;
+                if (total > 0)
+                    progress?.Report((int)(downloaded * 100 / total.Value));
+            }
+
+            await file.FlushAsync(ct);
+            progress?.Report(100);
+            return tempPath;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+        {
+            Console.WriteLine($"HidHide installer download failed: {ex.Message}");
             return null;
         }
     }

@@ -6,9 +6,10 @@
 
 $ErrorActionPreference = "Stop"
 
-$csproj    = "src\Asteriq\Asteriq.csproj"
-$outputDir = "publish-release"
-$distDir   = "dist"
+$csproj      = "src\Asteriq\Asteriq.csproj"
+$outputDir   = "publish-release"
+$distDir     = "dist"
+$wxsFile     = "src\Asteriq.Installer\Package.wxs"
 
 # --- Read version ---
 [xml]$proj = Get-Content $csproj
@@ -19,6 +20,7 @@ $version = "$major.$minor.$build"
 $zipName    = "Asteriq v$version.zip"
 $zipPath    = Join-Path (Get-Location) "$distDir\$zipName"
 $uploadPath = Join-Path (Get-Location) "$distDir\Asteriq.zip"  # fixed name for update checker
+$msiPath    = Join-Path (Get-Location) "$distDir\Asteriq.msi"
 
 Write-Host "Building Asteriq v$version..."
 
@@ -49,9 +51,23 @@ Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath
 # the display label, not the name the API returns.
 Copy-Item $zipPath $uploadPath -Force
 
+# --- Build MSI installer ---
+Write-Host "Building MSI installer..."
+$sourceDir = (Resolve-Path $outputDir).Path
+if (Test-Path $msiPath) { Remove-Item $msiPath }
+
+wix build $wxsFile `
+    -d "Version=$version" `
+    -d "SourceDir=$sourceDir" `
+    -arch x64 `
+    -o $msiPath
+
+if ($LASTEXITCODE -ne 0) { Write-Error "WiX MSI build failed"; exit 1 }
+
 Write-Host ""
 Write-Host "Done: dist\$zipName  (v$version)"
+Write-Host "Done: dist\Asteriq.msi  (v$version)"
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  git push"
-Write-Host "  gh release create v$version `"dist\Asteriq.zip`" --title `"Asteriq v$version`" --notes `"<release notes>`""
+Write-Host "  gh release create v$version \"dist\Asteriq.zip\" \"dist\Asteriq.msi\" --title \"Asteriq v$version\" --notes \"<release notes>\""

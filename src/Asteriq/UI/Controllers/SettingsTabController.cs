@@ -1133,6 +1133,9 @@ public class SettingsTabController : ITabController, IDisposable
 
     private void DrawVisualPanelCollapsed(SKCanvas canvas, SKRect bounds)
     {
+        // Clear theme button bounds so stale rects don't receive clicks
+        Array.Clear(_themeButtonBounds, 0, _themeButtonBounds.Length);
+
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
         float y = m.Y;
         bool hovered = bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);

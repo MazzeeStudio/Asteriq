@@ -87,7 +87,7 @@ internal static class ProfileCommands
         }
 
         // Initialize input service to get device info
-        var inputService = new InputService();
+        using var inputService = new InputService();
         if (!inputService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize SDL2");
@@ -411,18 +411,17 @@ internal static class ProfileCommands
         Console.WriteLine($"  {profile.ButtonMappings.Count} button mappings\n");
 
         // Initialize services
-        var inputService = new InputService();
+        using var inputService = new InputService();
         if (!inputService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize SDL2");
             return;
         }
 
-        var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
+        using var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
         if (!vjoyService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize vJoy");
-            inputService.Dispose();
             return;
         }
 
@@ -448,14 +447,12 @@ internal static class ProfileCommands
         }
 
         // Initialize mapping engine
-        var mappingEngine = new MappingEngine(vjoyService);
+        using var mappingEngine = new MappingEngine(vjoyService);
         mappingEngine.LoadProfile(profile);
 
         if (!mappingEngine.Start())
         {
             Console.WriteLine("\nERROR: Failed to start mapping engine");
-            inputService.Dispose();
-            vjoyService.Dispose();
             return;
         }
 

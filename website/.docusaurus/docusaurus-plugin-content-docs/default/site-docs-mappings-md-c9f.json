@@ -1,0 +1,27 @@
+{
+  "id": "mappings",
+  "title": "Mappings",
+  "description": "The Mappings tab is where you configure how each physical input is transformed before it reaches the virtual device. Axis response curves, deadzones, button modes, and multi-axis merging are all configured here.",
+  "source": "@site/docs/mappings.md",
+  "sourceDirName": ".",
+  "slug": "/mappings",
+  "permalink": "/Asteriq/docs/mappings",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4,
+    "title": "Mappings"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Devices",
+    "permalink": "/Asteriq/docs/devices"
+  },
+  "next": {
+    "title": "SC Bindings",
+    "permalink": "/Asteriq/docs/sc-bindings"
+  }
+}

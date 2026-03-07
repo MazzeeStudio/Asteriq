@@ -37,7 +37,7 @@ internal static class DeviceLeadLineRenderer
         }
 
         float targetLength = totalLength * progress;
-        var path = new SKPath();
+        using var path = new SKPath();
         path.MoveTo(pathPoints[0]);
 
         float drawnLength = 0f;

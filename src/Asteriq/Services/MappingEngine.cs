@@ -102,7 +102,8 @@ public class MappingEngine : IMappingEngine
         if (_activeProfile is null)
             return;
 
-        foreach (var state in deviceStates)
+        var stateList = deviceStates.ToList();
+        foreach (var state in stateList)
         {
             // Cache device values
             _deviceAxisValues[state.DeviceName] = state.Axes;
@@ -173,7 +174,7 @@ public class MappingEngine : IMappingEngine
             }
         }
 
-        System.Diagnostics.Debug.WriteLine($"Synchronized initial state for {deviceStates.Count()} devices");
+        System.Diagnostics.Debug.WriteLine($"Synchronized initial state for {stateList.Count} devices");
     }
 
     /// <summary>
@@ -600,7 +601,7 @@ public class MappingEngine : IMappingEngine
         }
     }
 
-    private bool ApplyButtonMode(ButtonMapping mapping, bool inputPressed)
+    private static bool ApplyButtonMode(ButtonMapping mapping, bool inputPressed)
     {
         switch (mapping.Mode)
         {
@@ -740,5 +741,6 @@ public class MappingEngine : IMappingEngine
         Stop();
         if (_ownsKeyboard)
             _keyboard.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

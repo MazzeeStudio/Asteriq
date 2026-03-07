@@ -15,7 +15,7 @@ public class SCXmlExportService
     /// </summary>
     /// <param name="profile">The export profile configuration</param>
     /// <returns>XML document ready to save</returns>
-    public XDocument Export(SCExportProfile profile)
+    public static XDocument Export(SCExportProfile profile)
     {
         // Star Citizen does NOT want an XML declaration - files must start directly with <ActionMaps>
         var doc = new XDocument(
@@ -67,7 +67,7 @@ public class SCXmlExportService
     /// Exports and saves a profile to file.
     /// Star Citizen requires UTF-8 without BOM and NO XML declaration.
     /// </summary>
-    public void ExportToFile(SCExportProfile profile, string filePath)
+    public static void ExportToFile(SCExportProfile profile, string filePath)
     {
         var doc = Export(profile);
 
@@ -89,7 +89,7 @@ public class SCXmlExportService
     /// <summary>
     /// Serialises the profile to UTF-8 XML bytes (no BOM, no XML declaration) for network transmission.
     /// </summary>
-    public byte[] ExportToBytes(SCExportProfile profile)
+    public static byte[] ExportToBytes(SCExportProfile profile)
     {
         var doc = Export(profile);
         var settings = new XmlWriterSettings
@@ -109,7 +109,7 @@ public class SCXmlExportService
     /// <summary>
     /// Exports to SC's Mappings folder for a specific installation
     /// </summary>
-    public string ExportToInstallation(SCExportProfile profile, SCInstallation installation)
+    public static string ExportToInstallation(SCExportProfile profile, SCInstallation installation)
     {
         // Ensure mappings directory exists
         SCInstallationService.EnsureMappingsDirectory(installation);
@@ -295,7 +295,7 @@ public class SCXmlExportService
     /// <summary>
     /// Validates an export profile before export
     /// </summary>
-    public ExportValidationResult Validate(SCExportProfile profile)
+    public static ExportValidationResult Validate(SCExportProfile profile)
     {
         var result = new ExportValidationResult();
 
@@ -339,7 +339,7 @@ public class SCXmlExportService
     /// <summary>
     /// Gets the export path preview for an installation
     /// </summary>
-    public string GetExportPath(SCExportProfile profile, SCInstallation installation)
+    public static string GetExportPath(SCExportProfile profile, SCInstallation installation)
     {
         var fileName = profile.GetExportFileName();
         return Path.Combine(installation.MappingsPath, fileName);
@@ -348,7 +348,7 @@ public class SCXmlExportService
     /// <summary>
     /// Imports bindings from an existing SC XML profile file
     /// </summary>
-    public SCImportResult ImportFromFile(string filePath)
+    public static SCImportResult ImportFromFile(string filePath)
     {
         var result = new SCImportResult();
 
@@ -510,7 +510,7 @@ public class SCXmlExportService
         {
             deviceType = SCDeviceType.Joystick;
             // Parse instance number
-            if (uint.TryParse(devicePrefix.Substring(2), out var instance))
+            if (uint.TryParse(devicePrefix.AsSpan(2), out var instance))
                 vjoyDevice = instance;
             else
                 vjoyDevice = 1;

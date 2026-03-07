@@ -5,11 +5,14 @@ namespace Asteriq;
 
 public partial class Form1 : Form
 {
+    // CA2213: _inputService disposed in OnFormClosing; WinForms controls disposed via Controls collection
+#pragma warning disable CA2213
     private readonly InputService _inputService;
     private ListBox _deviceList = null!;
     private TextBox _inputLog = null!;
     private Label _axisDisplay = null!;
     private Label _buttonDisplay = null!;
+#pragma warning restore CA2213
 
     public Form1()
     {

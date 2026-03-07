@@ -42,7 +42,10 @@ public class MappingDialog : FUIBaseDialog
     private readonly IVJoyService _vjoyService;
     private readonly List<VJoyDeviceInfo> _vjoyDevices;
 
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
     private System.Windows.Forms.Timer _renderTimer = null!;
     private System.Windows.Forms.Timer _timeoutTimer = null!;
 
@@ -323,7 +326,7 @@ public class MappingDialog : FUIBaseDialog
     /// <summary>
     /// Capture currently held modifier keys
     /// </summary>
-    private List<string> CaptureHeldModifiers()
+    private static List<string> CaptureHeldModifiers()
     {
         var mods = new List<string>();
 
@@ -517,7 +520,7 @@ public class MappingDialog : FUIBaseDialog
         DrawDialogFrame(canvas, bounds);
     }
 
-    private void DrawBackground(SKCanvas canvas, SKRect bounds)
+    private static void DrawBackground(SKCanvas canvas, SKRect bounds)
     {
         // Gradient background
         using var bgPaint = new SKPaint
@@ -535,7 +538,7 @@ public class MappingDialog : FUIBaseDialog
         FUIRenderer.DrawDotGrid(canvas, bounds, 20f, FUIColors.Grid.WithAlpha(30));
     }
 
-    private void DrawDialogFrame(SKCanvas canvas, SKRect bounds)
+    private static void DrawDialogFrame(SKCanvas canvas, SKRect bounds)
     {
         // Outer glow
         using var glowPaint = new SKPaint
@@ -807,7 +810,7 @@ public class MappingDialog : FUIBaseDialog
         DrawButton(canvas, createBounds, "CREATE", _hoveredButton == buttonOffset + 2, canCreate);
     }
 
-    private void DrawModeTab(SKCanvas canvas, SKRect bounds, string text, bool isActive, bool isHovered)
+    private static void DrawModeTab(SKCanvas canvas, SKRect bounds, string text, bool isActive, bool isHovered)
     {
         var bgColor = isActive ? FUIColors.Primary.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
         var frameColor = isActive ? FUIColors.Primary : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
@@ -822,7 +825,7 @@ public class MappingDialog : FUIBaseDialog
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
-    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
+    private static void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
     {
         var bgColor = isChecked ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
         var frameColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
@@ -837,7 +840,7 @@ public class MappingDialog : FUIBaseDialog
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
     }
 
-    private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
+    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
     {
         var bgColor = isPrimary
             ? (hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Active.WithAlpha(50))
@@ -856,7 +859,7 @@ public class MappingDialog : FUIBaseDialog
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
-    private void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool enabled)
+    private static void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool enabled)
     {
         var bgColor = enabled
             ? (hovered ? FUIColors.Primary.WithAlpha(60) : FUIColors.Background2)
@@ -875,7 +878,7 @@ public class MappingDialog : FUIBaseDialog
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
     }
 
-    private string GetAxisName(int index)
+    private static string GetAxisName(int index)
     {
         return index switch
         {
@@ -896,11 +899,19 @@ public class MappingDialog : FUIBaseDialog
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _renderTimer?.Stop();
-        _renderTimer?.Dispose();
         _timeoutTimer?.Stop();
-        _timeoutTimer?.Dispose();
-        _detectionService?.Dispose();
         base.OnFormClosing(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _renderTimer?.Dispose();
+            _timeoutTimer?.Dispose();
+            _detectionService?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -955,7 +966,7 @@ public class MappingDialog : FUIBaseDialog
     /// <summary>
     /// Get the specific modifier key name (left/right variant)
     /// </summary>
-    private string GetModifierKeyName(Keys key)
+    private static string GetModifierKeyName(Keys key)
     {
         // Use GetAsyncKeyState to determine if it's left or right variant
         if (key == Keys.ControlKey || key == Keys.Control)

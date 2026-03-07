@@ -38,7 +38,7 @@ public class FUIBackground : IDisposable
     /// <summary>
     /// Update animation state (currently no-op, kept for API compatibility)
     /// </summary>
-    public void Update(float deltaTime)
+    public static void Update(float deltaTime)
     {
         // No animation needed currently
     }
@@ -116,7 +116,7 @@ public class FUIBackground : IDisposable
         _noiseBitmap = GenerateNoiseBitmap(width, height);
     }
 
-    private SKBitmap GenerateGridBitmap(int width, int height)
+    private static SKBitmap GenerateGridBitmap(int width, int height)
     {
         var bitmap = new SKBitmap(width, height);
         using var canvas = new SKCanvas(bitmap);
@@ -176,7 +176,7 @@ public class FUIBackground : IDisposable
         return bitmap;
     }
 
-    private SKBitmap GenerateVignetteBitmap(int width, int height)
+    private static SKBitmap GenerateVignetteBitmap(int width, int height)
     {
         var bitmap = new SKBitmap(width, height);
         using var canvas = new SKCanvas(bitmap);
@@ -285,5 +285,6 @@ public class FUIBackground : IDisposable
         _gridBitmap?.Dispose();
         _vignetteBitmap?.Dispose();
         _noiseBitmap?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

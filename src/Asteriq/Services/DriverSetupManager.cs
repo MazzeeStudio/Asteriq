@@ -86,7 +86,7 @@ public class DriverSetupManager
     /// <summary>
     /// Get vJoy installation path
     /// </summary>
-    public string? GetVJoyInstallPath()
+    public static string? GetVJoyInstallPath()
     {
         try
         {
@@ -124,7 +124,7 @@ public class DriverSetupManager
     /// <summary>
     /// Get path to vJoyConfig.exe
     /// </summary>
-    public string? GetVJoyConfigPath()
+    public static string? GetVJoyConfigPath()
     {
         var installPath = GetVJoyInstallPath();
         if (string.IsNullOrEmpty(installPath))
@@ -338,12 +338,12 @@ public class DriverSetupManager
     /// <summary>
     /// Get vJoy releases URL for manual download
     /// </summary>
-    public string GetVJoyReleasesUrl() => VJOY_RELEASES_URL;
+    public static string GetVJoyReleasesUrl() => VJOY_RELEASES_URL;
 
     /// <summary>
     /// Get HidHide releases URL for manual download
     /// </summary>
-    public string GetHidHideReleasesUrl() => HIDHIDE_RELEASES_URL;
+    public static string GetHidHideReleasesUrl() => HIDHIDE_RELEASES_URL;
 
     #endregion
 

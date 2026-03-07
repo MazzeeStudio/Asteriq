@@ -269,7 +269,7 @@ internal static class SCCommands
 
         // Parse actions
         Console.WriteLine("Parsing action schema...\n");
-        var actions = schemaService.ParseActions(profile);
+        var actions = SCSchemaService.ParseActions(profile);
 
         Console.WriteLine($"Total actions: {actions.Count}");
 
@@ -284,7 +284,7 @@ internal static class SCCommands
         }
 
         // Group by action map
-        var byMap = schemaService.GroupByActionMap(actions);
+        var byMap = SCSchemaService.GroupByActionMap(actions);
 
         Console.WriteLine($"\n=== Action Maps ({byMap.Count}) ===\n");
 
@@ -319,7 +319,7 @@ internal static class SCCommands
         }
 
         // Filter to joystick actions
-        var joystickActions = schemaService.FilterJoystickActions(actions);
+        var joystickActions = SCSchemaService.FilterJoystickActions(actions);
         Console.WriteLine($"Joystick-relevant actions: {joystickActions.Count}");
 
         Console.WriteLine("\n(Press Enter to continue...)");
@@ -502,7 +502,7 @@ internal static class SCCommands
 
         // Validate
         Console.WriteLine("\nValidating profile...");
-        var validation = exportService.Validate(exportProfile);
+        var validation = SCXmlExportService.Validate(exportProfile);
         Console.WriteLine($"Valid: {validation.IsValid}");
         if (validation.Errors.Count > 0)
         {
@@ -519,7 +519,7 @@ internal static class SCCommands
 
         // Generate export
         Console.WriteLine("\nGenerating XML...\n");
-        var doc = exportService.Export(exportProfile);
+        var doc = SCXmlExportService.Export(exportProfile);
 
         // Display the XML
         Console.WriteLine("=== Generated XML ===\n");
@@ -539,7 +539,7 @@ internal static class SCCommands
         }
 
         // Show export path
-        var exportPath = exportService.GetExportPath(exportProfile, target);
+        var exportPath = SCXmlExportService.GetExportPath(exportProfile, target);
         Console.WriteLine($"\n=== Export Info ===");
         Console.WriteLine($"Filename: {exportProfile.GetExportFileName()}");
         Console.WriteLine($"Export path: {exportPath}");

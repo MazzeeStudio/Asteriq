@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "Constellation Alpha",
+  "vidPid": "3344:????",
+  "deviceType": "Grip",
+  "svgFile": "virpil_constellation_alpha_r.png",
+  "mirror": false,
+  "viewBox": { "x": 458, "y": 808 },
+  "controls": {}
+}

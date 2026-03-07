@@ -1,7 +1,7 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VKB GNX FSM Module",
+  "device": "GNX FSM Module",
   "vidPid": "231D:0302",
   "deviceType": "Panel",
   "svgFile": "vkb_stecs_mini_r.png",

@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "CDT-AERO-R",
+  "vidPid": "3344:????",
+  "deviceType": "Grip",
+  "svgFile": "virpil_cdt-aero_r.png",
+  "mirror": false,
+  "viewBox": { "x": 724, "y": 1223 },
+  "controls": {}
+}

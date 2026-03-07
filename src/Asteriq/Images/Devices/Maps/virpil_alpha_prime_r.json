@@ -1,7 +1,7 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "Alpha-R",
+  "device": "Constellation Alpha Prime [R]",
   "vidPid": "3344:40D5",
   "deviceType": "Grip",
   "svgFile": "joystick.svg",

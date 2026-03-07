@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "Hawk-60 Collective Grip",
+  "vidPid": "3344:????",
+  "deviceType": "Collective",
+  "svgFile": "virpil_hawk_60-collective.png",
+  "mirror": false,
+  "viewBox": { "x": 1098, "y": 833 },
+  "controls": {}
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "FLNKR Grip",
+  "vidPid": "3344:????",
+  "deviceType": "Grip",
+  "svgFile": "virpil_flnkr.png",
+  "mirror": false,
+  "viewBox": { "x": 471, "y": 860 },
+  "controls": {}
+}

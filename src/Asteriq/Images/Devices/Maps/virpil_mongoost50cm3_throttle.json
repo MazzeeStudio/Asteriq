@@ -1,10 +1,10 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VPC MongoosT-50CM3 Throttle",
+  "device": "MongoosT-50CM3 Throttle",
   "vidPid": "3344:0501",
   "deviceType": "Throttle",
-  "svgFile": "virpil_mongoost50cm2_throttle.png",
+  "svgFile": "virpil_mongoost_50cm3_throttle.png",
   "mirror": false,
   "viewBox": { "x": 903, "y": 911 },
   "controls": {}

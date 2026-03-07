@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "SharKa-50 Compact Pedals",
+  "vidPid": "3344:????",
+  "deviceType": "Pedals",
+  "svgFile": "virpil_sharka50_compact.png",
+  "mirror": false,
+  "viewBox": { "x": 1250, "y": 852 },
+  "controls": {}
+}

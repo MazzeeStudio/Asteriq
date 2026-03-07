@@ -1,10 +1,10 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VPC ACE Pedals",
+  "device": "R1 Falcon Rudder Pedals",
   "vidPid": "3344:0601",
   "deviceType": "Pedals",
-  "svgFile": "virpil_ace_torq6.png",
+  "svgFile": "virpil_r1_falcon_rudder_pedals.png",
   "mirror": false,
   "viewBox": { "x": 1267, "y": 609 },
   "controls": {}

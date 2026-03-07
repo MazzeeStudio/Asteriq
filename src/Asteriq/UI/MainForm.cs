@@ -724,13 +724,22 @@ public partial class MainForm : Form
             }
 
             // Step 2: Try device name match (skip generic maps)
+            // Strip manufacturer prefixes before comparing so map display names (e.g. "MongoosT-50CM3 Throttle")
+            // still match SDL-reported names (e.g. "VPC MongoosT-50CM3").
+            static string StripMfr(string s) => s
+                .Replace("VPC ", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("VKB ", "", StringComparison.OrdinalIgnoreCase)
+                .Trim();
+
+            string normDevice = StripMfr(deviceName);
             foreach (var (path, map) in allMaps)
             {
                 if (!string.IsNullOrEmpty(map.Device) &&
                     !map.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (deviceName.Contains(map.Device, StringComparison.OrdinalIgnoreCase) ||
-                        map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
+                    string normMap = StripMfr(map.Device);
+                    if (normDevice.Contains(normMap, StringComparison.OrdinalIgnoreCase) ||
+                        normMap.Contains(normDevice, StringComparison.OrdinalIgnoreCase))
                     {
                         _deviceMap = map;
                         SyncDeviceMapToTabContext();
@@ -828,14 +837,21 @@ public partial class MainForm : Form
                 }
             }
 
-            // Try device name match
+            // Try device name match (strip manufacturer prefixes so display names match SDL names)
+            static string StripMfr(string s) => s
+                .Replace("VPC ", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("VKB ", "", StringComparison.OrdinalIgnoreCase)
+                .Trim();
+
+            string normDevice = StripMfr(deviceName);
             foreach (var (path, map) in allMaps)
             {
                 if (!string.IsNullOrEmpty(map.Device) &&
                     !map.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (deviceName.Contains(map.Device, StringComparison.OrdinalIgnoreCase) ||
-                        map.Device.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
+                    string normMap = StripMfr(map.Device);
+                    if (normDevice.Contains(normMap, StringComparison.OrdinalIgnoreCase) ||
+                        normMap.Contains(normDevice, StringComparison.OrdinalIgnoreCase))
                     {
                         return map;
                     }

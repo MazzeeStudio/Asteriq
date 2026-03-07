@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "R1-LEGEND Rudder Pedals",
+  "vidPid": "3344:????",
+  "deviceType": "Pedals",
+  "svgFile": "virpil_r1_legend_rudder_pedals.png",
+  "mirror": false,
+  "viewBox": { "x": 1280, "y": 600 },
+  "controls": {}
+}

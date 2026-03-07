@@ -649,38 +649,34 @@ public class DevicesTabController : ITabController
 
     private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
     {
-        if (_ctx.JoystickSvg?.Picture is null)
-            return new SKPoint(viewBoxX, viewBoxY);
+        float screenX = _ctx.SvgMirrored
+            ? _ctx.SvgOffset.X + _ctx.SilhouetteSourceWidth * _ctx.SvgScale - viewBoxX * _ctx.SvgScale
+            : _ctx.SvgOffset.X + viewBoxX * _ctx.SvgScale;
 
-        float screenX, screenY;
-
-        if (_ctx.SvgMirrored)
-        {
-            var svgBounds = _ctx.JoystickSvg.Picture.CullRect;
-            float scaledWidth = svgBounds.Width * _ctx.SvgScale;
-            screenX = _ctx.SvgOffset.X + scaledWidth - viewBoxX * _ctx.SvgScale;
-        }
-        else
-        {
-            screenX = _ctx.SvgOffset.X + viewBoxX * _ctx.SvgScale;
-        }
-
-        screenY = _ctx.SvgOffset.Y + viewBoxY * _ctx.SvgScale;
+        float screenY = _ctx.SvgOffset.Y + viewBoxY * _ctx.SvgScale;
         return new SKPoint(screenX, screenY);
     }
 
     private void DrawDeviceSilhouette(SKCanvas canvas, SKRect bounds)
     {
+        bool mirror = _ctx.DeviceMap?.Mirror ?? false;
         var activeSvg = _ctx.GetActiveSvg?.Invoke();
         if (activeSvg?.Picture is not null)
         {
-            bool mirror = _ctx.DeviceMap?.Mirror ?? false;
             DrawSvgInBounds(canvas, activeSvg, bounds, mirror);
+            return;
         }
-        else
+
+        var activeBitmap = _ctx.GetActiveBitmap?.Invoke();
+        if (activeBitmap is not null)
         {
-            FUIWidgets.DrawJoystickOutlineFallback(canvas, bounds);
+            float vbW = _ctx.DeviceMap?.ViewBox?.X ?? activeBitmap.Width;
+            float vbH = _ctx.DeviceMap?.ViewBox?.Y ?? activeBitmap.Height;
+            DrawBitmapInBounds(canvas, activeBitmap, vbW, vbH, bounds, mirror);
+            return;
         }
+
+        FUIWidgets.DrawJoystickOutlineFallback(canvas, bounds);
     }
 
     private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
@@ -703,6 +699,7 @@ public class DevicesTabController : ITabController
         _ctx.SvgScale = scale;
         _ctx.SvgOffset = new SKPoint(offsetX, offsetY);
         _ctx.SvgMirrored = mirror;
+        _ctx.SilhouetteSourceWidth = svgBounds.Width;
 
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
@@ -718,6 +715,34 @@ public class DevicesTabController : ITabController
         }
 
         canvas.DrawPicture(svg.Picture);
+        canvas.Restore();
+    }
+
+    private void DrawBitmapInBounds(SKCanvas canvas, SKBitmap bitmap, float viewBoxWidth, float viewBoxHeight, SKRect bounds, bool mirror = false)
+    {
+        if (viewBoxWidth <= 0 || viewBoxHeight <= 0) return;
+
+        float scaleX = bounds.Width / viewBoxWidth;
+        float scaleY = bounds.Height / viewBoxHeight;
+        float scale = Math.Min(scaleX, scaleY) * 0.95f;
+
+        float scaledWidth = viewBoxWidth * scale;
+        float scaledHeight = viewBoxHeight * scale;
+
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2;
+
+        _ctx.SvgScale = scale;
+        _ctx.SvgOffset = new SKPoint(offsetX, offsetY);
+        _ctx.SvgMirrored = mirror;
+        _ctx.SilhouetteSourceWidth = viewBoxWidth;
+
+        var destRect = new SKRect(offsetX, offsetY, offsetX + scaledWidth, offsetY + scaledHeight);
+
+        canvas.Save();
+        if (mirror)
+            canvas.Scale(-1, 1, offsetX + scaledWidth / 2, offsetY + scaledHeight / 2);
+        canvas.DrawBitmap(bitmap, destRect);
         canvas.Restore();
     }
 

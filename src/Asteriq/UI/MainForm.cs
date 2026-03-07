@@ -140,9 +140,13 @@ public partial class MainForm : Form
     // Window control hover state
     private int _hoveredWindowControl = -1;
 
-    // SVG device silhouettes
+    // SVG device silhouettes (fallback generics)
     private SKSvg? _joystickSvg;
     private SKSvg? _throttleSvg;
+
+    // Per-device image caches (loaded on first use)
+    private readonly Dictionary<string, SKSvg> _svgCache = new();
+    private readonly Dictionary<string, SKBitmap> _bitmapCache = new();
 
     // SVG interaction state
     private string? _hoveredControlId;
@@ -306,6 +310,8 @@ public partial class MainForm : Form
         _tabContext.ApplyFontScale = ApplyFontScaleToWindowSize;
         _tabContext.GetActiveSvg = GetActiveSvg;
         _tabContext.GetSvgForDeviceMap = GetSvgForDeviceMap;
+        _tabContext.GetActiveBitmap = GetActiveBitmap;
+        _tabContext.GetBitmapForDeviceMap = GetBitmapForDeviceMap;
         _tabContext.OpenDriverSetup = OpenDriverSetupDialog;
         _tabContext.RefreshVJoyDevices = RefreshVJoyDevicesInternal;
         _tabContext.HidHide = _hidHideService;
@@ -862,18 +868,74 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Get the appropriate SVG for a given device map
+    /// Get the appropriate SVG for a given device map.
+    /// Returns null if the map references a non-SVG image — call GetBitmapForDeviceMap instead.
+    /// Falls back to the generic joystick/throttle SVG when no per-device file is found.
     /// </summary>
     private SKSvg? GetSvgForDeviceMap(DeviceMap? map)
     {
         if (map is null)
             return _joystickSvg;
 
-        var svgFile = map.SvgFile?.ToLowerInvariant() ?? "";
-        if (svgFile.Contains("throttle"))
-            return _throttleSvg ?? _joystickSvg;
+        var imageFile = map.SvgFile;
+        if (!string.IsNullOrEmpty(imageFile))
+        {
+            var ext = Path.GetExtension(imageFile).ToLowerInvariant();
+            if (ext != ".svg")
+                return null; // bitmap — caller should use GetBitmapForDeviceMap
 
-        return _joystickSvg;
+            var svg = LoadSvgFromCache(imageFile);
+            if (svg is not null) return svg;
+        }
+
+        // Generic fallback
+        var lower = (imageFile ?? "").ToLowerInvariant();
+        return lower.Contains("throttle") ? _throttleSvg ?? _joystickSvg : _joystickSvg;
+    }
+
+    /// <summary>
+    /// Get the bitmap for a given device map, if its image file is a raster format.
+    /// Returns null for SVG maps or maps with no image file.
+    /// </summary>
+    private SKBitmap? GetBitmapForDeviceMap(DeviceMap? map)
+    {
+        if (map is null) return null;
+
+        var imageFile = map.SvgFile;
+        if (string.IsNullOrEmpty(imageFile)) return null;
+
+        var ext = Path.GetExtension(imageFile).ToLowerInvariant();
+        if (ext == ".svg") return null;
+
+        return LoadBitmapFromCache(imageFile);
+    }
+
+    private SKSvg? LoadSvgFromCache(string imageFile)
+    {
+        if (_svgCache.TryGetValue(imageFile, out var cached)) return cached;
+
+        var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices");
+        var path = Path.Combine(imagesDir, imageFile);
+        if (!File.Exists(path)) return null;
+
+        var svg = new SKSvg();
+        if (svg.Load(path) is null) { svg.Dispose(); return null; }
+        _svgCache[imageFile] = svg;
+        return svg;
+    }
+
+    private SKBitmap? LoadBitmapFromCache(string imageFile)
+    {
+        if (_bitmapCache.TryGetValue(imageFile, out var cached)) return cached;
+
+        var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices");
+        var path = Path.Combine(imagesDir, imageFile);
+        if (!File.Exists(path)) return null;
+
+        var bitmap = SKBitmap.Decode(path);
+        if (bitmap is null) return null;
+        _bitmapCache[imageFile] = bitmap;
+        return bitmap;
     }
 
     /// <summary>
@@ -1016,23 +1078,9 @@ public partial class MainForm : Form
         return "Joystick";
     }
 
-    /// <summary>
-    /// Get the appropriate SVG for the current device map
-    /// </summary>
-    private SKSvg? GetActiveSvg()
-    {
-        if (_deviceMap is null)
-            return _joystickSvg;
+    private SKSvg? GetActiveSvg() => GetSvgForDeviceMap(_deviceMap);
 
-        // Check the device map's svgFile field
-        var svgFile = _deviceMap.SvgFile?.ToLowerInvariant() ?? "";
-
-        if (svgFile.Contains("throttle"))
-            return _throttleSvg ?? _joystickSvg;
-
-        // Default to joystick
-        return _joystickSvg;
-    }
+    private SKBitmap? GetActiveBitmap() => GetBitmapForDeviceMap(_deviceMap);
 
     private void ParseControlBounds(string svgPath)
     {
@@ -2141,6 +2189,10 @@ public partial class MainForm : Form
             _background?.Dispose();
             _joystickSvg?.Dispose();
             _throttleSvg?.Dispose();
+            foreach (var svg in _svgCache.Values) svg.Dispose();
+            _svgCache.Clear();
+            foreach (var bmp in _bitmapCache.Values) bmp.Dispose();
+            _bitmapCache.Clear();
             _settingsController?.Dispose();
             _networkVjoy?.Dispose();
             _heartbeatCts?.Dispose();

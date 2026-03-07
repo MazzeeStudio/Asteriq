@@ -51,6 +51,8 @@ public class TabContext
     public float SvgScale { get; set; } = 1f;
     public SKPoint SvgOffset { get; set; }
     public bool SvgMirrored { get; set; }
+    /// <summary>Source image width in viewBox units — used by ViewBoxToScreen for mirror math. Set by DrawSvgInBounds / DrawBitmapInBounds.</summary>
+    public float SilhouetteSourceWidth { get; set; } = 2048f;
     public Dictionary<string, SKRect> ControlBounds { get; set; } = new();
 
     // Profile UI state (shared, dropdown drawn in MainForm)
@@ -91,6 +93,8 @@ public class TabContext
     public Action? ApplyFontScale { get; set; }
     public Func<SKSvg?>? GetActiveSvg { get; set; }
     public Func<DeviceMap?, SKSvg?>? GetSvgForDeviceMap { get; set; }
+    public Func<SKBitmap?>? GetActiveBitmap { get; set; }
+    public Func<DeviceMap?, SKBitmap?>? GetBitmapForDeviceMap { get; set; }
     public Action? OpenDriverSetup { get; set; }
     public Action? RefreshVJoyDevices { get; set; }
 

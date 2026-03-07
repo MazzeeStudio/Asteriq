@@ -27,6 +27,7 @@ public partial class MappingsTabController
         _ctx.SvgScale = scale;
         _ctx.SvgOffset = new SKPoint(offsetX, offsetY);
         _ctx.SvgMirrored = mirror;
+        _ctx.SilhouetteSourceWidth = svgBounds.Width;
 
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
@@ -42,6 +43,34 @@ public partial class MappingsTabController
         }
 
         canvas.DrawPicture(svg.Picture);
+        canvas.Restore();
+    }
+
+    private void DrawBitmapInBounds(SKCanvas canvas, SKBitmap bitmap, float viewBoxWidth, float viewBoxHeight, SKRect bounds, bool mirror = false)
+    {
+        if (viewBoxWidth <= 0 || viewBoxHeight <= 0) return;
+
+        float scaleX = bounds.Width / viewBoxWidth;
+        float scaleY = bounds.Height / viewBoxHeight;
+        float scale = Math.Min(scaleX, scaleY) * 0.95f;
+
+        float scaledWidth = viewBoxWidth * scale;
+        float scaledHeight = viewBoxHeight * scale;
+
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2;
+
+        _ctx.SvgScale = scale;
+        _ctx.SvgOffset = new SKPoint(offsetX, offsetY);
+        _ctx.SvgMirrored = mirror;
+        _ctx.SilhouetteSourceWidth = viewBoxWidth;
+
+        var destRect = new SKRect(offsetX, offsetY, offsetX + scaledWidth, offsetY + scaledHeight);
+
+        canvas.Save();
+        if (mirror)
+            canvas.Scale(-1, 1, offsetX + scaledWidth / 2, offsetY + scaledHeight / 2);
+        canvas.DrawBitmap(bitmap, destRect);
         canvas.Restore();
     }
 
@@ -573,14 +602,15 @@ public partial class MappingsTabController
         // Show device silhouette - use primary device's map if available
         float centerX = bounds.MidX;
 
-        // Get the appropriate SVG based on primary device map
+        // Get the appropriate image based on primary device map
         var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) ?? _ctx.JoystickSvg;
+        var bitmap = svg is null ? _ctx.GetBitmapForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) : null;
         bool shouldMirror = _ctx.MappingsPrimaryDeviceMap?.Mirror ?? false;
 
         // Device name label at top of panel
         float labelRowHeight = 20f;
         float labelY = bounds.Top + frameInset + labelRowHeight;
-        string deviceLabel = _ctx.MappingsPrimaryDeviceMap?.Device ?? "ÔÇö";
+        string deviceLabel = _ctx.MappingsPrimaryDeviceMap?.Device ?? "—";
         FUIRenderer.DrawTextCentered(canvas, deviceLabel,
             new SKRect(bounds.Left, bounds.Top + frameInset, bounds.Right, labelY),
             FUIColors.TextDim, 13f);
@@ -589,26 +619,32 @@ public partial class MappingsTabController
         float checkboxRowHeight = 26f;
         float checkboxAreaTop = bounds.Bottom - frameInset - checkboxRowHeight;
 
+        // Constrained bounds for silhouette (shared between SVG and bitmap paths)
+        float maxSize = 900f;
+        float maxWidth = Math.Min(bounds.Width - 40, maxSize);
+        float maxHeight = Math.Min(bounds.Height - 40 - checkboxRowHeight - labelRowHeight, maxSize);
+        float constrainedWidth = Math.Min(maxWidth, maxHeight);
+        float constrainedHeight = constrainedWidth;
+        float availableCenterY = labelY + (checkboxAreaTop - labelY) / 2f;
+        var constrainedBounds = new SKRect(
+            centerX - constrainedWidth / 2,
+            availableCenterY - constrainedHeight / 2,
+            centerX + constrainedWidth / 2,
+            availableCenterY + constrainedHeight / 2
+        );
+
         if (svg?.Picture is not null)
         {
-            // Limit size to 900px max and apply same rendering as device tab
-            float maxSize = 900f;
-            float maxWidth = Math.Min(bounds.Width - 40, maxSize);
-            float maxHeight = Math.Min(bounds.Height - 40 - checkboxRowHeight - labelRowHeight, maxSize);
-
-            // Create constrained bounds centered in the available area (below label, above checkbox row)
-            float constrainedWidth = Math.Min(maxWidth, maxHeight); // Keep square-ish
-            float constrainedHeight = constrainedWidth;
-            float availableCenterY = labelY + (checkboxAreaTop - labelY) / 2f;
-            var constrainedBounds = new SKRect(
-                centerX - constrainedWidth / 2,
-                availableCenterY - constrainedHeight / 2,
-                centerX + constrainedWidth / 2,
-                availableCenterY + constrainedHeight / 2
-            );
-
             _ctx.SilhouetteBounds = constrainedBounds;
             DrawSvgInBounds(canvas, svg, constrainedBounds, shouldMirror);
+            DrawMappingHighlightLeadLine(canvas, constrainedBounds);
+        }
+        else if (bitmap is not null)
+        {
+            float vbW = _ctx.MappingsPrimaryDeviceMap?.ViewBox?.X ?? bitmap.Width;
+            float vbH = _ctx.MappingsPrimaryDeviceMap?.ViewBox?.Y ?? bitmap.Height;
+            _ctx.SilhouetteBounds = constrainedBounds;
+            DrawBitmapInBounds(canvas, bitmap, vbW, vbH, constrainedBounds, shouldMirror);
             DrawMappingHighlightLeadLine(canvas, constrainedBounds);
         }
         else
@@ -2680,12 +2716,8 @@ public partial class MappingsTabController
     /// </summary>
     private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
     {
-        var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) ?? _ctx.JoystickSvg;
-        if (svg?.Picture is null)
-            return new SKPoint(viewBoxX, viewBoxY);
-
         float screenX = _ctx.SvgMirrored
-            ? _ctx.SvgOffset.X + svg.Picture.CullRect.Width * _ctx.SvgScale - viewBoxX * _ctx.SvgScale
+            ? _ctx.SvgOffset.X + _ctx.SilhouetteSourceWidth * _ctx.SvgScale - viewBoxX * _ctx.SvgScale
             : _ctx.SvgOffset.X + viewBoxX * _ctx.SvgScale;
 
         float screenY = _ctx.SvgOffset.Y + viewBoxY * _ctx.SvgScale;

@@ -1,3 +1,5 @@
+// Win32 virtual-key constants must match OS-defined VK_* names exactly.
+#pragma warning disable CA1707
 using System.Runtime.InteropServices;
 
 namespace Asteriq.Services;

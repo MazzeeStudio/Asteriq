@@ -1,79 +1,274 @@
 root = true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# All files
+# ─────────────────────────────────────────────────────────────────────────────
 [*]
-indent_style = space
-indent_size = 4
-end_of_line = crlf
-charset = utf-8-bom
-trim_trailing_whitespace = true
-insert_final_newline = true
+indent_style              = space
+indent_size               = 4
+end_of_line               = crlf
+charset                   = utf-8-bom
+trim_trailing_whitespace  = true
+insert_final_newline      = true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# XML / config / project files
+# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# P/Invoke interop files — Win32/HID constants must match OS-defined names
+# ─────────────────────────────────────────────────────────────────────────────
+[src/Asteriq/Services/KeyboardService.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+[src/Asteriq/VJoy/VJoyInterop.cs]
+dotnet_diagnostic.CA1707.severity = none
+
+# ─────────────────────────────────────────────────────────────────────────────
+# XML / config / project files
+# ─────────────────────────────────────────────────────────────────────────────
+[*.{xml,config,props,targets,nuspec,resx,ruleset,vsixmanifest,vsct,wxs}]
+indent_size = 2
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JSON / YAML
+# ─────────────────────────────────────────────────────────────────────────────
+[*.{json,yml,yaml}]
+indent_size = 2
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C# files
+# ─────────────────────────────────────────────────────────────────────────────
 [*.cs]
-# Naming rules - Private fields with underscore prefix
-dotnet_naming_rule.private_fields_underscore.symbols = private_fields
-dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+
+# ── Naming: private instance fields ─────────────────────────────── _camelCase
+dotnet_naming_rule.private_fields_underscore.symbols  = private_instance_fields
+dotnet_naming_rule.private_fields_underscore.style    = underscore_camel_style
 dotnet_naming_rule.private_fields_underscore.severity = error
 
-dotnet_naming_symbols.private_fields.applicable_kinds = field
-dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_instance_fields.applicable_kinds          = field
+dotnet_naming_symbols.private_instance_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_instance_fields.required_modifiers         =
 
-dotnet_naming_style.underscore_prefix.capitalization = camel_case
-dotnet_naming_style.underscore_prefix.required_prefix = _
+dotnet_naming_style.underscore_camel_style.capitalization  = camel_case
+dotnet_naming_style.underscore_camel_style.required_prefix = _
 
-# Naming rules - Static fields with s_ prefix
-dotnet_naming_rule.static_fields_s_prefix.symbols = static_fields
-dotnet_naming_rule.static_fields_s_prefix.style = s_prefix
+# ── Naming: private/internal static fields ──────────────────────── s_camelCase
+dotnet_naming_rule.static_fields_s_prefix.symbols  = private_static_fields
+dotnet_naming_rule.static_fields_s_prefix.style    = s_prefix_style
 dotnet_naming_rule.static_fields_s_prefix.severity = error
 
-dotnet_naming_symbols.static_fields.applicable_kinds = field
-dotnet_naming_symbols.static_fields.applicable_accessibilities = private, internal, private_protected
-dotnet_naming_symbols.static_fields.required_modifiers = static
+dotnet_naming_symbols.private_static_fields.applicable_kinds          = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private, internal, private_protected
+dotnet_naming_symbols.private_static_fields.required_modifiers         = static
 
-dotnet_naming_style.s_prefix.capitalization = camel_case
-dotnet_naming_style.s_prefix.required_prefix = s_
+dotnet_naming_style.s_prefix_style.capitalization  = camel_case
+dotnet_naming_style.s_prefix_style.required_prefix = s_
+
+# ── Naming: constants ───────────────────────────────────────────── PascalCase
+dotnet_naming_rule.constants_pascal.symbols  = constants
+dotnet_naming_rule.constants_pascal.style    = pascal_case_style
+dotnet_naming_rule.constants_pascal.severity = warning
+
+dotnet_naming_symbols.constants.applicable_kinds          = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers         = const
+
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
+# ── Naming: interfaces ──────────────────────────────────────────── IPascalCase
+dotnet_naming_rule.interfaces_i_prefix.symbols  = interfaces
+dotnet_naming_rule.interfaces_i_prefix.style    = i_prefix_style
+dotnet_naming_rule.interfaces_i_prefix.severity = error
+
+dotnet_naming_symbols.interfaces.applicable_kinds          = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+dotnet_naming_style.i_prefix_style.capitalization  = pascal_case
+dotnet_naming_style.i_prefix_style.required_prefix = I
+
+# ── Naming: type parameters ─────────────────────────────────────── TPascalCase
+dotnet_naming_rule.type_parameters_t_prefix.symbols  = type_parameters
+dotnet_naming_rule.type_parameters_t_prefix.style    = t_prefix_style
+dotnet_naming_rule.type_parameters_t_prefix.severity = warning
+
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+
+dotnet_naming_style.t_prefix_style.capitalization  = pascal_case
+dotnet_naming_style.t_prefix_style.required_prefix = T
+
+# ── Naming: async methods ───────────────────────────────────────── *Async suffix
+dotnet_naming_rule.async_methods_suffix.symbols  = async_methods
+dotnet_naming_rule.async_methods_suffix.style    = async_suffix_style
+dotnet_naming_rule.async_methods_suffix.severity = error
+
+dotnet_naming_symbols.async_methods.applicable_kinds          = method
+dotnet_naming_symbols.async_methods.applicable_accessibilities = *
+dotnet_naming_symbols.async_methods.required_modifiers         = async
+
+dotnet_naming_style.async_suffix_style.capitalization   = pascal_case
+dotnet_naming_style.async_suffix_style.required_suffix  = Async
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Language style — C# syntax preferences
+# ─────────────────────────────────────────────────────────────────────────────
 
 # File-scoped namespaces (required)
 csharp_style_namespace_declarations = file_scoped:error
 
-# Modern C# preferences
-csharp_prefer_braces = true:warning
-csharp_style_var_for_built_in_types = false:suggestion
+# var usage: explicit when type is not immediately apparent; var when it is
+csharp_style_var_for_built_in_types    = false:suggestion
 csharp_style_var_when_type_is_apparent = true:suggestion
-csharp_style_var_elsewhere = false:suggestion
+csharp_style_var_elsewhere             = false:suggestion
+
+# Always use braces — prevents single-line if bugs
+csharp_prefer_braces = true:warning
+
+# Prefer 'is null' / 'is not null' over == null / != null
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:error
+
+# Null-coalescing
+dotnet_style_coalesce_expression      = true:warning
+dotnet_style_null_propagation         = true:warning
+dotnet_style_prefer_auto_properties   = true:suggestion
 
 # Pattern matching
-csharp_style_prefer_pattern_matching = true:warning
+csharp_style_prefer_pattern_matching              = true:warning
 csharp_style_pattern_matching_over_is_with_cast_check = true:warning
-csharp_style_prefer_not_pattern = true:warning
-csharp_style_prefer_extended_property_pattern = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+csharp_style_prefer_not_pattern                   = true:warning
+csharp_style_prefer_extended_property_pattern     = true:suggestion
+csharp_style_prefer_switch_expression             = true:suggestion
 
-# Null checking - enforce 'is null' and 'is not null'
-csharp_style_conditional_delegate_call = true:warning
+# Expression-bodied members
+csharp_style_expression_bodied_methods      = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties   = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_accessors    = when_on_single_line:suggestion
 
-# Expression preferences
+# Inlining
 csharp_style_inlined_variable_declaration = true:warning
-csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_deconstructed_variable_declaration = true:suggestion
+
+# Collections
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_object_initializer     = true:suggestion
+
+# Prefer index/range operators (^1, ..)
 csharp_style_prefer_index_operator = true:suggestion
 csharp_style_prefer_range_operator = true:suggestion
 
-# Code quality
-dotnet_code_quality_unused_parameters = all:warning
-dotnet_remove_unnecessary_suppression_exclusions = all:warning
+# Prefer tuple names over .Item1/.Item2
+dotnet_style_explicit_tuple_names = true:warning
 
-# Modifier preferences
+# Using declarations (using var x = ... instead of using (...))
+csharp_prefer_simple_using_statement = true:suggestion
+
+# Static local functions where possible
 csharp_prefer_static_local_function = true:warning
-csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:warning
 
-# Async
-dotnet_diagnostic.CA1001.severity = error  # Types that own disposable fields should be disposable
-dotnet_diagnostic.CA2007.severity = none   # ConfigureAwait - not needed for desktop apps
+# Readonly structs / members
+csharp_style_prefer_readonly_struct        = true:suggestion
+csharp_style_prefer_readonly_struct_member = true:suggestion
+
+# Throw expressions
+csharp_style_throw_expression = true:suggestion
+
+# Modifier ordering (enforces consistent ordering)
+csharp_preferred_modifier_order = public,private,protected,internal,file,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,required,volatile,async:warning
+
+# Prefer 'readonly' on fields that are never reassigned after construction
+dotnet_style_readonly_field = true:warning
+
+# Unused parameters
+dotnet_code_quality_unused_parameters = all:warning
+
+# Simplify boolean expressions
+dotnet_style_prefer_simplified_boolean_expressions = true:warning
+
+# Conditional delegate call (obj?.Method() instead of if (obj != null) obj.Method())
+csharp_style_conditional_delegate_call = true:warning
+
+# ─────────────────────────────────────────────────────────────────────────────
+# .NET diagnostic rules — severity overrides
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Nullable reference types ────────────────────────────────────────────────
+dotnet_diagnostic.CS8600.severity = error   # Converting null to non-nullable type
+dotnet_diagnostic.CS8601.severity = error   # Possible null reference assignment
+dotnet_diagnostic.CS8602.severity = error   # Dereference of possibly null reference
+dotnet_diagnostic.CS8603.severity = error   # Possible null reference return
+dotnet_diagnostic.CS8604.severity = error   # Possible null reference argument
+dotnet_diagnostic.CS8618.severity = error   # Non-nullable field uninitialized
+dotnet_diagnostic.CS8625.severity = error   # Cannot convert null to non-nullable type
+
+# ── Async / Task ────────────────────────────────────────────────────────────
+dotnet_diagnostic.CA2007.severity = none    # ConfigureAwait — not required for desktop WinForms apps
+dotnet_diagnostic.CA2008.severity = warning # Do not create tasks without passing a TaskScheduler
+dotnet_diagnostic.CA2012.severity = error   # Use ValueTasks correctly — do not await twice
+dotnet_diagnostic.CA2016.severity = warning # Forward CancellationToken when available
+dotnet_diagnostic.CS4014.severity = error   # Call not awaited — fire-and-forget must be intentional
+
+# ── Exception handling ───────────────────────────────────────────────────────
 dotnet_diagnostic.CA1031.severity = warning # Do not catch general exception types
+dotnet_diagnostic.CA2201.severity = warning # Do not raise reserved exception types (e.g. NullReferenceException)
+dotnet_diagnostic.CA2200.severity = error   # Rethrow to preserve stack details — use 'throw' not 'throw ex'
 
-# Nullable reference types
-dotnet_diagnostic.CS8600.severity = error  # Converting null literal or possible null value to non-nullable type
-dotnet_diagnostic.CS8602.severity = error  # Dereference of a possibly null reference
-dotnet_diagnostic.CS8603.severity = error  # Possible null reference return
-dotnet_diagnostic.CS8604.severity = error  # Possible null reference argument
+# ── Disposal ────────────────────────────────────────────────────────────────
+dotnet_diagnostic.CA1001.severity = error   # Types that own disposable fields must be IDisposable
+dotnet_diagnostic.CA2000.severity = warning # Dispose objects before losing scope
+dotnet_diagnostic.CA2213.severity = warning # Disposable fields should be disposed in Dispose()
+dotnet_diagnostic.CA1816.severity = warning # Dispose() should call GC.SuppressFinalize(this)
 
-[*.{xml,config,props,targets,nuspec,resx,ruleset,vsixmanifest,vsct}]
-indent_size = 2
+# ── Design ──────────────────────────────────────────────────────────────────
+dotnet_diagnostic.CA1000.severity = warning # Do not declare static members on generic types
+dotnet_diagnostic.CA1010.severity = warning # Collections should implement generic interface
+dotnet_diagnostic.CA1051.severity = warning # Do not declare visible instance fields — use properties
+dotnet_diagnostic.CA1052.severity = suggestion # Static holder types should be sealed or static
+dotnet_diagnostic.CA1062.severity = none    # Validate arguments of public methods — handled by NRT
+dotnet_diagnostic.CA1707.severity = warning # Identifiers should not contain underscores (public only)
+dotnet_diagnostic.CA1708.severity = warning # Identifiers should differ by more than case
+dotnet_diagnostic.CA1711.severity = suggestion # Identifiers should not have incorrect suffix
+dotnet_diagnostic.CA1716.severity = suggestion # Identifiers should not match keywords
+dotnet_diagnostic.CA1720.severity = suggestion # Identifiers should not contain type names
+dotnet_diagnostic.CA1724.severity = suggestion # Type names should not match namespaces
+dotnet_diagnostic.CA1805.severity = suggestion # Do not initialize unnecessarily to default
+dotnet_diagnostic.CA1822.severity = warning # Mark members as static where possible
+dotnet_diagnostic.CA1823.severity = warning # Avoid unused private fields
+dotnet_diagnostic.CA1825.severity = warning # Avoid zero-length array allocations — use Array.Empty<T>()
+dotnet_diagnostic.CA1826.severity = warning # Do not use Enumerable methods on indexable collections
+dotnet_diagnostic.CA1827.severity = warning # Do not use Count()/LongCount() when Any() can be used
+dotnet_diagnostic.CA1828.severity = warning # Do not use CountAsync()/LongCountAsync() when AnyAsync() can be used
+dotnet_diagnostic.CA1829.severity = warning # Use Length/Count instead of Count() for known collections
+dotnet_diagnostic.CA1836.severity = warning # Prefer IsEmpty over Count == 0
+dotnet_diagnostic.CA1851.severity = warning # Possible multiple enumerations of IEnumerable
+dotnet_diagnostic.CA1860.severity = suggestion # Prefer comparing Count to 0 rather than Any()
+
+# ── Reliability ─────────────────────────────────────────────────────────────
+dotnet_diagnostic.CA2002.severity = warning # Do not lock on objects with weak identity
+dotnet_diagnostic.CA2009.severity = warning # Do not call ToImmutableCollection on an immutable collection
+dotnet_diagnostic.CA2011.severity = error   # Avoid infinite recursion — do not assign property within its setter
+dotnet_diagnostic.CA2019.severity = warning # Improper ThreadStatic field initialization
+dotnet_diagnostic.CA2020.severity = warning # Prevent behavioural change caused by built-in operators
+
+# ── Performance ─────────────────────────────────────────────────────────────
+dotnet_diagnostic.CA1802.severity = suggestion # Use literals where appropriate (static readonly → const)
+dotnet_diagnostic.CA1812.severity = suggestion # Avoid uninstantiated internal classes
+dotnet_diagnostic.CA1813.severity = suggestion # Avoid unsealed attributes
+dotnet_diagnostic.CA1820.severity = warning # Test for empty strings using string.Length or IsNullOrEmpty
+dotnet_diagnostic.CA1837.severity = warning # Use Environment.ProcessId instead of Process.GetCurrentProcess().Id
+dotnet_diagnostic.CA1845.severity = warning # Use span-based methods — Concat, AsSpan, etc.
+dotnet_diagnostic.CA1846.severity = warning # Prefer AsSpan over Substring
+dotnet_diagnostic.CA1847.severity = warning # Use char literal for single character searches
+dotnet_diagnostic.CA1848.severity = suggestion # Use LoggerMessage delegates for high-performance logging
+dotnet_diagnostic.CA1854.severity = warning # Prefer TryGetValue over ContainsKey + indexer
+dotnet_diagnostic.CA1855.severity = warning # Prefer Clear() over Fill() with default value
+
+# ── Security ────────────────────────────────────────────────────────────────
+dotnet_diagnostic.CA5350.severity = warning # Do not use weak cryptographic algorithms (MD5, SHA1)
+dotnet_diagnostic.CA5351.severity = warning # Do not use broken cryptographic algorithms (DES, RC2)
+dotnet_diagnostic.CA5359.severity = error   # Do not disable certificate validation
+dotnet_diagnostic.CA5364.severity = warning # Do not use deprecated security protocols (SSL3, TLS 1.0)
+dotnet_diagnostic.CA5394.severity = suggestion # Do not use insecure randomness (use RandomNumberGenerator for security)
+
+# ── Suppression hygiene ──────────────────────────────────────────────────────
+dotnet_remove_unnecessary_suppression_exclusions = all:warning

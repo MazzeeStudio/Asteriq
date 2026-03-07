@@ -305,7 +305,7 @@ public partial class MappingsTabController
     /// <summary>
     /// Get the keyboard key parts for a button mapping (modifiers + key as separate items)
     /// </summary>
-    private List<string>? GetKeyboardMappingParts(ButtonMapping mapping)
+    private static List<string>? GetKeyboardMappingParts(ButtonMapping mapping)
     {
         var output = mapping.Output;
         if (string.IsNullOrEmpty(output.KeyName)) return null;
@@ -323,7 +323,7 @@ public partial class MappingsTabController
     /// Get the keyboard key parts for a button slot (if it outputs to keyboard)
     /// Returns list of key parts (e.g., ["LCtrl", "LShift", "A"]) for drawing as separate keycaps
     /// </summary>
-    private List<string>? GetButtonKeyParts(MappingProfile? profile, uint vjoyId, int buttonIndex)
+    private static List<string>? GetButtonKeyParts(MappingProfile? profile, uint vjoyId, int buttonIndex)
     {
         if (profile is null) return null;
 
@@ -356,7 +356,7 @@ public partial class MappingsTabController
         return mapping.Output.Index; // 0-based output index = row index in button category
     }
 
-    private void DrawScrollIndicator(SKCanvas canvas, SKRect bounds, float scrollOffset, float contentHeight)
+    private static void DrawScrollIndicator(SKCanvas canvas, SKRect bounds, float scrollOffset, float contentHeight)
     {
         float trackHeight = bounds.Height - 20;
         float thumbRatio = bounds.Height / contentHeight;
@@ -393,9 +393,9 @@ public partial class MappingsTabController
             var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
             // Parse output index from the outputName (e.g., "Button 5" -> 4, "Axis 0" -> 0)
             int outputIndex = -1;
-            if (outputName.StartsWith("Button ") && int.TryParse(outputName.Substring(7), out int btnNum))
+            if (outputName.StartsWith("Button ") && int.TryParse(outputName.AsSpan(7), out int btnNum))
                 outputIndex = btnNum - 1; // Buttons are 1-indexed in display
-            else if (outputName.StartsWith("Axis ") && int.TryParse(outputName.Substring(5), out int axisNum))
+            else if (outputName.StartsWith("Axis ") && int.TryParse(outputName.AsSpan(5), out int axisNum))
                 outputIndex = axisNum;
 
             if (outputIndex == _highlight.Row && vjoyDevice.Id == _highlight.VJoyDevice)
@@ -1100,6 +1100,8 @@ public partial class MappingsTabController
             float presetBtnWidth = 32f;
             float presetStartX = rightMargin - (presetBtnWidth * 4 + 9);
 
+            // CA2000: using var inside for loop is safe — analyzer false positive
+#pragma warning disable CA2000
             for (int col = 0; col < 4; col++)
             {
                 var btnBounds = new SKRect(
@@ -1124,6 +1126,7 @@ public partial class MappingsTabController
                 canvas.DrawRect(btnBounds, btnFrame);
                 FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 12f);
             }
+#pragma warning restore CA2000
 
             // Show which handle is selected (if any)
             if (_deadzone.SelectedHandle >= 0)
@@ -1554,7 +1557,7 @@ public partial class MappingsTabController
     /// <summary>
     /// Format key combo for display as simple text (used in mapping names)
     /// </summary>
-    private string FormatKeyComboForDisplay(string keyName, List<string>? modifiers)
+    private static string FormatKeyComboForDisplay(string keyName, List<string>? modifiers)
     {
         if (string.IsNullOrEmpty(keyName)) return "";
 
@@ -1881,13 +1884,13 @@ public partial class MappingsTabController
         return output;
     }
 
-    private float ApplySCurve(float x)
+    private static float ApplySCurve(float x)
     {
         // S-curve using smoothstep-like function
         return x * x * (3f - 2f * x);
     }
 
-    private float ApplyExponential(float x)
+    private static float ApplyExponential(float x)
     {
         // Exponential curve (steeper at the end)
         return x * x;
@@ -2480,7 +2483,7 @@ public partial class MappingsTabController
         }
     }
 
-    private string GetAxisBindingText(MappingProfile? profile, uint vjoyId, int axisIndex)
+    private static string GetAxisBindingText(MappingProfile? profile, uint vjoyId, int axisIndex)
     {
         if (profile is null) return "ÔÇö";
 
@@ -2495,7 +2498,7 @@ public partial class MappingsTabController
         return $"{input.DeviceName} - Axis {input.Index}";
     }
 
-    private string GetButtonBindingText(MappingProfile? profile, uint vjoyId, int buttonIndex)
+    private static string GetButtonBindingText(MappingProfile? profile, uint vjoyId, int buttonIndex)
     {
         if (profile is null) return "ÔÇö";
 

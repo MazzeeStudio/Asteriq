@@ -14,11 +14,14 @@ public class DriverSetupForm : FUIBaseDialog
     private readonly IApplicationSettingsService? _appSettings;
     private readonly bool _settingsMode;
     private readonly FUIBackground _background = new();
+    // CA2213: SKControl, ProgressBar, ListBox are WinForms child controls — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private readonly SKControl _canvas;
 
     // Native controls overlaid on canvas
     private readonly ProgressBar _progressBar;
     private readonly ListBox _logListBox;
+#pragma warning restore CA2213
 
     // State drawn on canvas (invalidate on change)
     private string _statusText = "Checking installed drivers...";
@@ -449,8 +452,8 @@ public class DriverSetupForm : FUIBaseDialog
             }
         }
         else if (_hoveredRegion == 1) { DialogResult = DialogResult.Cancel; Close(); }
-        else if (_hoveredRegion == 2) OpenUrl(_driverSetup.GetVJoyReleasesUrl());
-        else if (_hoveredRegion == 3) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
+        else if (_hoveredRegion == 2) OpenUrl(DriverSetupManager.GetVJoyReleasesUrl());
+        else if (_hoveredRegion == 3) OpenUrl(DriverSetupManager.GetHidHideReleasesUrl());
         else if (_hoveredRegion == 4 && !_vJoyInstalled && !_vJoyInstalling) _ = VJoyInstallAsync();
         else if (_hoveredRegion == 5 && !_hidHideInstalled && !_hidHideInstalling) _ = HidHideInstallAsync();
         else if (_hoveredRegion == 6)
@@ -541,7 +544,7 @@ public class DriverSetupForm : FUIBaseDialog
             int choice = FUIMessageBox.Show(this,
                 "Failed to download the vJoy installer.\n\nOpen the GitHub releases page to download manually?",
                 "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
-            if (choice == 0) OpenUrl(_driverSetup.GetVJoyReleasesUrl());
+            if (choice == 0) OpenUrl(DriverSetupManager.GetVJoyReleasesUrl());
             return;
         }
 
@@ -591,7 +594,7 @@ public class DriverSetupForm : FUIBaseDialog
             int choice = FUIMessageBox.Show(this,
                 "Failed to download the HidHide installer.\n\nOpen the GitHub releases page to download manually?",
                 "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
-            if (choice == 0) OpenUrl(_driverSetup.GetHidHideReleasesUrl());
+            if (choice == 0) OpenUrl(DriverSetupManager.GetHidHideReleasesUrl());
             return;
         }
 

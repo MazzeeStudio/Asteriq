@@ -172,7 +172,8 @@ internal static class SCBindingsRenderer
                 const float glowW   = 8f;
 
                 canvas.Save();
-                canvas.ClipRoundRect(new SKRoundRect(badgeBounds, 3f, 3f), SKClipOperation.Intersect, antialias: true);
+                using var badgeClip = new SKRoundRect(badgeBounds, 3f, 3f);
+                canvas.ClipRoundRect(badgeClip, SKClipOperation.Intersect, antialias: true);
 
                 // Soft bloom
                 using var glowPaint = new SKPaint

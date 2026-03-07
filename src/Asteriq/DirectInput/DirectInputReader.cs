@@ -278,7 +278,7 @@ public class DirectInputReader : IDisposable
         }
     }
 
-    private void ReleaseDevice(IntPtr device)
+    private static void ReleaseDevice(IntPtr device)
     {
         var releasePtr = GetVTableMethod(device, IDirectInputDevice8_Release);
         var release = Marshal.GetDelegateForFunctionPointer<ReleaseDelegate>(releasePtr);

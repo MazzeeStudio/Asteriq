@@ -23,7 +23,10 @@ public class FUIMessageBox : FUIBaseDialog
     private readonly string[] _buttonLabels;
     private readonly string[]? _detailLines;
     private readonly bool _primaryButtonIsDanger;
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private readonly SKControl _canvas;
+#pragma warning restore CA2213
     private int _hoveredButton = -1;
     private readonly SKRect[] _buttonBounds;
     private int _result = -1;
@@ -204,7 +207,7 @@ public class FUIMessageBox : FUIBaseDialog
         FUIRenderer.DrawLCornerFrame(canvas, bounds.Inset(-4, -4), FUIColors.Frame.WithAlpha(100), 20f, 6f, 1f);
     }
 
-    private void DrawIcon(SKCanvas canvas, SKPoint center, SKColor color, MessageBoxType type)
+    private static void DrawIcon(SKCanvas canvas, SKPoint center, SKColor color, MessageBoxType type)
     {
         using var paint = new SKPaint
         {

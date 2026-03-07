@@ -412,7 +412,7 @@ public partial class MappingsTabController
     /// <summary>
     /// Count the number of axes configured on a vJoy device
     /// </summary>
-    private int CountVJoyAxes(VJoyDeviceInfo vjoy)
+    private static int CountVJoyAxes(VJoyDeviceInfo vjoy)
     {
         int count = 0;
         if (vjoy.HasAxisX) count++;
@@ -430,7 +430,7 @@ public partial class MappingsTabController
     /// Get the list of available vJoy axis indices in standard order.
     /// Returns indices 0-7 corresponding to X, Y, Z, RX, RY, RZ, Slider0, Slider1.
     /// </summary>
-    private List<int> GetVJoyAxisIndices(VJoyDeviceInfo vjoy)
+    private static List<int> GetVJoyAxisIndices(VJoyDeviceInfo vjoy)
     {
         var indices = new List<int>();
         if (vjoy.HasAxisX) indices.Add(0);   // X
@@ -447,7 +447,7 @@ public partial class MappingsTabController
     /// <summary>
     /// Get a human-readable name for a vJoy axis index.
     /// </summary>
-    private string GetVJoyAxisName(int index)
+    private static string GetVJoyAxisName(int index)
     {
         return index switch
         {
@@ -506,7 +506,7 @@ public partial class MappingsTabController
     /// </summary>
     private VJoyDeviceInfo? CreateVJoyDeviceForPhysical(PhysicalDeviceInfo physical)
     {
-        string? configPath = _ctx.DriverSetupManager.GetVJoyConfigPath();
+        string? configPath = DriverSetupManager.GetVJoyConfigPath();
         if (configPath is null)
         {
             FUIMessageBox.ShowWarning(_ctx.OwnerForm,
@@ -948,7 +948,7 @@ public partial class MappingsTabController
     /// Check if a physical input is already mapped anywhere in the profile.
     /// Returns the mapping name if found, null otherwise.
     /// </summary>
-    private string? FindExistingMappingForInput(MappingProfile profile, InputSource inputToCheck)
+    private static string? FindExistingMappingForInput(MappingProfile profile, InputSource inputToCheck)
     {
         // Check axis mappings
         foreach (var mapping in profile.AxisMappings)
@@ -1012,7 +1012,7 @@ public partial class MappingsTabController
     /// <summary>
     /// Remove any existing mappings that use the specified input source.
     /// </summary>
-    private void RemoveExistingMappingsForInput(MappingProfile profile, InputSource inputToRemove)
+    private static void RemoveExistingMappingsForInput(MappingProfile profile, InputSource inputToRemove)
     {
         // Remove from axis mappings
         foreach (var mapping in profile.AxisMappings.ToList())
@@ -2006,12 +2006,12 @@ public partial class MappingsTabController
         }
     }
 
-    private (InputType? type, int index) ParseBinding(string binding, string controlType)
+    private static (InputType? type, int index) ParseBinding(string binding, string controlType)
     {
         // Handle button bindings: "button0", "button1", etc.
         if (binding.StartsWith("button", StringComparison.OrdinalIgnoreCase))
         {
-            if (int.TryParse(binding.Substring(6), out int buttonIndex))
+            if (int.TryParse(binding.AsSpan(6), out int buttonIndex))
                 return (InputType.Button, buttonIndex);
         }
 
@@ -2028,7 +2028,7 @@ public partial class MappingsTabController
         // Handle hat bindings: "hat0", "hat1", etc.
         if (binding.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
         {
-            if (int.TryParse(binding.Substring(3), out int hatIndex))
+            if (int.TryParse(binding.AsSpan(3), out int hatIndex))
                 return (InputType.Hat, hatIndex);
         }
 

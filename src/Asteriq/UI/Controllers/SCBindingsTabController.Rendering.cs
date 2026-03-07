@@ -160,7 +160,7 @@ public partial class SCBindingsTabController
         // Action count on right of title
         int actionCount = _scFilteredActions?.Count ?? 0;
         int totalCount = _scSchemaService is not null && _scInstall.Actions is not null
-            ? _scSchemaService.FilterJoystickActions(_scInstall.Actions).Count
+            ? SCSchemaService.FilterJoystickActions(_scInstall.Actions).Count
             : actionCount;
         // Total bound is always against the full unfiltered list so it reflects the whole profile
         int totalBound = _scInstall.Actions?.Count(a => _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null) ?? 0;
@@ -1161,16 +1161,18 @@ public partial class SCBindingsTabController
             float scrollTrackHeight = dropdownHeight - 4;
 
             using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(80));
-            canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, scrollTrackY, scrollTrackX + scrollbarWidth, scrollTrackY + scrollTrackHeight), 2f), trackPaint);
+            using var scrollTrack = new SKRoundRect(new SKRect(scrollTrackX, scrollTrackY, scrollTrackX + scrollbarWidth, scrollTrackY + scrollTrackHeight), 2f);
+            canvas.DrawRoundRect(scrollTrack, trackPaint);
 
             float thumbHeight = Math.Max(20f, scrollTrackHeight * (dropdownHeight / totalContentHeight));
             float thumbY = scrollTrackY + (_searchFilter.FilterScrollOffset / _searchFilter.FilterMaxScroll) * (scrollTrackHeight - thumbHeight);
             using var thumbPaint = FUIRenderer.CreateFillPaint(FUIColors.TextDim.WithAlpha(150));
-            canvas.DrawRoundRect(new SKRoundRect(new SKRect(scrollTrackX, thumbY, scrollTrackX + scrollbarWidth, thumbY + thumbHeight), 2f), thumbPaint);
+            using var scrollThumb = new SKRoundRect(new SKRect(scrollTrackX, thumbY, scrollTrackX + scrollbarWidth, thumbY + thumbHeight), 2f);
+            canvas.DrawRoundRect(scrollThumb, thumbPaint);
         }
     }
 
-    private void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
+    private static void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
     {
         float lineHeight = 18f;
         FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -1599,7 +1601,7 @@ public partial class SCBindingsTabController
         return (saved, _scAvailableProfiles);
     }
 
-    private string GetColImportSourceLabel(int index, List<SCExportProfileInfo> saved, List<SCMappingFile> xml)
+    private static string GetColImportSourceLabel(int index, List<SCExportProfileInfo> saved, List<SCMappingFile> xml)
     {
         if (index < saved.Count)
             return saved[index].ProfileName;

@@ -183,7 +183,7 @@ public partial class SCBindingsTabController
                     if (profile is not null)
                     {
                         ReportProgress(version, "Parsing actions...");
-                        actions = _scSchemaService.ParseActions(profile);
+                        actions = SCSchemaService.ParseActions(profile);
                         s_schemaCache[cacheKey] = actions;
                     }
                 }
@@ -191,7 +191,7 @@ public partial class SCBindingsTabController
                 if (actions is not null)
                 {
                     ReportProgress(version, "Building categories...");
-                    var joystickActions = _scSchemaService.FilterJoystickActions(actions);
+                    var joystickActions = SCSchemaService.FilterJoystickActions(actions);
                     actionMaps = SCCategoryMapper.GetSortedCategoriesFromActions(
                         joystickActions.Select(a => (a.ActionMap, a.ActionName))
                     ).ToList();
@@ -319,7 +319,7 @@ public partial class SCBindingsTabController
             var installation = _scInstall.Installations[_scInstall.SelectedInstallation];
 
             // Validate profile
-            var validation = _scExportService.Validate(_scExportProfile);
+            var validation = SCXmlExportService.Validate(_scExportProfile);
             if (!validation.IsValid)
             {
                 SetStatus($"Validation failed: {validation.Errors.FirstOrDefault()}", SCStatusKind.Error);
@@ -353,7 +353,7 @@ public partial class SCBindingsTabController
 
             try
             {
-                _scExportService.ExportToFile(_scExportProfile, exportPath);
+                SCXmlExportService.ExportToFile(_scExportProfile, exportPath);
             }
             finally
             {
@@ -529,7 +529,7 @@ public partial class SCBindingsTabController
         _scExportProfile.ProfileName = mappingFile.DisplayName;
 
         // Import the profile
-        var importResult = _scExportService.ImportFromFile(mappingFile.FilePath);
+        var importResult = SCXmlExportService.ImportFromFile(mappingFile.FilePath);
 
         if (!importResult.Success)
         {
@@ -727,7 +727,7 @@ public partial class SCBindingsTabController
         // Try to truncate by removing middle part
         int start = maxLength / 3;
         int end = maxLength - start - 3;  // 3 for "..."
-        return path.Substring(0, start) + "..." + path.Substring(path.Length - end);
+        return string.Concat(path.AsSpan(0, start), "...", path.AsSpan(path.Length - end));
     }
 
     /// <summary>

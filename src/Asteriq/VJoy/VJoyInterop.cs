@@ -1,3 +1,5 @@
+// HID/vJoy interop constants must match OS/SDK-defined names exactly.
+#pragma warning disable CA1707
 using System.Runtime.InteropServices;
 
 namespace Asteriq.VJoy;

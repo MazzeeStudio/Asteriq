@@ -256,13 +256,13 @@ public static class FUIRenderer
     /// </summary>
     public struct ResponsiveLayout
     {
-        public float LeftPanelWidth;
-        public float CenterWidth;
-        public float RightPanelWidth;
-        public float Gutter;
-        public bool ShowLeftPanel;
-        public bool ShowRightPanel;
-        public bool IsCompact;
+        public float LeftPanelWidth { get; set; }
+        public float CenterWidth { get; set; }
+        public float RightPanelWidth { get; set; }
+        public float Gutter { get; set; }
+        public bool ShowLeftPanel { get; set; }
+        public bool ShowRightPanel { get; set; }
+        public bool IsCompact { get; set; }
     }
 
     /// <summary>
@@ -753,7 +753,7 @@ public static class FUIRenderer
             }
         }
 
-        return bestFit > 0 ? text.Substring(0, bestFit) + ellipsis : ellipsis;
+        return bestFit > 0 ? string.Concat(text.AsSpan(0, bestFit), ellipsis) : ellipsis;
     }
 
     /// <summary>
@@ -1002,12 +1002,12 @@ public static class FUIRenderer
     /// </summary>
     public struct PanelMetrics
     {
-        public float Y;              // Current Y position for content
-        public float LeftMargin;     // Left content edge
-        public float RightMargin;    // Right content edge
-        public float ContentWidth;   // Available content width
-        public float RowHeight;      // Standard row height
-        public float SectionSpacing; // Space between sections
+        public float Y { get; set; }              // Current Y position for content
+        public float LeftMargin { get; set; }     // Left content edge
+        public float RightMargin { get; set; }    // Right content edge
+        public float ContentWidth { get; set; }   // Available content width
+        public float RowHeight { get; set; }      // Standard row height
+        public float SectionSpacing { get; set; } // Space between sections
     }
 
     /// <summary>

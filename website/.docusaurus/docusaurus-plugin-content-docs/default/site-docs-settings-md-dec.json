@@ -1,0 +1,27 @@
+{
+  "id": "settings",
+  "title": "Settings",
+  "description": "The Settings tab covers configuration management, system driver status, network forwarding setup, visual themes, and general application preferences.",
+  "source": "@site/docs/settings.md",
+  "sourceDirName": ".",
+  "slug": "/settings",
+  "permalink": "/Asteriq/docs/settings",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 7,
+  "frontMatter": {
+    "sidebar_position": 7,
+    "title": "Settings"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Network Forwarding",
+    "permalink": "/Asteriq/docs/network-forwarding"
+  },
+  "next": {
+    "title": "Client Only Mode",
+    "permalink": "/Asteriq/docs/client-only"
+  }
+}

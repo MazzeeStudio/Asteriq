@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "VKB Gunfighter Mk.III",
+  "vidPid": "231D:0121",
+  "deviceType": "Joystick",
+  "svgFile": "vkb_mcg.png",
+  "mirror": false,
+  "viewBox": { "x": 478, "y": 891 },
+  "controls": {}
+}

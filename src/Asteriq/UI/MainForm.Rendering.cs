@@ -138,10 +138,10 @@ public partial class MainForm
         }
     }
 
-    private void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
+    private static void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
         => FUIWidgets.DrawSelector(canvas, bounds, text, isHovered, isEnabled);
 
-    private void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
+    private static void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
         => FUIWidgets.DrawTextFieldReadOnly(canvas, bounds, text, isHovered);
 
 
@@ -338,7 +338,7 @@ public partial class MainForm
         float widestAction = actionLabels.Max(s => FUIRenderer.MeasureText(s, 14f));
         float widestProfile = _profiles.Count > 0
             ? _profiles.Max(p => {
-                string n = p.Name.Length > 14 ? p.Name.Substring(0, 13) + "…" : p.Name;
+                string n = p.Name.Length > 14 ? string.Concat(p.Name.AsSpan(0, 13), "…") : p.Name;
                 return FUIRenderer.MeasureText(n, 14f);
               })
             : 0f;
@@ -403,7 +403,7 @@ public partial class MainForm
             // Profile name
             string name = profile.Name;
             if (name.Length > 14)
-                name = name.Substring(0, 13) + "…";
+                name = string.Concat(name.AsSpan(0, 13), "…");
 
             var color = isActive ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
             FUIRenderer.DrawText(canvas, name, new SKPoint(x + 12, itemY + 17), color, 14f);
@@ -439,11 +439,11 @@ public partial class MainForm
             _hoveredProfileIndex == _profiles.Count + 2, false, canExport);
     }
 
-    private void DrawDropdownItem(SKCanvas canvas, float x, float itemY, float width, float itemHeight,
+    private static void DrawDropdownItem(SKCanvas canvas, float x, float itemY, float width, float itemHeight,
         string text, bool isHovered, bool isActive, bool isEnabled)
         => FUIWidgets.DrawDropdownItem(canvas, x, itemY, width, itemHeight, text, isHovered, isActive, isEnabled);
 
-    private void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
+    private static void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
         => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
 
     /// <summary>

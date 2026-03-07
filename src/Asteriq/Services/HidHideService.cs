@@ -474,7 +474,7 @@ public class HidHideService : IHidHideService
         }
     }
 
-    private List<HidHideDeviceGroup> ParseDeviceJson(string json)
+    private static List<HidHideDeviceGroup> ParseDeviceJson(string json)
     {
         var groups = new List<HidHideDeviceGroup>();
 

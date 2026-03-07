@@ -25,7 +25,10 @@ public class SCSharedBindingDialog : FUIBaseDialog
     private readonly string _primaryInputDisplay;
     private readonly string _secondaryDeviceLabel;
     private readonly string _secondaryInputDisplay;
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
 
     private SKRect _cancelButtonBounds;
     private SKRect _shareButtonBounds;

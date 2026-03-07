@@ -1,0 +1,27 @@
+{
+  "id": "network-forwarding",
+  "title": "Network Forwarding",
+  "description": "Network forwarding lets you use your HOTAS setup from a different PC on your local network. The machine with the physical controllers transmits input to another machine, which presents it as virtual joystick devices to Star Citizen.",
+  "source": "@site/docs/network-forwarding.md",
+  "sourceDirName": ".",
+  "slug": "/network-forwarding",
+  "permalink": "/Asteriq/docs/network-forwarding",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 6,
+  "frontMatter": {
+    "sidebar_position": 6,
+    "title": "Network Forwarding"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "SC Bindings",
+    "permalink": "/Asteriq/docs/sc-bindings"
+  },
+  "next": {
+    "title": "Settings",
+    "permalink": "/Asteriq/docs/settings"
+  }
+}

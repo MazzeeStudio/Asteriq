@@ -210,47 +210,53 @@ public sealed class NetworkInputService : INetworkInputService
             peer.MachineName, peer.IpAddress, peer.TcpPort, code);
 
         var client = new TcpClient { NoDelay = true };
-        await client.ConnectAsync(peer.IpAddress, peer.TcpPort, cancellationToken).ConfigureAwait(false);
-
-        var stream = client.GetStream();
-
-        // Send HELLO with our permanent master code
-        var helloPayload = EncodeHello(Environment.MachineName, (ushort)peer.TcpPort, code);
-        await WritePacketAsync(stream, MsgType.Hello, helloPayload, cancellationToken).ConfigureAwait(false);
-
-        // Wait for accept/reject from client.  The client shows a trust dialog so we
-        // allow up to 45 seconds — longer than the client's own 60 s timeout so Castra
-        // gets a clean rejection rather than a raw socket error.
-        using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        handshakeCts.CancelAfter(TimeSpan.FromSeconds(45));
-        byte responseType;
         try
         {
-            (responseType, _) = await ReadPacketAsync(stream, handshakeCts.Token).ConfigureAwait(false);
+            await client.ConnectAsync(peer.IpAddress, peer.TcpPort, cancellationToken).ConfigureAwait(false);
+
+            var stream = client.GetStream();
+
+            // Send HELLO with our permanent master code
+            var helloPayload = EncodeHello(Environment.MachineName, (ushort)peer.TcpPort, code);
+            await WritePacketAsync(stream, MsgType.Hello, helloPayload, cancellationToken).ConfigureAwait(false);
+
+            // Wait for accept/reject from client.  The client shows a trust dialog so we
+            // allow up to 45 seconds — longer than the client's own 60 s timeout so Castra
+            // gets a clean rejection rather than a raw socket error.
+            using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            handshakeCts.CancelAfter(TimeSpan.FromSeconds(45));
+            byte responseType;
+            try
+            {
+                (responseType, _) = await ReadPacketAsync(stream, handshakeCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Connection to {peer.MachineName} timed out waiting for trust confirmation.");
+            }
+            if (responseType != MsgType.HelloAccept)
+            {
+                _logger.LogWarning("Connection to {Peer} rejected", peer.MachineName);
+                throw new InvalidOperationException($"Connection to {peer.MachineName} was rejected.");
+            }
+
+            _client = client;
+            _stream = stream;
+            _mode   = NetworkInputMode.Remote;
+            client = null!; // ownership transferred to _client; prevent disposal in finally
+
+            // Send ACQUIRE so client grabs vJoy
+            await WritePacketAsync(stream, MsgType.Acquire, [], cancellationToken).ConfigureAwait(false);
+
+            _logger.LogInformation("Connected to {Peer}, mode=Remote", peer.MachineName);
+
+            _receiveCts = new CancellationTokenSource();
+            _ = RunPingAsync(stream, _receiveCts.Token);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        finally
         {
-            client.Dispose();
-            throw new TimeoutException($"Connection to {peer.MachineName} timed out waiting for trust confirmation.");
+            client?.Dispose();
         }
-        if (responseType != MsgType.HelloAccept)
-        {
-            _logger.LogWarning("Connection to {Peer} rejected", peer.MachineName);
-            client.Dispose();
-            throw new InvalidOperationException($"Connection to {peer.MachineName} was rejected.");
-        }
-
-        _client = client;
-        _stream = stream;
-        _mode   = NetworkInputMode.Remote;
-
-        // Send ACQUIRE so client grabs vJoy
-        await WritePacketAsync(stream, MsgType.Acquire, [], cancellationToken).ConfigureAwait(false);
-
-        _logger.LogInformation("Connected to {Peer}, mode=Remote", peer.MachineName);
-
-        _receiveCts = new CancellationTokenSource();
-        _ = RunPingAsync(stream, _receiveCts.Token);
     }
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
@@ -644,7 +650,7 @@ public sealed class NetworkInputService : INetworkInputService
             await stream.WriteAsync(payload, ct).ConfigureAwait(false);
     }
 
-    private void WriteVJoyPacketSync(NetworkStream stream, VJoyOutputSnapshot snapshot)
+    private static void WriteVJoyPacketSync(NetworkStream stream, VJoyOutputSnapshot snapshot)
     {
         var payload = EncodeVJoyPayload(snapshot);
         var header  = new byte[9];
@@ -671,6 +677,8 @@ public sealed class NetworkInputService : INetworkInputService
         DisconnectAsync().GetAwaiter().GetResult();
         _listenerCts?.Cancel();
         _listenerCts?.Dispose();
-        _listener?.Stop();
+        _listener?.Dispose(); // Dispose calls Stop() internally
+        _pendingStream?.Dispose();
+        _pendingClient?.Dispose();
     }
 }

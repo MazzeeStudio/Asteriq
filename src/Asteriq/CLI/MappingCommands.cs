@@ -30,18 +30,17 @@ internal static class MappingCommands
         }
 
         // Initialize services
-        var inputService = new InputService();
+        using var inputService = new InputService();
         if (!inputService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize SDL2");
             return;
         }
 
-        var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
+        using var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
         if (!vjoyService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize vJoy");
-            inputService.Dispose();
             return;
         }
 
@@ -132,14 +131,12 @@ internal static class MappingCommands
         Console.WriteLine("Curve: S-Curve (0.3 curvature, 5% deadzone)\n");
 
         // Initialize mapping engine
-        var mappingEngine = new MappingEngine(vjoyService);
+        using var mappingEngine = new MappingEngine(vjoyService);
         mappingEngine.LoadProfile(profile);
 
         if (!mappingEngine.Start())
         {
             Console.WriteLine("ERROR: Failed to start mapping engine");
-            inputService.Dispose();
-            vjoyService.Dispose();
             return;
         }
 
@@ -239,7 +236,7 @@ internal static class MappingCommands
         }
 
         // Initialize input service
-        var inputService = new InputService();
+        using var inputService = new InputService();
         if (!inputService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize SDL2");

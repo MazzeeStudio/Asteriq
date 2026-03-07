@@ -21,7 +21,10 @@ public class SCAssignmentDialog : FUIBaseDialog
     private readonly List<DeviceEntry> _devices;
     private readonly bool _isPhysicalMode;
 
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
     private System.Windows.Forms.Timer _renderTimer = null!;
 
     // Dialog state
@@ -173,7 +176,7 @@ public class SCAssignmentDialog : FUIBaseDialog
         Close();
     }
 
-    private string GetInputNameAtIndex(int index)
+    private static string GetInputNameAtIndex(int index)
     {
         if (index < 8)
         {
@@ -189,7 +192,7 @@ public class SCAssignmentDialog : FUIBaseDialog
         }
     }
 
-    private string GetInputDisplayName(int index)
+    private static string GetInputDisplayName(int index)
     {
         var name = GetInputNameAtIndex(index);
         if (name == "---") return "---";
@@ -365,7 +368,7 @@ public class SCAssignmentDialog : FUIBaseDialog
         _buttonBounds = buttons.ToArray();
     }
 
-    private void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool enabled)
+    private static void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool enabled)
     {
         var bgColor = enabled
             ? (hovered ? FUIColors.Primary.WithAlpha(60) : FUIColors.Background2)
@@ -384,7 +387,7 @@ public class SCAssignmentDialog : FUIBaseDialog
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
     }
 
-    private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
+    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
     {
         var bgColor = isPrimary
             ? (hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Active.WithAlpha(50))
@@ -403,7 +406,7 @@ public class SCAssignmentDialog : FUIBaseDialog
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
     }
 
-    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
+    private static void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
     {
         var bgColor = isChecked ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
         var frameColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
@@ -421,8 +424,14 @@ public class SCAssignmentDialog : FUIBaseDialog
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _renderTimer?.Stop();
-        _renderTimer?.Dispose();
         base.OnFormClosing(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            _renderTimer?.Dispose();
+        base.Dispose(disposing);
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)

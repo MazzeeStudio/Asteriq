@@ -12,7 +12,10 @@ public class FUISelectionDialog : FUIBaseDialog
     private readonly string _title;
     private readonly string _description;
     private readonly List<SelectionItem> _items;
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private readonly SKControl _canvas;
+#pragma warning restore CA2213
     private int _hoveredItem = -1;
     private int _selectedItem = 0;
     private int _hoveredButton = -1;

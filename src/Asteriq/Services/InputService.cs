@@ -280,7 +280,7 @@ public class InputService : IInputService
             // Cache HID devices on first call (to handle multiple identical devices)
             if (_hidDevicesCache is null)
             {
-                _hidDevicesCache = _hidDeviceService.EnumerateDevices();
+                _hidDevicesCache = HidDeviceService.EnumerateDevices();
                 LogAxisTypes($"Enumerated {_hidDevicesCache.Count} HID devices:");
                 foreach (var d in _hidDevicesCache)
                 {
@@ -382,9 +382,9 @@ public class InputService : IInputService
         // "L-" at start -> "LEFT "
         // "R-" at start -> "RIGHT "
         if (normalized.StartsWith("L-", StringComparison.OrdinalIgnoreCase))
-            normalized = "LEFT " + normalized.Substring(2);
+            normalized = string.Concat("LEFT ", normalized.AsSpan(2));
         else if (normalized.StartsWith("R-", StringComparison.OrdinalIgnoreCase))
-            normalized = "RIGHT " + normalized.Substring(2);
+            normalized = string.Concat("RIGHT ", normalized.AsSpan(2));
 
         // Remove extra whitespace
         normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\s+", " ");
@@ -642,7 +642,7 @@ public class InputService : IInputService
     /// <summary>
     /// Read device state using SDL2
     /// </summary>
-    private DeviceInputState ReadDeviceStateSDL(IntPtr joystick, PhysicalDeviceInfo info)
+    private static DeviceInputState ReadDeviceStateSDL(IntPtr joystick, PhysicalDeviceInfo info)
     {
         // Read axes (normalize from -32768..32767 to -1.0..1.0)
         var axes = new float[info.AxisCount];
@@ -781,6 +781,7 @@ public class InputService : IInputService
         // Dispose DirectInput resources
         _directInputReader?.Dispose();
         _directInputReader = null;
+        _directInputService?.Dispose();
         _directInputService = null;
         _sdlToDirectInputGuid.Clear();
 
@@ -802,5 +803,6 @@ public class InputService : IInputService
             SDL.SDL_Quit();
             _isInitialized = false;
         }
+        GC.SuppressFinalize(this);
     }
 }

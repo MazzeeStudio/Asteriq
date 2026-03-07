@@ -1,0 +1,27 @@
+{
+  "id": "sc-bindings",
+  "title": "SC Bindings",
+  "description": "The SC Bindings tab lets you load a Star Citizen control profile, assign inputs to SC actions across your devices, detect binding conflicts, and export a ready-to-use profile to your Star Citizen directory.",
+  "source": "@site/docs/sc-bindings.md",
+  "sourceDirName": ".",
+  "slug": "/sc-bindings",
+  "permalink": "/Asteriq/docs/sc-bindings",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5,
+    "title": "SC Bindings"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Mappings",
+    "permalink": "/Asteriq/docs/mappings"
+  },
+  "next": {
+    "title": "Network Forwarding",
+    "permalink": "/Asteriq/docs/network-forwarding"
+  }
+}

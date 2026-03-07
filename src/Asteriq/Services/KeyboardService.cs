@@ -25,7 +25,6 @@ public class KeyboardService : IDisposable
     private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
     // MapVirtualKey types
-    private const uint MAPVK_VK_TO_VSC = 0;
     private const uint MAPVK_VK_TO_VSC_EX = 4;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -145,7 +144,7 @@ public class KeyboardService : IDisposable
     /// <summary>
     /// Send a single key press or release
     /// </summary>
-    private void SendKey(int virtualKeyCode, bool press)
+    private static void SendKey(int virtualKeyCode, bool press)
     {
         // Get the scan code for this virtual key
         // Use MAPVK_VK_TO_VSC_EX to get extended scan code info
@@ -208,6 +207,7 @@ public class KeyboardService : IDisposable
     public void Dispose()
     {
         ReleaseAll();
+        GC.SuppressFinalize(this);
     }
 
     #region Virtual Key Codes

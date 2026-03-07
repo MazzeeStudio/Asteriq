@@ -10,7 +10,10 @@ namespace Asteriq.UI;
 /// </summary>
 public class FUICurveEditor : UserControl
 {
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
     private AxisCurve _curve = new();
 
     // Control points (normalized 0-1 space)
@@ -364,7 +367,7 @@ public class FUICurveEditor : UserControl
         DrawSlider(canvas, _saturationBounds, "SATURATION", _curve.Saturation, FUIColors.Success, _draggingSaturation);
     }
 
-    private void DrawSlider(SKCanvas canvas, SKRect bounds, string label, float value, SKColor color, bool dragging)
+    private static void DrawSlider(SKCanvas canvas, SKRect bounds, string label, float value, SKColor color, bool dragging)
     {
         // Label
         FUIRenderer.DrawText(canvas, $"{label}: {value:P0}", new SKPoint(bounds.Left, bounds.Top), FUIColors.TextDim, 12f);

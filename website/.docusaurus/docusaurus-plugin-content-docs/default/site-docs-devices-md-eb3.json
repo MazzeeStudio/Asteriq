@@ -1,0 +1,27 @@
+{
+  "id": "devices",
+  "title": "Devices",
+  "description": "The Devices tab is the starting point for any Asteriq setup. It shows all connected physical controllers and your configured vJoy virtual devices, and is where you assign physical inputs to virtual outputs and start or stop forwarding.",
+  "source": "@site/docs/devices.md",
+  "sourceDirName": ".",
+  "slug": "/devices",
+  "permalink": "/Asteriq/docs/devices",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "title": "Devices"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Getting Started",
+    "permalink": "/Asteriq/docs/getting-started"
+  },
+  "next": {
+    "title": "Mappings",
+    "permalink": "/Asteriq/docs/mappings"
+  }
+}

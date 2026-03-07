@@ -345,5 +345,6 @@ public class P4kExtractorService : IDisposable
             _fileStream = null;
             _disposed = true;
         }
+        GC.SuppressFinalize(this);
     }
 }

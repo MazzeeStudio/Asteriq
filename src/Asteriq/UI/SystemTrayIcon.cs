@@ -57,7 +57,7 @@ public sealed class SystemTrayIcon : IDisposable
         try
         {
             // Load and render SVG using SkiaSharp
-            var svg = new SKSvg();
+            using var svg = new SKSvg();
             if (File.Exists(_svgPath))
             {
                 using var stream = File.OpenRead(_svgPath);
@@ -94,7 +94,7 @@ public sealed class SystemTrayIcon : IDisposable
                 using var bitmap = new Bitmap(ms);
 
                 // Apply color tint to the bitmap
-                var tintedBitmap = ApplyColorTint(bitmap, targetColor);
+                using var tintedBitmap = ApplyColorTint(bitmap, targetColor);
                 return Icon.FromHandle(tintedBitmap.GetHicon());
             }
         }

@@ -35,7 +35,7 @@ internal static class DeviceCommands
             Log($"SDL2.dll exists in runtimes: {File.Exists(sdlRuntimePath)}");
 
             Log("Creating InputService...");
-            var inputService = new InputService();
+            using var inputService = new InputService();
 
             Log("Initializing SDL2...");
             if (!inputService.Initialize())
@@ -157,7 +157,7 @@ internal static class DeviceCommands
         Console.WriteLine($"vJoy target device: {vjoyId}\n");
 
         // Initialize input
-        var inputService = new InputService();
+        using var inputService = new InputService();
         if (!inputService.Initialize())
         {
             Console.WriteLine("Failed to initialize SDL2!");
@@ -184,7 +184,7 @@ internal static class DeviceCommands
         }
 
         // Initialize vJoy
-        var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
+        using var vjoyService = new VJoyService(NullLogger<VJoyService>.Instance);
         if (!vjoyService.Initialize())
         {
             Console.WriteLine("Failed to initialize vJoy!");
@@ -332,7 +332,7 @@ internal static class DeviceCommands
         Console.WriteLine("=== Asteriq Device Matching ===\n");
 
         // Initialize SDL
-        var inputService = new InputService();
+        using var inputService = new InputService();
         if (!inputService.Initialize())
         {
             Console.WriteLine("ERROR: Failed to initialize SDL2");

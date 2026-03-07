@@ -699,7 +699,8 @@ public class SettingsTabController : ITabController, IDisposable
                     var fillRect = new SKRect(bannerRect.Left, bannerRect.Top, bannerRect.Left + fillWidth, bannerRect.Bottom);
                     using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                     canvas.Save();
-                    canvas.ClipRoundRect(new SKRoundRect(bannerRect, bannerRadius));
+                    using var bannerClip = new SKRoundRect(bannerRect, bannerRadius);
+                    canvas.ClipRoundRect(bannerClip);
                     canvas.DrawRect(fillRect, fillPaint);
                     canvas.Restore();
                     using var bannerBorder = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(50));
@@ -1305,6 +1306,7 @@ public class SettingsTabController : ITabController, IDisposable
         _hidHideDownloadCts?.Cancel();
         _hidHideDownloadCts?.Dispose();
         _hidHideDownloadCts = null;
+        GC.SuppressFinalize(this);
     }
 
     private bool IsHidHideUpdateAvailable()
@@ -1839,7 +1841,9 @@ public class SettingsTabController : ITabController, IDisposable
             {
                 _ = _ctx.UpdateService.CheckAsync().ContinueWith(
                     _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
-                    TaskContinuationOptions.ExecuteSynchronously);
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
                 _ctx.InvalidateCanvas();
             }
             return;
@@ -1850,7 +1854,9 @@ public class SettingsTabController : ITabController, IDisposable
         {
             _ = _ctx.UpdateService.DownloadAsync().ContinueWith(
                 _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
-                TaskContinuationOptions.ExecuteSynchronously);
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
             _ctx.InvalidateCanvas();
             return;
         }

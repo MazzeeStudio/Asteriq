@@ -48,7 +48,7 @@ public class HidDeviceService
     /// <summary>
     /// Enumerate all joystick/gamepad HID devices with their axis type information
     /// </summary>
-    public List<HidDeviceInfo> EnumerateDevices()
+    public static List<HidDeviceInfo> EnumerateDevices()
     {
         var result = new List<HidDeviceInfo>();
         var hidDevices = DeviceList.Local.GetHidDevices();
@@ -91,7 +91,7 @@ public class HidDeviceService
     /// Find a HID device that matches the given SDL device name.
     /// Returns null if no match is found.
     /// </summary>
-    public HidDeviceInfo? FindMatchingDevice(string sdlDeviceName, HashSet<string>? excludePaths = null)
+    public static HidDeviceInfo? FindMatchingDevice(string sdlDeviceName, HashSet<string>? excludePaths = null)
     {
         var devices = EnumerateDevices();
 
@@ -100,7 +100,7 @@ public class HidDeviceService
             d.ProductName.Equals(sdlDeviceName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private bool IsJoystickDevice(HidDevice device)
+    private static bool IsJoystickDevice(HidDevice device)
     {
         try
         {
@@ -132,7 +132,7 @@ public class HidDeviceService
         return false;
     }
 
-    private bool IsJoystickByName(HidDevice device)
+    private static bool IsJoystickByName(HidDevice device)
     {
         var name = GetProductName(device).ToLowerInvariant();
         var keywords = new[]
@@ -146,7 +146,7 @@ public class HidDeviceService
         return keywords.Any(k => name.Contains(k));
     }
 
-    private string GetProductName(HidDevice device)
+    private static string GetProductName(HidDevice device)
     {
         try
         {
@@ -173,7 +173,7 @@ public class HidDeviceService
         return $"Unknown Device ({device.VendorID:X4}:{device.ProductID:X4})";
     }
 
-    private string GetSerialNumber(HidDevice device)
+    private static string GetSerialNumber(HidDevice device)
     {
         try
         {
@@ -186,7 +186,7 @@ public class HidDeviceService
         }
     }
 
-    private void PopulateAxisInfo(HidDevice device, HidDeviceInfo deviceInfo)
+    private static void PopulateAxisInfo(HidDevice device, HidDeviceInfo deviceInfo)
     {
         try
         {
@@ -253,7 +253,7 @@ public class HidDeviceService
         }
     }
 
-    private AxisType UsageToAxisType(uint usageId, ref int sliderCount)
+    private static AxisType UsageToAxisType(uint usageId, ref int sliderCount)
     {
         return usageId switch
         {

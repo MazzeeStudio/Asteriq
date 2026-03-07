@@ -12,7 +12,10 @@ namespace Asteriq.UI;
 /// </summary>
 public sealed class TrustRequestDialog : FUIBaseDialog
 {
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
 
     private readonly string _peerName;
     private readonly string _code;

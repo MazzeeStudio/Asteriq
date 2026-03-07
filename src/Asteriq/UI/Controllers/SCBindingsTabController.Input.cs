@@ -1198,7 +1198,7 @@ public partial class SCBindingsTabController
             if (xmlIdx < xmlFiles.Count)
             {
                 var xmlFile = xmlFiles[xmlIdx];
-                var importResult = _scExportService.ImportFromFile(xmlFile.FilePath);
+                var importResult = SCXmlExportService.ImportFromFile(xmlFile.FilePath);
                 if (importResult.Success)
                 {
                     _colImport.LoadedProfile = new SCExportProfile { ProfileName = xmlFile.DisplayName };

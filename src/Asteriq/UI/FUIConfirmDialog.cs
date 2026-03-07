@@ -8,7 +8,10 @@ namespace Asteriq.UI;
 /// </summary>
 public class FUIConfirmDialog : FUIBaseDialog
 {
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
     private readonly string _title;
     private readonly string _message;
     private readonly string _confirmText;
@@ -126,7 +129,7 @@ public class FUIConfirmDialog : FUIBaseDialog
         DrawButton(canvas, _confirmButtonBounds, _confirmText, _hoveredButton == 0, true);
     }
 
-    private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
+    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
     {
         var bgColor = isPrimary
             ? (hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Active.WithAlpha(40))

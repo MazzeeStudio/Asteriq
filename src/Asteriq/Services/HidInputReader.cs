@@ -70,7 +70,10 @@ public class HidInputReader : IDisposable
                     return false;
                 }
 
+                // CA2000: ownership transferred to _readers dictionary; disposed in RemoveDevice/Dispose
+#pragma warning disable CA2000
                 var reader = new DeviceReader(hidDevice, hidDevicePath, displayName, this);
+#pragma warning restore CA2000
                 if (!reader.Start())
                 {
                     System.Diagnostics.Debug.WriteLine($"[HidInputReader] Failed to start reader: {displayName}");
@@ -153,6 +156,7 @@ public class HidInputReader : IDisposable
         if (_disposed) return;
         _disposed = true;
         CloseAllDevices();
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>
@@ -427,6 +431,7 @@ public class HidInputReader : IDisposable
             if (_disposed) return;
             _disposed = true;
             _cts?.Cancel();
+            _cts?.Dispose();
             _stream?.Dispose();
         }
     }

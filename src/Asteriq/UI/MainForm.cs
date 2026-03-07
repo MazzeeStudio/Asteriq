@@ -52,7 +52,6 @@ public partial class MainForm : Form
     private const uint SWP_NOCOPYBITS = 0x0100;  // Discards entire window content (prevents ghost window)
     private const uint SWP_FRAMECHANGED = 0x0020;  // Recalculates frame
     private const uint SWP_NOZORDER = 0x0004;     // Retains current Z order
-    private const uint SWP_NOACTIVATE = 0x0010;   // Does not activate window
 
     // DWM (Desktop Window Manager) for Windows 11 border color
     [DllImport("dwmapi.dll")]
@@ -106,7 +105,10 @@ public partial class MainForm : Form
     private SKRect _profileDropdownBounds;
 
     // UI State
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
     private System.Windows.Forms.Timer _renderTimer = null!;
     private FUIBackground _background = new();
     private float _scanLineProgress = 0f;
@@ -251,8 +253,11 @@ public partial class MainForm : Form
 
         // Silent background update check — only if user has enabled auto-check
         if (_appSettings.AutoCheckUpdates)
-            _ = _updateService.CheckAsync().ContinueWith(_ => _canvas?.Invoke(() => _canvas.Invalidate()),
-                TaskContinuationOptions.ExecuteSynchronously);
+            _ = _updateService.CheckAsync().ContinueWith(
+                _ => _canvas?.Invoke(() => _canvas.Invalidate()),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
     }
 
     private void InitializeTabControllers(
@@ -783,7 +788,7 @@ public partial class MainForm : Form
     /// <summary>
     /// Load device map for a device and return it (doesn't modify _deviceMap field)
     /// </summary>
-    private DeviceMap? LoadDeviceMapForDeviceInfo(PhysicalDeviceInfo? device)
+    private static DeviceMap? LoadDeviceMapForDeviceInfo(PhysicalDeviceInfo? device)
     {
         var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
         string? deviceName = device?.Name;
@@ -875,7 +880,7 @@ public partial class MainForm : Form
     /// Enumerates all device map JSON files in the Maps directory and returns them as
     /// (Key, DisplayName) pairs. Called once at startup and stored in TabContext.
     /// </summary>
-    private List<(string Key, string DisplayName)> LoadAvailableDeviceMaps()
+    private static List<(string Key, string DisplayName)> LoadAvailableDeviceMaps()
     {
         var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
         var result = new List<(string Key, string DisplayName)>();
@@ -985,7 +990,7 @@ public partial class MainForm : Form
     /// <summary>
     /// Detect device type from device name using common keywords
     /// </summary>
-    private string DetectDeviceType(string deviceName)
+    private static string DetectDeviceType(string deviceName)
     {
         var name = deviceName.ToUpperInvariant();
 
@@ -1060,7 +1065,7 @@ public partial class MainForm : Form
         }
     }
 
-    private SKRect? CalculateGroupBounds(XElement group, XNamespace svg)
+    private static SKRect? CalculateGroupBounds(XElement group, XNamespace svg)
     {
         float minX = float.MaxValue, minY = float.MaxValue;
         float maxX = float.MinValue, maxY = float.MinValue;
@@ -1140,7 +1145,7 @@ public partial class MainForm : Form
         return hasValidBounds ? new SKRect(minX, minY, maxX, maxY) : null;
     }
 
-    private SKRect? GetPathApproximateBounds(string d, float tx, float ty)
+    private static SKRect? GetPathApproximateBounds(string d, float tx, float ty)
     {
         // Simple extraction of coordinate values from path data
         var numbers = System.Text.RegularExpressions.Regex.Matches(d, @"[-+]?\d*\.?\d+");
@@ -1348,7 +1353,7 @@ public partial class MainForm : Form
             if (_leadLineProgress > 1.3f) _leadLineProgress = 0f;
 
             // Update background animations
-            _background.Update(0.016f);
+            FUIBackground.Update(0.016f);
 
             needsUpdate = true;
         }
@@ -1567,7 +1572,7 @@ public partial class MainForm : Form
         }
     }
 
-    private string GetAxisBindingName(int axisIndex)
+    private static string GetAxisBindingName(int axisIndex)
     {
         return axisIndex switch
         {
@@ -2046,10 +2051,13 @@ public partial class MainForm : Form
                 ? $"Disconnect from {peer.MachineName}"
                 : peer.MachineName;
 
+            // CA2000: ToolStripMenuItem ownership transferred to DropDownItems which manages disposal
+#pragma warning disable CA2000
             var peerItem = new ToolStripMenuItem(label)
             {
                 Image = TrayMenuIcons.Monitor(TrayIconSize, isConnected ? SkiaColorToGdi(FUIColors.Active) : dimColor),
             };
+#pragma warning restore CA2000
 
             var captured = peer;
             peerItem.Click += (s, e) =>
@@ -2118,14 +2126,26 @@ public partial class MainForm : Form
         }
 
         _renderTimer?.Stop();
-        _renderTimer?.Dispose();
         _inputService?.StopPolling();
         _inputService?.Dispose();
-        _joystickSvg?.Dispose();
-        _throttleSvg?.Dispose();
         _trayIcon?.Dispose();
         ShutdownNetworking();
         base.OnFormClosing(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _renderTimer?.Dispose();
+            _background?.Dispose();
+            _joystickSvg?.Dispose();
+            _throttleSvg?.Dispose();
+            _settingsController?.Dispose();
+            _networkVjoy?.Dispose();
+            _heartbeatCts?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     #endregion

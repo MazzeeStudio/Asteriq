@@ -25,7 +25,10 @@ public class BindingConflictDialog : FUIBaseDialog
     private readonly string _newActionName;
     private readonly string _inputDisplayName;
     private readonly string _deviceName;
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
 
     private SKRect _cancelButtonBounds;
     private SKRect _applyButtonBounds;
@@ -185,7 +188,7 @@ public class BindingConflictDialog : FUIBaseDialog
             _hoveredButton == 2 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
-    private void DrawWarningIcon(SKCanvas canvas, SKPoint center, SKColor color)
+    private static void DrawWarningIcon(SKCanvas canvas, SKPoint center, SKColor color)
     {
         using var paint = new SKPaint
         {
@@ -211,7 +214,7 @@ public class BindingConflictDialog : FUIBaseDialog
         canvas.DrawPoint(center.X, center.Y + 6, paint);
     }
 
-    private void DrawWarningButton(SKCanvas canvas, SKRect bounds, string text, bool hovered)
+    private static void DrawWarningButton(SKCanvas canvas, SKRect bounds, string text, bool hovered)
     {
         // Warning-colored button for "Apply Anyway"
         using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Active.WithAlpha(30));

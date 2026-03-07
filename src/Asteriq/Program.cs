@@ -29,7 +29,8 @@ static class Program
         if (args.Contains("--map-editor"))
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new UI.DeviceMapEditorForm());
+            using var editorForm = new UI.DeviceMapEditorForm();
+            Application.Run(editorForm);
             return;
         }
 #endif
@@ -172,7 +173,7 @@ static class Program
         if (!singleInstance.IsFirstInstance)
         {
             // Another instance is running - activate it and exit
-            singleInstance.ActivateExistingInstance();
+            SingleInstanceManager.ActivateExistingInstance();
             return;
         }
 
@@ -197,7 +198,7 @@ static class Program
         }
 
         // Create and run MainForm with injected services
-        var mainForm = ActivatorUtilities.CreateInstance<UI.MainForm>(serviceProvider);
+        using var mainForm = ActivatorUtilities.CreateInstance<UI.MainForm>(serviceProvider);
         Application.Run(mainForm);
 
         // Cleanup

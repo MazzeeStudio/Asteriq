@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "WarBRD Rudder Pedals",
+  "vidPid": "3344:????",
+  "deviceType": "Pedals",
+  "svgFile": "virpil_warbrd_rudder_pedals.png",
+  "mirror": false,
+  "viewBox": { "x": 1280, "y": 448 },
+  "controls": {}
+}

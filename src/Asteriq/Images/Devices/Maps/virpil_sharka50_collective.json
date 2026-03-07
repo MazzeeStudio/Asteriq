@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "SharKa-50 Collective Grip",
+  "vidPid": "3344:????",
+  "deviceType": "Collective",
+  "svgFile": "virpil_sharka-50-collective.png",
+  "mirror": false,
+  "viewBox": { "x": 975, "y": 962 },
+  "controls": {}
+}

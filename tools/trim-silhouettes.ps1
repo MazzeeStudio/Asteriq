@@ -56,7 +56,7 @@ $Mappings = @(
     # duplicate angle: QR_ekcd4JLOu_d92nb6Ck2BsD2X8Fn5j9g — skipped
     @{ Dir=$ViirpilDir; Src="pufNZ9HEE6KrQh9bcL-l0kvJIKPYFpocOA-Photoroom.png";            Out="virpil_sharka50_compact.png" }
     @{ Dir=$ViirpilDir; Src="HOBFWNvNBw2MUv_Ww9kbbOY2ZRgQUtqeIw-Photoroom.png";            Out="virpil_ace_torq6.png" }
-    @{ Dir=$ViirpilDir; Src="IDRuabVz4aeY96GpdxFhLJiNXqOuEPqMtw-Photoroom.png";            Out="virpil_ace_torq6_front.png" }
+    @{ Dir=$ViirpilDir; Src="IDRuabVz4aeY96GpdxFhLJiNXqOuEPqMtw-Photoroom.png";            Out="virpil_r1_legend_rudder_pedals.png" }
     @{ Dir=$ViirpilDir; Src="yke6Qio7KfFWIgjiy6Ie8Ihzb9e0tFoxUw-Photoroom.png";            Out="virpil_ace_torq6_b.png" }
     @{ Dir=$ViirpilDir; Src="sTTczVmyqnQeibXBetUUlb3P_-k5_YfMJw-Photoroom.png";            Out="virpil_ace2_pedals.png" }
     @{ Dir=$ViirpilDir; Src="uXtyhsjWfJ-feVI3T8knyaGJAs4zh7tQqQ-Photoroom.png";            Out="virpil_rudder_mk4.png" }

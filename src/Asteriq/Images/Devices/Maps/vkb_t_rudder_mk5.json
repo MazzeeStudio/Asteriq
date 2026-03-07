@@ -1,7 +1,7 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VKB T-Rudder Mk.V",
+  "device": "T-Rudder Mk.V",
   "vidPid": "231D:0401",
   "deviceType": "Pedals",
   "svgFile": "vkb_t_rudder_mk5.png",

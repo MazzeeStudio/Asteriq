@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "ACE TORQ Rudder Pedals",
+  "vidPid": "3344:????",
+  "deviceType": "Pedals",
+  "svgFile": "virpil_ace_torq_rudder_pedals.png",
+  "mirror": false,
+  "viewBox": { "x": 999, "y": 758 },
+  "controls": {}
+}

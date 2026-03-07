@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "Dual-SF Collective Grip",
+  "vidPid": "3344:????",
+  "deviceType": "Collective",
+  "svgFile": "virpil_dual_sf_collective.png",
+  "mirror": false,
+  "viewBox": { "x": 1259, "y": 841 },
+  "controls": {}
+}

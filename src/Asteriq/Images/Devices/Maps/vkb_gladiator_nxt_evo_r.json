@@ -1,7 +1,7 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "VKB Gladiator NXT EVO",
+  "device": "Gladiator NXT EVO",
   "vidPid": "231D:0201",
   "deviceType": "Joystick",
   "svgFile": "vkb_gnx_evo_scg_r.png",

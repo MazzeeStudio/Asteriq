@@ -1,11 +1,11 @@
 {
   "$schema": "device-control-map.schema.json",
   "schemaVersion": "1.1",
-  "device": "T-Rudder Mk.IV",
-  "vidPid": "231D:0400",
+  "device": "ACE-2 Rudder Pedals",
+  "vidPid": "3344:????",
   "deviceType": "Pedals",
-  "svgFile": "vkb_t_rudder_mk5.png",
+  "svgFile": "virpil_ace2_pedals.png",
   "mirror": false,
-  "viewBox": { "x": 1064, "y": 647 },
+  "viewBox": { "x": 1162, "y": 742 },
   "controls": {}
 }

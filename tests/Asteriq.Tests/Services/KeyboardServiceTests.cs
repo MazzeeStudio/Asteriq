@@ -204,17 +204,25 @@ public class KeyboardServiceTests
     [Fact]
     public void KeyboardService_CreateAndDispose_NoException()
     {
-        var service = new KeyboardService();
-        service.Dispose();
+        var ex = Record.Exception(() =>
+        {
+            var service = new KeyboardService();
+            service.Dispose();
+        });
+        Assert.Null(ex);
     }
 
     // Test that ReleaseAll can be called without exception
     [Fact]
     public void KeyboardService_ReleaseAll_NoException()
     {
-        var service = new KeyboardService();
-        service.ReleaseAll();
-        service.Dispose();
+        var ex = Record.Exception(() =>
+        {
+            var service = new KeyboardService();
+            service.ReleaseAll();
+            service.Dispose();
+        });
+        Assert.Null(ex);
     }
 
     // Note: We can't easily test actual keyboard input without affecting the system,
@@ -223,13 +231,17 @@ public class KeyboardServiceTests
     [Fact]
     public void KeyboardService_SetKeyThenReleaseAll_NoException()
     {
-        var service = new KeyboardService();
+        var ex = Record.Exception(() =>
+        {
+            var service = new KeyboardService();
 
-        // This will actually send keyboard input, so we use a safe key
-        // and immediately release it
-        service.SetKey(KeyboardService.VK_RCONTROL, true);
-        service.SetKey(KeyboardService.VK_RCONTROL, false);
-        service.ReleaseAll();
-        service.Dispose();
+            // This will actually send keyboard input, so we use a safe key
+            // and immediately release it
+            service.SetKey(KeyboardService.VK_RCONTROL, true);
+            service.SetKey(KeyboardService.VK_RCONTROL, false);
+            service.ReleaseAll();
+            service.Dispose();
+        });
+        Assert.Null(ex);
     }
 }

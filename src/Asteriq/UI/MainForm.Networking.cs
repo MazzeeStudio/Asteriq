@@ -158,7 +158,7 @@ public partial class MainForm : Form
             _logger.LogWarning("[ConnectMaster] FAILED → {Peer} ({Ip}): {Error}",
                 peer.MachineName, peer.IpAddress, ex.Message);
             BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq",
-                $"Could not connect to {peer.MachineName}", ToolTipIcon.Warning));
+                $"Could not connect to {peer.MachineName}"));
         }
         finally
         {
@@ -292,7 +292,7 @@ public partial class MainForm : Form
         StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes on disconnect
         _networkMode = NetworkInputMode.Local;
-        BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", "Network connection lost", ToolTipIcon.Warning));
+        BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", "Network connection lost"));
         BeginInvoke(() =>
         {
             // If we were in client mode, unlock tabs

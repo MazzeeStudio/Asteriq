@@ -236,7 +236,7 @@ public sealed class SystemTrayIcon : IDisposable
     /// <summary>
     /// Show a balloon tip notification.
     /// </summary>
-    public void ShowBalloonTip(string title, string text, ToolTipIcon icon = ToolTipIcon.Info, int timeout = 3000)
+    public void ShowBalloonTip(string title, string text, ToolTipIcon icon = ToolTipIcon.None, int timeout = 3000)
     {
         _notifyIcon.ShowBalloonTip(timeout, title, text, icon);
     }

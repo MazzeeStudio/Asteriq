@@ -95,7 +95,7 @@ public partial class SCBindingsTabController
         System.Diagnostics.Debug.WriteLine("[SCBindings] Input listening cancelled");
     }
 
-    private (Keys key, List<string> modifiers)? DetectKeyboardInput()
+    private static (Keys key, List<string> modifiers)? DetectKeyboardInput()
     {
         // Collect held modifiers
         var modifiers = new List<string>();
@@ -155,7 +155,7 @@ public partial class SCBindingsTabController
         return null;
     }
 
-    private string? DetectMouseInput()
+    private static string? DetectMouseInput()
     {
         if (IsKeyPressed(0x01)) return "mouse1"; // VK_LBUTTON
         if (IsKeyPressed(0x02)) return "mouse2"; // VK_RBUTTON

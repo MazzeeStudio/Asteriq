@@ -592,5 +592,8 @@ public class InputDetectionService : IDisposable
     public void Dispose()
     {
         Cancel();
+        _cancellationSource?.Dispose();
+        _cancellationSource = null;
+        GC.SuppressFinalize(this);
     }
 }

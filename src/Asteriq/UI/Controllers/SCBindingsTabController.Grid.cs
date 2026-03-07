@@ -184,7 +184,7 @@ public partial class SCBindingsTabController
         }
 
         // Start with joystick-relevant actions
-        var actions = _scSchemaService.FilterJoystickActions(_scInstall.Actions);
+        var actions = SCSchemaService.FilterJoystickActions(_scInstall.Actions);
 
         // Apply action map filter if set (use category name for filtering)
         // Use GetCategoryNameForAction to respect action-level overrides (e.g., Emergency)
@@ -419,7 +419,7 @@ public partial class SCBindingsTabController
             foreach (var defaultBinding in action.DefaultBindings)
             {
                 // Skip empty bindings (SC uses space for "no binding")
-                if (string.IsNullOrWhiteSpace(defaultBinding.Input) || defaultBinding.Input.Trim() == "")
+                if (string.IsNullOrWhiteSpace(defaultBinding.Input) || string.IsNullOrEmpty(defaultBinding.Input.Trim()))
                     continue;
 
                 SCDeviceType deviceType;
@@ -460,7 +460,7 @@ public partial class SCBindingsTabController
                 {
                     // Extract instance from "js1", "js2", etc.
                     if (defaultBinding.DevicePrefix.Length > 2 &&
-                        uint.TryParse(defaultBinding.DevicePrefix.Substring(2), out var jsInstance))
+                        uint.TryParse(defaultBinding.DevicePrefix.AsSpan(2), out var jsInstance))
                     {
                         binding.VJoyDevice = jsInstance;
                     }
@@ -555,7 +555,7 @@ public partial class SCBindingsTabController
             string inputDisplayName = SCBindingsRenderer.FormatInputName(inputName);
             string deviceName = $"JS{col.SCInstance}";
 
-            var dialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
+            using var dialog = new BindingConflictDialog(conflicts, actionDisplayName, inputDisplayName, deviceName);
             dialog.ShowDialog(_ctx.OwnerForm);
 
             switch (dialog.Result)
@@ -961,7 +961,7 @@ public partial class SCBindingsTabController
             "rz" => 5,
             "slider1" => 6,
             "slider2" => 7,
-            _ when binding.StartsWith("axis") && int.TryParse(binding.Substring(4), out int idx) => idx,
+            _ when binding.StartsWith("axis") && int.TryParse(binding.AsSpan(4), out int idx) => idx,
             _ => -1
         };
     }

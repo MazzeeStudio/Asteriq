@@ -40,16 +40,10 @@ public partial class MappingsTabController : ITabController
     private bool _isEditingAxis = false;
     private InputDetectionService? _inputDetectionService;
 
-    private const int DoubleClickThresholdMs = 400;
-
     private const int KeyCaptureTimeoutMs = 10000; // 10 second timeout for key capture
 
     // Input listening timeout
     private const int InputListeningTimeoutMs = 15000; // 15 second timeout for input listening
-
-    // Double-click detection for binding rows
-    private DateTime _lastRowClickTime = DateTime.MinValue;
-    private const int DoubleClickMs = 400;
 
     // Right panel - input sources and actions
     private SKRect _addInputButtonBounds;
@@ -99,7 +93,6 @@ public partial class MappingsTabController : ITabController
     private static extern short GetAsyncKeyState(int vKey);
 
     // Virtual key codes for left/right modifiers
-    private const int VK_LSHIFT = 0xA0;
     private const int VK_RSHIFT = 0xA1;
     private const int VK_LCONTROL = 0xA2;
     private const int VK_RCONTROL = 0xA3;

@@ -757,7 +757,7 @@ public class DevicesTabController : ITabController
                 new SKPoint(contentBounds.Left + pad, y), isDisconnected ? FUIColors.Danger : FUIColors.TextDim, 12f);
             y += 16f;
 
-            string shortName = device.Name.Length > 22 ? device.Name.Substring(0, 20) + "..." : device.Name;
+            string shortName = device.Name.Length > 22 ? string.Concat(device.Name.AsSpan(0, 20), "...") : device.Name;
             FUIRenderer.DrawText(canvas, shortName, new SKPoint(contentBounds.Left + pad, y),
                 isDisconnected ? FUIColors.TextDim : FUIColors.TextPrimary, 14f);
             y += 20f;
@@ -1252,7 +1252,7 @@ public class DevicesTabController : ITabController
         bool confirmed = FUIMessageBox.ShowDestructiveConfirm(_ctx.OwnerForm, message, "Remove vJoy Device", "Remove", detailLines);
         if (!confirmed) return;
 
-        string? configPath = _ctx.DriverSetupManager.GetVJoyConfigPath();
+        string? configPath = DriverSetupManager.GetVJoyConfigPath();
         if (configPath is null)
         {
             FUIMessageBox.ShowWarning(_ctx.OwnerForm,
@@ -1463,7 +1463,7 @@ public class DevicesTabController : ITabController
 
         string name = primaryDevice.Name;
         if (name.Length > 20)
-            name = name.Substring(0, 17) + "...";
+            name = string.Concat(name.AsSpan(0, 17), "...");
 
         return $"\u2192 {name}";
     }

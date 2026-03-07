@@ -122,7 +122,7 @@ public partial class SCBindingsTabController : ITabController
             {
                 var profile = _scExportProfileService.LoadProfile(info.ProfileName);
                 if (profile is null) continue;
-                list.Add((info.ProfileName, _scExportService.ExportToBytes(profile)));
+                list.Add((info.ProfileName, SCXmlExportService.ExportToBytes(profile)));
             }
             _ctx.NetworkInput.SendProfileList(list);
         };

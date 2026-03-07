@@ -1,0 +1,23 @@
+{
+  "id": "client-only",
+  "title": "Client Only Mode",
+  "description": "Client Only Mode is designed for RX machines in a network forwarding setup. When enabled, Asteriq hides the Devices and Mappings tabs, leaving only the SC Bindings and Settings tabs visible.",
+  "source": "@site/docs/client-only.md",
+  "sourceDirName": ".",
+  "slug": "/client-only",
+  "permalink": "/Asteriq/docs/client-only",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 8,
+  "frontMatter": {
+    "sidebar_position": 8,
+    "title": "Client Only Mode"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Settings",
+    "permalink": "/Asteriq/docs/settings"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/Asteriq/docs/",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/Asteriq/docs/",
+          "mainDocId": "intro",
+          "docs": [
+            {
+              "id": "client-only",
+              "path": "/Asteriq/docs/client-only",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "devices",
+              "path": "/Asteriq/docs/devices",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "getting-started",
+              "path": "/Asteriq/docs/getting-started",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "intro",
+              "path": "/Asteriq/docs/",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "mappings",
+              "path": "/Asteriq/docs/mappings",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "network-forwarding",
+              "path": "/Asteriq/docs/network-forwarding",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "sc-bindings",
+              "path": "/Asteriq/docs/sc-bindings",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "settings",
+              "path": "/Asteriq/docs/settings",
+              "sidebar": "docsSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "docsSidebar": {
+              "link": {
+                "path": "/Asteriq/docs/",
+                "label": "intro"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

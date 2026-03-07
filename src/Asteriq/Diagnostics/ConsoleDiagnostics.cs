@@ -80,7 +80,7 @@ public class ConsoleDiagnostics : IDisposable
         _nextLine = _headerLines;
     }
 
-    private void WriteFooter()
+    private static void WriteFooter()
     {
         Console.SetCursorPosition(0, Console.WindowHeight - 2);
         Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -193,5 +193,6 @@ public class ConsoleDiagnostics : IDisposable
     public void Dispose()
     {
         _running = false;
+        GC.SuppressFinalize(this);
     }
 }

@@ -16,7 +16,7 @@ public class SCSchemaService
     /// <summary>
     /// Parses defaultProfile.xml and extracts all action definitions
     /// </summary>
-    public List<SCAction> ParseActions(XmlDocument doc)
+    public static List<SCAction> ParseActions(XmlDocument doc)
     {
         var actions = new List<SCAction>();
 
@@ -64,7 +64,7 @@ public class SCSchemaService
     /// <summary>
     /// Parses default bindings from an action element
     /// </summary>
-    private List<SCDefaultBinding> ParseDefaultBindings(XmlElement actionNode)
+    private static List<SCDefaultBinding> ParseDefaultBindings(XmlElement actionNode)
     {
         var bindings = new List<SCDefaultBinding>();
 
@@ -260,7 +260,7 @@ public class SCSchemaService
     /// <summary>
     /// Compares two action lists and returns changes
     /// </summary>
-    public SchemaChangeReport CompareSchemas(List<SCAction> oldActions, List<SCAction> newActions)
+    public static SchemaChangeReport CompareSchemas(List<SCAction> oldActions, List<SCAction> newActions)
     {
         var report = new SchemaChangeReport();
 
@@ -311,7 +311,7 @@ public class SCSchemaService
     /// <summary>
     /// Gets action maps grouped for UI display
     /// </summary>
-    public Dictionary<string, List<SCAction>> GroupByActionMap(List<SCAction> actions)
+    public static Dictionary<string, List<SCAction>> GroupByActionMap(List<SCAction> actions)
     {
         return actions
             .GroupBy(a => a.ActionMap)
@@ -322,7 +322,7 @@ public class SCSchemaService
     /// <summary>
     /// Gets actions grouped by category for UI display
     /// </summary>
-    public Dictionary<string, List<SCAction>> GroupByCategory(List<SCAction> actions)
+    public static Dictionary<string, List<SCAction>> GroupByCategory(List<SCAction> actions)
     {
         return actions
             .GroupBy(a => a.Category)
@@ -336,7 +336,7 @@ public class SCSchemaService
     /// Previously filtered to only show actions with existing JS bindings, but this
     /// excluded actions like VTOL that users want to bind to their joystick.
     /// </summary>
-    public List<SCAction> FilterJoystickActions(List<SCAction> actions)
+    public static List<SCAction> FilterJoystickActions(List<SCAction> actions)
     {
         // Include all actions - users should be able to bind any action to their joystick
         // The old filter excluded actions like v_vtol_toggle that have keyboard defaults

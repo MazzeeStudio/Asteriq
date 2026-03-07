@@ -1157,6 +1157,10 @@ public class DevicesTabController : ITabController
     {
         if (_ctx.HidHide is null || _ctx.SCInstallation is null) return;
 
+        // On unhide: only modify the SC whitelist if no hidden devices remain.
+        // If other joysticks are still hidden, the SC restriction must stay in place.
+        if (!isHiding && _ctx.HidHide.GetHiddenDevices().Count > 0) return;
+
         bool isInverse = _ctx.HidHide.IsInverseMode();
 
         foreach (var installation in _ctx.SCInstallation.Installations)

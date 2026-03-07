@@ -53,9 +53,12 @@ public static class CryXmlService
         {
             try
             {
-                var doc = new XmlDocument();
                 var xmlContent = Encoding.UTF8.GetString(data);
-                doc.LoadXml(xmlContent);
+                var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit };
+                using var stringReader = new System.IO.StringReader(xmlContent);
+                using var xmlReader = XmlReader.Create(stringReader, settings);
+                var doc = new XmlDocument();
+                doc.Load(xmlReader);
                 System.Diagnostics.Debug.WriteLine("[CryXmlService] Parsed as regular XML");
                 return doc;
             }

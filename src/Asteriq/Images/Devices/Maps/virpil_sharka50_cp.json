@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "VPC SharKa-50",
+  "vidPid": "3344:0810",
+  "deviceType": "Joystick",
+  "svgFile": "virpil_sharka50.png",
+  "mirror": false,
+  "viewBox": { "x": 1127, "y": 717 },
+  "controls": {}
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "VPC CDT-VMAX Throttle",
+  "vidPid": "3344:0505",
+  "deviceType": "Throttle",
+  "svgFile": "virpil_mongoost50cm2_throttle.png",
+  "mirror": false,
+  "viewBox": { "x": 903, "y": 911 },
+  "controls": {}
+}

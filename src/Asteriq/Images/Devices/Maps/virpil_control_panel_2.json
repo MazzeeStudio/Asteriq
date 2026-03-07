@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "VPC Control Panel #2",
+  "vidPid": "3344:0802",
+  "deviceType": "Panel",
+  "svgFile": "virpil_control_panel_2.png",
+  "mirror": false,
+  "viewBox": { "x": 1275, "y": 1142 },
+  "controls": {}
+}

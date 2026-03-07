@@ -1,0 +1,11 @@
+{
+  "$schema": "device-control-map.schema.json",
+  "schemaVersion": "1.1",
+  "device": "VKB GNX SEM Module",
+  "vidPid": "231D:0301",
+  "deviceType": "Panel",
+  "svgFile": "vkb_stecs_mini_r.png",
+  "mirror": false,
+  "viewBox": { "x": 694, "y": 931 },
+  "controls": {}
+}

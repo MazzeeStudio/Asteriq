@@ -1,3 +1,4 @@
+using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
 using Asteriq.UI.Controllers;
@@ -500,7 +501,8 @@ public partial class MainForm
             new SKPoint(mousePosX, y + 22), FUIColors.TextDim, 13f);
 
         // Centre: client mode banner OR normal device connection status
-        if (_networkMode == NetworkInputMode.Receiving)
+        bool inClientRole = _appSettings.NetworkEnabled && _appSettings.NetworkRole == NetworkRole.Client;
+        if (inClientRole || _networkMode == NetworkInputMode.Receiving)
         {
             string banner = _isClientConnected
                 ? $"CLIENT MODE — {_connectedMasterName.ToUpperInvariant()}"

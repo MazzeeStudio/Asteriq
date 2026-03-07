@@ -620,7 +620,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -649,7 +649,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -682,7 +682,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -712,7 +712,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -742,7 +742,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -773,7 +773,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -801,7 +801,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -832,7 +832,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Equal(2, result.Bindings.Count);
@@ -862,7 +862,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             Assert.Single(result.Bindings);
@@ -911,7 +911,7 @@ public class SCXmlExportServiceTests
         {
             File.WriteAllText(tempFile, xml);
 
-            var result = _service.ImportFromFile(tempFile);
+            var result = SCXmlExportService.ImportFromFile(tempFile);
 
             Assert.True(result.Success);
             // Should have 4 bindings (the js1_ with space should be skipped)

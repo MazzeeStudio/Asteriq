@@ -56,9 +56,18 @@ Write-Host "Building MSI installer..."
 $sourceDir = (Resolve-Path $outputDir).Path
 if (Test-Path $msiPath) { Remove-Item $msiPath }
 
+# Ensure WiX extensions are available (idempotent, version-pinned to match WiX 6.0.2)
+wix extension add WixToolset.UI.wixext/6.0.2   2>&1 | Out-Null
+wix extension add WixToolset.Util.wixext/6.0.2 2>&1 | Out-Null
+
+$installerDir = (Resolve-Path "src\Asteriq.Installer").Path
+
 wix build $wxsFile `
+    -ext WixToolset.UI.wixext `
+    -ext WixToolset.Util.wixext `
     -d "Version=$version" `
     -d "SourceDir=$sourceDir" `
+    -d "InstallerDir=$installerDir" `
     -arch x64 `
     -o $msiPath
 

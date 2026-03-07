@@ -15,7 +15,10 @@ namespace Asteriq.UI;
 public class DeviceMapEditorForm : Form
 {
     // Canvas and rendering
+    // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private SKControl _canvas = null!;
+#pragma warning restore CA2213
     private System.Windows.Forms.Timer _renderTimer = null!;
     private float _pulsePhase = 0f;
 
@@ -56,10 +59,6 @@ public class DeviceMapEditorForm : Form
     private SKRect _loadButtonBounds;
     private bool _svgDropdownOpen = false;
     private List<SKRect> _svgDropdownItemBounds = new();
-
-    // Properties panel controls
-    private readonly string[] _controlTypes = { "Button", "Axis", "Hat", "Toggle", "Slider", "Encoder", "Ministick" };
-    private readonly string[] _shelfSides = { "left", "right" };
 
     // Controls list
     private List<SKRect> _controlListItemBounds = new();
@@ -257,7 +256,7 @@ public class DeviceMapEditorForm : Form
         }
     }
 
-    private string? FindSourceMapsDirectory()
+    private static string? FindSourceMapsDirectory()
     {
         // Try to find the source directory by walking up from bin folder
         var dir = AppDomain.CurrentDomain.BaseDirectory;
@@ -419,7 +418,7 @@ public class DeviceMapEditorForm : Form
         DrawButton(canvas, _saveButtonBounds, "SAVE", _saveButtonHovered, true);
     }
 
-    private void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool hovered)
+    private static void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool hovered)
     {
         var bgColor = hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
         using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
@@ -510,6 +509,8 @@ public class DeviceMapEditorForm : Form
 
     private void DrawControlOverlays(SKCanvas canvas)
     {
+        // CA2000: using var inside foreach is safe — analyzer false positive
+#pragma warning disable CA2000
         foreach (var kvp in _deviceMap.Controls)
         {
             var key = kvp.Key;
@@ -590,6 +591,7 @@ public class DeviceMapEditorForm : Form
             FUIRenderer.DrawText(canvas, labelText, new SKPoint(labelScreen.X, textY),
                 isSelected ? FUIColors.Active : FUIColors.TextPrimary, 14f);
         }
+#pragma warning restore CA2000
     }
 
     private void DrawLeadLine(SKCanvas canvas, SKPoint anchor, SKPoint label, LeadLineDefinition? leadLine, bool selected)
@@ -617,7 +619,7 @@ public class DeviceMapEditorForm : Form
         }
 
         // Build path from lead line definition
-        var path = new SKPath();
+        using var path = new SKPath();
         path.MoveTo(anchor);
 
         // Shelf segment - when mirrored, screen direction is inverted
@@ -840,14 +842,14 @@ public class DeviceMapEditorForm : Form
         FUIRenderer.DrawText(canvas, "        45=diag-up, -45=diag-down", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
     }
 
-    private void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text)
+    private static void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text)
     {
         FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background2, FUIColors.Frame);
         FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextPrimary, 12f);
     }
 
 
-    private void DrawPropertyRow(SKCanvas canvas, ref float y, string label, string value,
+    private static void DrawPropertyRow(SKCanvas canvas, ref float y, string label, string value,
         float leftMargin, float labelWidth, float rightMargin, bool readOnly)
     {
         FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -1009,7 +1011,7 @@ public class DeviceMapEditorForm : Form
         }
     }
 
-    private void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
+    private static void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
     {
         FUIRenderer.DrawRoundedPanel(canvas, bounds,
             open ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2,
@@ -1055,14 +1057,14 @@ public class DeviceMapEditorForm : Form
         }
     }
 
-    private void DrawTextBox(SKCanvas canvas, SKRect bounds, string text)
+    private static void DrawTextBox(SKCanvas canvas, SKRect bounds, string text)
     {
         FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background2, FUIColors.Frame, 4f);
 
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
     }
 
-    private void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool primary = false)
+    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool primary = false)
     {
         var bgColor = primary
             ? (hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Active.WithAlpha(30))
@@ -1084,7 +1086,7 @@ public class DeviceMapEditorForm : Form
         FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
     }
 
-    private SKRect MeasureText(string text, float size)
+    private static SKRect MeasureText(string text, float size)
     {
         // Use the same scaled size as FUIRenderer.DrawText
         float scaledSize = size;
@@ -1656,5 +1658,15 @@ public class DeviceMapEditorForm : Form
     }
 
     #endregion
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _renderTimer?.Dispose();
+            _currentSvg?.Dispose();
+        }
+        base.Dispose(disposing);
+    }
 }
 #endif

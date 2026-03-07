@@ -293,5 +293,6 @@ public class VJoyService : IVJoyService
         {
             ReleaseDevice(deviceId);
         }
+        GC.SuppressFinalize(this);
     }
 }

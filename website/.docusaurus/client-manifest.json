@@ -1,0 +1,235 @@
+{
+  "entrypoints": [
+    "main"
+  ],
+  "origins": {
+    "237": [
+      237
+    ],
+    "17896441": [
+      869,
+      401
+    ],
+    "main": [
+      354,
+      869,
+      792
+    ],
+    "runtime~main": [
+      792,
+      869,
+      354
+    ],
+    "0e384e19": [
+      976
+    ],
+    "492895dd": [
+      50
+    ],
+    "5e95c892": [
+      647
+    ],
+    "6c3524c4": [
+      357
+    ],
+    "a7bd4aaa": [
+      98
+    ],
+    "a94703ab": [
+      869,
+      48
+    ],
+    "aba21aa0": [
+      742
+    ],
+    "c2a887f8": [
+      478
+    ],
+    "c9fdda6d": [
+      546
+    ],
+    "d589d3a7": [
+      924
+    ],
+    "dec09136": [
+      718
+    ],
+    "eb38e6db": [
+      256
+    ],
+    "f013c2c3": [
+      528
+    ],
+    "styles": [
+      48,
+      354,
+      401,
+      792,
+      869
+    ]
+  },
+  "assets": {
+    "48": {
+      "js": [
+        {
+          "file": "assets/js/a94703ab.836168bb.js",
+          "hash": "8a212ef7baa7d450",
+          "publicPath": "/Asteriq/docs/assets/js/a94703ab.836168bb.js"
+        }
+      ]
+    },
+    "50": {
+      "js": [
+        {
+          "file": "assets/js/492895dd.5003e491.js",
+          "hash": "9c4b850b20d3a0bd",
+          "publicPath": "/Asteriq/docs/assets/js/492895dd.5003e491.js"
+        }
+      ]
+    },
+    "98": {
+      "js": [
+        {
+          "file": "assets/js/a7bd4aaa.0b489c09.js",
+          "hash": "4edb3ab7a01f2d27",
+          "publicPath": "/Asteriq/docs/assets/js/a7bd4aaa.0b489c09.js"
+        }
+      ]
+    },
+    "237": {
+      "js": [
+        {
+          "file": "assets/js/237.70ab64c4.js",
+          "hash": "cc4b5f8427e4555c",
+          "publicPath": "/Asteriq/docs/assets/js/237.70ab64c4.js"
+        }
+      ]
+    },
+    "256": {
+      "js": [
+        {
+          "file": "assets/js/eb38e6db.4a264279.js",
+          "hash": "d59152dffcfae7c2",
+          "publicPath": "/Asteriq/docs/assets/js/eb38e6db.4a264279.js"
+        }
+      ]
+    },
+    "354": {
+      "js": [
+        {
+          "file": "assets/js/runtime~main.d1901ac3.js",
+          "hash": "a0948aad33421017",
+          "publicPath": "/Asteriq/docs/assets/js/runtime~main.d1901ac3.js"
+        }
+      ]
+    },
+    "357": {
+      "js": [
+        {
+          "file": "assets/js/6c3524c4.e8e22631.js",
+          "hash": "33c753ed57dc8263",
+          "publicPath": "/Asteriq/docs/assets/js/6c3524c4.e8e22631.js"
+        }
+      ]
+    },
+    "401": {
+      "js": [
+        {
+          "file": "assets/js/17896441.ccba3222.js",
+          "hash": "da7a29ad1e0a745d",
+          "publicPath": "/Asteriq/docs/assets/js/17896441.ccba3222.js"
+        }
+      ]
+    },
+    "478": {
+      "js": [
+        {
+          "file": "assets/js/c2a887f8.933867f9.js",
+          "hash": "e49c2d98ab56d387",
+          "publicPath": "/Asteriq/docs/assets/js/c2a887f8.933867f9.js"
+        }
+      ]
+    },
+    "528": {
+      "js": [
+        {
+          "file": "assets/js/f013c2c3.a5c0bb4d.js",
+          "hash": "beec50e6b66f10c8",
+          "publicPath": "/Asteriq/docs/assets/js/f013c2c3.a5c0bb4d.js"
+        }
+      ]
+    },
+    "546": {
+      "js": [
+        {
+          "file": "assets/js/c9fdda6d.4fa75d5b.js",
+          "hash": "7f5d7344b0c1f899",
+          "publicPath": "/Asteriq/docs/assets/js/c9fdda6d.4fa75d5b.js"
+        }
+      ]
+    },
+    "647": {
+      "js": [
+        {
+          "file": "assets/js/5e95c892.9503a094.js",
+          "hash": "2d51508ad18f8942",
+          "publicPath": "/Asteriq/docs/assets/js/5e95c892.9503a094.js"
+        }
+      ]
+    },
+    "718": {
+      "js": [
+        {
+          "file": "assets/js/dec09136.d2c749cc.js",
+          "hash": "ce44fb3f338d0fea",
+          "publicPath": "/Asteriq/docs/assets/js/dec09136.d2c749cc.js"
+        }
+      ]
+    },
+    "742": {
+      "js": [
+        {
+          "file": "assets/js/aba21aa0.6c061b4f.js",
+          "hash": "c9a890e46be16c8b",
+          "publicPath": "/Asteriq/docs/assets/js/aba21aa0.6c061b4f.js"
+        }
+      ]
+    },
+    "792": {
+      "js": [
+        {
+          "file": "assets/js/main.307598f6.js",
+          "hash": "1a3eefd2faa604f7",
+          "publicPath": "/Asteriq/docs/assets/js/main.307598f6.js"
+        }
+      ]
+    },
+    "869": {
+      "css": [
+        {
+          "file": "assets/css/styles.fe1bd3eb.css",
+          "hash": "23e2cf8b4363c31a",
+          "publicPath": "/Asteriq/docs/assets/css/styles.fe1bd3eb.css"
+        }
+      ]
+    },
+    "924": {
+      "js": [
+        {
+          "file": "assets/js/d589d3a7.251388fc.js",
+          "hash": "46b96a1d4790575a",
+          "publicPath": "/Asteriq/docs/assets/js/d589d3a7.251388fc.js"
+        }
+      ]
+    },
+    "976": {
+      "js": [
+        {
+          "file": "assets/js/0e384e19.c6099315.js",
+          "hash": "d9687bc6c299886b",
+          "publicPath": "/Asteriq/docs/assets/js/0e384e19.c6099315.js"
+        }
+      ]
+    }
+  }
+}

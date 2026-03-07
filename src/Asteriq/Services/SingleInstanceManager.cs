@@ -63,7 +63,7 @@ public sealed class SingleInstanceManager : IDisposable
     /// Attempt to activate an existing instance of the application.
     /// Returns true if an existing instance was found and activated.
     /// </summary>
-    public bool ActivateExistingInstance()
+    public static bool ActivateExistingInstance()
     {
         // Find the main window by enumerating all Asteriq processes
         var currentProcess = Process.GetCurrentProcess();

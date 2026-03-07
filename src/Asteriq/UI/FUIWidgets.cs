@@ -39,7 +39,7 @@ internal static class FUIWidgets
             isDisconnected ? 4f : 8f);
 
         // Device name (truncate if needed) - dim for disconnected
-        string displayName = name.Length > 28 ? name.Substring(0, 25) + "..." : name;
+        string displayName = name.Length > 28 ? string.Concat(name.AsSpan(0, 25), "...") : name;
         var nameColor = isDisconnected
             ? FUIColors.TextDim
             : (isSelected ? FUIColors.TextBright : FUIColors.TextPrimary);
@@ -152,6 +152,8 @@ internal static class FUIWidgets
         y += lineHeight + 4;
 
         float layerRowHeight = FUIRenderer.TouchTargetStandard;
+        // CA2000: using var inside foreach is safe — analyzer false positive
+#pragma warning disable CA2000
         foreach (var layer in profile.ShiftLayers)
         {
             if (y + layerRowHeight > bottom - 50) break;
@@ -177,6 +179,7 @@ internal static class FUIWidgets
 
             y += layerRowHeight;
         }
+#pragma warning restore CA2000
 
         if (y + 36 < bottom)
         {
@@ -672,12 +675,12 @@ internal static class FUIWidgets
         while (low < high)
         {
             int mid = (low + high + 1) / 2;
-            if (FUIRenderer.MeasureText(text.Substring(0, mid) + "...", fontSize) <= maxWidth)
+            if (FUIRenderer.MeasureText(string.Concat(text.AsSpan(0, mid), "..."), fontSize) <= maxWidth)
                 low = mid;
             else
                 high = mid - 1;
         }
-        return low > 0 ? text.Substring(0, low) + "..." : "...";
+        return low > 0 ? string.Concat(text.AsSpan(0, low), "...") : "...";
     }
 
     // ─── SC Bindings Shared Widgets ───────────────────────────────────────────

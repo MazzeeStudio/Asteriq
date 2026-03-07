@@ -87,7 +87,7 @@ public class SCInstallationService : ISCInstallationService
         }
 
         // Fallback to first found
-        return installations.First();
+        return installations[0];
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ public class SCInstallationService : ISCInstallationService
         }
     }
 
-    private SCInstallation? ValidateInstallation(string path, string environment)
+    private static SCInstallation? ValidateInstallation(string path, string environment)
     {
         // Check for Data.p4k to verify it's a valid installation
         var dataP4kPath = Path.Combine(path, "Data.p4k");

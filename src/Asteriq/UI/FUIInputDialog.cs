@@ -12,8 +12,11 @@ public class FUIInputDialog : FUIBaseDialog
     private readonly string _title;
     private readonly string _label;
     private readonly string _confirmText;
+    // CA2213: TextBox and SKControl are WinForms child controls — disposed automatically via Controls collection
+#pragma warning disable CA2213
     private readonly TextBox _textBox;
     private readonly SKControl _canvas;
+#pragma warning restore CA2213
 
     private SKRect _confirmButtonBounds;
     private SKRect _cancelButtonBounds;

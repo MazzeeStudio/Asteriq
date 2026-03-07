@@ -1995,8 +1995,15 @@ public partial class MainForm : Form
             };
             menu.Items.Add(connectItem);
 
-            // Rebuild peer submenu each time the menu opens
-            menu.Opening += (s, e) => RefreshPeerSubmenu(connectItem);
+            // Rebuild peer submenu each time the menu opens; also re-evaluate visibility
+            menu.Opening += (s, e) =>
+            {
+                bool isClientRole = _appSettings.NetworkEnabled && _appSettings.NetworkRole == Models.NetworkRole.Client;
+                connectItem.Visible = !isClientRole && _networkMode != NetworkInputMode.Receiving;
+                if (_trayIcon.ContextMenuStrip?.Items["forwarding"] is ToolStripMenuItem fwd)
+                    fwd.Visible = !isClientRole;
+                if (connectItem.Visible) RefreshPeerSubmenu(connectItem);
+            };
         }
 
         menu.Items.Add(new ToolStripSeparator());
@@ -2077,9 +2084,11 @@ public partial class MainForm : Form
             forwardingItem.Image = TrayMenuIcons.Play(TrayIconSize, SkiaColorToGdi(FUIColors.TextDim));
         }
 
-        // Connect to... is irrelevant in Rx mode — this machine receives, it doesn't initiate
+        // Connect to... and forwarding are irrelevant in Rx role
+        bool isClientRole = _appSettings.NetworkEnabled && _appSettings.NetworkRole == Models.NetworkRole.Client;
+        forwardingItem.Visible = !isClientRole;
         if (_trayIcon.ContextMenuStrip.Items["connect"] is ToolStripMenuItem connectItem)
-            connectItem.Visible = _networkMode != NetworkInputMode.Receiving;
+            connectItem.Visible = !isClientRole && _networkMode != NetworkInputMode.Receiving;
     }
 
     private static Color SkiaColorToGdi(SkiaSharp.SKColor c) => Color.FromArgb(c.Red, c.Green, c.Blue);

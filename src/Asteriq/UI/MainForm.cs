@@ -2076,6 +2076,10 @@ public partial class MainForm : Form
             forwardingItem.Text  = "Start Forwarding";
             forwardingItem.Image = TrayMenuIcons.Play(TrayIconSize, SkiaColorToGdi(FUIColors.TextDim));
         }
+
+        // Connect to... is irrelevant in Rx mode — this machine receives, it doesn't initiate
+        if (_trayIcon.ContextMenuStrip.Items["connect"] is ToolStripMenuItem connectItem)
+            connectItem.Visible = _networkMode != NetworkInputMode.Receiving;
     }
 
     private static Color SkiaColorToGdi(SkiaSharp.SKColor c) => Color.FromArgb(c.Red, c.Green, c.Blue);

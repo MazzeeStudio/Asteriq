@@ -500,9 +500,11 @@ public partial class MainForm
             new SKPoint(mousePosX, y + 22), FUIColors.TextDim, 13f);
 
         // Centre: client mode banner OR normal device connection status
-        if (_isClientConnected)
+        if (_networkMode == NetworkInputMode.Receiving)
         {
-            string banner = $"CLIENT MODE — {_connectedMasterName.ToUpperInvariant()}";
+            string banner = _isClientConnected
+                ? $"CLIENT MODE — {_connectedMasterName.ToUpperInvariant()}"
+                : "CLIENT MODE";
             float bannerWidth = FUIRenderer.MeasureText(banner, 15f);
             FUIRenderer.DrawText(canvas, banner,
                 new SKPoint(bounds.MidX - bannerWidth / 2f, y + 22), FUIColors.Warning, 15f);

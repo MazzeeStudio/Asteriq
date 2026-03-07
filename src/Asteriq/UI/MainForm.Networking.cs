@@ -157,6 +157,8 @@ public partial class MainForm : Form
             _tabContext.ConnectedPeerIp = null;
             _logger.LogWarning("[ConnectMaster] FAILED → {Peer} ({Ip}): {Error}",
                 peer.MachineName, peer.IpAddress, ex.Message);
+            BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq",
+                $"Could not connect to {peer.MachineName}", ToolTipIcon.Warning));
         }
         finally
         {
@@ -370,6 +372,7 @@ public partial class MainForm : Form
             if (_activeTab == 1) _mappingsController.OnDeactivated();
             _activeTab = 3;
         }
+        UpdateTrayMenu();
         MarkDirty();
     }
 

@@ -44,8 +44,10 @@ public class SCProfileCacheService
 
         try
         {
+            var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit };
+            using var reader = XmlReader.Create(cachePath, settings);
             var doc = new XmlDocument();
-            doc.Load(cachePath);
+            doc.Load(reader);
 
             System.Diagnostics.Debug.WriteLine($"[SCProfileCache] Loaded cached profile for {installation.Environment} (key: {cacheKey})");
             return doc;

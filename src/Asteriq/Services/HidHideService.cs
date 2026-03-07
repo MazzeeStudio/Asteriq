@@ -125,7 +125,7 @@ public class HidHideService : IHidHideService
     /// </summary>
     public bool HideDevice(string deviceInstancePath)
     {
-        var result = RunCommand($"--dev-hide \"{deviceInstancePath}\"");
+        var result = RunCommand("--dev-hide", deviceInstancePath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -134,7 +134,7 @@ public class HidHideService : IHidHideService
     /// </summary>
     public bool UnhideDevice(string deviceInstancePath)
     {
-        var result = RunCommand($"--dev-unhide \"{deviceInstancePath}\"");
+        var result = RunCommand("--dev-unhide", deviceInstancePath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -225,7 +225,7 @@ public class HidHideService : IHidHideService
     /// </summary>
     public bool WhitelistApp(string appPath)
     {
-        var result = RunCommand($"--app-reg \"{appPath}\"");
+        var result = RunCommand("--app-reg", appPath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -234,7 +234,7 @@ public class HidHideService : IHidHideService
     /// </summary>
     public bool UnwhitelistApp(string appPath)
     {
-        var result = RunCommand($"--app-unreg \"{appPath}\"");
+        var result = RunCommand("--app-unreg", appPath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -441,19 +441,20 @@ public class HidHideService : IHidHideService
         }
     }
 
-    private string RunCommand(string arguments)
+    private string RunCommand(params string[] args)
     {
         try
         {
             var psi = new ProcessStartInfo
             {
                 FileName = _cliPath,
-                Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
 
             using var process = Process.Start(psi);
             if (process is null)
@@ -467,7 +468,7 @@ public class HidHideService : IHidHideService
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
-            Console.WriteLine($"HidHide CLI command failed. Command: '{arguments}', " +
+            Console.WriteLine($"HidHide CLI command failed. Args: '{string.Join(" ", args)}', " +
                               $"CLI path: '{_cliPath}', Error type: {ex.GetType().Name}, Details: {ex.Message}");
             return "";
         }

@@ -2,13 +2,11 @@ using SkiaSharp;
 using Svg.Skia;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using Asteriq.Models;
-
 namespace Asteriq.UI;
 
 /// <summary>
 /// Manages the system tray icon with color-changing based on forwarding state.
-/// Loads throttle.svg (or joystick.svg) and colorizes it based on forwarding state and current theme.
+/// Colorizes the Asteriq logo based on forwarding state and current theme.
 /// </summary>
 public sealed class SystemTrayIcon : IDisposable
 {
@@ -16,11 +14,9 @@ public sealed class SystemTrayIcon : IDisposable
     private string _svgPath = string.Empty;
     private bool _isActive;
     private Icon? _currentIcon;
-    private TrayIconType _iconType;
 
-    public SystemTrayIcon(string toolTipText = "Asteriq", TrayIconType iconType = TrayIconType.Throttle)
+    public SystemTrayIcon(string toolTipText = "Asteriq")
     {
-        _iconType = iconType;
         UpdateSvgPath();
         _notifyIcon = new NotifyIcon
         {
@@ -212,25 +208,9 @@ public sealed class SystemTrayIcon : IDisposable
         UpdateIcon();
     }
 
-    /// <summary>
-    /// Change the icon type (joystick or throttle) and regenerate.
-    /// </summary>
-    public void SetIconType(TrayIconType iconType)
-    {
-        if (_iconType == iconType) return;
-
-        _iconType = iconType;
-        UpdateSvgPath();
-        UpdateIcon();
-    }
-
-    /// <summary>
-    /// Update the SVG path based on current icon type.
-    /// </summary>
     private void UpdateSvgPath()
     {
-        var svgFileName = _iconType == TrayIconType.Joystick ? "joystick.svg" : "throttle.svg";
-        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", svgFileName);
+        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "AsteriqLogo.svg");
     }
 
     /// <summary>

@@ -102,15 +102,6 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
-    public TrayIconType TrayIconType
-    {
-        get => _cachedSettings.TrayIconType;
-        set
-        {
-            _cachedSettings.TrayIconType = value;
-            SaveSettings(_cachedSettings);
-        }
-    }
 
     public string? LastSCExportProfile
     {
@@ -349,7 +340,6 @@ public class ApplicationSettingsService : IApplicationSettingsService
 
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
         public bool CloseToTray { get; set; }
-        public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public bool SCBindingsShowPhysicalHeaders { get; set; } = true;

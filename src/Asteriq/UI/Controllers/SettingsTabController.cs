@@ -32,7 +32,6 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _closeToTrayToggleBounds;
     private SKRect _clientOnlyToggleBounds;
     private SKRect _checkUpdatesToggleBounds;
-    private SKRect[] _trayIconTypeButtonBounds = new SKRect[2];
     private string? _draggingBgSlider;
 
     // Support panel button bounds
@@ -178,11 +177,7 @@ public class SettingsTabController : ITabController, IDisposable
             if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
 
-        // Tray icon type buttons
-        foreach (var b in _trayIconTypeButtonBounds)
-        {
-            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
-        }
+
 
         // Toggles
         if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) || _clientOnlyToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) || _networkEnabledToggleBounds.Contains(pt))
@@ -496,33 +491,6 @@ public class SettingsTabController : ITabController, IDisposable
         _clientOnlyToggleBounds = new SKRect(rightMargin - toggleWidth, clientOnlyToggleY, rightMargin, clientOnlyToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _clientOnlyToggleBounds, _clientOnlyT, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
-
-        // Tray icon type selection
-        TrayIconType[] trayIconValues = { TrayIconType.Throttle, TrayIconType.Joystick };
-        string[] trayIconLabels = { "Throttle", "Joystick" };
-        float iconBtnWidth = 72f;
-        float iconBtnHeight = 32f;
-        float iconBtnGap = 4f;
-        float iconBtnsWidth = iconBtnWidth * 2 + iconBtnGap;
-        float iconLabelMaxWidth = contentWidth - iconBtnsWidth - minControlGap;
-
-        FUIRenderer.DrawTextTruncated(canvas, "Tray icon", new SKPoint(leftMargin, y + 6),
-            iconLabelMaxWidth, FUIColors.TextPrimary, 14f);
-
-        float iconBtnsStartX = rightMargin - iconBtnsWidth;
-
-        for (int i = 0; i < trayIconValues.Length; i++)
-        {
-            var iconBounds = new SKRect(
-                iconBtnsStartX + i * (iconBtnWidth + iconBtnGap), y,
-                iconBtnsStartX + i * (iconBtnWidth + iconBtnGap) + iconBtnWidth, y + iconBtnHeight);
-            _trayIconTypeButtonBounds[i] = iconBounds;
-
-            bool isSelected = _ctx.AppSettings.TrayIconType == trayIconValues[i];
-            bool isHovered = iconBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            FUIWidgets.DrawToggleButton(canvas, iconBounds, trayIconLabels[i], isSelected, isHovered, 13f);
-        }
-        y += iconBtnHeight + sectionSpacing;
 
         // DRIVERS section
         FUIRenderer.DrawText(canvas, "DRIVERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -1781,18 +1749,6 @@ public class SettingsTabController : ITabController, IDisposable
             }
         }
 
-        // Tray icon type button clicks
-        for (int i = 0; i < _trayIconTypeButtonBounds.Length; i++)
-        {
-            if (_trayIconTypeButtonBounds[i].Contains(pt))
-            {
-                var newType = (TrayIconType)i;
-                _ctx.AppSettings.TrayIconType = newType;
-                _ctx.TrayIcon.SetIconType(newType);
-                _ctx.InvalidateCanvas();
-                return;
-            }
-        }
 
         // Background slider clicks (start drag)
         if (_bgGridSliderBounds.Contains(pt)) { _draggingBgSlider = "grid"; UpdateBgSliderFromPoint(pt.X); return; }

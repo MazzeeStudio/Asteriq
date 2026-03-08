@@ -37,6 +37,7 @@ public class DriverSetupForm : FUIBaseDialog
     private bool _hidHideInstalled;
     private bool _vJoyInstalling;
     private bool _hidHideInstalling;
+    private readonly bool _winGetAvailable;
 
     // Canvas-drawn interactive regions
     private SKRect _continueButtonBounds;
@@ -80,6 +81,7 @@ public class DriverSetupForm : FUIBaseDialog
         _appSettings = appSettings;
         _settingsMode = settingsMode;
         _dontShowAgain = appSettings?.SkipDriverSetup ?? false;
+        _winGetAvailable = DriverSetupManager.IsWinGetAvailable();
         _statusColor = FUIColors.TextDim;
         _vJoyStatusColor = FUIColors.TextDim;
         _hidHideStatusColor = FUIColors.TextDim;
@@ -253,11 +255,11 @@ public class DriverSetupForm : FUIBaseDialog
 
         _vJoyInstallBounds = new SKRect(installBtnX, _panel1Y + InstallBtnOffsetY,
             installBtnX + InstallBtnW, _panel1Y + InstallBtnOffsetY + InstallBtnH);
-        DrawInstallButton(canvas, _vJoyInstallBounds, _vJoyInstalled, _vJoyInstalling, _hoveredRegion == 4);
+        DrawInstallButton(canvas, _vJoyInstallBounds, _vJoyInstalled, _vJoyInstalling, _hoveredRegion == 4, _winGetAvailable);
 
         _hidHideInstallBounds = new SKRect(installBtnX, _panel2Y + InstallBtnOffsetY,
             installBtnX + InstallBtnW, _panel2Y + InstallBtnOffsetY + InstallBtnH);
-        DrawInstallButton(canvas, _hidHideInstallBounds, _hidHideInstalled, _hidHideInstalling, _hoveredRegion == 5);
+        DrawInstallButton(canvas, _hidHideInstallBounds, _hidHideInstalled, _hidHideInstalling, _hoveredRegion == 5, _winGetAvailable);
 
         // Manual download links — anchored below panel 2
         float linkY = _panel2Y + PanelH + 18f;
@@ -340,7 +342,7 @@ public class DriverSetupForm : FUIBaseDialog
         FUIRenderer.DrawLCornerFrame(canvas, b.Inset(-4, -4), FUIColors.Frame.WithAlpha(100), 20f, 6f, 1f);
     }
 
-    private static void DrawInstallButton(SKCanvas canvas, SKRect bounds, bool installed, bool installing, bool hovered)
+    private static void DrawInstallButton(SKCanvas canvas, SKRect bounds, bool installed, bool installing, bool hovered, bool winGet)
     {
         if (installed)
         {
@@ -349,12 +351,14 @@ public class DriverSetupForm : FUIBaseDialog
         }
         else if (installing)
         {
-            FUIRenderer.DrawButton(canvas, bounds, "DOWNLOADING",
+            var label = winGet ? "INSTALLING" : "DOWNLOADING";
+            FUIRenderer.DrawButton(canvas, bounds, label,
                 FUIRenderer.ButtonState.Disabled);
         }
         else
         {
-            FUIRenderer.DrawButton(canvas, bounds, "INSTALL",
+            var label = winGet ? "WINGET" : "INSTALL";
+            FUIRenderer.DrawButton(canvas, bounds, label,
                 hovered ? FUIRenderer.ButtonState.Active : FUIRenderer.ButtonState.Hover);
         }
     }
@@ -525,10 +529,32 @@ public class DriverSetupForm : FUIBaseDialog
     private async Task VJoyInstallAsync()
     {
         _vJoyInstalling = true;
-        _progressBar.Visible = true;
-        _progressBar.Value = 0;
         _canvas.Invalidate();
 
+        if (_winGetAvailable)
+        {
+            Log("Installing vJoy via Windows Package Manager...");
+            var success = await _driverSetup.InstallViaWinGetAsync(DriverSetupManager.VJoyWinGetId, Log);
+            _vJoyInstalling = false;
+            _canvas.Invalidate();
+
+            if (success)
+            {
+                RefreshDriverStatus();
+            }
+            else
+            {
+                int choice = FUIMessageBox.Show(this,
+                    "winget could not install vJoy automatically.\n\nOpen the GitHub releases page to download manually?",
+                    "Installation Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
+                if (choice == 0) OpenUrl(DriverSetupManager.GetVJoyReleasesUrl());
+            }
+            return;
+        }
+
+        // Fallback: direct download
+        _progressBar.Visible = true;
+        _progressBar.Value = 0;
         Log("Downloading vJoy installer...");
 
         var progress = new Progress<int>(p => _progressBar.Value = p);
@@ -575,10 +601,32 @@ public class DriverSetupForm : FUIBaseDialog
     private async Task HidHideInstallAsync()
     {
         _hidHideInstalling = true;
-        _progressBar.Visible = true;
-        _progressBar.Value = 0;
         _canvas.Invalidate();
 
+        if (_winGetAvailable)
+        {
+            Log("Installing HidHide via Windows Package Manager...");
+            var success = await _driverSetup.InstallViaWinGetAsync(DriverSetupManager.HidHideWinGetId, Log);
+            _hidHideInstalling = false;
+            _canvas.Invalidate();
+
+            if (success)
+            {
+                RefreshDriverStatus();
+            }
+            else
+            {
+                int choice = FUIMessageBox.Show(this,
+                    "winget could not install HidHide automatically.\n\nOpen the GitHub releases page to download manually?",
+                    "Installation Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
+                if (choice == 0) OpenUrl(DriverSetupManager.GetHidHideReleasesUrl());
+            }
+            return;
+        }
+
+        // Fallback: direct download
+        _progressBar.Visible = true;
+        _progressBar.Value = 0;
         Log("Downloading HidHide installer...");
 
         var progress = new Progress<int>(p => _progressBar.Value = p);

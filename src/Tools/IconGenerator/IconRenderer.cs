@@ -60,12 +60,12 @@ public static class IconRenderer
         float offsetX = (size - bounds.Width * scale) / 2;
         float offsetY = (size - bounds.Height * scale) / 2;
 
-        // Render SVG tinted dark — the ICO is used in File Explorer and shortcuts
-        // which have a light/white background. Form.Icon handles runtime light/dark
-        // adaptation separately via SystemTrayIcon.
+        // Render SVG in brand blue — a mid-brightness colour visible on both dark and
+        // light taskbar/Explorer backgrounds. The static ICO cannot adapt to Windows theme
+        // at runtime; Form.Icon handles that separately via SystemTrayIcon.
         using var tintPaint = new SKPaint();
         tintPaint.ColorFilter = SKColorFilter.CreateBlendMode(
-            new SKColor(0x28, 0x28, 0x28), SKBlendMode.Modulate);
+            new SKColor(0x40, 0x90, 0xFF), SKBlendMode.Modulate);
 
         canvas.Save();
         canvas.Translate(offsetX, offsetY);

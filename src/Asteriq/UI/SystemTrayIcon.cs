@@ -134,7 +134,7 @@ public sealed class SystemTrayIcon : IDisposable
 
                 // Apply color tint to the bitmap
                 using var tintedBitmap = ApplyColorTint(bitmap, targetColor);
-                return Icon.FromHandle(tintedBitmap.GetHicon());
+                return BitmapToIcon(tintedBitmap);
             }
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
@@ -218,7 +218,38 @@ public sealed class SystemTrayIcon : IDisposable
                 baseRadius * 2.6f, baseRadius * 2.6f);
         }
 
-        return Icon.FromHandle(bitmap.GetHicon());
+        return BitmapToIcon(bitmap);
+    }
+
+    /// <summary>
+    /// Encodes a Bitmap as a single-image ICO in a MemoryStream and returns a fully
+    /// managed Icon. Unlike Icon.FromHandle(GetHicon()), this Icon owns its data and
+    /// renders correctly as Form.Icon (taskbar button) on all Windows versions.
+    /// </summary>
+    private static Icon BitmapToIcon(Bitmap bitmap)
+    {
+        using var pngStream = new MemoryStream();
+        bitmap.Save(pngStream, System.Drawing.Imaging.ImageFormat.Png);
+        byte[] png = pngStream.ToArray();
+
+        using var icoStream = new MemoryStream();
+        // ICONDIR header: Reserved=0, Type=1 (ICO), Count=1
+        icoStream.Write(new byte[] { 0, 0, 1, 0, 1, 0 });
+        // ICONDIRENTRY: Width, Height, ColorCount, Reserved, Planes, BitCount, BytesInRes, ImageOffset
+        int w = bitmap.Width >= 256 ? 0 : bitmap.Width;
+        int h = bitmap.Height >= 256 ? 0 : bitmap.Height;
+        icoStream.WriteByte((byte)w);
+        icoStream.WriteByte((byte)h);
+        icoStream.WriteByte(0);   // ColorCount
+        icoStream.WriteByte(0);   // Reserved
+        icoStream.Write(BitConverter.GetBytes((short)1));  // Planes
+        icoStream.Write(BitConverter.GetBytes((short)32)); // BitCount
+        icoStream.Write(BitConverter.GetBytes(png.Length));
+        icoStream.Write(BitConverter.GetBytes(22)); // ImageOffset = 6 + 16
+        icoStream.Write(png);
+
+        icoStream.Position = 0;
+        return new Icon(icoStream);
     }
 
     /// <summary>

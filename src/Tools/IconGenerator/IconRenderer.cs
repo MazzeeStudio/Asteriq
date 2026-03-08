@@ -60,19 +60,12 @@ public static class IconRenderer
         float offsetX = (size - bounds.Width * scale) / 2;
         float offsetY = (size - bounds.Height * scale) / 2;
 
-        // Render SVG tinted with the brand orange so the icon is visible on both
-        // light and dark Windows taskbars / desktops.
-        // RGB(255, 128, 32) matches the Drake/default active colour used in the app.
-        var tint = new SKColor(0xFF, 0x80, 0x20);
-        using var tintPaint = new SKPaint
-        {
-            ColorFilter = SKColorFilter.CreateBlendMode(tint, SKBlendMode.Modulate)
-        };
-
+        // Render SVG preserving original colours — Form.Icon handles runtime
+        // light/dark adaptation; the ICO is used for File Explorer and shortcuts.
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
         canvas.Scale(scale);
-        canvas.DrawPicture(svg.Picture, tintPaint);
+        canvas.DrawPicture(svg.Picture);
         canvas.Restore();
 
         // Encode to PNG

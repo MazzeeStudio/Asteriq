@@ -1,14 +1,14 @@
+using System.Security;
+using Microsoft.Win32;
 using SkiaSharp;
 using Svg.Skia;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using Asteriq.Models;
-
 namespace Asteriq.UI;
 
 /// <summary>
 /// Manages the system tray icon with color-changing based on forwarding state.
-/// Loads throttle.svg (or joystick.svg) and colorizes it based on forwarding state and current theme.
+/// Colorizes the Asteriq logo based on forwarding state and current theme.
 /// </summary>
 public sealed class SystemTrayIcon : IDisposable
 {
@@ -16,11 +16,9 @@ public sealed class SystemTrayIcon : IDisposable
     private string _svgPath = string.Empty;
     private bool _isActive;
     private Icon? _currentIcon;
-    private TrayIconType _iconType;
 
-    public SystemTrayIcon(string toolTipText = "Asteriq", TrayIconType iconType = TrayIconType.Throttle)
+    public SystemTrayIcon(string toolTipText = "Asteriq")
     {
-        _iconType = iconType;
         UpdateSvgPath();
         _notifyIcon = new NotifyIcon
         {
@@ -28,9 +26,32 @@ public sealed class SystemTrayIcon : IDisposable
             Visible = false // Start hidden, will show after first icon generation
         };
 
+        // Refresh icon if the user switches Windows light/dark mode live
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+
         // Generate initial icon
         UpdateIcon();
         _notifyIcon.Visible = true;
+    }
+
+    private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category == UserPreferenceCategory.General)
+            UpdateIcon();
+    }
+
+    /// <summary>
+    /// Returns true when Windows is set to a light system theme (light taskbar/tray area).
+    /// </summary>
+    private static bool IsSystemLightTheme()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return key?.GetValue("SystemUsesLightTheme") is int v && v == 1;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException) { return false; }
     }
 
     /// <summary>
@@ -43,16 +64,39 @@ public sealed class SystemTrayIcon : IDisposable
     }
 
     /// <summary>
-    /// Generate icon from SVG with current theme colors.
+    /// Generate a taskbar/form icon themed for the current Windows light/dark setting.
+    /// Dark mode → brand orange; light mode → near-black.
+    /// </summary>
+    public Icon CreateFormIcon()
+    {
+        SKColor color = IsSystemLightTheme()
+            ? new SKColor(0x20, 0x20, 0x20)       // near-black — readable on light taskbar
+            : new SKColor(0xFF, 0x80, 0x20);       // brand orange — readable on dark taskbar
+        return RenderIconWithColor(Color.FromArgb(color.Red, color.Green, color.Blue));
+    }
+
+    /// <summary>
+    /// Generate tray icon from SVG with current state and Windows theme colors.
     /// Renders SVG to bitmap then applies color tint.
     /// </summary>
     private Icon GenerateIcon()
     {
-        const int size = 32;  // Use 32x32 for better visibility in system tray
+        // Get color based on forwarding state and Windows taskbar theme.
+        // In light mode the tray background is near-white, so use a dark colour for
+        // the inactive state to keep the icon visible.
+        SKColor skColor;
+        if (_isActive)
+            skColor = FUIColors.Active;
+        else if (IsSystemLightTheme())
+            skColor = new SKColor(40, 40, 40); // dark grey — readable on light taskbar
+        else
+            skColor = FUIColors.TextBright;
+        return RenderIconWithColor(Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue));
+    }
 
-        // Get color based on state and current theme
-        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextDim;
-        Color targetColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+    private Icon RenderIconWithColor(Color targetColor)
+    {
+        const int size = 64;
 
         try
         {
@@ -66,19 +110,14 @@ public sealed class SystemTrayIcon : IDisposable
 
             if (svg.Picture is not null)
             {
-                // Render SVG to SKBitmap
                 var bounds = svg.Picture.CullRect;
-
-                // Scale to fill more of the canvas - multiply by 1.2 to make icon bigger without clipping
-                var baseScale = Math.Min(size / bounds.Width, size / bounds.Height);
-                var scale = baseScale * 1.2f;
+                var scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.90f;
 
                 using var surface = SKSurface.Create(new SKImageInfo(size, size));
                 var canvas = surface.Canvas;
                 canvas.Clear(SKColors.Transparent);
 
-                // Center the scaled icon
-                canvas.Translate((size - bounds.Width * scale) / 2, (size - bounds.Height * scale) / 2);
+                canvas.Translate((size - bounds.Width * scale) / 2f, (size - bounds.Height * scale) / 2f);
                 canvas.Scale(scale);
 
                 // Draw SVG in white (we'll colorize it later)
@@ -103,7 +142,7 @@ public sealed class SystemTrayIcon : IDisposable
             // SVG loading failed, fall back to simple shape
         }
 
-        // Fallback: draw simple joystick icon if SVG fails
+        // Fallback: simple A shape if SVG fails
         return GenerateFallbackIcon(targetColor, size);
     }
 
@@ -212,25 +251,9 @@ public sealed class SystemTrayIcon : IDisposable
         UpdateIcon();
     }
 
-    /// <summary>
-    /// Change the icon type (joystick or throttle) and regenerate.
-    /// </summary>
-    public void SetIconType(TrayIconType iconType)
-    {
-        if (_iconType == iconType) return;
-
-        _iconType = iconType;
-        UpdateSvgPath();
-        UpdateIcon();
-    }
-
-    /// <summary>
-    /// Update the SVG path based on current icon type.
-    /// </summary>
     private void UpdateSvgPath()
     {
-        var svgFileName = _iconType == TrayIconType.Joystick ? "joystick.svg" : "throttle.svg";
-        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", svgFileName);
+        _svgPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "AsteriqLogo.svg");
     }
 
     /// <summary>
@@ -278,6 +301,7 @@ public sealed class SystemTrayIcon : IDisposable
 
     public void Dispose()
     {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _currentIcon?.Dispose();

@@ -87,7 +87,6 @@ public class SettingsMigrationService
             #pragma warning restore CS0618
             _appSettings.FontFamily = oldSettings.FontFamily;
             _appSettings.CloseToTray = oldSettings.CloseToTray;
-            _appSettings.TrayIconType = oldSettings.TrayIconType;
             _appSettings.LastSCExportProfile = oldSettings.LastSCExportProfile;
             _appSettings.AutoLoadLastSCExportProfile = oldSettings.AutoLoadLastSCExportProfile;
 
@@ -139,7 +138,6 @@ public class SettingsMigrationService
         #pragma warning restore CS0618
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
         public bool CloseToTray { get; set; }
-        public TrayIconType TrayIconType { get; set; } = TrayIconType.Throttle;
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public FUITheme Theme { get; set; } = FUITheme.Midnight;

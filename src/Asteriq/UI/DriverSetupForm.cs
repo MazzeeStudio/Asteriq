@@ -14,12 +14,9 @@ public class DriverSetupForm : FUIBaseDialog
     private readonly IApplicationSettingsService? _appSettings;
     private readonly bool _settingsMode;
     private readonly FUIBackground _background = new();
-    // CA2213: SKControl, ProgressBar, ListBox are WinForms child controls — disposed automatically via Controls collection
+    // CA2213: SKControl and ListBox are WinForms child controls — disposed automatically via Controls collection
 #pragma warning disable CA2213
     private readonly SKControl _canvas;
-
-    // Native controls overlaid on canvas
-    private readonly ProgressBar _progressBar;
     private readonly ListBox _logListBox;
 #pragma warning restore CA2213
 
@@ -113,25 +110,14 @@ public class DriverSetupForm : FUIBaseDialog
         _canvas.MouseLeave += OnCanvasMouseLeave;
         Controls.Add(_canvas);
 
-        // Create native controls (positioned later in ApplyScale)
-        _progressBar = new ProgressBar
-        {
-            Style = ProgressBarStyle.Continuous,
-            Visible = false,
-        };
-
         _logListBox = new ListBox
         {
             BackColor = ToColor(FUIColors.Background2),
             ForeColor = ToColor(FUIColors.TextDim),
             BorderStyle = BorderStyle.None,
         };
-
-        foreach (Control ctl in new Control[] { _progressBar, _logListBox })
-        {
-            Controls.Add(ctl);
-            ctl.BringToFront();
-        }
+        Controls.Add(_logListBox);
+        _logListBox.BringToFront();
 
         KeyDown += (_, e) =>
         {
@@ -184,14 +170,9 @@ public class DriverSetupForm : FUIBaseDialog
         float btnY = LogicalH - 50f;
         float logBoxBottom = btnY - 10f;
         float logBoxTop = logBoxBottom - 120f;
-        float logHeaderY = logBoxTop - 14f;
-        float progressBarY = logHeaderY - 20f;
 
         // Position native controls in physical pixels
         float contentW = LogicalW - Pad * 2;
-
-        _progressBar.Location = new Point((int)(Pad * scale), (int)(progressBarY * scale));
-        _progressBar.Size = new Size((int)(contentW * scale), (int)(14 * scale));
 
         _logListBox.Location = new Point((int)(Pad * scale), (int)((logBoxTop + 2) * scale));
         _logListBox.Size = new Size((int)(contentW * scale), (int)(116 * scale));
@@ -344,13 +325,11 @@ public class DriverSetupForm : FUIBaseDialog
     {
         if (installed)
         {
-            FUIRenderer.DrawButton(canvas, bounds, "INSTALLED",
-                FUIRenderer.ButtonState.Active);
+            FUIRenderer.DrawButton(canvas, bounds, "INSTALLED", FUIRenderer.ButtonState.Active);
         }
         else if (installing)
         {
-            FUIRenderer.DrawButton(canvas, bounds, "DOWNLOADING",
-                FUIRenderer.ButtonState.Disabled);
+            FUIRenderer.DrawButton(canvas, bounds, "INSTALLING", FUIRenderer.ButtonState.Disabled);
         }
         else
         {
@@ -525,101 +504,49 @@ public class DriverSetupForm : FUIBaseDialog
     private async Task VJoyInstallAsync()
     {
         _vJoyInstalling = true;
-        _progressBar.Visible = true;
-        _progressBar.Value = 0;
         _canvas.Invalidate();
 
-        Log("Downloading vJoy installer...");
+        Log("Installing vJoy via Windows Package Manager...");
+        var success = await _driverSetup.InstallViaWinGetAsync(DriverSetupManager.VJoyWinGetId, Log);
 
-        var progress = new Progress<int>(p => _progressBar.Value = p);
-        var installerPath = await _driverSetup.DownloadVJoyInstallerAsync(progress);
+        _vJoyInstalling = false;
+        _canvas.Invalidate();
 
-        if (string.IsNullOrEmpty(installerPath))
+        if (success)
         {
-            Log("Failed to download vJoy installer");
-            _vJoyInstalling = false;
-            _progressBar.Visible = false;
-            _canvas.Invalidate();
-
-            int choice = FUIMessageBox.Show(this,
-                "Failed to download the vJoy installer.\n\nOpen the GitHub releases page to download manually?",
-                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
-            if (choice == 0) OpenUrl(DriverSetupManager.GetVJoyReleasesUrl());
-            return;
-        }
-
-        Log($"Downloaded to: {installerPath}");
-        Log("Launching installer (UAC prompt may appear)...");
-
-        if (_driverSetup.LaunchVJoyInstaller(installerPath))
-        {
-            Log("Installer launched - please complete the installation");
-            int choice = FUIMessageBox.Show(this,
-                "The vJoy installer has been launched.\n\nComplete the installation wizard, then click Refresh.\nA system restart may be required.",
-                "vJoy Installation", FUIMessageBox.MessageBoxType.Information, "Refresh", "Later");
-            if (choice == 0) RefreshDriverStatus();
+            RefreshDriverStatus();
         }
         else
         {
-            Log("Failed to launch installer");
-            FUIMessageBox.ShowError(this,
-                $"Failed to launch the vJoy installer.\n\nInstaller downloaded to:\n{installerPath}\n\nRun it manually with administrator privileges.",
-                "Installation Error");
+            int choice = FUIMessageBox.Show(this,
+                "winget could not install vJoy automatically.\n\nOpen the GitHub releases page to download manually?",
+                "Installation Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
+            if (choice == 0) OpenUrl(DriverSetupManager.GetVJoyReleasesUrl());
         }
-
-        _vJoyInstalling = false;
-        _progressBar.Visible = false;
-        _canvas.Invalidate();
     }
 
     private async Task HidHideInstallAsync()
     {
         _hidHideInstalling = true;
-        _progressBar.Visible = true;
-        _progressBar.Value = 0;
         _canvas.Invalidate();
 
-        Log("Downloading HidHide installer...");
+        Log("Installing HidHide via Windows Package Manager...");
+        var success = await _driverSetup.InstallViaWinGetAsync(DriverSetupManager.HidHideWinGetId, Log);
 
-        var progress = new Progress<int>(p => _progressBar.Value = p);
-        var installerPath = await _driverSetup.DownloadHidHideInstallerAsync(progress);
+        _hidHideInstalling = false;
+        _canvas.Invalidate();
 
-        if (string.IsNullOrEmpty(installerPath))
+        if (success)
         {
-            Log("Failed to download HidHide installer");
-            _hidHideInstalling = false;
-            _progressBar.Visible = false;
-            _canvas.Invalidate();
-
-            int choice = FUIMessageBox.Show(this,
-                "Failed to download the HidHide installer.\n\nOpen the GitHub releases page to download manually?",
-                "Download Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
-            if (choice == 0) OpenUrl(DriverSetupManager.GetHidHideReleasesUrl());
-            return;
-        }
-
-        Log($"Downloaded to: {installerPath}");
-        Log("Launching installer (UAC prompt may appear)...");
-
-        if (_driverSetup.LaunchHidHideInstaller(installerPath))
-        {
-            Log("Installer launched - please complete the installation");
-            int choice = FUIMessageBox.Show(this,
-                "The HidHide installer has been launched.\n\nComplete the installation wizard, then click Refresh.\nA system restart may be required.",
-                "HidHide Installation", FUIMessageBox.MessageBoxType.Information, "Refresh", "Later");
-            if (choice == 0) RefreshDriverStatus();
+            RefreshDriverStatus();
         }
         else
         {
-            Log("Failed to launch installer");
-            FUIMessageBox.ShowError(this,
-                $"Failed to launch the HidHide installer.\n\nInstaller downloaded to:\n{installerPath}\n\nRun it manually with administrator privileges.",
-                "Installation Error");
+            int choice = FUIMessageBox.Show(this,
+                "winget could not install HidHide automatically.\n\nOpen the GitHub releases page to download manually?",
+                "Installation Failed", FUIMessageBox.MessageBoxType.Error, "Open", "Cancel");
+            if (choice == 0) OpenUrl(DriverSetupManager.GetHidHideReleasesUrl());
         }
-
-        _hidHideInstalling = false;
-        _progressBar.Visible = false;
-        _canvas.Invalidate();
     }
 
     private bool CheckDontShowAgainLabelHit(SKPoint pt)

@@ -21,6 +21,7 @@ $zipName    = "Asteriq v$version.zip"
 $zipPath    = Join-Path (Get-Location) "$distDir\$zipName"
 $uploadPath = Join-Path (Get-Location) "$distDir\Asteriq.zip"  # fixed name for update checker
 $msiPath    = Join-Path (Get-Location) "$distDir\Asteriq.msi"
+$msixPath   = Join-Path (Get-Location) "$distDir\Asteriq.msix"
 
 Write-Host "Building Asteriq v$version..."
 
@@ -73,10 +74,50 @@ wix build $wxsFile `
 
 if ($LASTEXITCODE -ne 0) { Write-Error "WiX MSI build failed"; exit 1 }
 
+# --- Build MSIX package (Microsoft Store) ---
+Write-Host "Building MSIX package..."
+
+$makeAppx      = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\makeappx.exe"
+$msixSourceDir = "src\Asteriq.MsixPackage"
+$msixLayout    = "msix-layout"
+$msixVersion   = "$version.0"   # MSIX requires 4-part version
+
+# Regenerate icon assets from the logo SVG so they always match the source
+$logoSvg   = "mockups\AsteriqLogo.svg"
+$assetProj = "src\Tools\AssetGenerator\AssetGenerator.csproj"
+if (Test-Path $logoSvg) {
+    Write-Host "  Regenerating icon assets from $logoSvg..."
+    dotnet run --project $assetProj -- $logoSvg "$msixSourceDir\Assets" 2>&1 | Out-Null
+}
+
+# Build package layout: publish output + manifest + assets
+if (Test-Path $msixLayout) { Remove-Item $msixLayout -Recurse -Force }
+New-Item -ItemType Directory -Path $msixLayout | Out-Null
+Copy-Item "$outputDir\*" $msixLayout -Recurse
+
+New-Item -ItemType Directory -Path "$msixLayout\Assets" | Out-Null
+Copy-Item "$msixSourceDir\Assets\*" "$msixLayout\Assets\"
+
+# Stamp version into manifest
+$manifest = (Get-Content "$msixSourceDir\AppxManifest.xml" -Raw) -replace "PACKAGE_VERSION", $msixVersion
+Set-Content "$msixLayout\AppxManifest.xml" $manifest -Encoding UTF8
+
+# Pack
+if (Test-Path $msixPath) { Remove-Item $msixPath }
+& $makeAppx pack /d $msixLayout /p $msixPath /nv /o 2>&1
+
+if ($LASTEXITCODE -ne 0) { Write-Error "makeappx failed"; exit 1 }
+
+Remove-Item $msixLayout -Recurse -Force
+
 Write-Host ""
 Write-Host "Done: dist\$zipName  (v$version)"
 Write-Host "Done: dist\Asteriq.msi  (v$version)"
+Write-Host "Done: dist\Asteriq.msix  (v$version)"
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  git push"
 Write-Host "  gh release create v$version \"dist\Asteriq.zip\" \"dist\Asteriq.msi\" --title \"Asteriq v$version\" --notes \"<release notes>\""
+Write-Host ""
+Write-Host "Store submission:"
+Write-Host "  Upload dist\Asteriq.msix to https://partner.microsoft.com/dashboard"

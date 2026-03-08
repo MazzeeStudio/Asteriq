@@ -16,6 +16,9 @@ public class DriverSetupManager
     private const string HIDHIDE_RELEASES_URL = "https://github.com/nefarius/HidHide/releases";
     private const string HIDHIDE_API_URL = "https://api.github.com/repos/nefarius/HidHide/releases/latest";
 
+    public const string VJoyWinGetId = "ShaulEizikovich.vJoyDeviceDriver";
+    public const string HidHideWinGetId = "Nefarius.HidHide";
+
     private readonly ILogger<DriverSetupManager> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IHidHideService _hidHideService;
@@ -160,6 +163,78 @@ public class DriverSetupManager
         var isAvailable = _hidHideService.IsAvailable();
         _logger.LogTrace("HidHide availability: {IsAvailable}", isAvailable);
         return isAvailable;
+    }
+
+    #endregion
+
+    #region WinGet
+
+    /// <summary>
+    /// Returns true if the winget CLI is available on this machine.
+    /// </summary>
+    public static bool IsWinGetAvailable()
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "winget",
+                Arguments = "--version",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            });
+            process?.WaitForExit(5000);
+            return process?.ExitCode == 0;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Installs a package via winget. Streams output lines to <paramref name="log"/>.
+    /// winget handles UAC elevation internally for packages that require it.
+    /// </summary>
+    public async Task<bool> InstallViaWinGetAsync(string packageId, Action<string>? log = null, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Installing {PackageId} via winget", packageId);
+        log?.Invoke($"Running: winget install --id {packageId}");
+
+        try
+        {
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "winget",
+                Arguments = $"install --id {packageId} --silent --accept-package-agreements --accept-source-agreements",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            process.OutputDataReceived += (_, e) => { if (e.Data is not null) log?.Invoke(e.Data); };
+            process.ErrorDataReceived += (_, e) => { if (e.Data is not null) log?.Invoke(e.Data); };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            await process.WaitForExitAsync(cancellationToken);
+
+            var success = process.ExitCode == 0;
+            _logger.LogInformation("winget install {PackageId} exited with code {ExitCode}", packageId, process.ExitCode);
+            log?.Invoke(success ? "Installation complete." : $"winget exited with code {process.ExitCode}.");
+            return success;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException or TaskCanceledException)
+        {
+            _logger.LogError(ex, "winget install failed for {PackageId}", packageId);
+            log?.Invoke($"Error: {ex.Message}");
+            return false;
+        }
     }
 
     #endregion

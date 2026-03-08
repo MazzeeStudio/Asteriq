@@ -140,6 +140,9 @@ public partial class MainForm : Form
     // Window control hover state
     private int _hoveredWindowControl = -1;
 
+    // Title bar logo
+    private SKSvg? _logoSvg;
+
     // SVG device silhouettes (fallback generics)
     private SKSvg? _joystickSvg;
     private SKSvg? _throttleSvg;
@@ -924,6 +927,15 @@ public partial class MainForm : Form
         if (ext == ".svg") return null;
 
         return LoadBitmapFromCache(imageFile);
+    }
+
+    private static SKSvg? LoadLogoSvg()
+    {
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "AsteriqLogo.svg");
+        if (!File.Exists(path)) return null;
+        var svg = new SKSvg();
+        if (svg.Load(path) is null) { svg.Dispose(); return null; }
+        return svg;
     }
 
     private SKSvg? LoadSvgFromCache(string imageFile)
@@ -2203,6 +2215,7 @@ public partial class MainForm : Form
         {
             _renderTimer?.Dispose();
             _background?.Dispose();
+            _logoSvg?.Dispose();
             _joystickSvg?.Dispose();
             _throttleSvg?.Dispose();
             foreach (var svg in _svgCache.Values) svg.Dispose();

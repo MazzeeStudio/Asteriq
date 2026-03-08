@@ -156,6 +156,28 @@ public partial class MainForm
         // Panel starts at sideTabPad(8) + sideTabWidth(28) = 36
         float titleX = 36f;
 
+        // Draw logo to the left of the title text
+        _logoSvg ??= LoadLogoSvg();
+        if (_logoSvg?.Picture is not null)
+        {
+            var pic = _logoSvg.Picture;
+            const float logoH = 26f;
+            float logoW = logoH * (pic.CullRect.Width / pic.CullRect.Height);
+            float logoY = titleBarY + (48f - logoH) / 2f;
+
+            canvas.Save();
+            canvas.Translate(titleX, logoY);
+            canvas.Scale(logoW / pic.CullRect.Width, logoH / pic.CullRect.Height);
+            using var logoPaint = new SKPaint
+            {
+                ColorFilter = SKColorFilter.CreateBlendMode(FUIColors.Primary, SKBlendMode.Modulate)
+            };
+            canvas.DrawPicture(pic, logoPaint);
+            canvas.Restore();
+
+            titleX += logoW + 8f;
+        }
+
         // Measure actual title width (title uses scaled font)
         using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, 29f);
         float titleWidth = titlePaint.MeasureText("ASTERIQ");

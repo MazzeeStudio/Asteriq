@@ -27,6 +27,10 @@
 
     <MediaTemplate EmbedCab="yes" />
 
+    <!-- Force per-machine (all users) installation — installs to Program Files, requires UAC -->
+    <Property Id="ALLUSERS" Value="1" Secure="yes" />
+    <Property Id="MSIINSTALLPERUSER" Value="" Secure="yes" />
+
     <!-- Add/Remove Programs appearance -->
     <Icon Id="AsteriqIcon" SourceFile="$(var.SourceDir)\asteriq.ico" />
     <Property Id="ARPPRODUCTICON"  Value="AsteriqIcon" />

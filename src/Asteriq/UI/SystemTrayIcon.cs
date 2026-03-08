@@ -64,13 +64,23 @@ public sealed class SystemTrayIcon : IDisposable
     }
 
     /// <summary>
-    /// Generate icon from SVG with current theme colors.
+    /// Generate a taskbar/form icon themed for the current Windows light/dark setting.
+    /// Dark mode → brand orange; light mode → near-black.
+    /// </summary>
+    public Icon CreateFormIcon()
+    {
+        SKColor color = IsSystemLightTheme()
+            ? new SKColor(0x20, 0x20, 0x20)       // near-black — readable on light taskbar
+            : new SKColor(0xFF, 0x80, 0x20);       // brand orange — readable on dark taskbar
+        return RenderIconWithColor(Color.FromArgb(color.Red, color.Green, color.Blue));
+    }
+
+    /// <summary>
+    /// Generate tray icon from SVG with current state and Windows theme colors.
     /// Renders SVG to bitmap then applies color tint.
     /// </summary>
     private Icon GenerateIcon()
     {
-        const int size = 64;  // Render at 64x64 — Windows scales down for tray; larger source = sharper result
-
         // Get color based on forwarding state and Windows taskbar theme.
         // In light mode the tray background is near-white, so use a dark colour for
         // the inactive state to keep the icon visible.
@@ -81,7 +91,12 @@ public sealed class SystemTrayIcon : IDisposable
             skColor = new SKColor(40, 40, 40); // dark grey — readable on light taskbar
         else
             skColor = FUIColors.TextBright;
-        Color targetColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
+        return RenderIconWithColor(Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue));
+    }
+
+    private Icon RenderIconWithColor(Color targetColor)
+    {
+        const int size = 64;
 
         try
         {

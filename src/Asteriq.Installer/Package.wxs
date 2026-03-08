@@ -4,7 +4,7 @@
   UpgradeCode is fixed for the lifetime of the product. NEVER change it.
   Version and SourceDir are passed in at build time by publish.ps1.
 
-  Install location: %LocalAppData%\Asteriq  (per-user, no UAC required)
+  Install location: C:\Program Files\Asteriq  (per-machine, requires UAC)
 
   NOTE: When new device SVGs or map JSONs are added under Images/, add a
   corresponding <Component> entry in the DeviceImageFiles or DeviceMapFiles
@@ -17,7 +17,7 @@
            Manufacturer="Mazzee Studio"
            Version="$(var.Version)"
            UpgradeCode="{2902A093-3E1F-45CC-86AD-0B1DB28BE088}"
-           Scope="perUser"
+           Scope="perMachine"
            Compressed="yes">
 
     <SummaryInformation Description="Asteriq HOTAS Manager for Star Citizen" />
@@ -65,7 +65,7 @@
     </UI>
 
     <!-- Directory layout -->
-    <StandardDirectory Id="LocalAppDataFolder">
+    <StandardDirectory Id="ProgramFilesFolder">
       <Directory Id="INSTALLFOLDER" Name="Asteriq">
         <Directory Id="ImagesDir" Name="Images">
           <Directory Id="DevicesDir" Name="Devices">
@@ -110,8 +110,8 @@
   </Fragment>
 
   <!-- ═══════════════════════════════════════════════════
-       Device silhouette SVGs  (Images\Devices\)
-       Add a new Component here for each new device SVG.
+       Device silhouette images  (Images\Devices\)
+       Add a new Component here for each new device image.
        ═══════════════════════════════════════════════════ -->
   <Fragment>
     <ComponentGroup Id="DeviceImageFiles" Directory="DevicesDir">
@@ -122,6 +122,172 @@
 
       <Component Id="ImgThrottle">
         <File Source="$(var.SourceDir)\Images\Devices\throttle.svg" KeyPath="yes" />
+      </Component>
+
+      <!-- Virpil device images -->
+      <Component Id="ImgVirpilAce2Pedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace2_pedals.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAce2Throttle">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace2_throttle.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAceCollectionRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace_collection_rudder_pedals.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAceInterceptorRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace_interceptor_rudder_pedals.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAceTorq6">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace_torq6.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAceTorq6B">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace_torq6_b.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAceTorq6Front">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace_torq6_front.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAceTorqRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_ace_torq_rudder_pedals.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilAlphaGrip">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_alpha_grip.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilCdtAeroL">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_cdt-aero_l.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilCdtAeroR">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_cdt-aero_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilCdtVmaxThrottle">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_cdt_vmax_throttle.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilConstellationAlphaPrimeR">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_constellation_alpha_prime_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilConstellationAlphaPrimeRB">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_constellation_alpha_prime_r_b.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilConstellationAlphaR">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_constellation_alpha_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilControlPanel1">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_control_panel_1.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilControlPanel2">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_control_panel_2.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilControlPanel3">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_control_panel_3.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilDualSfCollective">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_dual_sf_collective.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilFlnkr">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_flnkr.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilHawk60Collective">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_hawk_60-collective.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilMongoost50cm2Base">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_mongoost50cm2_base.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilMongoost50cm2Throttle">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_mongoost50cm2_throttle.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilMongoost50cm2Throttle3lev">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_mongoost50cm2_throttle_3lev.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilMongoost50cm2ThrottleB">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_mongoost50cm2_throttle_b.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilMongoost50cm3Throttle">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_mongoost_50cm3_throttle.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilR1FalconRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_r1_falcon_rudder_pedals.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilR1FalconRudderPedals2">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_r1_falcon_rudder_pedals_2.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilR1LegendRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_r1_legend_rudder_pedals.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilRudderCompact">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_rudder_compact.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilRudderMk4">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_rudder_mk4.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilSharka50Collective">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_sharka-50-collective.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilSharka50">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_sharka50.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilSharka50Compact">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_sharka50_compact.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilSharka50Heels">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_sharka50_heels.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilSharka50ControlPanel">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_sharka_50_control_panel.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilThrottleCm2Grip">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_throttle_cm2_grip.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilThrottleCm3Grip">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_throttle_cm3_grip.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilThrottleStickPanel">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_throttle_stick_panel.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilVmaxPrimeThrottle">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_vmax_prime_throttle.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilWarbrdBase">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_warbrd_base.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVirpilWarbrdRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\virpil_warbrd_rudder_pedals.png" KeyPath="yes" />
+      </Component>
+
+      <!-- VKB device images -->
+      <Component Id="ImgVkbGnxEvoOmniThrottleR">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_gnx_evo_omni_throttle_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbGnxEvoScgL">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_gnx_evo_scg_l.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbGnxEvoScgPremiumR">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_gnx_evo_scg_premium_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbGnxEvoScgR">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_gnx_evo_scg_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbMcg">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_mcg.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbMcgu">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_mcgu.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbScgRPremium">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_scg_r_premium.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbStecsMiniL">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_stecs_mini_l.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbStecsMiniPremiumR">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_stecs_mini_premium_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbStecsMiniR">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_stecs_mini_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbStecsStandardR">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_stecs_standard_r.png" KeyPath="yes" />
+      </Component>
+      <Component Id="ImgVkbTRudderMk5">
+        <File Source="$(var.SourceDir)\Images\Devices\vkb_t_rudder_mk5.png" KeyPath="yes" />
       </Component>
 
     </ComponentGroup>
@@ -137,21 +303,123 @@
       <Component Id="MapSchema">
         <File Source="$(var.SourceDir)\Images\Devices\Maps\device-control-map.schema.json" KeyPath="yes" />
       </Component>
-
       <Component Id="MapJoystick">
         <File Source="$(var.SourceDir)\Images\Devices\Maps\joystick.json" KeyPath="yes" />
       </Component>
-
       <Component Id="MapThrottle">
         <File Source="$(var.SourceDir)\Images\Devices\Maps\throttle.json" KeyPath="yes" />
       </Component>
 
+      <!-- Virpil device maps -->
+      <Component Id="MapVirpilAce2RudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_ace2_rudder_pedals.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilAceCollectionRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_ace_collection_rudder_pedals.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilAceInterceptorRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_ace_interceptor_rudder_pedals.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilAcePedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_ace_pedals.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilAceTorqRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_ace_torq_rudder_pedals.json" KeyPath="yes" />
+      </Component>
       <Component Id="MapVirpilAlphaPrimeL">
         <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_alpha_prime_l.json" KeyPath="yes" />
       </Component>
-
       <Component Id="MapVirpilAlphaPrimeR">
         <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_alpha_prime_r.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilCdtAeroL">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_cdt_aero_l.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilCdtAeroR">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_cdt_aero_r.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilCdtVmaxThrottle">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_cdt_vmax_throttle.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilConstellationAlphaL">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_constellation_alpha_l.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilConstellationAlphaR">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_constellation_alpha_r.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilControlPanel1">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_control_panel_1.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilControlPanel2">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_control_panel_2.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilControlPanel3">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_control_panel_3.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilDualSfCollective">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_dual_sf_collective.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilFlnkr">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_flnkr.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilHawk60Collective">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_hawk_60_collective.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilMongoost50cm3Throttle">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_mongoost50cm3_throttle.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilR1LegendRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_r1_legend_rudder_pedals.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilSharka50Collective">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_sharka50_collective.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilSharka50CompactPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_sharka50_compact_pedals.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilSharka50Cp">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_sharka50_cp.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilVmaxPrimeThrottle">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_vmax_prime_throttle.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVirpilWarbrdRudderPedals">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\virpil_warbrd_rudder_pedals.json" KeyPath="yes" />
+      </Component>
+
+      <!-- VKB device maps -->
+      <Component Id="MapVkbGladiatorK">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gladiator_k.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGladiatorNxt">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gladiator_nxt.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGladiatorNxtEvoR">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gladiator_nxt_evo_r.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGnxFsm">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gnx_fsm.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGnxSem">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gnx_sem.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGnxThq">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gnx_thq.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGunfighterMk2">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gunfighter_mk2.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGunfighterMk3">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gunfighter_mk3.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbGunfighterMk4">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_gunfighter_mk4.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbTRudderMk4">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_t_rudder_mk4.json" KeyPath="yes" />
+      </Component>
+      <Component Id="MapVkbTRudderMk5">
+        <File Source="$(var.SourceDir)\Images\Devices\Maps\vkb_t_rudder_mk5.json" KeyPath="yes" />
       </Component>
 
     </ComponentGroup>
@@ -171,7 +439,7 @@
       <!-- Clean up the Start Menu folder on uninstall -->
       <RemoveFolder Id="RemoveProgramMenuAsteriq" Directory="ProgramMenuAsteriq" On="uninstall" />
       <!-- Registry key path required by Windows Installer for the shortcut component -->
-      <RegistryValue Root="HKCU"
+      <RegistryValue Root="HKLM"
                      Key="Software\MazzeeStudio\Asteriq"
                      Name="StartMenuShortcut"
                      Type="integer" Value="1"

@@ -154,20 +154,28 @@ public partial class MainForm
 
         // Title text - aligned with left panel L-corner frame
         // Panel starts at sideTabPad(8) + sideTabWidth(28) = 36
-        float titleX = 36f;
+        float titleStartX = 36f;
+        float titleX = titleStartX;
 
-        // Draw logo to the left of the title text
+        // Logo replaces the "A" in ASTERIQ — sized to match the font's cap height
+        // and baseline-aligned with the title text.
         _logoSvg ??= LoadLogoSvg();
+        float logoW = 0f;
         if (_logoSvg?.Picture is not null)
         {
             var pic = _logoSvg.Picture;
-            const float logoH = 26f;
-            float logoW = logoH * (pic.CullRect.Width / pic.CullRect.Height);
-            float logoY = titleBarY + (48f - logoH) / 2f;
+            using var metricsCalc = FUIRenderer.CreateTextPaint(FUIColors.Primary, 29f);
+            var metrics = metricsCalc.FontMetrics;
+            // CapHeight is the distance from baseline to top of a capital letter.
+            // Fall back to 72% of TextSize if the font doesn't expose it.
+            float capH = metrics.CapHeight > 0 ? metrics.CapHeight : metricsCalc.TextSize * 0.72f;
+            logoW = capH * (pic.CullRect.Width / pic.CullRect.Height);
+            // Baseline is titleBarY + 38; logo top = baseline - capH
+            float logoY = titleBarY + 38f - capH;
 
             canvas.Save();
             canvas.Translate(titleX, logoY);
-            canvas.Scale(logoW / pic.CullRect.Width, logoH / pic.CullRect.Height);
+            canvas.Scale(logoW / pic.CullRect.Width, capH / pic.CullRect.Height);
             using var logoPaint = new SKPaint
             {
                 ColorFilter = SKColorFilter.CreateBlendMode(FUIColors.Primary, SKBlendMode.Modulate)
@@ -175,13 +183,15 @@ public partial class MainForm
             canvas.DrawPicture(pic, logoPaint);
             canvas.Restore();
 
-            titleX += logoW + 8f;
+            titleX += logoW + 3f; // tight optical kerning, like a letter gap
         }
 
-        // Measure actual title width (title uses scaled font)
+        // "STERIQ" — the logo has replaced the leading "A"
         using var titlePaint = FUIRenderer.CreateTextPaint(FUIColors.Primary, 29f);
-        float titleWidth = titlePaint.MeasureText("ASTERIQ");
-        FUIRenderer.DrawText(canvas, "ASTERIQ", new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 29f, true);
+        string titleText = logoW > 0f ? "STERIQ" : "ASTERIQ";
+        float steriqWidth = titlePaint.MeasureText(titleText);
+        FUIRenderer.DrawText(canvas, titleText, new SKPoint(titleX, titleBarY + 38), FUIColors.Primary, 29f, true);
+        float titleWidth = titleX - titleStartX + steriqWidth; // full block width for layout
 
         // Window controls - always at fixed position from right edge
         // 3 buttons at 32px + 2 gaps at 8px = 112px
@@ -209,7 +219,7 @@ public partial class MainForm
 
         // Left side elements positioning - measure actual widths
         float elementGap = 20f;  // Gap between title/subtitle/profile selector
-        float subtitleX = titleX + titleWidth + elementGap;
+        float subtitleX = titleStartX + titleWidth + elementGap;
 
         // Measure subtitle width
         using var subtitlePaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 15f);
@@ -231,7 +241,7 @@ public partial class MainForm
         }
         else
         {
-            profileSelectorX = titleX + titleWidth + elementGap;
+            profileSelectorX = titleStartX + titleWidth + elementGap;
         }
 
         // Check if profile selector fits before tabs

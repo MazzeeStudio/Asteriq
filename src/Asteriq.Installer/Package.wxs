@@ -81,6 +81,7 @@
 
     <Feature Id="Main" Title="Asteriq" Level="1">
       <ComponentGroupRef Id="RootFiles" />
+      <ComponentGroupRef Id="ImageFiles" />
       <ComponentGroupRef Id="DeviceImageFiles" />
       <ComponentGroupRef Id="DeviceMapFiles" />
       <ComponentRef Id="StartMenuShortcut" />
@@ -106,6 +107,12 @@
         <File Source="$(var.SourceDir)\asteriq.ico" KeyPath="yes" />
       </Component>
 
+    </ComponentGroup>
+
+    <ComponentGroup Id="ImageFiles" Directory="ImagesDir">
+      <Component Id="AsteriqLogoSvg">
+        <File Source="$(var.SourceDir)\Images\AsteriqLogo.svg" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
   </Fragment>
 

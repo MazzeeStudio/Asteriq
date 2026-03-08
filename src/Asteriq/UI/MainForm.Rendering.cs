@@ -157,8 +157,8 @@ public partial class MainForm
         float titleStartX = 36f;
         float titleX = titleStartX;
 
-        // Logo replaces the "A" in ASTERIQ — sized to match the font's cap height
-        // and baseline-aligned with the title text.
+        // Logo replaces the "A" in ASTERIQ — slightly oversized vs cap height
+        // and vertically centred on the text midline for visual balance.
         _logoSvg ??= LoadLogoSvg();
         float logoW = 0f;
         if (_logoSvg?.Picture is not null)
@@ -166,16 +166,19 @@ public partial class MainForm
             var pic = _logoSvg.Picture;
             using var metricsCalc = FUIRenderer.CreateTextPaint(FUIColors.Primary, 29f);
             var metrics = metricsCalc.FontMetrics;
-            // CapHeight is the distance from baseline to top of a capital letter.
+            // Cap height: distance from baseline to top of a capital letter.
             // Fall back to 72% of TextSize if the font doesn't expose it.
             float capH = metrics.CapHeight > 0 ? metrics.CapHeight : metricsCalc.TextSize * 0.72f;
-            logoW = capH * (pic.CullRect.Width / pic.CullRect.Height);
-            // Baseline is titleBarY + 38; logo top = baseline - capH
-            float logoY = titleBarY + 38f - capH;
+            // 20% larger than cap height so the mark reads as a distinct brand element
+            float logoH = capH * 1.20f;
+            logoW = logoH * (pic.CullRect.Width / pic.CullRect.Height);
+            // Centre vertically on the text midline (midpoint of cap height from baseline)
+            float textMidline = titleBarY + 38f - capH / 2f;
+            float logoY = textMidline - logoH / 2f;
 
             canvas.Save();
             canvas.Translate(titleX, logoY);
-            canvas.Scale(logoW / pic.CullRect.Width, capH / pic.CullRect.Height);
+            canvas.Scale(logoW / pic.CullRect.Width, logoH / pic.CullRect.Height);
             using var logoPaint = new SKPaint
             {
                 ColorFilter = SKColorFilter.CreateBlendMode(FUIColors.Primary, SKBlendMode.Modulate)
@@ -183,7 +186,7 @@ public partial class MainForm
             canvas.DrawPicture(pic, logoPaint);
             canvas.Restore();
 
-            titleX += logoW + 3f; // tight optical kerning, like a letter gap
+            titleX += logoW + 4f; // slight gap before "STERIQ"
         }
 
         // "STERIQ" — the logo has replaced the leading "A"

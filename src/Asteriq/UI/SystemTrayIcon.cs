@@ -117,24 +117,32 @@ public sealed class SystemTrayIcon : IDisposable
                 var canvas = surface.Canvas;
                 canvas.Clear(SKColors.Transparent);
 
+                // Apply color tint via SkiaSharp color filter — no GDI+ involved.
+                // The SVG paths are near-white, so multiplying each channel by the
+                // target colour fraction maps them to the desired colour.
+                float r = targetColor.R / 255f;
+                float g = targetColor.G / 255f;
+                float b = targetColor.B / 255f;
+
+                using var colorFilter = SKColorFilter.CreateColorMatrix(new float[]
+                {
+                    r, 0, 0, 0, 0,
+                    0, g, 0, 0, 0,
+                    0, 0, b, 0, 0,
+                    0, 0, 0, 1, 0
+                });
+                using var paint = new SKPaint { ColorFilter = colorFilter };
+
+                canvas.Save();
                 canvas.Translate((size - bounds.Width * scale) / 2f, (size - bounds.Height * scale) / 2f);
                 canvas.Scale(scale);
+                canvas.DrawPicture(svg.Picture, paint);
+                canvas.Restore();
 
-                // Draw SVG in white (we'll colorize it later)
-                canvas.DrawPicture(svg.Picture);
-
-                // Convert to GDI+ bitmap
+                // Encode entirely in SkiaSharp — no GDI+ Bitmap needed.
                 using var image = surface.Snapshot();
-                using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-                using var ms = new MemoryStream();
-                data.SaveTo(ms);
-                ms.Position = 0;
-
-                using var bitmap = new Bitmap(ms);
-
-                // Apply color tint to the bitmap
-                using var tintedBitmap = ApplyColorTint(bitmap, targetColor);
-                return BitmapToIcon(tintedBitmap);
+                using var pngData = image.Encode(SKEncodedImageFormat.Png, 100);
+                return BuildIconFromPng(pngData.ToArray(), size);
             }
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
@@ -142,44 +150,33 @@ public sealed class SystemTrayIcon : IDisposable
             // SVG loading failed, fall back to simple shape
         }
 
-        // Fallback: simple A shape if SVG fails
+        // Fallback: simple joystick shape if SVG fails
         return GenerateFallbackIcon(targetColor, size);
     }
 
     /// <summary>
-    /// Apply a color tint to a bitmap while preserving transparency.
+    /// Writes a raw PNG byte array into a minimal ICO container and returns an Icon.
+    /// No GDI+ involved — the PNG is embedded directly as the ICO image data.
     /// </summary>
-    private static Bitmap ApplyColorTint(Bitmap source, Color tintColor)
+    private static Icon BuildIconFromPng(byte[] png, int size)
     {
-        var result = new Bitmap(source.Width, source.Height);
-
-        using (var g = Graphics.FromImage(result))
-        {
-            // Create a color matrix to tint the image
-            float r = tintColor.R / 255f;
-            float gr = tintColor.G / 255f;
-            float b = tintColor.B / 255f;
-
-            var colorMatrix = new ColorMatrix(new float[][]
-            {
-                new float[] {r, 0, 0, 0, 0},
-                new float[] {0, gr, 0, 0, 0},
-                new float[] {0, 0, b, 0, 0},
-                new float[] {0, 0, 0, 1, 0},
-                new float[] {0, 0, 0, 0, 1}
-            });
-
-            using var attributes = new ImageAttributes();
-            attributes.SetColorMatrix(colorMatrix);
-
-            g.DrawImage(source,
-                new Rectangle(0, 0, source.Width, source.Height),
-                0, 0, source.Width, source.Height,
-                GraphicsUnit.Pixel,
-                attributes);
-        }
-
-        return result;
+        using var icoStream = new MemoryStream();
+        // ICONDIR: Reserved=0, Type=1 (ICO), Count=1
+        icoStream.Write(new byte[] { 0, 0, 1, 0, 1, 0 });
+        // ICONDIRENTRY: Width, Height, ColorCount, Reserved, Planes, BitCount, BytesInRes, ImageOffset(22)
+        int w = size >= 256 ? 0 : size;
+        int h = size >= 256 ? 0 : size;
+        icoStream.WriteByte((byte)w);
+        icoStream.WriteByte((byte)h);
+        icoStream.WriteByte(0);  // ColorCount
+        icoStream.WriteByte(0);  // Reserved
+        icoStream.Write(BitConverter.GetBytes((short)1));   // Planes
+        icoStream.Write(BitConverter.GetBytes((short)32));  // BitCount
+        icoStream.Write(BitConverter.GetBytes(png.Length));
+        icoStream.Write(BitConverter.GetBytes(22));  // ImageOffset = 6 + 16
+        icoStream.Write(png);
+        icoStream.Position = 0;
+        return new Icon(icoStream);
     }
 
     /// <summary>
@@ -230,26 +227,7 @@ public sealed class SystemTrayIcon : IDisposable
     {
         using var pngStream = new MemoryStream();
         bitmap.Save(pngStream, System.Drawing.Imaging.ImageFormat.Png);
-        byte[] png = pngStream.ToArray();
-
-        using var icoStream = new MemoryStream();
-        // ICONDIR header: Reserved=0, Type=1 (ICO), Count=1
-        icoStream.Write(new byte[] { 0, 0, 1, 0, 1, 0 });
-        // ICONDIRENTRY: Width, Height, ColorCount, Reserved, Planes, BitCount, BytesInRes, ImageOffset
-        int w = bitmap.Width >= 256 ? 0 : bitmap.Width;
-        int h = bitmap.Height >= 256 ? 0 : bitmap.Height;
-        icoStream.WriteByte((byte)w);
-        icoStream.WriteByte((byte)h);
-        icoStream.WriteByte(0);   // ColorCount
-        icoStream.WriteByte(0);   // Reserved
-        icoStream.Write(BitConverter.GetBytes((short)1));  // Planes
-        icoStream.Write(BitConverter.GetBytes((short)32)); // BitCount
-        icoStream.Write(BitConverter.GetBytes(png.Length));
-        icoStream.Write(BitConverter.GetBytes(22)); // ImageOffset = 6 + 16
-        icoStream.Write(png);
-
-        icoStream.Position = 0;
-        return new Icon(icoStream);
+        return BuildIconFromPng(pngStream.ToArray(), bitmap.Width);
     }
 
     /// <summary>

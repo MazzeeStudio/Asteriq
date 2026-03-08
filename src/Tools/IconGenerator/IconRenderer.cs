@@ -60,17 +60,13 @@ public static class IconRenderer
         float offsetX = (size - bounds.Width * scale) / 2;
         float offsetY = (size - bounds.Height * scale) / 2;
 
-        // Render SVG in brand blue — a mid-brightness colour visible on both dark and
-        // light taskbar/Explorer backgrounds. The static ICO cannot adapt to Windows theme
-        // at runtime; Form.Icon handles that separately via SystemTrayIcon.
-        using var tintPaint = new SKPaint();
-        tintPaint.ColorFilter = SKColorFilter.CreateBlendMode(
-            new SKColor(0x40, 0x90, 0xFF), SKBlendMode.Modulate);
-
+        // Render SVG with its natural colours (near-white). The static ICO is used by
+        // File Explorer and pinned shortcuts. The running app's taskbar button uses
+        // Form.Icon which is set dynamically by SystemTrayIcon.CreateFormIcon().
         canvas.Save();
         canvas.Translate(offsetX, offsetY);
         canvas.Scale(scale);
-        canvas.DrawPicture(svg.Picture, tintPaint);
+        canvas.DrawPicture(svg.Picture);
         canvas.Restore();
 
         // Encode to PNG

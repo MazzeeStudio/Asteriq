@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="MazzeeStudio.Asteriq"
+    Publisher="CN=Mazzee Studio"
+    Version="PACKAGE_VERSION"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Asteriq</DisplayName>
+    <PublisherDisplayName>Mazzee Studio</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 2004 (20H1) minimum — ensures winget is available -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Asteriq" Executable="Asteriq.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Asteriq"
+        Description="Unified HOTAS management for Star Citizen"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Required to run as a full-trust Win32 app and spawn winget -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

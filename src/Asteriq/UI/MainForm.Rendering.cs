@@ -169,8 +169,8 @@ public partial class MainForm
             // Cap height: distance from baseline to top of a capital letter.
             // Fall back to 72% of TextSize if the font doesn't expose it.
             float capH = metrics.CapHeight > 0 ? metrics.CapHeight : metricsCalc.TextSize * 0.72f;
-            // 20% larger than cap height so the mark reads as a distinct brand element
-            float logoH = capH * 1.20f;
+            // 50% larger than cap height so the mark reads as a distinct brand element
+            float logoH = capH * 1.50f;
             logoW = logoH * (pic.CullRect.Width / pic.CullRect.Height);
             // Centre vertically on the text midline (midpoint of cap height from baseline)
             float textMidline = titleBarY + 38f - capH / 2f;
@@ -186,7 +186,7 @@ public partial class MainForm
             canvas.DrawPicture(pic, logoPaint);
             canvas.Restore();
 
-            titleX += logoW + 4f; // slight gap before "STERIQ"
+            titleX += logoW + 1f; // tight gap before "STERIQ"
         }
 
         // "STERIQ" — the logo has replaced the leading "A"

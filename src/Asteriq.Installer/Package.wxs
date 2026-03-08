@@ -65,7 +65,7 @@
     </UI>
 
     <!-- Directory layout -->
-    <StandardDirectory Id="ProgramFilesFolder">
+    <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Asteriq">
         <Directory Id="ImagesDir" Name="Images">
           <Directory Id="DevicesDir" Name="Devices">

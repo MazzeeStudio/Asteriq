@@ -228,12 +228,7 @@ static class Program
         // UI components (Transient - created per request)
         services.AddTransient<UI.MainForm>();
 
-        // SystemTrayIcon factory - needs IApplicationSettingsService to determine icon type
-        services.AddTransient<UI.SystemTrayIcon>(sp =>
-        {
-            var appSettings = sp.GetRequiredService<IApplicationSettingsService>();
-            return new UI.SystemTrayIcon("Asteriq", appSettings.TrayIconType);
-        });
+        services.AddTransient<UI.SystemTrayIcon>(_ => new UI.SystemTrayIcon("Asteriq"));
 
         return services.BuildServiceProvider();
     }

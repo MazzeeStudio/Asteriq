@@ -11,11 +11,13 @@ namespace Asteriq.Tools.IconGenerator;
 /// </summary>
 public static class IconRenderer
 {
+    // Drake Active colour (#FF8020) — matches FUIColors.Active for the Drake theme.
+    // Visible on both light and dark backgrounds; consistent with the runtime Form.Icon.
+    private static readonly SKColor s_iconColor = new(0xFF, 0x80, 0x20);
+
     /// <summary>
     /// Generates all icon sizes from the specified SVG file.
     /// </summary>
-    /// <param name="svgPath">Path to the SVG file</param>
-    /// <returns>List of (size, pngData) tuples</returns>
     public static List<(int size, byte[] pngData)> GenerateAllSizes(string svgPath)
     {
         if (!File.Exists(svgPath))
@@ -25,86 +27,54 @@ public static class IconRenderer
         var results = new List<(int, byte[])>();
 
         foreach (int size in sizes)
-        {
-            byte[] pngData = RenderIcon(svgPath, size);
-            results.Add((size, pngData));
-        }
+            results.Add((size, RenderIcon(svgPath, size)));
 
         return results;
     }
 
-    /// <summary>
-    /// Renders a single icon at the specified size with a thin dark outline.
-    /// The outline makes the near-white logo visible on both light and dark backgrounds
-    /// (File Explorer, pinned taskbar shortcuts, Start Menu).
-    /// </summary>
     private static byte[] RenderIcon(string svgPath, int size)
     {
         using var surface = SKSurface.Create(new SKImageInfo(size, size));
         var canvas = surface.Canvas;
-
-        // Clear to transparent background
         canvas.Clear(SKColors.Transparent);
 
-        // Load SVG
         using var svg = new SKSvg();
         using (var stream = File.OpenRead(svgPath))
-        {
             svg.Load(stream);
-        }
 
         if (svg.Picture is null)
             throw new InvalidOperationException($"Failed to load SVG: {svgPath}");
 
-        // Scale to 87% to leave a 1-pixel margin for the outline without clipping.
         var bounds = svg.Picture.CullRect;
-        float scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.87f;
+        float scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.90f;
         float offsetX = (size - bounds.Width * scale) / 2;
         float offsetY = (size - bounds.Height * scale) / 2;
 
-        DrawOutlinedLogo(canvas, svg.Picture, offsetX, offsetY, scale);
+        // Tint the near-white SVG to the brand colour via SaveLayer.
+        // DrawPicture(picture, paint) does not reliably apply paint filters in SkiaSharp.
+        float r = s_iconColor.Red   / 255f;
+        float g = s_iconColor.Green / 255f;
+        float b = s_iconColor.Blue  / 255f;
 
-        // Encode to PNG
+        using var colorFilter = SKColorFilter.CreateColorMatrix(new float[]
+        {
+            r, 0, 0, 0, 0,
+            0, g, 0, 0, 0,
+            0, 0, b, 0, 0,
+            0, 0, 0, 1, 0
+        });
+        using var tintPaint = new SKPaint { ColorFilter = colorFilter };
+
+        canvas.SaveLayer(tintPaint);
+        canvas.Save();
+        canvas.Translate(offsetX, offsetY);
+        canvas.Scale(scale);
+        canvas.DrawPicture(svg.Picture);
+        canvas.Restore();
+        canvas.Restore();
+
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return data.ToArray();
-    }
-
-    /// <summary>
-    /// Draws the SVG with a 1-pixel dark outline then the original fill on top.
-    /// Visible on both light and dark backgrounds without theme detection.
-    /// </summary>
-    internal static void DrawOutlinedLogo(SKCanvas canvas, SKPicture picture,
-        float offsetX, float offsetY, float scale)
-    {
-        // Pass 1: dark dilated silhouette (the outline)
-        // ColorMatrix zeroes every input channel and adds a fixed near-black offset,
-        // preserving the source alpha so only the shape area is affected.
-        using var outlineColorFilter = SKColorFilter.CreateColorMatrix(new float[]
-        {
-            0, 0, 0, 0, 0.10f,   // R = 0.10 (~#1A)
-            0, 0, 0, 0, 0.10f,   // G = 0.10
-            0, 0, 0, 0, 0.10f,   // B = 0.10
-            0, 0, 0, 1, 0        // A = A_in
-        });
-        using var dilateFilter = SKImageFilter.CreateDilate(1, 1);
-        using var outlinePaint = new SKPaint
-        {
-            ColorFilter = outlineColorFilter,
-            ImageFilter  = dilateFilter
-        };
-
-        canvas.Save();
-        canvas.Translate(offsetX, offsetY);
-        canvas.Scale(scale);
-        canvas.DrawPicture(picture, outlinePaint);
-        canvas.Restore();
-
-        // Pass 2: original near-white fill on top
-        canvas.Save();
-        canvas.Translate(offsetX, offsetY);
-        canvas.Scale(scale);
-        canvas.DrawPicture(picture);
-        canvas.Restore();
     }
 }

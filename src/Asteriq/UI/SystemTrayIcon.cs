@@ -1,3 +1,5 @@
+using System.Security;
+using Microsoft.Win32;
 using SkiaSharp;
 using Svg.Skia;
 using System.Drawing.Drawing2D;
@@ -24,9 +26,32 @@ public sealed class SystemTrayIcon : IDisposable
             Visible = false // Start hidden, will show after first icon generation
         };
 
+        // Refresh icon if the user switches Windows light/dark mode live
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+
         // Generate initial icon
         UpdateIcon();
         _notifyIcon.Visible = true;
+    }
+
+    private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category == UserPreferenceCategory.General)
+            UpdateIcon();
+    }
+
+    /// <summary>
+    /// Returns true when Windows is set to a light system theme (light taskbar/tray area).
+    /// </summary>
+    private static bool IsSystemLightTheme()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return key?.GetValue("SystemUsesLightTheme") is int v && v == 1;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException) { return false; }
     }
 
     /// <summary>
@@ -46,8 +71,16 @@ public sealed class SystemTrayIcon : IDisposable
     {
         const int size = 64;  // Render at 64x64 — Windows scales down for tray; larger source = sharper result
 
-        // Get color based on state and current theme
-        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextBright;
+        // Get color based on forwarding state and Windows taskbar theme.
+        // In light mode the tray background is near-white, so use a dark colour for
+        // the inactive state to keep the icon visible.
+        SKColor skColor;
+        if (_isActive)
+            skColor = FUIColors.Active;
+        else if (IsSystemLightTheme())
+            skColor = new SKColor(40, 40, 40); // dark grey — readable on light taskbar
+        else
+            skColor = FUIColors.TextBright;
         Color targetColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
 
         try
@@ -253,6 +286,7 @@ public sealed class SystemTrayIcon : IDisposable
 
     public void Dispose()
     {
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _currentIcon?.Dispose();

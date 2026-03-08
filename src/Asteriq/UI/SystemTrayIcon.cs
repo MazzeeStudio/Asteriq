@@ -70,8 +70,8 @@ public sealed class SystemTrayIcon : IDisposable
     public Icon CreateFormIcon()
     {
         SKColor color = IsSystemLightTheme()
-            ? new SKColor(0x20, 0x20, 0x20)       // near-black — readable on light taskbar
-            : new SKColor(0xFF, 0x80, 0x20);       // brand orange — readable on dark taskbar
+            ? new SKColor(0x20, 0x20, 0x20)  // near-black — readable on light taskbar
+            : FUIColors.TextBright;           // white — same as inactive tray on dark taskbar
         return RenderIconWithColor(Color.FromArgb(color.Red, color.Green, color.Blue));
     }
 

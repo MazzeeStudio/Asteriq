@@ -333,7 +333,7 @@ public class DriverSetupForm : FUIBaseDialog
         }
         else
         {
-            FUIRenderer.DrawButton(canvas, bounds, "WINGET",
+            FUIRenderer.DrawButton(canvas, bounds, "INSTALL",
                 hovered ? FUIRenderer.ButtonState.Active : FUIRenderer.ButtonState.Hover);
         }
     }

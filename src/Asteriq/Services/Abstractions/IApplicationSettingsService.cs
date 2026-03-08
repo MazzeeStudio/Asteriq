@@ -44,11 +44,6 @@ public interface IApplicationSettingsService
     bool CloseToTray { get; set; }
 
     /// <summary>
-    /// Get or set the system tray icon type (joystick or throttle)
-    /// </summary>
-    TrayIconType TrayIconType { get; set; }
-
-    /// <summary>
     /// Get or set the last used SC export profile name
     /// </summary>
     string? LastSCExportProfile { get; set; }

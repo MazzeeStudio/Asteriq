@@ -140,6 +140,9 @@ public partial class MainForm : Form
     // Window control hover state
     private int _hoveredWindowControl = -1;
 
+    // Title bar logo
+    private SKSvg? _logoSvg;
+
     // SVG device silhouettes (fallback generics)
     private SKSvg? _joystickSvg;
     private SKSvg? _throttleSvg;
@@ -926,6 +929,15 @@ public partial class MainForm : Form
         return LoadBitmapFromCache(imageFile);
     }
 
+    private static SKSvg? LoadLogoSvg()
+    {
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "AsteriqLogo.svg");
+        if (!File.Exists(path)) return null;
+        var svg = new SKSvg();
+        if (svg.Load(path) is null) { svg.Dispose(); return null; }
+        return svg;
+    }
+
     private SKSvg? LoadSvgFromCache(string imageFile)
     {
         if (_svgCache.TryGetValue(imageFile, out var cached)) return cached;
@@ -1298,21 +1310,27 @@ public partial class MainForm : Form
 
     private void LoadApplicationIcon()
     {
+        RefreshFormIcon();
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnSystemThemeChanged;
+    }
+
+    private void OnSystemThemeChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category == Microsoft.Win32.UserPreferenceCategory.General)
+            RefreshFormIcon();
+    }
+
+    private void RefreshFormIcon()
+    {
         try
         {
-            // Load the application icon from the asteriq.ico file
-            // This is in the same directory as the exe
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "asteriq.ico");
-
-            if (File.Exists(iconPath))
-            {
-                Icon = new Icon(iconPath);
-            }
+            var oldIcon = Icon;
+            Icon = _trayIcon.CreateFormIcon();
+            oldIcon?.Dispose();
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
         {
-            // Icon loading failed, continue without icon
-            // The app will still work, just won't show icon in taskbar
+            // Icon generation failed — taskbar will show default
         }
     }
 
@@ -2201,8 +2219,10 @@ public partial class MainForm : Form
     {
         if (disposing)
         {
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnSystemThemeChanged;
             _renderTimer?.Dispose();
             _background?.Dispose();
+            _logoSvg?.Dispose();
             _joystickSvg?.Dispose();
             _throttleSvg?.Dispose();
             foreach (var svg in _svgCache.Values) svg.Dispose();

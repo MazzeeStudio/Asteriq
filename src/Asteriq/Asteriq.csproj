@@ -44,7 +44,7 @@
     <PropertyGroup>
       <IconGeneratorProject>$(MSBuildThisFileDirectory)..\Tools\IconGenerator\IconGenerator.csproj</IconGeneratorProject>
       <IconOutputPath>$(MSBuildProjectDirectory)\asteriq.ico</IconOutputPath>
-      <IconSvgPath>$(MSBuildProjectDirectory)\Images\Devices\throttle.svg</IconSvgPath>
+      <IconSvgPath>$(MSBuildProjectDirectory)\Images\AsteriqLogo.svg</IconSvgPath>
     </PropertyGroup>
 
     <!-- Run icon generator if ico doesn't exist -->
@@ -77,6 +77,13 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Images\AsteriqLogo.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

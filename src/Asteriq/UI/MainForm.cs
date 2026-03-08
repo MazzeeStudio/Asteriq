@@ -1317,7 +1317,12 @@ public partial class MainForm : Form
     private void OnSystemThemeChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
     {
         if (e.Category == Microsoft.Win32.UserPreferenceCategory.General)
-            RefreshFormIcon();
+        {
+            if (InvokeRequired)
+                BeginInvoke(RefreshFormIcon);
+            else
+                RefreshFormIcon();
+        }
     }
 
     private void RefreshFormIcon()

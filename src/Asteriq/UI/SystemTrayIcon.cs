@@ -64,15 +64,77 @@ public sealed class SystemTrayIcon : IDisposable
     }
 
     /// <summary>
-    /// Generate a taskbar/form icon themed for the current Windows light/dark setting.
-    /// Dark mode → brand orange; light mode → near-black.
+    /// Generate the form/taskbar icon with a dark outline around the near-white logo.
+    /// The outline makes it visible on both light and dark taskbar backgrounds without
+    /// needing to detect the current Windows theme.
     /// </summary>
     public Icon CreateFormIcon()
     {
-        SKColor color = IsSystemLightTheme()
-            ? new SKColor(0x20, 0x20, 0x20)  // near-black — readable on light taskbar
-            : FUIColors.TextBright;           // white — same as inactive tray on dark taskbar
-        return RenderIconWithColor(Color.FromArgb(color.Red, color.Green, color.Blue));
+        const int size = 64;
+        try
+        {
+            using var svg = new SKSvg();
+            if (File.Exists(_svgPath))
+            {
+                using var stream = File.OpenRead(_svgPath);
+                svg.Load(stream);
+            }
+
+            if (svg.Picture is not null)
+            {
+                var bounds = svg.Picture.CullRect;
+                float scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.87f;
+
+                using var surface = SKSurface.Create(new SKImageInfo(size, size));
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.Transparent);
+
+                DrawOutlinedLogo(canvas, svg.Picture,
+                    (size - bounds.Width * scale) / 2f,
+                    (size - bounds.Height * scale) / 2f,
+                    scale);
+
+                using var image = surface.Snapshot();
+                using var pngData = image.Encode(SKEncodedImageFormat.Png, 100);
+                return BuildIconFromPng(pngData.ToArray(), size);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
+        {
+            // Fall through to fallback
+        }
+
+        return GenerateFallbackIcon(Color.FromArgb(0x20, 0x20, 0x20), size);
+    }
+
+    /// <summary>
+    /// Draws the SVG with a 1-pixel dark outline then the original fill on top.
+    /// Visible on both light and dark backgrounds without reading the Windows theme.
+    /// </summary>
+    private static void DrawOutlinedLogo(SKCanvas canvas, SKPicture picture,
+        float offsetX, float offsetY, float scale)
+    {
+        using var outlineColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+        {
+            0, 0, 0, 0, 0.10f,
+            0, 0, 0, 0, 0.10f,
+            0, 0, 0, 0, 0.10f,
+            0, 0, 0, 1, 0
+        });
+        using var dilateFilter = SKImageFilter.CreateDilate(1, 1);
+        using var outlinePaint = new SKPaint { ColorFilter = outlineColorFilter, ImageFilter = dilateFilter };
+
+        canvas.Save();
+        canvas.Translate(offsetX, offsetY);
+        canvas.Scale(scale);
+        canvas.DrawPicture(picture, outlinePaint);
+        canvas.Restore();
+
+        canvas.Save();
+        canvas.Translate(offsetX, offsetY);
+        canvas.Scale(scale);
+        canvas.DrawPicture(picture);
+        canvas.Restore();
     }
 
     /// <summary>

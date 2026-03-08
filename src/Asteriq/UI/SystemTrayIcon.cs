@@ -44,10 +44,10 @@ public sealed class SystemTrayIcon : IDisposable
     /// </summary>
     private Icon GenerateIcon()
     {
-        const int size = 32;  // Use 32x32 for better visibility in system tray
+        const int size = 64;  // Render at 64x64 — Windows scales down for tray; larger source = sharper result
 
         // Get color based on state and current theme
-        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextDim;
+        SKColor skColor = _isActive ? FUIColors.Active : FUIColors.TextBright;
         Color targetColor = Color.FromArgb(skColor.Red, skColor.Green, skColor.Blue);
 
         try
@@ -62,19 +62,14 @@ public sealed class SystemTrayIcon : IDisposable
 
             if (svg.Picture is not null)
             {
-                // Render SVG to SKBitmap
                 var bounds = svg.Picture.CullRect;
-
-                // Scale to fill more of the canvas - multiply by 1.2 to make icon bigger without clipping
-                var baseScale = Math.Min(size / bounds.Width, size / bounds.Height);
-                var scale = baseScale * 1.2f;
+                var scale = Math.Min(size / bounds.Width, size / bounds.Height) * 0.90f;
 
                 using var surface = SKSurface.Create(new SKImageInfo(size, size));
                 var canvas = surface.Canvas;
                 canvas.Clear(SKColors.Transparent);
 
-                // Center the scaled icon
-                canvas.Translate((size - bounds.Width * scale) / 2, (size - bounds.Height * scale) / 2);
+                canvas.Translate((size - bounds.Width * scale) / 2f, (size - bounds.Height * scale) / 2f);
                 canvas.Scale(scale);
 
                 // Draw SVG in white (we'll colorize it later)
@@ -99,7 +94,7 @@ public sealed class SystemTrayIcon : IDisposable
             // SVG loading failed, fall back to simple shape
         }
 
-        // Fallback: draw simple joystick icon if SVG fails
+        // Fallback: simple A shape if SVG fails
         return GenerateFallbackIcon(targetColor, size);
     }
 

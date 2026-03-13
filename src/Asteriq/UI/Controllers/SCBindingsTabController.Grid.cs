@@ -239,17 +239,25 @@ public partial class SCBindingsTabController
         if (action.ActionMap.ToLowerInvariant().Contains(searchLower))
             return true;
 
-        // Check user binding input names
-        var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
-        if (userBinding is not null)
+        // Check ALL user bindings for this action (all device types, all device columns).
+        // The old GetBinding() only returned the first joystick binding, causing misses when
+        // the matching binding wasn't first in the list.
+        foreach (var b in _scExportProfile.Bindings.Where(b =>
+            b.ActionMap == action.ActionMap && b.ActionName == action.ActionName))
         {
-            if (userBinding.InputName.ToLowerInvariant().Contains(searchLower))
+            if (b.InputName.ToLowerInvariant().Contains(searchLower))
                 return true;
-
-            // Check modifiers
-            foreach (var modifier in userBinding.Modifiers)
+            foreach (var modifier in b.Modifiers)
             {
                 if (modifier.ToLowerInvariant().Contains(searchLower))
+                    return true;
+            }
+            // Also check the composed full string e.g. "rctrl+button3" so a capture
+            // search of "rctrl+button3" matches a binding that stores them separately.
+            if (b.Modifiers.Count > 0)
+            {
+                string full = (string.Join("+", b.Modifiers) + "+" + b.InputName).ToLowerInvariant();
+                if (full.Contains(searchLower))
                     return true;
             }
         }
@@ -1055,7 +1063,7 @@ public partial class SCBindingsTabController
     private void UpdateModifierKeys()
     {
         _scModifierKeys.Clear();
-        _scModifierPhysicalButtonNames.Clear();
+        _scModifierPhysicalButtons.Clear();
         _scModifierButtonToModifiers.Clear();
 
         var profile = _ctx.ProfileManager.ActiveProfile;
@@ -1071,18 +1079,19 @@ public partial class SCBindingsTabController
             string modName = keyName.ToLowerInvariant();
             _scModifierKeys.TryAdd(vkCode, modName);
 
-            // Record which physical buttons trigger this modifier key so they can be
-            // identified during joystick listen mode — pressing one skips it as the
-            // binding target and waits for the actual target button instead.
+            // Record which (device, button) pairs trigger this modifier key so that
+            // button31 on the LEFT stick is treated as a modifier only for that device —
+            // the same button index on a DIFFERENT device is not affected.
             foreach (var input in mapping.Inputs)
             {
                 if (input.Type != InputType.Button) continue;
-                string btnName = $"button{input.Index + 1}";
-                _scModifierPhysicalButtonNames.Add(btnName);
-                if (!_scModifierButtonToModifiers.TryGetValue(btnName, out var mods))
+                if (!Guid.TryParse(input.DeviceId, out var deviceGuid)) continue;
+                var key = (deviceGuid, input.Index); // 0-based index
+                _scModifierPhysicalButtons.Add(key);
+                if (!_scModifierButtonToModifiers.TryGetValue(key, out var mods))
                 {
                     mods = new List<string>();
-                    _scModifierButtonToModifiers[btnName] = mods;
+                    _scModifierButtonToModifiers[key] = mods;
                 }
                 if (!mods.Contains(modName))
                     mods.Add(modName);
@@ -1091,7 +1100,7 @@ public partial class SCBindingsTabController
 
         System.Diagnostics.Debug.WriteLine(
             $"[SCBindings] UpdateModifierKeys: {_scModifierKeys.Count} modifier(s), " +
-            $"{_scModifierPhysicalButtonNames.Count} modifier button(s): {string.Join(", ", _scModifierPhysicalButtonNames)}");
+            $"{_scModifierPhysicalButtons.Count} modifier (device,button) pair(s)");
     }
 
     /// <summary>

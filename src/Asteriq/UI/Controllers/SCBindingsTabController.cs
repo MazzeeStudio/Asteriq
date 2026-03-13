@@ -85,11 +85,12 @@ public partial class SCBindingsTabController : ITabController
     // Modifier keys detected from Mappings profile (vkCode → SC modifier name, e.g. {0xA3: "rctrl"})
     private Dictionary<int, string> _scModifierKeys = new();
 
-    // Physical button names (e.g. "button31") that are mapped to keyboard modifier keys.
-    private HashSet<string> _scModifierPhysicalButtonNames = new();
+    // (InstanceGuid, 0-based buttonIndex) pairs that are mapped to keyboard modifier keys.
+    // Keyed by device instance so button31 on the left stick ≠ button31 on the right stick.
+    private HashSet<(Guid DeviceGuid, int ButtonIndex)> _scModifierPhysicalButtons = new();
 
-    // Maps physical button name → list of SC modifier names (e.g. "button31" → ["rctrl"])
-    private Dictionary<string, List<string>> _scModifierButtonToModifiers = new();
+    // Maps (InstanceGuid, 0-based buttonIndex) → list of SC modifier names (e.g. ["rctrl"])
+    private Dictionary<(Guid DeviceGuid, int ButtonIndex), List<string>> _scModifierButtonToModifiers = new();
 
     // Public properties for MainForm mouse dispatch
     public bool IsDraggingVScroll => _scroll.IsDraggingVScroll;
@@ -353,10 +354,12 @@ public partial class SCBindingsTabController : ITabController
             }
         }
 
-        // Text input fields - IBeam cursor
+        // Text input fields - IBeam cursor, Hand over the × clear button
         if (_searchFilter.SearchBoxBounds.Contains(e.X, e.Y))
         {
-            _ctx.OwnerForm.Cursor = Cursors.IBeam;
+            bool overClear = !string.IsNullOrEmpty(_searchFilter.SearchText)
+                && e.X > _searchFilter.SearchBoxBounds.Right - 24;
+            _ctx.OwnerForm.Cursor = overClear ? Cursors.Hand : Cursors.IBeam;
         }
 
         // Panel header hover (collapsed panel expand buttons)
@@ -565,6 +568,19 @@ public partial class SCBindingsTabController : ITabController
 
     public bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        var key = keyData & Keys.KeyCode;
+        if (_searchFilter.ButtonCaptureActive && key == Keys.Escape)
+        {
+            _searchFilter.ButtonCaptureActive = false;
+            _searchFilter.CaptureButtonBaseline = null;
+            _searchFilter.CaptureHatBaseline = null;
+            _searchFilter.CapturePendingModifier = null;
+            _searchFilter.CaptureWaitingForRelease = false;
+            _searchFilter.CaptureReleasePendingInput = null;
+            _ctx.SuppressForwarding = false;
+            _ctx.MarkDirty();
+            return true;
+        }
         if (_searchFilter.SearchBoxFocused)
             return HandleSearchBoxKey(keyData);
         if (_scExportFilenameBoxFocused)
@@ -582,9 +598,11 @@ public partial class SCBindingsTabController : ITabController
     public void OnTick()
     {
         if (_scListening.IsListening)
-        {
             CheckSCBindingInput();
-        }
+        if (_searchFilter.ButtonCaptureActive)
+            CheckButtonCaptureInput();
+        if (_searchFilter.CaptureWaitingForRelease)
+            CheckCaptureRelease();
     }
 
     public void OnActivated()
@@ -733,6 +751,26 @@ public partial class SCBindingsTabController : ITabController
         public List<string> ActionMaps = new();
         public SKRect ShowJSRefBounds;
         public bool ShowJSRefHovered;
+
+        // Button capture mode — press a physical button to search for it
+        public bool ButtonCaptureActive;
+        public bool ButtonCaptureHovered;
+        public SKRect ButtonCaptureBounds;
+        public Dictionary<Guid, bool[]>? CaptureButtonBaseline;
+        public Dictionary<Guid, int[]>? CaptureHatBaseline;
+        public int CaptureBaselineFrames;
+        // Set when a physical modifier button is detected — wait for the target button next
+        public string? CapturePendingModifier;
+        // HID path of the device whose button was captured — used to restrict search results
+        public string? CaptureDeviceHidPath;
+        // True when SearchText was filled by button capture — render as pill
+        public bool ButtonCaptureTextActive;
+        // Set after capture result is applied — keeps SuppressForwarding=true until the button is released
+        public bool CaptureWaitingForRelease;
+        // Raw input name (no modifier prefix) used to poll for release, e.g. "button13" or "hat1_up"
+        public string? CaptureReleasePendingInput;
+        // Tick counter for release-wait timeout (safety valve if device disconnects mid-capture)
+        public int CaptureReleaseWaitTicks;
     }
 
     private sealed class ScrollState

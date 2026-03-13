@@ -105,6 +105,17 @@ public class TabContext
     public NetworkInputMode NetworkMode { get; set; } = NetworkInputMode.Local;
     /// <summary>True while a master-side connect handshake is in progress. CONNECT button is disabled.</summary>
     public bool IsNetworkConnecting { get; set; }
+    /// <summary>
+    /// When true, the network forwarding heartbeat skips sending vJoy snapshots to the remote machine.
+    /// Set by SCBindingsTabController while button-capture mode is active so that deliberate button
+    /// presses used only for search are not forwarded.
+    /// </summary>
+    public bool SuppressForwarding { get; set; }
+    /// <summary>
+    /// Clears button/hat states from all forwarding snapshots so that buttons held during a capture
+    /// session are not forwarded when suppression ends. Set by MainForm; no-op when not forwarding.
+    /// </summary>
+    public Action? ClearForwardingSnapshots { get; set; }
     /// <summary>IP address of the RX peer currently connected as TX master. Null when not connected.</summary>
     public string? ConnectedPeerIp { get; set; }
     /// <summary>True when this machine is in client mode (receiving vJoy from master). Tabs 0 and 1 are locked.</summary>

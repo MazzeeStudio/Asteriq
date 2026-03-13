@@ -349,6 +349,9 @@ public partial class MainForm : Form
 
         // Wire up network conflict check (delegated to SCBindingsTabController)
         _tabContext.CheckNetworkSwitchConflicts = _scBindingsController.CheckNetworkSwitchConflictsPublic;
+
+        // Wire up forwarding snapshot clear (for button capture mode)
+        _tabContext.ClearForwardingSnapshots = _networkVjoy.ClearAllSnapshotButtons;
     }
 
     private void SyncTabContext()
@@ -1604,9 +1607,11 @@ public partial class MainForm : Form
 
         // ── Master mode: run MappingEngine in capture mode, send snapshot ────
         // ForwardingMode is set exclusively by ConnectAsMasterAsync — no role setting required.
+        // SuppressForwarding is true while SC Bindings button-capture is active — skip ProcessInput
+        // entirely so the captured button press never reaches the snapshot or the remote machine.
         if (_networkMode == NetworkInputMode.Remote && _networkVjoy.ForwardingMode)
         {
-            if (_mappingEngine.IsRunning)
+            if (_mappingEngine.IsRunning && !_tabContext.SuppressForwarding)
                 _mappingEngine.ProcessInput(state);
 
             // Do NOT send here — the 20 Hz heartbeat handles transmission.

@@ -456,6 +456,33 @@ public partial class SCBindingsTabController
             return;
         }
 
+        // Button capture toggle click
+        if (_searchFilter.ButtonCaptureBounds.Contains(point))
+        {
+            _searchFilter.ButtonCaptureActive = !_searchFilter.ButtonCaptureActive;
+            if (_searchFilter.ButtonCaptureActive)
+            {
+                // Enter capture mode — reset baseline so detection starts fresh
+                _searchFilter.CaptureButtonBaseline = null;
+                _searchFilter.CaptureHatBaseline = null;
+                _searchFilter.CaptureBaselineFrames = 0;
+                _searchFilter.CapturePendingModifier = null;
+                _searchFilter.SearchBoxFocused = false;
+                _ctx.SuppressForwarding = true;
+            }
+            else
+            {
+                _searchFilter.CaptureWaitingForRelease = false;
+                _searchFilter.CaptureReleasePendingInput = null;
+                _ctx.SuppressForwarding = false;
+            }
+            _scInstall.DropdownOpen = false;
+            _searchFilter.FilterDropdownOpen = false;
+            _profileMgmt.DropdownOpen = false;
+            _ctx.MarkDirty();
+            return;
+        }
+
         // Search box click
         if (_searchFilter.SearchBoxBounds.Contains(point))
         {
@@ -463,10 +490,14 @@ public partial class SCBindingsTabController
             if (!string.IsNullOrEmpty(_searchFilter.SearchText) && point.X > _searchFilter.SearchBoxBounds.Right - 24)
             {
                 _searchFilter.SearchText = "";
+                _searchFilter.ButtonCaptureTextActive = false;
+                _searchFilter.CaptureDeviceHidPath = null;
                 RefreshFilteredActions();
             }
             else
             {
+                _searchFilter.ButtonCaptureTextActive = false;
+                _searchFilter.CaptureDeviceHidPath = null;
                 _searchFilter.SearchBoxFocused = true;
             }
             _scInstall.DropdownOpen = false;
@@ -1032,6 +1063,8 @@ public partial class SCBindingsTabController
 
         if (key == Keys.Back)
         {
+            _searchFilter.ButtonCaptureTextActive = false;
+            _searchFilter.CaptureDeviceHidPath = null;
             if (_searchFilter.SearchText.Length > 0)
             {
                 _searchFilter.SearchText = _searchFilter.SearchText.Substring(0, _searchFilter.SearchText.Length - 1);
@@ -1043,6 +1076,8 @@ public partial class SCBindingsTabController
         if (key == Keys.Delete)
         {
             _searchFilter.SearchText = "";
+            _searchFilter.ButtonCaptureTextActive = false;
+            _searchFilter.CaptureDeviceHidPath = null;
             RefreshFilteredActions();
             return true;
         }
@@ -1050,6 +1085,8 @@ public partial class SCBindingsTabController
         char c = KeyToChar(key, (keyData & Keys.Shift) == Keys.Shift);
         if (c != '\0' && _searchFilter.SearchText.Length < 50)
         {
+            _searchFilter.ButtonCaptureTextActive = false;
+            _searchFilter.CaptureDeviceHidPath = null;
             _searchFilter.SearchText += c;
             RefreshFilteredActions();
             return true;

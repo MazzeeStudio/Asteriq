@@ -187,7 +187,6 @@ public partial class SCBindingsTabController
         float filterRowHeight = 32f;
         float checkboxSize = 16f;
         float filterWidth = 220f;  // Width for category selector
-        float gap = 10f;
 
         // Category filter dropdown on the right
         float filterX = rightMargin - filterWidth;
@@ -196,13 +195,37 @@ public partial class SCBindingsTabController
         bool filterHovered = _searchFilter.FilterBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIWidgets.DrawSelector(canvas, _searchFilter.FilterBounds, filterText, filterHovered || _searchFilter.FilterDropdownOpen, _searchFilter.ActionMaps.Count > 0);
 
-        // Search box on the left (max 280px wide)
-        float maxSearchWidth = 280f;
+        // Search box on the left (narrowed to make room for capture toggle button)
+        const float captureButtonW = 28f;
+        const float captureButtonGap = 4f;
+        float maxSearchWidth = 280f - captureButtonW - captureButtonGap;
         _searchFilter.SearchBoxBounds = new SKRect(leftMargin, y, leftMargin + maxSearchWidth, y + filterRowHeight);
-        FUIWidgets.DrawSearchBox(canvas, _searchFilter.SearchBoxBounds, _searchFilter.SearchText, _searchFilter.SearchBoxFocused, _ctx.MousePosition);
+        string searchPlaceholder = _searchFilter.ButtonCaptureActive ? "Press a button..." : "Search actions...";
+        // When capture result is active, parse "rctrl+button13" → ["CTRL", "Btn13"] for badge display
+        IReadOnlyList<string>? captureBadges = null;
+        if (_searchFilter.ButtonCaptureTextActive && !string.IsNullOrEmpty(_searchFilter.SearchText))
+        {
+            var parts = _searchFilter.SearchText.Split('+');
+            var badges = new List<string>();
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                var fmt = SCBindingsRenderer.FormatModifierName(parts[i]);
+                if (!string.IsNullOrEmpty(fmt)) badges.Add(fmt);
+            }
+            badges.Add(SCBindingsRenderer.FormatInputName(parts[^1]));
+            captureBadges = badges;
+        }
+        FUIWidgets.DrawSearchBox(canvas, _searchFilter.SearchBoxBounds, _searchFilter.SearchText, _searchFilter.SearchBoxFocused, _ctx.MousePosition, searchPlaceholder,
+            captureBadges: captureBadges);
 
-        // "Bound only" checkbox
-        float checkboxX = leftMargin + maxSearchWidth + gap;
+        // Button capture toggle button [🎮] — right of search box
+        float capBtnX = _searchFilter.SearchBoxBounds.Right + captureButtonGap;
+        _searchFilter.ButtonCaptureBounds = new SKRect(capBtnX, y, capBtnX + captureButtonW, y + filterRowHeight);
+        _searchFilter.ButtonCaptureHovered = _searchFilter.ButtonCaptureBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        DrawButtonCaptureToggle(canvas, _searchFilter.ButtonCaptureBounds, _searchFilter.ButtonCaptureActive, _searchFilter.ButtonCaptureHovered);
+
+        // "Bound only" checkbox — 16px gap after capture toggle button
+        float checkboxX = _searchFilter.ButtonCaptureBounds.Right + 16f;
         _searchFilter.ShowBoundOnlyBounds = new SKRect(checkboxX, y + (filterRowHeight - checkboxSize) / 2,
             checkboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
         _searchFilter.ShowBoundOnlyHovered = _searchFilter.ShowBoundOnlyBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
@@ -1178,6 +1201,33 @@ public partial class SCBindingsTabController
         FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 13f);
         y += lineHeight;
+    }
+
+    private static void DrawButtonCaptureToggle(SKCanvas canvas, SKRect bounds, bool active, bool hovered)
+    {
+        // Background
+        var bgColor = active
+            ? FUIColors.Active.WithAlpha(60)
+            : hovered ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(100);
+        var borderColor = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
+        FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor, 4f);
+
+        // Keycap icon: outer rounded square + smaller inner square (like a physical button)
+        var iconColor = active ? FUIColors.Active : (hovered ? FUIColors.TextBright : FUIColors.TextDim);
+        float cx = bounds.MidX;
+        float cy = bounds.MidY;
+        const float outerR = 5.5f;
+        const float innerR = 3f;
+
+        using var strokePaint = FUIRenderer.CreateStrokePaint(iconColor, 1.5f);
+        using var fillPaint = FUIRenderer.CreateFillPaint(iconColor.WithAlpha(active ? (byte)180 : (byte)100));
+
+        // Outer keycap border
+        var outerRect = new SKRect(cx - outerR, cy - outerR, cx + outerR, cy + outerR);
+        canvas.DrawRoundRect(outerRect, 2f, 2f, strokePaint);
+        // Inner filled square (pressed indicator)
+        var innerRect = new SKRect(cx - innerR, cy - innerR, cx + innerR, cy + innerR);
+        canvas.DrawRoundRect(innerRect, 1f, 1f, fillPaint);
     }
 
     private void DrawStatusBanner(SKCanvas canvas, SKRect bounds)

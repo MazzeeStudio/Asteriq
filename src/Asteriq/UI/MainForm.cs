@@ -116,6 +116,9 @@ public partial class MainForm : Form
     private float _pulsePhase = 0f;
     private float _leadLineProgress = 0f;
 
+    // Custom form icon (tracked separately so we never accidentally Dispose the shared WinForms DefaultIcon)
+    private Icon? _customFormIcon;
+
     // Performance optimization
     private bool _isDirty = true;  // Force initial render
     private bool _enableAnimations = true;  // Can be toggled for performance
@@ -1329,8 +1332,13 @@ public partial class MainForm : Form
     {
         try
         {
-            var oldIcon = Icon;
-            Icon = _trayIcon.CreateFormIcon();
+            // Track our custom icon separately so we never accidentally Dispose the shared
+            // WinForms static DefaultIcon (Form.DefaultIcon) that is returned by Form.Icon
+            // when no custom icon has been set yet. Disposing DefaultIcon corrupts all
+            // undecorated dialogs (e.g. FUIConfirmDialog) that inherit it during CreateHandle.
+            var oldIcon = _customFormIcon;
+            _customFormIcon = _trayIcon.CreateFormIcon();
+            Icon = _customFormIcon;
             oldIcon?.Dispose();
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
@@ -2226,6 +2234,7 @@ public partial class MainForm : Form
         {
             Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnSystemThemeChanged;
             _renderTimer?.Dispose();
+            _customFormIcon?.Dispose();
             _background?.Dispose();
             _logoSvg?.Dispose();
             _joystickSvg?.Dispose();

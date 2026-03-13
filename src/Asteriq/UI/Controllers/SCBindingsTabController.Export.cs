@@ -314,32 +314,63 @@ public partial class SCBindingsTabController
             return;
         }
 
+        // Validate profile
+        var validation = SCXmlExportService.Validate(_scExportProfile);
+        if (!validation.IsValid)
+        {
+            SetStatus($"Validation failed: {validation.Errors.FirstOrDefault()}", SCStatusKind.Error);
+            return;
+        }
+
+        var installation = _scInstall.Installations[_scInstall.SelectedInstallation];
+
+        // Export - use custom filename if provided, otherwise auto-generate
+        string filename = string.IsNullOrEmpty(_scExportFilename)
+            ? _scExportProfile.GetExportFileName()
+            : $"{_scExportFilename}.xml";
+
+        // Ensure mappings directory exists
+        if (!SCInstallationService.EnsureMappingsDirectory(installation))
+        {
+            SetStatus($"Cannot create SC mappings directory: {installation.MappingsPath}", SCStatusKind.Error);
+            return;
+        }
+
+        string exportPath = Path.Combine(installation.MappingsPath, filename);
+
+        // Warn before overwriting — outside the I/O try-catch so dialog errors are not
+        // misreported as "Export failed".
+        if (File.Exists(exportPath))
+        {
+            string displayName = filename.Length > 38 ? filename[..35] + "..." : filename;
+            using var confirmDialog = new FUIConfirmDialog(
+                "File Already Exists",
+                $"'{displayName}'\nalready exists in SC mappings.\n\nOverwrite it?",
+                "Overwrite", "Choose Name");
+
+            if (confirmDialog.ShowDialog(_ctx.OwnerForm) != DialogResult.Yes)
+            {
+                // Let user pick a different filename
+                string baseName = Path.GetFileNameWithoutExtension(filename);
+                var newName = FUIInputDialog.Show(_ctx.OwnerForm, "Export As", "File name (without .xml):", baseName, "Export");
+                if (newName is null)
+                    return; // user cancelled
+
+                newName = newName.Trim();
+                if (string.IsNullOrEmpty(newName))
+                    return;
+
+                // Strip accidental .xml suffix
+                if (newName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    newName = newName[..^4];
+
+                filename = newName + ".xml";
+                exportPath = Path.Combine(installation.MappingsPath, filename);
+            }
+        }
+
         try
         {
-            var installation = _scInstall.Installations[_scInstall.SelectedInstallation];
-
-            // Validate profile
-            var validation = SCXmlExportService.Validate(_scExportProfile);
-            if (!validation.IsValid)
-            {
-                SetStatus($"Validation failed: {validation.Errors.FirstOrDefault()}", SCStatusKind.Error);
-                return;
-            }
-
-            // Export - use custom filename if provided, otherwise auto-generate
-            string filename = string.IsNullOrEmpty(_scExportFilename)
-                ? _scExportProfile.GetExportFileName()
-                : $"{_scExportFilename}.xml";
-
-            // Ensure mappings directory exists
-            if (!SCInstallationService.EnsureMappingsDirectory(installation))
-            {
-                SetStatus($"Cannot create SC mappings directory: {installation.MappingsPath}", SCStatusKind.Error);
-                return;
-            }
-
-            string exportPath = Path.Combine(installation.MappingsPath, filename);
-
             // TX TOGGLE bindings share a vJoy button with the network switch — exclude them
             // from the export so SC never sees that button, rather than blocking the whole export.
             List<SCActionBinding>? excluded = null;

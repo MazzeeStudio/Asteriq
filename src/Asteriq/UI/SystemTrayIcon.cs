@@ -161,7 +161,9 @@ public sealed class SystemTrayIcon : IDisposable
     /// </summary>
     private static Icon BuildIconFromPng(byte[] png, int size)
     {
-        using var icoStream = new MemoryStream();
+        // Do NOT dispose this stream — Icon(Stream) keeps a reference to it.
+        // The stream will be collected when the Icon is GC'd or disposed.
+        var icoStream = new MemoryStream();
         // ICONDIR: Reserved=0, Type=1 (ICO), Count=1
         icoStream.Write(new byte[] { 0, 0, 1, 0, 1, 0 });
         // ICONDIRENTRY: Width, Height, ColorCount, Reserved, Planes, BitCount, BytesInRes, ImageOffset(22)

@@ -1198,7 +1198,8 @@ public partial class SCBindingsTabController
         using var accentPaint = FUIRenderer.CreateFillPaint(color.WithAlpha(180));
         canvas.DrawRect(new SKRect(bounds.Left, bounds.Top, bounds.Left + 3f, bounds.Bottom), accentPaint);
 
-        FUIRenderer.DrawTextCentered(canvas, _scExportStatus, bounds, color, 13f);
+        string statusText = FUIRenderer.TruncateText(_scExportStatus, bounds.Width - 16f, 13f);
+        FUIRenderer.DrawTextCentered(canvas, statusText, bounds, color, 13f);
     }
 
     private void DrawSCProfileDropdownList(SKCanvas canvas, SKRect bounds)

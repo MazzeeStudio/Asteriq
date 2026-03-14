@@ -555,18 +555,25 @@ public class SettingsTabController : ITabController, IDisposable
         }
         y += sectionSpacing;
 
-        // NETWORK enable toggle (always shown — not gated on vJoy)
-        FUIRenderer.DrawText(canvas, "NETWORK", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += sectionSpacing;
+        // NETWORK enable toggle — only shown when vJoy is installed
+        if (driverStatus.IsComplete)
+        {
+            FUIRenderer.DrawText(canvas, "NETWORK", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
+            y += sectionSpacing;
 
-        float netLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
-        float netLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
-        FUIRenderer.DrawTextTruncated(canvas, "Enable network forwarding", new SKPoint(leftMargin, netLabelY),
-            netLabelMaxWidth, FUIColors.TextPrimary, 14f);
-        float netToggleY = y + (rowHeight - toggleHeight) / 2;
-        _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT, _ctx.MousePosition);
-        y += rowHeight + sectionSpacing;
+            float netLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+            float netLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+            FUIRenderer.DrawTextTruncated(canvas, "Enable network forwarding", new SKPoint(leftMargin, netLabelY),
+                netLabelMaxWidth, FUIColors.TextPrimary, 14f);
+            float netToggleY = y + (rowHeight - toggleHeight) / 2;
+            _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
+            FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT, _ctx.MousePosition);
+            y += rowHeight + sectionSpacing;
+        }
+        else
+        {
+            _networkEnabledToggleBounds = SKRect.Empty;
+        }
 
         // VERSION & UPDATES section
         FUIRenderer.DrawText(canvas, "VERSION & UPDATES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);

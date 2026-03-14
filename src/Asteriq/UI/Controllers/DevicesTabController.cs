@@ -857,15 +857,15 @@ public class DevicesTabController : ITabController
                 // Hide Device — Asteriq-level UI preference, bottom-anchored (separate from HidHide driver hiding)
                 {
                     bool isHiddenFromView = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
-                    float toggleWidth = 44f;
-                    float toggleHeight = 24f;
-                    float toggleY = contentBounds.Bottom - pad - toggleHeight;
-                    float toggleX = contentBounds.Right - pad - toggleWidth;
-                    float textY = toggleY + toggleHeight / 2f + 4f;
+                    const float cbSize = 14f;
+                    float rowCenterY = contentBounds.Bottom - pad - cbSize / 2f;
+                    float cbX = contentBounds.Right - pad - cbSize;
+                    float cbY = rowCenterY - cbSize / 2f;
+                    _actions.HideFromViewBounds = new SKRect(cbX, cbY, cbX + cbSize, cbY + cbSize);
+                    bool cbHovered = _actions.HideFromViewBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                     FUIRenderer.DrawText(canvas, "Hide Device",
-                        new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextDim, 12f);
-                    _actions.HideFromViewBounds = new SKRect(toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight);
-                    FUIWidgets.DrawToggleSwitch(canvas, _actions.HideFromViewBounds, isHiddenFromView ? 1f : 0f, _ctx.MousePosition);
+                        new SKPoint(contentBounds.Left + pad, rowCenterY + 4f), FUIColors.TextDim, 12f);
+                    FUIWidgets.DrawSCCheckbox(canvas, _actions.HideFromViewBounds, isHiddenFromView, cbHovered);
                 }
             }
         }

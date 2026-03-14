@@ -686,7 +686,8 @@ internal static class FUIWidgets
     // ─── SC Bindings Shared Widgets ───────────────────────────────────────────
 
 
-    internal static void DrawSearchBox(SKCanvas canvas, SKRect bounds, string text, bool focused, Point mousePosition)
+    internal static void DrawSearchBox(SKCanvas canvas, SKRect bounds, string text, bool focused, Point mousePosition,
+        string placeholder = "Search actions...", IReadOnlyList<string>? captureBadges = null)
     {
         var bgColor = focused ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(100);
         var borderColor = focused ? FUIColors.Active : FUIColors.Frame;
@@ -698,15 +699,49 @@ internal static class FUIWidgets
         canvas.DrawCircle(iconX + 5, iconY - 1, 5f, iconPaint);
         canvas.DrawLine(iconX + 9, iconY + 3, iconX + 13, iconY + 7, iconPaint);
 
-        float textX = bounds.Left + 24f;
+        float contentX = bounds.Left + 24f;
         float textY = bounds.MidY + 4f;
         if (string.IsNullOrEmpty(text))
         {
-            FUIRenderer.DrawText(canvas, "Search actions...", new SKPoint(textX, textY), FUIColors.TextDim, 13f);
+            FUIRenderer.DrawText(canvas, placeholder, new SKPoint(contentX, textY), FUIColors.TextDim, 13f);
+        }
+        else if (captureBadges is not null && captureBadges.Count > 0)
+        {
+            // Draw keycap badges matching the table — same visual language
+            const float badgeH = 18f;
+            const float badgePadX = 6f;
+            const float badgeGap = 3f;
+            const float fontSize = 12f;
+            var color = FUIColors.Active;
+            float x = contentX;
+            float badgeY = bounds.MidY - badgeH / 2;
+
+            for (int i = 0; i < captureBadges.Count; i++)
+            {
+                string label = captureBadges[i];
+                float textW = FUIRenderer.MeasureText(label, fontSize);
+                float badgeW = textW + badgePadX * 2;
+                bool isMain = i == captureBadges.Count - 1;
+
+                var badgeRect = new SKRect(x, badgeY, x + badgeW, badgeY + badgeH);
+                byte bgAlpha = isMain ? (byte)50 : (byte)35;
+                byte borderAlpha = isMain ? (byte)180 : (byte)120;
+                FUIRenderer.DrawRoundedPanel(canvas, badgeRect, color.WithAlpha(bgAlpha), color.WithAlpha(borderAlpha));
+                FUIRenderer.DrawText(canvas, label, new SKPoint(x + badgePadX, bounds.MidY + 4f), color, fontSize);
+
+                x += badgeW + badgeGap;
+            }
+
+            // × always visible at right edge (same hit zone as plain text clear)
+            float clearX = bounds.Right - 18f;
+            float clearY = bounds.MidY;
+            using var clearPaint = FUIRenderer.CreateStrokePaint(FUIColors.TextDim, 1.5f);
+            canvas.DrawLine(clearX - 4, clearY - 4, clearX + 4, clearY + 4, clearPaint);
+            canvas.DrawLine(clearX + 4, clearY - 4, clearX - 4, clearY + 4, clearPaint);
         }
         else
         {
-            FUIRenderer.DrawText(canvas, text, new SKPoint(textX, textY), FUIColors.TextPrimary, 13f);
+            FUIRenderer.DrawText(canvas, text, new SKPoint(contentX, textY), FUIColors.TextPrimary, 13f);
 
             if (bounds.Contains(mousePosition.X, mousePosition.Y))
             {
@@ -720,7 +755,7 @@ internal static class FUIWidgets
 
         if (focused)
         {
-            float cursorX = textX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 13f));
+            float cursorX = contentX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 13f));
             if ((DateTime.Now.Millisecond / 500) % 2 == 0)
             {
                 using var cursorPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active);

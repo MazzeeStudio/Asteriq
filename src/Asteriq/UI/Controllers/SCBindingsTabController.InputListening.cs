@@ -64,12 +64,17 @@ public partial class SCBindingsTabController
             var detectedJoystick = DetectJoystickInput(col);
             if (detectedJoystick is not null)
             {
-                if (_scListening.PendingModifiers is null
-                    && _scModifierPhysicalButtonNames.Contains(detectedJoystick))
+                var (inputName, deviceGuid) = detectedJoystick.Value;
+                var modKey = (deviceGuid, ParseButtonIndex(inputName));
+                bool isModifier = _scListening.PendingModifiers is null
+                    && modKey.Item2 >= 0
+                    && _scModifierPhysicalButtons.Contains(modKey);
+
+                if (isModifier)
                 {
                     // This is the modifier button — record which modifier it produces and
                     // keep listening for the actual target button.
-                    _scListening.PendingModifiers = _scModifierButtonToModifiers.TryGetValue(detectedJoystick, out var mods)
+                    _scListening.PendingModifiers = _scModifierButtonToModifiers.TryGetValue(modKey, out var mods)
                         ? new List<string>(mods) : null;
                     _scListening.StartTime = DateTime.Now; // reset timeout so user has time to press target
                     _ctx.MarkDirty();
@@ -80,7 +85,7 @@ public partial class SCBindingsTabController
                     // Cancel BEFORE assigning so a blocking conflict dialog cannot re-trigger detection.
                     var finalModifiers = _scListening.PendingModifiers;
                     CancelSCInputListening();
-                    AssignJoystickBinding(action, col, detectedJoystick, finalModifiers);
+                    AssignJoystickBinding(action, col, inputName, finalModifiers);
                 }
             }
         }
@@ -169,7 +174,7 @@ public partial class SCBindingsTabController
         return null;
     }
 
-    private string? DetectJoystickInput(SCGridColumn col)
+    private (string inputName, Guid deviceGuid)? DetectJoystickInput(SCGridColumn col)
     {
         const float AxisThreshold = 0.15f; // 15% threshold like SCVirtStick/Gremlin
 
@@ -235,7 +240,7 @@ public partial class SCBindingsTabController
                 {
                     System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected button {i + 1} on {device.Name}");
                     ResetJoystickDetectionState();
-                    return $"button{i + 1}";
+                    return ($"button{i + 1}", device.InstanceGuid);
                 }
             }
 
@@ -255,7 +260,7 @@ public partial class SCBindingsTabController
                         : GetVJoyAxisNameFromMapping(device, i, col);
                     System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> {axisName} on {device.Name}, deflection: {deflection:F2}");
                     ResetJoystickDetectionState();
-                    return axisName;
+                    return (axisName, device.InstanceGuid);
                 }
             }
 
@@ -271,7 +276,7 @@ public partial class SCBindingsTabController
                     string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
                     System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected hat {i + 1} {hatDir} on {device.Name}");
                     ResetJoystickDetectionState();
-                    return $"hat{i + 1}_{hatDir}";
+                    return ($"hat{i + 1}_{hatDir}", device.InstanceGuid);
                 }
             }
         }
@@ -285,5 +290,401 @@ public partial class SCBindingsTabController
         _scListening.ButtonBaseline = null;
         _scListening.HatBaseline = null;
         _scListening.BaselineFrames = 0;
+    }
+
+    // How long after the last detected button press to wait before committing the candidate.
+    // This covers multi-stage triggers (e.g. VIRPIL button4→button5): if a higher button
+    // follows within this window the candidate is updated to it before committing.
+    private const int CaptureDebounceMs = 80;
+
+    /// <summary>
+    /// Activates button capture mode: subscribes to the 500 Hz InputReceived event so that
+    /// the detection loop runs at full SDL2 polling rate rather than the 60 Hz UI timer.
+    /// Builds a snapshot of physical device GUIDs on the UI thread (safe to read _ctx.Devices),
+    /// then arms the background handler. SuppressForwarding is set immediately so no
+    /// inputs reach the game while capture is active.
+    /// </summary>
+    private void StartButtonCapture()
+    {
+        // Build GUID → HID path map on UI thread (safe here; background handler is read-only).
+        _captureGuidToHidPath = new Dictionary<Guid, string>();
+        for (int i = 0; i < _ctx.Devices.Count; i++)
+        {
+            var dev = _ctx.Devices[i];
+            if (!dev.IsVirtual && dev.IsConnected)
+                _captureGuidToHidPath[dev.InstanceGuid] = dev.HidDevicePath;
+        }
+
+        // Reset all detection state before subscribing.
+        _captureButtonBaseline = null;
+        _captureHatBaseline = null;
+        _capturePrevButtons = null;
+        _capturePrevHats = null;
+        _capturePendingModifierBg = null;
+        _captureCandidateInput = null;
+        _captureCandidatePath = null;
+        _captureCandidateDebounceUntil = default;
+        _captureWarmupUntil = DateTime.UtcNow + TimeSpan.FromMilliseconds(83); // ~5 frames @ 60 Hz
+
+        // Subscribe — arm the flag BEFORE adding the handler so the first event is never missed.
+        Interlocked.Exchange(ref _captureHandlerActive, 1);
+        _captureEventHandler = OnCaptureInputReceived;
+        _ctx.InputService.InputReceived += _captureEventHandler;
+
+        _ctx.SuppressForwarding = true;
+    }
+
+    /// <summary>
+    /// Deactivates button capture mode: signals the background handler to stop,
+    /// unsubscribes from InputReceived, clears all detection state, and re-enables forwarding.
+    /// Safe to call from the UI thread at any time (e.g. toggle-off click or Escape key).
+    /// </summary>
+    private void StopButtonCapture()
+    {
+        // Signal handler to stop before unsubscribing to close the race window.
+        Interlocked.Exchange(ref _captureHandlerActive, 0);
+        if (_captureEventHandler is not null)
+        {
+            _ctx.InputService.InputReceived -= _captureEventHandler;
+            _captureEventHandler = null;
+        }
+
+        // Clear detection state — safe now that the handler is detached.
+        _captureGuidToHidPath = null;
+        _captureButtonBaseline = null;
+        _captureHatBaseline = null;
+        _capturePrevButtons = null;
+        _capturePrevHats = null;
+        _capturePendingModifierBg = null;
+        _captureCandidateInput = null;
+        _captureCandidatePath = null;
+
+        // Clear search filter state.
+        _searchFilter.ButtonCaptureActive = false;
+        _searchFilter.CaptureWaitingForRelease = false;
+        _searchFilter.CaptureReleasePendingInput = null;
+        _ctx.SuppressForwarding = false;
+    }
+
+    /// <summary>
+    /// Button capture event handler — runs on the SDL2 background thread at ~500 Hz.
+    ///
+    /// Phase 1 — Warmup (~83 ms): both the ignore-baseline and previous-frame snapshot are
+    ///   refreshed on every event, absorbing any pass-through buttons pressed in this window.
+    /// Phase 2 — Detection with debounce: on each new-press transition the candidate is
+    ///   updated and the debounce window is extended by <see cref="CaptureDebounceMs"/>.
+    ///   Once the debounce window expires with no new presses, the final candidate is
+    ///   committed via BeginInvoke. This correctly handles multi-stage triggers where button N
+    ///   fires transiently on the way to button M — the last button pressed wins.
+    ///
+    /// Thread-safety: all detection dicts are written/read exclusively on this thread.
+    /// The only cross-thread operation is the Interlocked flag + BeginInvoke for the result.
+    /// </summary>
+    private void OnCaptureInputReceived(object? sender, DeviceInputState state)
+    {
+        // Quick gate (volatile read) — bail out if capture was cancelled.
+        if (_captureHandlerActive == 0) return;
+
+        // Only process physical devices we snapshotted at subscription time.
+        var guidMap = _captureGuidToHidPath;
+        if (guidMap is null || !guidMap.TryGetValue(state.InstanceGuid, out string? hidPath)) return;
+
+        var guid = state.InstanceGuid;
+        var now = DateTime.UtcNow;
+        bool inWarmup = now < _captureWarmupUntil;
+
+        // Lazily initialise dicts on the first event we receive.
+        _captureButtonBaseline ??= new Dictionary<Guid, bool[]>();
+        _captureHatBaseline ??= new Dictionary<Guid, int[]>();
+        _capturePrevButtons ??= new Dictionary<Guid, bool[]>();
+        _capturePrevHats ??= new Dictionary<Guid, int[]>();
+
+        if (inWarmup)
+        {
+            // Keep refreshing both dicts so any held button is absorbed into the baseline.
+            _captureButtonBaseline[guid] = (bool[])state.Buttons.Clone();
+            _captureHatBaseline[guid] = (int[])state.Hats.Clone();
+            _capturePrevButtons[guid] = (bool[])state.Buttons.Clone();
+            _capturePrevHats[guid] = (int[])state.Hats.Clone();
+            return;
+        }
+
+        // Debounce check: if a candidate was recorded and the window has elapsed, commit it.
+        if (_captureCandidateInput is not null && now >= _captureCandidateDebounceUntil)
+        {
+            string finalInput = _captureCandidateInput;
+            string? finalPath = _captureCandidatePath;
+            if (Interlocked.Exchange(ref _captureHandlerActive, 0) == 1)
+            {
+                _ctx.InputService.InputReceived -= _captureEventHandler;
+                _captureEventHandler = null;
+                _ctx.OwnerForm.BeginInvoke(() => ApplyButtonCaptureResult(finalInput, finalPath));
+            }
+            return;
+        }
+
+        // Detection phase.
+        _captureButtonBaseline.TryGetValue(guid, out var baseButtons);
+        _captureHatBaseline.TryGetValue(guid, out var baseHats);
+        _capturePrevButtons.TryGetValue(guid, out var prevButtons);
+        _capturePrevHats.TryGetValue(guid, out var prevHats);
+
+        bool detectedThisEvent = false;
+
+        // Buttons — scan all buttons; last new-press in this event wins the candidate.
+        for (int i = 0; i < state.Buttons.Length; i++)
+        {
+            bool inBaseline = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
+            if (inBaseline) continue;
+
+            bool wasPrev = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
+            if (!state.Buttons[i] || wasPrev) continue;
+
+            // New button press transition detected.
+            string buttonName = $"button{i + 1}";
+            var modKey = (guid, i);
+
+            if (_scModifierPhysicalButtons.Contains(modKey) && _capturePendingModifierBg is null)
+            {
+                // Modifier button — record which modifier and re-arm with a fresh warmup
+                // so the modifier hold is absorbed before the target button is detected.
+                _capturePendingModifierBg = _scModifierButtonToModifiers.TryGetValue(modKey, out var mods) && mods.Count > 0
+                    ? mods[0] : null;
+                _captureButtonBaseline = null;
+                _captureHatBaseline = null;
+                _capturePrevButtons = null;
+                _capturePrevHats = null;
+                _captureCandidateInput = null;
+                _captureCandidatePath = null;
+                _captureWarmupUntil = now + TimeSpan.FromMilliseconds(83);
+                return;
+            }
+
+            string modPrefix = _capturePendingModifierBg is not null
+                ? _capturePendingModifierBg + "+"
+                : GetHeldModifierPrefix();
+
+            // Update candidate and extend debounce. Continue iterating — if another button
+            // becomes newly active in the same event it also updates the candidate.
+            _captureCandidateInput = modPrefix + buttonName;
+            _captureCandidatePath = hidPath;
+            _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+            detectedThisEvent = true;
+        }
+
+        // Hats — only check if no button was already detected this event.
+        if (!detectedThisEvent)
+        {
+            for (int i = 0; i < state.Hats.Length; i++)
+            {
+                bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
+                if (hatInBaseline) continue;
+
+                int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
+                int currHat = state.Hats[i];
+
+                if (currHat >= 0 && prevHat < 0)
+                {
+                    string dir = GetHatDirection(HatAngleToDiscrete(currHat));
+                    string modPrefix = _capturePendingModifierBg is not null
+                        ? _capturePendingModifierBg + "+"
+                        : GetHeldModifierPrefix();
+                    _captureCandidateInput = modPrefix + $"hat{i + 1}_{dir}";
+                    _captureCandidatePath = hidPath;
+                    _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+                    break; // one hat direction per event
+                }
+            }
+        }
+
+        // Always update previous-frame snapshot for this device.
+        _capturePrevButtons![guid] = (bool[])state.Buttons.Clone();
+        _capturePrevHats![guid] = (int[])state.Hats.Clone();
+    }
+
+    /// <summary>
+    /// Returns the currently held keyboard modifier prefix (e.g. "lctrl+", "rshift+")
+    /// for composing a capture search string. Returns empty string if none are held.
+    /// Only one modifier is returned — the first one found in priority order.
+    /// </summary>
+    private static string GetHeldModifierPrefix()
+    {
+        if (IsKeyHeld(0xA2)) return "lctrl+";   // VK_LCONTROL
+        if (IsKeyHeld(0xA3)) return "rctrl+";   // VK_RCONTROL
+        if (IsKeyHeld(0xA0)) return "lshift+";  // VK_LSHIFT
+        if (IsKeyHeld(0xA1)) return "rshift+";  // VK_RSHIFT
+        if (IsKeyHeld(0xA4)) return "lalt+";    // VK_LMENU
+        if (IsKeyHeld(0xA5)) return "ralt+";    // VK_RMENU
+        return "";
+    }
+
+    private void ApplyButtonCaptureResult(string inputName, string? hidPath = null)
+    {
+        _searchFilter.ButtonCaptureActive = false;
+        // Clear controller-level detection state (handler already unsubscribed before posting this call).
+        _captureGuidToHidPath = null;
+        _captureButtonBaseline = null;
+        _captureHatBaseline = null;
+        _capturePrevButtons = null;
+        _capturePrevHats = null;
+        _capturePendingModifierBg = null;
+        _captureCandidateInput = null;
+        _captureCandidatePath = null;
+
+        // Keep SuppressForwarding=true until the captured button is physically released,
+        // then clear snapshots and resume. This prevents the held button from being
+        // forwarded to the remote machine the instant forwarding resumes.
+        string rawInput = inputName.Contains('+') ? inputName[(inputName.LastIndexOf('+') + 1)..] : inputName;
+        _searchFilter.CaptureReleasePendingInput = rawInput;
+        _searchFilter.CaptureReleaseWaitTicks = 0;
+        _searchFilter.CaptureWaitingForRelease = true;
+        // SuppressForwarding remains true — CheckCaptureRelease() clears it on release
+        _searchFilter.CaptureDeviceHidPath = hidPath;
+        _searchFilter.SearchText = inputName;
+        _searchFilter.ButtonCaptureTextActive = true;
+
+        // Highlight the column corresponding to the detected device (same as clicking the column header).
+        // Two cases:
+        //   - No vJoy setup: physical columns exist directly → match by HID path.
+        //   - vJoy setup (typical): physical devices route through vJoy. Find the vJoy column whose
+        //     primary physical device (from the active Mappings profile) matches the captured device.
+        if (hidPath is not null && _grid.Columns is not null)
+        {
+            int foundCol = -1;
+
+            // Case 1: physical column (no-vJoy setup)
+            for (int c = 0; c < _grid.Columns.Count; c++)
+            {
+                var col = _grid.Columns[c];
+                if (col.IsPhysical && col.PhysicalDevice!.HidDevicePath == hidPath)
+                {
+                    foundCol = c;
+                    break;
+                }
+            }
+
+            // Case 2: vJoy column — find via VJoyPrimaryDevices in the active Mappings profile
+            if (foundCol < 0)
+            {
+                var physDevice = _ctx.Devices.FirstOrDefault(d => !d.IsVirtual && d.HidDevicePath == hidPath);
+                var activeProfile = _ctx.ProfileManager.ActiveProfile;
+                if (physDevice is not null && activeProfile is not null)
+                {
+                    string physGuid = physDevice.InstanceGuid.ToString();
+                    foreach (var kv in activeProfile.VJoyPrimaryDevices)
+                    {
+                        if (!kv.Value.Equals(physGuid, StringComparison.OrdinalIgnoreCase)) continue;
+                        uint vjoyId = kv.Key;
+                        for (int c = 0; c < _grid.Columns.Count; c++)
+                        {
+                            var col = _grid.Columns[c];
+                            if (col.IsJoystick && !col.IsPhysical && col.VJoyDeviceId == vjoyId)
+                            {
+                                foundCol = c;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (foundCol >= 0)
+            {
+                _colImport.HighlightedColumn = foundCol;
+                _colImport.ProfileIndex = -1;
+                _colImport.ColumnIndex = -1;
+                _colImport.LoadedProfile = null;
+                _colImport.SourceColumns.Clear();
+            }
+        }
+
+        RefreshFilteredActions();
+        _ctx.MarkDirty();
+    }
+
+    // After capture, wait up to ~2 seconds (at ~60 Hz tick) for the button to be released
+    private const int CaptureReleaseTimeoutTicks = 120;
+    // Minimum ticks before polling for release — prevents same-frame or fast-tap false completion
+    private const int CaptureReleaseMinTicks = 3;
+
+    /// <summary>
+    /// Polls SDL2 after a button capture to detect when the captured button is physically released.
+    /// Once released, clears forwarding snapshots and re-enables forwarding so the button press
+    /// that was used for search is never sent to the remote machine.
+    /// </summary>
+    private void CheckCaptureRelease()
+    {
+        _searchFilter.CaptureReleaseWaitTicks++;
+
+        // Safety timeout — force-finish if device disconnects or state is unavailable
+        if (_searchFilter.CaptureReleaseWaitTicks > CaptureReleaseTimeoutTicks)
+        {
+            FinishCaptureRelease();
+            return;
+        }
+
+        // Minimum wait before polling — prevents false completion on a fast tap or same-frame evaluation
+        if (_searchFilter.CaptureReleaseWaitTicks < CaptureReleaseMinTicks)
+            return;
+
+        string? hidPath = _searchFilter.CaptureDeviceHidPath;
+        string? inputName = _searchFilter.CaptureReleasePendingInput;
+
+        // No device/input info — can't poll, keep waiting until timeout
+        if (hidPath is null || inputName is null)
+            return;
+
+        // Find device by HID path
+        int devIdx = -1;
+        for (int i = 0; i < _ctx.Devices.Count; i++)
+        {
+            if (!_ctx.Devices[i].IsVirtual && _ctx.Devices[i].HidDevicePath == hidPath)
+            {
+                devIdx = i;
+                break;
+            }
+        }
+
+        // Device not found — keep waiting until timeout
+        if (devIdx < 0)
+            return;
+
+        var state = _ctx.InputService.GetDeviceState(devIdx);
+
+        // State unavailable — keep waiting until timeout
+        if (state is null)
+            return;
+
+        // Check button still held
+        if (inputName.StartsWith("button", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(inputName["button".Length..], out int btnNum))
+        {
+            int idx = btnNum - 1;
+            if (idx >= 0 && idx < state.Buttons.Length && state.Buttons[idx])
+                return; // still held — keep waiting
+        }
+        // Check hat still active
+        else if (inputName.StartsWith("hat", StringComparison.OrdinalIgnoreCase))
+        {
+            int underscoreIdx = inputName.IndexOf('_');
+            if (underscoreIdx > 3 && int.TryParse(inputName[3..underscoreIdx], out int hatNum))
+            {
+                int idx = hatNum - 1;
+                if (idx >= 0 && idx < state.Hats.Length && state.Hats[idx] >= 0)
+                    return; // still active — keep waiting
+            }
+        }
+
+        FinishCaptureRelease();
+    }
+
+    private void FinishCaptureRelease()
+    {
+        _searchFilter.CaptureWaitingForRelease = false;
+        _searchFilter.CaptureReleasePendingInput = null;
+        _searchFilter.CaptureReleaseWaitTicks = 0;
+        _ctx.ClearForwardingSnapshots?.Invoke();
+        _ctx.SuppressForwarding = false;
     }
 }

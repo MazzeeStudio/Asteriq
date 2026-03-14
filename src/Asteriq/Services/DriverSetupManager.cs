@@ -38,7 +38,7 @@ public class DriverSetupManager
             using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\vjoy");
             if (key is not null)
             {
-                _logger.LogTrace("vJoy service found in registry");
+                _logger.LogInformation("vJoy detected: service key found at HKLM\\SYSTEM\\CurrentControlSet\\Services\\vjoy");
                 return true;
             }
 
@@ -50,7 +50,7 @@ public class DriverSetupManager
                 {
                     if (subKeyName.Contains("VID_1234&PID_BEAD", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger.LogTrace("vJoy device found in registry: {DeviceKey}", subKeyName);
+                        _logger.LogInformation("vJoy detected: device found in HIDCLASS registry: {DeviceKey}", subKeyName);
                         return true;
                     }
                 }

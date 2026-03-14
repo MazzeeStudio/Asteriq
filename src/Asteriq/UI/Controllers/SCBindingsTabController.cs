@@ -92,6 +92,24 @@ public partial class SCBindingsTabController : ITabController
     // Maps (InstanceGuid, 0-based buttonIndex) → list of SC modifier names (e.g. ["rctrl"])
     private Dictionary<(Guid DeviceGuid, int ButtonIndex), List<string>> _scModifierButtonToModifiers = new();
 
+    // ── Button capture — 500 Hz event subscription ───────────────────────────
+    // Delegate reference kept for unsubscription; null when capture is inactive.
+    private EventHandler<DeviceInputState>? _captureEventHandler;
+    // GUID → HID path for physical devices, built on UI thread at subscription time.
+    // Read-only on background thread. Null when capture is inactive.
+    private Dictionary<Guid, string>? _captureGuidToHidPath;
+    // Warmup/detection dicts — written and read exclusively on the background event-handler thread.
+    private Dictionary<Guid, bool[]>? _captureButtonBaseline;
+    private Dictionary<Guid, int[]>? _captureHatBaseline;
+    private Dictionary<Guid, bool[]>? _capturePrevButtons;
+    private Dictionary<Guid, int[]>? _capturePrevHats;
+    // Pending modifier name detected mid-capture (e.g. "rctrl"), set on bg thread.
+    private string? _capturePendingModifierBg;
+    // End of the warmup window. Events arriving before this time update baseline+previous.
+    private DateTime _captureWarmupUntil;
+    // Interlocked flag: 1 = handler processes events, 0 = inactive/cancelled.
+    private volatile int _captureHandlerActive;
+
     // Public properties for MainForm mouse dispatch
     public bool IsDraggingVScroll => _scroll.IsDraggingVScroll;
     public bool IsDraggingHScroll => _scroll.IsDraggingHScroll;
@@ -571,15 +589,7 @@ public partial class SCBindingsTabController : ITabController
         var key = keyData & Keys.KeyCode;
         if (_searchFilter.ButtonCaptureActive && key == Keys.Escape)
         {
-            _searchFilter.ButtonCaptureActive = false;
-            _searchFilter.CaptureButtonBaseline = null;
-            _searchFilter.CaptureHatBaseline = null;
-            _searchFilter.CapturePreviousButtons = null;
-            _searchFilter.CapturePreviousHats = null;
-            _searchFilter.CapturePendingModifier = null;
-            _searchFilter.CaptureWaitingForRelease = false;
-            _searchFilter.CaptureReleasePendingInput = null;
-            _ctx.SuppressForwarding = false;
+            StopButtonCapture();
             _ctx.MarkDirty();
             return true;
         }
@@ -601,9 +611,7 @@ public partial class SCBindingsTabController : ITabController
     {
         if (_scListening.IsListening)
             CheckSCBindingInput();
-        if (_searchFilter.ButtonCaptureActive)
-            CheckButtonCaptureInput();
-        else if (_searchFilter.CaptureWaitingForRelease)
+        if (_searchFilter.CaptureWaitingForRelease)
             CheckCaptureRelease();
     }
 
@@ -758,15 +766,6 @@ public partial class SCBindingsTabController : ITabController
         public bool ButtonCaptureActive;
         public bool ButtonCaptureHovered;
         public SKRect ButtonCaptureBounds;
-        // Initial button/hat state at the END of warmup — buttons present here are ignored entirely
-        public Dictionary<Guid, bool[]>? CaptureButtonBaseline;
-        public Dictionary<Guid, int[]>? CaptureHatBaseline;
-        // Previous-frame state for transition detection (new-press = was false last frame, true now)
-        public Dictionary<Guid, bool[]>? CapturePreviousButtons;
-        public Dictionary<Guid, int[]>? CapturePreviousHats;
-        public int CaptureBaselineFrames;
-        // Set when a physical modifier button is detected — wait for the target button next
-        public string? CapturePendingModifier;
         // HID path of the device whose button was captured — used to restrict search results
         public string? CaptureDeviceHidPath;
         // True when SearchText was filled by button capture — render as pill

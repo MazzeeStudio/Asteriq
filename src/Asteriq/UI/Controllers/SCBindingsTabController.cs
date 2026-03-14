@@ -107,6 +107,10 @@ public partial class SCBindingsTabController : ITabController
     private string? _capturePendingModifierBg;
     // End of the warmup window. Events arriving before this time update baseline+previous.
     private DateTime _captureWarmupUntil;
+    // Latest detected input candidate (updated on each new press; committed after debounce expires).
+    private string? _captureCandidateInput;
+    private string? _captureCandidatePath;
+    private DateTime _captureCandidateDebounceUntil;
     // Interlocked flag: 1 = handler processes events, 0 = inactive/cancelled.
     private volatile int _captureHandlerActive;
 

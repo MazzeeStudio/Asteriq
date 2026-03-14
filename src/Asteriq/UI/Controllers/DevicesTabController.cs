@@ -544,17 +544,16 @@ public class DevicesTabController : ITabController
         if (_devCat.Active == 0)
         {
             const float checkboxSize = 14f;
-            float rowY = bounds.Bottom - pad - 20;
-            float rowMidY = rowY + 5f;
-
+            const float checkboxH = checkboxSize;
+            float rowCenterY = bounds.Bottom - pad - 10f;
             float cbX = contentBounds.Left + pad;
-            float cbY = rowY - (checkboxSize - 10f) / 2f;
-            _showHiddenCheckboxBounds = new SKRect(cbX, cbY, cbX + checkboxSize, cbY + checkboxSize);
+            float cbY = rowCenterY - checkboxH / 2f;
+            _showHiddenCheckboxBounds = new SKRect(cbX, cbY, cbX + checkboxSize, cbY + checkboxH);
             bool cbHovered = _showHiddenCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
             FUIWidgets.DrawSCCheckbox(canvas, _showHiddenCheckboxBounds, _showHiddenDevices, cbHovered);
 
             float includeLabelX = cbX + checkboxSize + 5f;
-            FUIRenderer.DrawText(canvas, "Include hidden", new SKPoint(includeLabelX, rowMidY),
+            FUIRenderer.DrawText(canvas, "Include hidden", new SKPoint(includeLabelX, rowCenterY + 4f),
                 _showHiddenDevices ? FUIColors.Active : FUIColors.TextDim, 12f);
         }
         else
@@ -862,7 +861,7 @@ public class DevicesTabController : ITabController
                     float toggleHeight = 24f;
                     float toggleY = contentBounds.Bottom - pad - toggleHeight;
                     float toggleX = contentBounds.Right - pad - toggleWidth;
-                    float textY = toggleY + toggleHeight / 2f;
+                    float textY = toggleY + toggleHeight / 2f + 4f;
                     FUIRenderer.DrawText(canvas, "Hide Device",
                         new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextDim, 12f);
                     _actions.HideFromViewBounds = new SKRect(toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight);

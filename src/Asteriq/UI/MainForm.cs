@@ -347,6 +347,9 @@ public partial class MainForm : Form
         _tabContext.RemoveDisconnectedDevice = _mappingsController.RemoveDisconnectedDevicePublic;
         _tabContext.OpenMappingDialogForControl = _mappingsController.OpenMappingDialogForControlPublic;
 
+        // Wire up HidHide toggle (Settings panel calls into DevicesTabController logic)
+        _tabContext.ToggleHidHideForDevice = _devicesController.ToggleHidHideForDevicePublic;
+
         // Wire up network conflict check (delegated to SCBindingsTabController)
         _tabContext.CheckNetworkSwitchConflicts = _scBindingsController.CheckNetworkSwitchConflictsPublic;
 

@@ -297,6 +297,23 @@ public class ApplicationSettingsService : IApplicationSettingsService
         SaveSettings(_cachedSettings);
     }
 
+    public bool IsDeviceHidden(string instanceGuid) =>
+        _cachedSettings.HiddenDeviceGuids.Contains(instanceGuid);
+
+    public void SetDeviceHidden(string instanceGuid, bool hidden)
+    {
+        if (hidden)
+        {
+            if (!_cachedSettings.HiddenDeviceGuids.Contains(instanceGuid))
+                _cachedSettings.HiddenDeviceGuids.Add(instanceGuid);
+        }
+        else
+        {
+            _cachedSettings.HiddenDeviceGuids.Remove(instanceGuid);
+        }
+        SaveSettings(_cachedSettings);
+    }
+
     private AppSettings LoadSettings()
     {
         if (!File.Exists(_settingsFile))
@@ -364,6 +381,8 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public string NetworkMasterCode { get; set; } = "";
         /// <summary>Client-side: the trusted master peer. Null = no master trusted yet.</summary>
         public TrustedPeerConfig? TrustedMaster { get; set; }
+        /// <summary>SDL instance GUIDs of devices the user has hidden from the Devices list (UI preference only).</summary>
+        public List<string> HiddenDeviceGuids { get; set; } = new();
     }
 
     /// <summary>

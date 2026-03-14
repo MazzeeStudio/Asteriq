@@ -235,17 +235,26 @@ public partial class SCBindingsTabController
         FUIRenderer.DrawText(canvas, "Bound only", new SKPoint(boundOnlyLabelX, y + filterRowHeight / 2 + 4),
             showBoundOnly ? FUIColors.Active : FUIColors.TextDim, 13f);
 
-        // "Show JS ref" checkbox — 16px after "Bound only" label
+        // "Show JS ref" checkbox — hidden in client mode (JS ref is always the header in that context)
         float boundOnlyLabelW = FUIRenderer.MeasureText("Bound only", 13f);
-        float jsRefCheckboxX = boundOnlyLabelX + boundOnlyLabelW + 16f;
-        bool showJSRef = !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
-        _searchFilter.ShowJSRefBounds = new SKRect(jsRefCheckboxX, y + (filterRowHeight - checkboxSize) / 2,
-            jsRefCheckboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
-        _searchFilter.ShowJSRefHovered = _searchFilter.ShowJSRefBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawSCCheckbox(canvas, _searchFilter.ShowJSRefBounds, showJSRef, _searchFilter.ShowJSRefHovered);
-        float jsRefLabelX = jsRefCheckboxX + checkboxSize + 6f;
-        FUIRenderer.DrawText(canvas, "Show JS ref", new SKPoint(jsRefLabelX, y + filterRowHeight / 2 + 4),
-            showJSRef ? FUIColors.Active : FUIColors.TextDim, 13f);
+        bool isClientMode = _ctx.AppSettings.ClientOnlyMode;
+        bool showJSRef = isClientMode || !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+        if (!isClientMode)
+        {
+            float jsRefCheckboxX = boundOnlyLabelX + boundOnlyLabelW + 16f;
+            _searchFilter.ShowJSRefBounds = new SKRect(jsRefCheckboxX, y + (filterRowHeight - checkboxSize) / 2,
+                jsRefCheckboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
+            _searchFilter.ShowJSRefHovered = _searchFilter.ShowJSRefBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIWidgets.DrawSCCheckbox(canvas, _searchFilter.ShowJSRefBounds, showJSRef, _searchFilter.ShowJSRefHovered);
+            float jsRefLabelX = jsRefCheckboxX + checkboxSize + 6f;
+            FUIRenderer.DrawText(canvas, "Show JS ref", new SKPoint(jsRefLabelX, y + filterRowHeight / 2 + 4),
+                showJSRef ? FUIColors.Active : FUIColors.TextDim, 13f);
+        }
+        else
+        {
+            _searchFilter.ShowJSRefBounds = SKRect.Empty;
+            _searchFilter.ShowJSRefHovered = false;
+        }
 
         y += filterRowHeight + 12f;
 
@@ -334,12 +343,22 @@ public partial class SCBindingsTabController
 
                 if (col.IsReadOnly)
                 {
-                    // Read-only column: dimmed header + "NO DEVICE" sub-label
-                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
-                    float centeredX = colX + (colW - headerTextWidth) / 2;
-                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), FUIColors.TextDim, 12f, true);
-                    float subLabelWidth = FUIRenderer.MeasureText("NO DEVICE", 12f);
-                    FUIRenderer.DrawText(canvas, "NO DEVICE", new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.TextDim.WithAlpha(120), 12f);
+                    if (!isClientMode)
+                    {
+                        // Read-only column: dimmed header + "NO DEVICE" sub-label
+                        float headerTextWidth = FUIRenderer.MeasureText(col.Header, 12f);
+                        float centeredX = colX + (colW - headerTextWidth) / 2;
+                        FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), FUIColors.TextDim, 12f, true);
+                        float subLabelWidth = FUIRenderer.MeasureText("NO DEVICE", 12f);
+                        FUIRenderer.DrawText(canvas, "NO DEVICE", new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.TextDim.WithAlpha(120), 12f);
+                    }
+                    else
+                    {
+                        // In client mode show the JS reference cleanly without the "no device" warning
+                        string jsLabel = $"JS{col.SCInstance}";
+                        float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 12f);
+                        FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY), FUIColors.Active.WithAlpha(180), 12f);
+                    }
                 }
                 else if (col.IsPhysical)
                 {

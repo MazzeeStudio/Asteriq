@@ -12,6 +12,10 @@ public class DevicesTabController : ITabController
     // Device list hover/selection (local to this tab)
     private int _hoveredDevice = -1;
 
+    // Transient D1 filter state (not persisted)
+    private bool _showHiddenDevices;
+    private SKRect _showHiddenCheckboxBounds;
+
     // State groups
     private readonly DeviceCategoryState _devCat = new();
     private readonly DeviceDragState _drag = new();
@@ -130,9 +134,18 @@ public class DevicesTabController : ITabController
             _ctx.RemoveDisconnectedDevice?.Invoke();
             return;
         }
-        if (_actions.HideToggleHovered && !_actions.HideToggleBounds.IsEmpty)
+        if (_actions.HideFromViewHovered && !_actions.HideFromViewBounds.IsEmpty)
         {
-            ToggleDeviceHide();
+            ToggleHideFromView();
+            return;
+        }
+
+        // "Include hidden" checkbox (D1 bottom row)
+        if (!_showHiddenCheckboxBounds.IsEmpty && _showHiddenCheckboxBounds.Contains(e.X, e.Y))
+        {
+            _showHiddenDevices = !_showHiddenDevices;
+            EnsureVisibleDeviceSelected();
+            _ctx.MarkDirty();
             return;
         }
 
@@ -249,7 +262,8 @@ public class DevicesTabController : ITabController
             float itemGap = FUIRenderer.ItemSpacing;
 
             var filteredDevices = _devCat.Active == 0
-                ? _ctx.Devices.Where(d => !d.IsVirtual).ToList()
+                ? _ctx.Devices.Where(d => !d.IsVirtual &&
+                    (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))).ToList()
                 : _ctx.Devices.Where(d => d.IsVirtual).ToList();
 
             int filteredIndex = (int)((e.Y - itemY) / (itemHeight + itemGap));
@@ -274,11 +288,11 @@ public class DevicesTabController : ITabController
         _actions.Map1to1Hovered = !_actions.Map1to1Bounds.IsEmpty && _actions.Map1to1Bounds.Contains(e.X, e.Y);
         _actions.ClearMappingsHovered = !_actions.ClearMappingsBounds.IsEmpty && _actions.ClearMappingsBounds.Contains(e.X, e.Y);
         _actions.RemoveDeviceHovered = !_actions.RemoveDeviceBounds.IsEmpty && _actions.RemoveDeviceBounds.Contains(e.X, e.Y);
-        _actions.HideToggleHovered = !_actions.HideToggleBounds.IsEmpty && _actions.HideToggleBounds.Contains(e.X, e.Y);
+        _actions.HideFromViewHovered = !_actions.HideFromViewBounds.IsEmpty && _actions.HideFromViewBounds.Contains(e.X, e.Y);
         _silhouette.RemoveVJoyHovered = !_silhouette.RemoveVJoyBounds.IsEmpty && _silhouette.RemoveVJoyBounds.Contains(e.X, e.Y);
 
         if (_actions.Map1to1Hovered || _actions.ClearMappingsHovered || _actions.RemoveDeviceHovered ||
-            _actions.HideToggleHovered || _silhouette.RemoveVJoyHovered)
+            _actions.HideFromViewHovered || _silhouette.RemoveVJoyHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // Forwarding button hover detection
@@ -436,7 +450,8 @@ public class DevicesTabController : ITabController
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
         var filteredDevices = _devCat.Active == 0
-            ? _ctx.Devices.Where(d => !d.IsVirtual).ToList()
+            ? _ctx.Devices.Where(d => !d.IsVirtual &&
+                (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))).ToList()
             : _ctx.Devices.Where(d => d.IsVirtual).ToList();
 
         float itemY = contentBounds.Top + titleBarHeight + pad;
@@ -527,13 +542,26 @@ public class DevicesTabController : ITabController
             }
         }
 
-        float promptY = bounds.Bottom - pad - 20;
-        FUIRenderer.DrawText(canvas, "+ SCAN FOR DEVICES",
-            new SKPoint(contentBounds.Left + pad, promptY), FUIColors.TextDim, 15f);
+        // Bottom row: "Include hidden" checkbox (only when on physical devices tab)
+        if (_devCat.Active == 0)
+        {
+            const float checkboxSize = 14f;
+            const float checkboxH = checkboxSize;
+            float rowCenterY = bounds.Bottom - pad - 10f;
+            float cbX = contentBounds.Left + pad;
+            float cbY = rowCenterY - checkboxH / 2f;
+            _showHiddenCheckboxBounds = new SKRect(cbX, cbY, cbX + checkboxSize, cbY + checkboxH);
+            bool cbHovered = _showHiddenCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIWidgets.DrawSCCheckbox(canvas, _showHiddenCheckboxBounds, _showHiddenDevices, cbHovered);
 
-        using var bracketPaint = FUIRenderer.CreateStrokePaint(FUIColors.FrameDim);
-        canvas.DrawLine(contentBounds.Left + pad - 20, promptY - 10, contentBounds.Left + pad - 20, promptY + 5, bracketPaint);
-        canvas.DrawLine(contentBounds.Left + pad - 20, promptY - 10, contentBounds.Left + pad - 8, promptY - 10, bracketPaint);
+            float includeLabelX = cbX + checkboxSize + 5f;
+            FUIRenderer.DrawText(canvas, "Include hidden", new SKPoint(includeLabelX, rowCenterY + 4f),
+                _showHiddenDevices ? FUIColors.Active : FUIColors.TextDim, 12f);
+        }
+        else
+        {
+            _showHiddenCheckboxBounds = SKRect.Empty;
+        }
     }
 
     private void DrawDeviceCategorySideTabs(SKCanvas canvas, float x, float y, float width, float height)
@@ -828,35 +856,18 @@ public class DevicesTabController : ITabController
                     _actions.ClearMappingsBounds = SKRect.Empty;
                 }
 
-                // HidHide — hide/unhide toggle (extra gap to separate from action buttons above)
-                y += 16f;
-                if (_ctx.HidHide is not null && _ctx.DeviceMatching is not null && _ctx.HidHide.IsAvailable())
+                // Hide Device — Asteriq-level UI preference, bottom-anchored (separate from HidHide driver hiding)
                 {
-                    // Refresh cached hide state when device selection changes.
-                    // Match against GetHiddenDevices() via VID/PID so hidden devices are detected
-                    // even if they no longer appear in GetGamingDevices().
-                    if (_actions.CheckedDeviceGuid != device.InstanceGuid)
-                    {
-                        var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
-                        var pattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
-                        var hiddenPaths = _ctx.HidHide.GetHiddenDevices();
-                        _actions.IsHidden = pattern is not null &&
-                            hiddenPaths.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
-                        _actions.CheckedDeviceGuid = device.InstanceGuid;
-                    }
-
-                    float toggleWidth = 44f;
-                    float toggleHeight = 24f;
-                    float toggleX = contentBounds.Right - pad - toggleWidth;
-                    float textY = y + toggleHeight / 2f;
-                    FUIRenderer.DrawText(canvas, "HIDE",
-                        new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextDim, 12f);
-                    _actions.HideToggleBounds = new SKRect(toggleX, y, toggleX + toggleWidth, y + toggleHeight);
-                    FUIWidgets.DrawToggleSwitch(canvas, _actions.HideToggleBounds, _actions.IsHidden ? 1f : 0f, _ctx.MousePosition);
-                }
-                else
-                {
-                    _actions.HideToggleBounds = SKRect.Empty;
+                    bool isHiddenFromView = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
+                    const float cbSize = 14f;
+                    float rowCenterY = contentBounds.Bottom - pad - cbSize / 2f;
+                    float cbX = contentBounds.Right - pad - cbSize;
+                    float cbY = rowCenterY - cbSize / 2f;
+                    _actions.HideFromViewBounds = new SKRect(cbX, cbY, cbX + cbSize, cbY + cbSize);
+                    bool cbHovered = _actions.HideFromViewBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                    FUIRenderer.DrawText(canvas, "Hide Device",
+                        new SKPoint(contentBounds.Left + pad, rowCenterY + 4f), FUIColors.TextDim, 12f);
+                    FUIWidgets.DrawSCCheckbox(canvas, _actions.HideFromViewBounds, isHiddenFromView, cbHovered);
                 }
             }
         }
@@ -865,7 +876,7 @@ public class DevicesTabController : ITabController
             _actions.Map1to1Bounds = SKRect.Empty;
             _actions.ClearMappingsBounds = SKRect.Empty;
             _actions.RemoveDeviceBounds = SKRect.Empty;
-            _actions.HideToggleBounds = SKRect.Empty;
+            _actions.HideFromViewBounds = SKRect.Empty;
             _silhouette.RemoveVJoyBounds = SKRect.Empty;
 
             uint vjoyId = GetSelectedVJoyId();
@@ -947,7 +958,7 @@ public class DevicesTabController : ITabController
             _actions.Map1to1Bounds = SKRect.Empty;
             _actions.ClearMappingsBounds = SKRect.Empty;
             _actions.RemoveDeviceBounds = SKRect.Empty;
-            _actions.HideToggleBounds = SKRect.Empty;
+            _actions.HideFromViewBounds = SKRect.Empty;
             _silhouette.RemoveVJoyBounds = SKRect.Empty;
             _silhouette.PrevBounds = SKRect.Empty;
             _silhouette.NextBounds = SKRect.Empty;
@@ -1113,57 +1124,85 @@ public class DevicesTabController : ITabController
 
     #region vJoy Device Management
 
+    private void ToggleHideFromView()
+    {
+        if (_ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count) return;
+        var device = _ctx.Devices[_ctx.SelectedDevice];
+        bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
+        _ctx.AppSettings.SetDeviceHidden(device.InstanceGuid.ToString(), !currentlyHidden);
+        EnsureVisibleDeviceSelected();
+        _ctx.MarkDirty();
+    }
+
     /// <summary>
-    /// Toggles HidHide hiding for the currently selected physical device.
+    /// Ensures a visible physical device is selected whenever the visible list is non-empty.
+    /// Clears selection only when the visible list is genuinely empty.
+    /// </summary>
+    private void EnsureVisibleDeviceSelected()
+    {
+        var visible = _ctx.Devices
+            .Where(d => !d.IsVirtual &&
+                (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString())))
+            .ToList();
+
+        if (visible.Count == 0)
+        {
+            _ctx.SelectedDevice = -1;
+            return;
+        }
+
+        // If current selection is still in the visible list, keep it
+        if (_ctx.SelectedDevice >= 0 && _ctx.SelectedDevice < _ctx.Devices.Count)
+        {
+            var current = _ctx.Devices[_ctx.SelectedDevice];
+            if (visible.Contains(current)) return;
+        }
+
+        // Otherwise pick the first visible device
+        var first = visible[0];
+        _ctx.SelectedDevice = _ctx.Devices.IndexOf(first);
+        _ctx.LoadDeviceMapForDevice(first);
+    }
+
+    /// <summary>
+    /// Toggles HidHide driver hiding for the given physical device.
+    /// Called from both the Devices tab and the Settings → HidHide panel via TabContext callback.
     /// When hiding: enables cloaking, ensures Asteriq can see devices, whitelists SC executables.
     /// </summary>
-    private void ToggleDeviceHide()
+    public void ToggleHidHideForDevicePublic(PhysicalDeviceInfo device) => ToggleHidHideForDevice(device);
+
+    private void ToggleHidHideForDevice(PhysicalDeviceInfo device)
     {
         if (_ctx.HidHide is null || _ctx.DeviceMatching is null) return;
-        if (_ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count) return;
-
-        var device = _ctx.Devices[_ctx.SelectedDevice];
         var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
         var vidPidPattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
 
-        if (_actions.IsHidden)
+        // Determine current state directly from the service (no cached state needed)
+        var hiddenPaths = _ctx.HidHide.GetHiddenDevices();
+        bool isCurrentlyHidden = vidPidPattern is not null &&
+            hiddenPaths.Any(p => p.Contains(vidPidPattern, StringComparison.OrdinalIgnoreCase));
+
+        if (isCurrentlyHidden)
         {
-            // Unhide: filter the current hidden-device list by this device's VID/PID.
-            // This works even if GetGamingDevices() omits hidden devices.
-            var hiddenPaths = _ctx.HidHide.GetHiddenDevices();
             var toUnhide = vidPidPattern is not null
                 ? hiddenPaths.Where(p => p.Contains(vidPidPattern, StringComparison.OrdinalIgnoreCase)).ToList()
                 : new List<string>();
-
             foreach (var path in toUnhide)
                 _ctx.HidHide.UnhideDevice(path);
-
             UpdateSCWhitelist(isHiding: false);
         }
         else
         {
-            // Hide: query gaming devices to get the full instance path list
             var matches = _ctx.DeviceMatching.FindMatchingHidDevices(device);
             if (matches.Count == 0) return;
-
             foreach (var match in matches)
                 _ctx.HidHide.HideDevice(match.DeviceInstancePath);
-
             if (!_ctx.HidHide.IsCloakingEnabled())
                 _ctx.HidHide.EnableCloaking();
-
-            // Ensure Asteriq can still see hidden devices (handles both normal and inverse mode)
             _ctx.HidHide.EnsureSelfCanSeeDevices();
-
-            // Ensure SC executables are blocked from hidden devices (mode-aware)
             UpdateSCWhitelist(isHiding: true);
         }
 
-        // Refresh cached state using the same VID/PID-against-hidden-list approach
-        var newHiddenPaths = _ctx.HidHide.GetHiddenDevices();
-        _actions.IsHidden = vidPidPattern is not null &&
-            newHiddenPaths.Any(p => p.Contains(vidPidPattern, StringComparison.OrdinalIgnoreCase));
-        _actions.CheckedDeviceGuid = device.InstanceGuid;
         _ctx.MarkDirty();
     }
 
@@ -1526,11 +1565,8 @@ public class DevicesTabController : ITabController
         public bool ClearMappingsHovered;
         public SKRect RemoveDeviceBounds;
         public bool RemoveDeviceHovered;
-        public SKRect HideToggleBounds;
-        public bool HideToggleHovered;
-        // Cached hide state — refreshed when selected device changes
-        public bool IsHidden;
-        public Guid CheckedDeviceGuid;
+        public SKRect HideFromViewBounds;
+        public bool HideFromViewHovered;
     }
 
     private sealed class ForwardingButtonsState

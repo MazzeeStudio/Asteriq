@@ -1047,10 +1047,59 @@ public partial class SCBindingsTabController
     private bool HandleSearchBoxKey(Keys keyData)
     {
         var key = keyData & Keys.KeyCode;
+        bool ctrl = (keyData & Keys.Control) == Keys.Control;
 
         if (key == Keys.Escape)
         {
             _searchFilter.SearchBoxFocused = false;
+            return true;
+        }
+
+        // Clipboard operations
+        if (ctrl && key == Keys.C)
+        {
+            if (!string.IsNullOrEmpty(_searchFilter.SearchText))
+                Clipboard.SetText(_searchFilter.SearchText);
+            return true;
+        }
+
+        if (ctrl && key == Keys.X)
+        {
+            if (!string.IsNullOrEmpty(_searchFilter.SearchText))
+            {
+                Clipboard.SetText(_searchFilter.SearchText);
+                _searchFilter.SearchText = "";
+                _searchFilter.ButtonCaptureTextActive = false;
+                _searchFilter.CaptureDeviceHidPath = null;
+                RefreshFilteredActions();
+            }
+            return true;
+        }
+
+        if (ctrl && key == Keys.V)
+        {
+            if (Clipboard.ContainsText())
+            {
+                string pasted = Clipboard.GetText();
+                // Strip newlines, append up to field limit
+                pasted = pasted.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ').Trim();
+                _searchFilter.ButtonCaptureTextActive = false;
+                _searchFilter.CaptureDeviceHidPath = null;
+                int remaining = 50 - _searchFilter.SearchText.Length;
+                if (remaining > 0)
+                {
+                    _searchFilter.SearchText += pasted.Length > remaining ? pasted[..remaining] : pasted;
+                    RefreshFilteredActions();
+                }
+            }
+            return true;
+        }
+
+        if (ctrl && key == Keys.A)
+        {
+            // Select-all: copy the full text to clipboard as the closest equivalent
+            if (!string.IsNullOrEmpty(_searchFilter.SearchText))
+                Clipboard.SetText(_searchFilter.SearchText);
             return true;
         }
 

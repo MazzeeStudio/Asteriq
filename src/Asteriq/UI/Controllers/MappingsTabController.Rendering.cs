@@ -602,9 +602,12 @@ public partial class MappingsTabController
         // Show device silhouette - use primary device's map if available
         float centerX = bounds.MidX;
 
-        // Get the appropriate image based on primary device map
-        var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) ?? _ctx.JoystickSvg;
+        // Get the appropriate image based on primary device map.
+        // Resolve bitmap before applying the JoystickSvg fallback — otherwise bitmap-based maps never render.
+        var svg = _ctx.GetSvgForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap);
         var bitmap = svg is null ? _ctx.GetBitmapForDeviceMap?.Invoke(_ctx.MappingsPrimaryDeviceMap) : null;
+        if (svg is null && bitmap is null)
+            svg = _ctx.JoystickSvg;
         bool shouldMirror = _ctx.MappingsPrimaryDeviceMap?.Mirror ?? false;
 
         // Device name label at top of panel

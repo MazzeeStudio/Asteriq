@@ -154,6 +154,8 @@ public class TabContext
     public IHidHideService? HidHide { get; set; }
     public DeviceMatchingService? DeviceMatching { get; set; }
     public ISCInstallationService? SCInstallation { get; set; }
+    /// <summary>Toggle HidHide driver hiding for a specific physical device. Set by DevicesTabController.</summary>
+    public Action<PhysicalDeviceInfo>? ToggleHidHideForDevice { get; set; }
 
     public TabContext(
         IInputService inputService,

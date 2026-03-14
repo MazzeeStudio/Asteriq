@@ -131,6 +131,18 @@ public interface IApplicationSettingsService
     TrustedPeerConfig? TrustedMaster { get; set; }
 
     /// <summary>
+    /// Returns true if the device with the given SDL instance GUID has been hidden from the Devices list.
+    /// This is a UI-only preference and does not affect HidHide driver state.
+    /// </summary>
+    bool IsDeviceHidden(string instanceGuid);
+
+    /// <summary>
+    /// Show or hide a device from the Devices list by its SDL instance GUID.
+    /// Persisted across sessions.
+    /// </summary>
+    void SetDeviceHidden(string instanceGuid, bool hidden);
+
+    /// <summary>
     /// Get the user-specified silhouette override for a vJoy slot.
     /// Returns null if no override is set (auto-detect from physical device).
     /// The value is the device map filename key (e.g., "joystick", "throttle", "virpil_alpha_prime_r").

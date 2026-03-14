@@ -261,7 +261,8 @@ public class DevicesTabController : ITabController
             float itemGap = FUIRenderer.ItemSpacing;
 
             var filteredDevices = _devCat.Active == 0
-                ? _ctx.Devices.Where(d => !d.IsVirtual).ToList()
+                ? _ctx.Devices.Where(d => !d.IsVirtual &&
+                    (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))).ToList()
                 : _ctx.Devices.Where(d => d.IsVirtual).ToList();
 
             int filteredIndex = (int)((e.Y - itemY) / (itemHeight + itemGap));
@@ -1128,9 +1129,19 @@ public class DevicesTabController : ITabController
         var device = _ctx.Devices[_ctx.SelectedDevice];
         bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
         _ctx.AppSettings.SetDeviceHidden(device.InstanceGuid.ToString(), !currentlyHidden);
-        // If hiding the currently selected device, deselect it so the panel doesn't show stale info
+
+        // If hiding the selected device and it will no longer be visible, move selection to the next visible device
         if (!currentlyHidden && !_showHiddenDevices)
-            _ctx.SelectedDevice = -1;
+        {
+            var visibleDevices = _ctx.Devices
+                .Where(d => !d.IsVirtual && !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))
+                .ToList();
+            var next = visibleDevices.FirstOrDefault();
+            _ctx.SelectedDevice = next is not null ? _ctx.Devices.IndexOf(next) : -1;
+            if (next is not null)
+                _ctx.LoadDeviceMapForDevice(next);
+        }
+
         _ctx.MarkDirty();
     }
 

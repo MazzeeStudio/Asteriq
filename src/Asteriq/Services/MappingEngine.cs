@@ -184,6 +184,9 @@ public class MappingEngine : IMappingEngine
     {
         _isRunning = false;
 
+        // Release any keyboard keys that were held during forwarding
+        _keyboard.ReleaseAll();
+
         // Reset all vJoy devices
         var requiredDevices = GetRequiredVJoyDevices();
         foreach (var deviceId in requiredDevices)

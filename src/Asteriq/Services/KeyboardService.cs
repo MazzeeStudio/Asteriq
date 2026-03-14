@@ -93,11 +93,14 @@ public class KeyboardService : IDisposable
 
             if (pressed)
             {
-                // Press modifiers first
+                // Press modifiers first (track each so ReleaseAll can clean them up)
                 if (modifiers is not null)
                 {
                     foreach (var mod in modifiers)
+                    {
+                        _keyStates[mod] = true;
                         SendKey(mod, true);
+                    }
                 }
 
                 SendKey(virtualKeyCode, true);
@@ -106,11 +109,14 @@ public class KeyboardService : IDisposable
             {
                 SendKey(virtualKeyCode, false);
 
-                // Release modifiers
+                // Release modifiers and remove their tracking
                 if (modifiers is not null)
                 {
                     foreach (var mod in modifiers.Reverse())
+                    {
+                        _keyStates.Remove(mod);
                         SendKey(mod, false);
+                    }
                 }
             }
         }

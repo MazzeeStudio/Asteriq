@@ -22,6 +22,7 @@ public partial class MappingsTabController : ITabController
 
     // Mappings tab UI state - Left panel (output list)
     private int _selectedMappingRow = -1;
+    private bool _selectionIsExplicit = false; // true only when user explicitly clicked a row
     private int _hoveredMappingRow = -1;
 
     private SKRect _vjoyPrevButtonBounds;
@@ -286,6 +287,7 @@ public partial class MappingsTabController : ITabController
         {
             _mappingCategory = _hoveredMappingCategory;
             _selectedMappingRow = -1;
+            _selectionIsExplicit = false;
             _listScroll.ScrollOffset = 0;
             CancelInputListening();
             SelectFirstRowIfUnselected();
@@ -301,7 +303,7 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Add input button - toggles listening
-        if (_addInputButtonHovered && _selectedMappingRow >= 0)
+        if (_addInputButtonHovered && _selectedMappingRow >= 0 && _selectionIsExplicit)
         {
             if (_inputDetection.IsListening)
             {
@@ -315,14 +317,14 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Remove input source
-        if (_hoveredInputSourceRemove >= 0)
+        if (_hoveredInputSourceRemove >= 0 && _selectionIsExplicit)
         {
             RemoveInputSourceAtIndex(_hoveredInputSourceRemove);
             return;
         }
 
         // Right panel: Merge operation selection (axis category with 2+ inputs)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _hoveredMergeOpButton >= 0)
+        if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _selectionIsExplicit && _hoveredMergeOpButton >= 0)
         {
             UpdateMergeOperationForSelected(_hoveredMergeOpButton);
             return;
@@ -330,7 +332,7 @@ public partial class MappingsTabController : ITabController
 
         // Right panel: Button mode selection (button category) — blocked for modifier keys
         bool selectedIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _buttonMode.HoveredMode >= 0 && !selectedIsModifier)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _buttonMode.HoveredMode >= 0 && !selectedIsModifier)
         {
             _buttonMode.SelectedMode = (ButtonMode)_buttonMode.HoveredMode;
             UpdateButtonModeForSelected();
@@ -338,7 +340,7 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Pulse duration slider (button category, Pulse mode)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _buttonMode.SelectedMode == ButtonMode.Pulse)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _buttonMode.SelectedMode == ButtonMode.Pulse)
         {
             var pt = new SKPoint(e.X, e.Y);
             if (_buttonMode.PulseSliderBounds.Contains(pt))
@@ -350,7 +352,7 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Hold duration slider (button category, HoldToActivate mode)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _buttonMode.SelectedMode == ButtonMode.HoldToActivate)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _buttonMode.SelectedMode == ButtonMode.HoldToActivate)
         {
             var pt = new SKPoint(e.X, e.Y);
             if (_buttonMode.HoldSliderBounds.Contains(pt))
@@ -362,7 +364,7 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Output type selection (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _keyboardOutput.HoveredOutputType >= 0)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _keyboardOutput.HoveredOutputType >= 0)
         {
             _keyboardOutput.IsKeyboard = (_keyboardOutput.HoveredOutputType == 1);
             if (!_keyboardOutput.IsKeyboard)
@@ -374,14 +376,14 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Key clear button (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _keyboardOutput.IsKeyboard && _keyboardOutput.ClearHovered)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _keyboardOutput.IsKeyboard && _keyboardOutput.ClearHovered)
         {
             ClearKeyboardBinding();
             return;
         }
 
         // Right panel: Key capture field (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _keyboardOutput.IsKeyboard && _keyboardOutput.CaptureHovered)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _keyboardOutput.IsKeyboard && _keyboardOutput.CaptureHovered)
         {
             _keyboardOutput.IsCapturing = true;
             _keyboardOutput.CaptureStartTime = DateTime.Now;
@@ -389,14 +391,14 @@ public partial class MappingsTabController : ITabController
         }
 
         // Right panel: Clear Mapping button (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _clearAllButtonHovered)
+        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _clearAllButtonHovered)
         {
             ClearSelectedButtonMapping();
             return;
         }
 
         // Right panel: Axis settings - curve type selection (axis category)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0)
+        if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _selectionIsExplicit)
         {
             // Check curve preset clicks
             var pt = new SKPoint(e.X, e.Y);
@@ -459,6 +461,7 @@ public partial class MappingsTabController : ITabController
         {
             _ctx.SelectedVJoyDeviceIndex--;
             _selectedMappingRow = -1;
+            _selectionIsExplicit = false;
             _listScroll.ScrollOffset = 0;
             _highlight.ControlDef = null;
             CancelInputListening();
@@ -470,7 +473,7 @@ public partial class MappingsTabController : ITabController
         if (_vjoyNextHovered && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
         {
             _ctx.SelectedVJoyDeviceIndex++;
-            _selectedMappingRow = -1;
+            _selectionIsExplicit = false;
             _listScroll.ScrollOffset = 0;
             _highlight.ControlDef = null;
             CancelInputListening();
@@ -496,6 +499,7 @@ public partial class MappingsTabController : ITabController
             {
                 _selectedMappingRow = _hoveredMappingRow;
             }
+            _selectionIsExplicit = true;
             // Trigger silhouette highlight for the selected row
             _highlight.ControlDef = GetControlForRow(_selectedMappingRow);
             _highlight.ControlHighlightTime = DateTime.Now;
@@ -851,6 +855,7 @@ public partial class MappingsTabController : ITabController
         if (_selectedMappingRow >= 0) return;
         if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return;
         _selectedMappingRow = 0;
+        _selectionIsExplicit = false; // auto-selected — user has not explicitly chosen this row
         LoadOutputTypeStateForRow();
         LoadAxisSettingsForRow();
     }

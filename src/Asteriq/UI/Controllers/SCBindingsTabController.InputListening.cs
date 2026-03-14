@@ -292,144 +292,190 @@ public partial class SCBindingsTabController
         _scListening.BaselineFrames = 0;
     }
 
-    // Number of warmup frames before active detection starts.
-    // During warmup both the initial-ignore baseline AND the previous-frame snapshot are
-    // updated every frame — matching the InputDetectionService warmup pattern so that
-    // buttons pressed during this window (e.g. passing through button4 on a multi-stage
-    // trigger to reach button5) are absorbed and never fire as false detections.
-    private const int CaptureBaselineWarmupFrames = 5; // ~83 ms at 60 Hz
+    /// <summary>
+    /// Activates button capture mode: subscribes to the 500 Hz InputReceived event so that
+    /// the detection loop runs at full SDL2 polling rate rather than the 60 Hz UI timer.
+    /// Builds a snapshot of physical device GUIDs on the UI thread (safe to read _ctx.Devices),
+    /// then arms the background handler. SuppressForwarding is set immediately so no
+    /// inputs reach the game while capture is active.
+    /// </summary>
+    private void StartButtonCapture()
+    {
+        // Build GUID → HID path map on UI thread (safe here; background handler is read-only).
+        _captureGuidToHidPath = new Dictionary<Guid, string>();
+        for (int i = 0; i < _ctx.Devices.Count; i++)
+        {
+            var dev = _ctx.Devices[i];
+            if (!dev.IsVirtual && dev.IsConnected)
+                _captureGuidToHidPath[dev.InstanceGuid] = dev.HidDevicePath;
+        }
+
+        // Reset all detection state before subscribing.
+        _captureButtonBaseline = null;
+        _captureHatBaseline = null;
+        _capturePrevButtons = null;
+        _capturePrevHats = null;
+        _capturePendingModifierBg = null;
+        _captureWarmupUntil = DateTime.UtcNow + TimeSpan.FromMilliseconds(83); // ~5 frames @ 60 Hz
+
+        // Subscribe — arm the flag BEFORE adding the handler so the first event is never missed.
+        Interlocked.Exchange(ref _captureHandlerActive, 1);
+        _captureEventHandler = OnCaptureInputReceived;
+        _ctx.InputService.InputReceived += _captureEventHandler;
+
+        _ctx.SuppressForwarding = true;
+    }
 
     /// <summary>
-    /// Polls all physical devices for button/hat presses while button capture mode is active.
-    /// On first detected press, fills the search box and exits capture mode.
+    /// Deactivates button capture mode: signals the background handler to stop,
+    /// unsubscribes from InputReceived, clears all detection state, and re-enables forwarding.
+    /// Safe to call from the UI thread at any time (e.g. toggle-off click or Escape key).
+    /// </summary>
+    private void StopButtonCapture()
+    {
+        // Signal handler to stop before unsubscribing to close the race window.
+        Interlocked.Exchange(ref _captureHandlerActive, 0);
+        if (_captureEventHandler is not null)
+        {
+            _ctx.InputService.InputReceived -= _captureEventHandler;
+            _captureEventHandler = null;
+        }
+
+        // Clear detection state — safe now that the handler is detached.
+        _captureGuidToHidPath = null;
+        _captureButtonBaseline = null;
+        _captureHatBaseline = null;
+        _capturePrevButtons = null;
+        _capturePrevHats = null;
+        _capturePendingModifierBg = null;
+
+        // Clear search filter state.
+        _searchFilter.ButtonCaptureActive = false;
+        _searchFilter.CaptureWaitingForRelease = false;
+        _searchFilter.CaptureReleasePendingInput = null;
+        _ctx.SuppressForwarding = false;
+    }
+
+    /// <summary>
+    /// Button capture event handler — runs on the SDL2 background thread at ~500 Hz.
     ///
     /// Uses the same two-phase approach as <see cref="InputDetectionService"/>:
-    ///   Phase 1 (warmup): snapshot and continuously update both the ignore-baseline and the
-    ///     previous-frame state so pass-through buttons are absorbed before detection begins.
-    ///   Phase 2 (detection): only fires on a NEW transition — button was not pressed last
-    ///     frame AND is pressed now AND was not in the initial-ignore baseline.
+    ///   Warmup (~83 ms): both the ignore-baseline and previous-frame snapshot are refreshed
+    ///     on every event, absorbing any pass-through buttons pressed during this window.
+    ///   Detection: only fires on a NEW transition (not in baseline, was false last event,
+    ///     is true now). Posts the result to the UI thread via BeginInvoke.
+    ///
+    /// Thread-safety: all detection dicts are written/read exclusively on this thread.
+    /// The only cross-thread write is the Interlocked flag that gates the result post.
     /// </summary>
-    private void CheckButtonCaptureInput()
+    private void OnCaptureInputReceived(object? sender, DeviceInputState state)
     {
-        // First call: initialise both the ignore-baseline and the previous-frame state.
-        if (_searchFilter.CaptureButtonBaseline is null)
-        {
-            _searchFilter.CaptureButtonBaseline = new Dictionary<Guid, bool[]>();
-            _searchFilter.CaptureHatBaseline = new Dictionary<Guid, int[]>();
-            _searchFilter.CapturePreviousButtons = new Dictionary<Guid, bool[]>();
-            _searchFilter.CapturePreviousHats = new Dictionary<Guid, int[]>();
-            _searchFilter.CaptureBaselineFrames = 0;
+        // Quick gate (volatile read) — bail out if capture was cancelled.
+        if (_captureHandlerActive == 0) return;
 
-            for (int idx = 0; idx < _ctx.Devices.Count; idx++)
-            {
-                var device = _ctx.Devices[idx];
-                if (device.IsVirtual || !device.IsConnected) continue;
-                var state = _ctx.InputService.GetDeviceState(idx);
-                if (state is null) continue;
-                _searchFilter.CaptureButtonBaseline[device.InstanceGuid] = (bool[])state.Buttons.Clone();
-                _searchFilter.CaptureHatBaseline[device.InstanceGuid] = (int[])state.Hats.Clone();
-                _searchFilter.CapturePreviousButtons[device.InstanceGuid] = (bool[])state.Buttons.Clone();
-                _searchFilter.CapturePreviousHats[device.InstanceGuid] = (int[])state.Hats.Clone();
-            }
+        // Only process physical devices we snapshotted at subscription time.
+        var guidMap = _captureGuidToHidPath;
+        if (guidMap is null || !guidMap.TryGetValue(state.InstanceGuid, out string? hidPath)) return;
+
+        var guid = state.InstanceGuid;
+        bool inWarmup = DateTime.UtcNow < _captureWarmupUntil;
+
+        // Lazily initialise dicts on the first event we receive.
+        _captureButtonBaseline ??= new Dictionary<Guid, bool[]>();
+        _captureHatBaseline ??= new Dictionary<Guid, int[]>();
+        _capturePrevButtons ??= new Dictionary<Guid, bool[]>();
+        _capturePrevHats ??= new Dictionary<Guid, int[]>();
+
+        if (inWarmup)
+        {
+            // Keep refreshing both dicts so any held button is absorbed into the baseline.
+            _captureButtonBaseline[guid] = (bool[])state.Buttons.Clone();
+            _captureHatBaseline[guid] = (int[])state.Hats.Clone();
+            _capturePrevButtons[guid] = (bool[])state.Buttons.Clone();
+            _capturePrevHats[guid] = (int[])state.Hats.Clone();
             return;
         }
 
-        _searchFilter.CaptureBaselineFrames++;
+        // Detection phase.
+        _captureButtonBaseline.TryGetValue(guid, out var baseButtons);
+        _captureHatBaseline.TryGetValue(guid, out var baseHats);
+        _capturePrevButtons.TryGetValue(guid, out var prevButtons);
+        _capturePrevHats.TryGetValue(guid, out var prevHats);
 
-        // Warmup phase: keep refreshing both dictionaries so any button that is active
-        // during this window lands in the ignore-baseline and won't trigger detection.
-        if (_searchFilter.CaptureBaselineFrames < CaptureBaselineWarmupFrames)
+        // Buttons
+        for (int i = 0; i < state.Buttons.Length; i++)
         {
-            for (int idx = 0; idx < _ctx.Devices.Count; idx++)
+            bool inBaseline = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
+            if (inBaseline) continue;
+
+            bool wasPrev = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
+            if (!state.Buttons[i] || wasPrev) continue;
+
+            // New button press detected.
+            string buttonName = $"button{i + 1}";
+            var modKey = (guid, i);
+
+            if (_scModifierPhysicalButtons.Contains(modKey) && _capturePendingModifierBg is null)
             {
-                var device = _ctx.Devices[idx];
-                if (device.IsVirtual || !device.IsConnected) continue;
-                var state = _ctx.InputService.GetDeviceState(idx);
-                if (state is null) continue;
-                _searchFilter.CaptureButtonBaseline[device.InstanceGuid] = (bool[])state.Buttons.Clone();
-                _searchFilter.CaptureHatBaseline![device.InstanceGuid] = (int[])state.Hats.Clone();
-                _searchFilter.CapturePreviousButtons![device.InstanceGuid] = (bool[])state.Buttons.Clone();
-                _searchFilter.CapturePreviousHats![device.InstanceGuid] = (int[])state.Hats.Clone();
-            }
-            return;
-        }
-
-        // Detection phase: transition-based — only fire on buttons that were NOT pressed
-        // last frame and are NOT in the ignore-baseline.
-        for (int idx = 0; idx < _ctx.Devices.Count; idx++)
-        {
-            var device = _ctx.Devices[idx];
-            if (device.IsVirtual || !device.IsConnected) continue;
-            var state = _ctx.InputService.GetDeviceState(idx);
-            if (state is null) continue;
-
-            _searchFilter.CaptureButtonBaseline.TryGetValue(device.InstanceGuid, out var baseButtons);
-            _searchFilter.CaptureHatBaseline!.TryGetValue(device.InstanceGuid, out var baseHats);
-            _searchFilter.CapturePreviousButtons!.TryGetValue(device.InstanceGuid, out var prevButtons);
-            _searchFilter.CapturePreviousHats!.TryGetValue(device.InstanceGuid, out var prevHats);
-
-            // Buttons
-            for (int i = 0; i < state.Buttons.Length; i++)
-            {
-                // Ignore buttons that were already active at the end of warmup
-                bool inBaseline = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
-                if (inBaseline) continue;
-
-                // Only fire on the NEW-press transition (was not pressed last frame)
-                bool wasPressedLastFrame = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
-                if (!state.Buttons[i] || wasPressedLastFrame) continue;
-
-                string buttonName = $"button{i + 1}";
-                var modKey = (device.InstanceGuid, i);
-
-                // If this (device, button) pair maps to a keyboard modifier, record it and
-                // re-baseline so the modifier press is absorbed before the target is detected.
-                if (_scModifierPhysicalButtons.Contains(modKey) && _searchFilter.CapturePendingModifier is null)
-                {
-                    _searchFilter.CapturePendingModifier = _scModifierButtonToModifiers.TryGetValue(modKey, out var mods) && mods.Count > 0
-                        ? mods[0] : null;
-                    _searchFilter.CaptureButtonBaseline = null;
-                    _searchFilter.CaptureHatBaseline = null;
-                    _searchFilter.CapturePreviousButtons = null;
-                    _searchFilter.CapturePreviousHats = null;
-                    _searchFilter.CaptureBaselineFrames = 0;
-                    _ctx.MarkDirty();
-                    return;
-                }
-
-                string modPrefix = _searchFilter.CapturePendingModifier is not null
-                    ? _searchFilter.CapturePendingModifier + "+"
-                    : GetHeldModifierPrefix();
-                ApplyButtonCaptureResult(modPrefix + buttonName, device.HidDevicePath);
+                // Modifier button — record which modifier and re-arm with a fresh warmup
+                // so the modifier hold is absorbed before the target button is detected.
+                _capturePendingModifierBg = _scModifierButtonToModifiers.TryGetValue(modKey, out var mods) && mods.Count > 0
+                    ? mods[0] : null;
+                _captureButtonBaseline = null;
+                _captureHatBaseline = null;
+                _capturePrevButtons = null;
+                _capturePrevHats = null;
+                _captureWarmupUntil = DateTime.UtcNow + TimeSpan.FromMilliseconds(83);
                 return;
             }
 
-            // Hats
-            for (int i = 0; i < state.Hats.Length; i++)
+            string modPrefix = _capturePendingModifierBg is not null
+                ? _capturePendingModifierBg + "+"
+                : GetHeldModifierPrefix();
+            string inputName = modPrefix + buttonName;
+
+            // Win the race and post result to UI thread.
+            if (Interlocked.Exchange(ref _captureHandlerActive, 0) == 1)
             {
-                bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
-                if (hatInBaseline) continue;
-
-                int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
-                int currHat = state.Hats[i];
-
-                // New hat transition: was centred (or unknown) last frame, now has direction
-                if (currHat >= 0 && prevHat < 0)
-                {
-                    string dir = GetHatDirection(HatAngleToDiscrete(currHat));
-                    string modPrefix = _searchFilter.CapturePendingModifier is not null
-                        ? _searchFilter.CapturePendingModifier + "+"
-                        : GetHeldModifierPrefix();
-                    ApplyButtonCaptureResult(modPrefix + $"hat{i + 1}_{dir}", device.HidDevicePath);
-                    return;
-                }
+                _ctx.InputService.InputReceived -= _captureEventHandler;
+                _captureEventHandler = null;
+                string capturedPath = hidPath;
+                _ctx.OwnerForm.BeginInvoke(() => ApplyButtonCaptureResult(inputName, capturedPath));
             }
-
-            // No detection for this device this frame — update the previous-frame snapshot
-            // so that buttons held from a previous frame do not re-trigger as new presses.
-            _searchFilter.CapturePreviousButtons![device.InstanceGuid] = (bool[])state.Buttons.Clone();
-            _searchFilter.CapturePreviousHats![device.InstanceGuid] = (int[])state.Hats.Clone();
+            return;
         }
+
+        // Hats
+        for (int i = 0; i < state.Hats.Length; i++)
+        {
+            bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
+            if (hatInBaseline) continue;
+
+            int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
+            int currHat = state.Hats[i];
+
+            if (currHat >= 0 && prevHat < 0)
+            {
+                string dir = GetHatDirection(HatAngleToDiscrete(currHat));
+                string modPrefix = _capturePendingModifierBg is not null
+                    ? _capturePendingModifierBg + "+"
+                    : GetHeldModifierPrefix();
+                string inputName = modPrefix + $"hat{i + 1}_{dir}";
+
+                if (Interlocked.Exchange(ref _captureHandlerActive, 0) == 1)
+                {
+                    _ctx.InputService.InputReceived -= _captureEventHandler;
+                    _captureEventHandler = null;
+                    string capturedPath = hidPath;
+                    _ctx.OwnerForm.BeginInvoke(() => ApplyButtonCaptureResult(inputName, capturedPath));
+                }
+                return;
+            }
+        }
+
+        // No detection this event — update previous-frame snapshot for this device.
+        _capturePrevButtons![guid] = (bool[])state.Buttons.Clone();
+        _capturePrevHats![guid] = (int[])state.Hats.Clone();
     }
 
     /// <summary>
@@ -451,9 +497,13 @@ public partial class SCBindingsTabController
     private void ApplyButtonCaptureResult(string inputName, string? hidPath = null)
     {
         _searchFilter.ButtonCaptureActive = false;
-        _searchFilter.CaptureButtonBaseline = null;
-        _searchFilter.CaptureHatBaseline = null;
-        _searchFilter.CapturePendingModifier = null;
+        // Clear controller-level detection state (handler already unsubscribed before posting this call).
+        _captureGuidToHidPath = null;
+        _captureButtonBaseline = null;
+        _captureHatBaseline = null;
+        _capturePrevButtons = null;
+        _capturePrevHats = null;
+        _capturePendingModifierBg = null;
 
         // Keep SuppressForwarding=true until the captured button is physically released,
         // then clear snapshots and resume. This prevents the held button from being

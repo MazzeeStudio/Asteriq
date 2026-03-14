@@ -462,21 +462,12 @@ public partial class SCBindingsTabController
             _searchFilter.ButtonCaptureActive = !_searchFilter.ButtonCaptureActive;
             if (_searchFilter.ButtonCaptureActive)
             {
-                // Enter capture mode — reset all capture state so detection starts fresh
-                _searchFilter.CaptureButtonBaseline = null;
-                _searchFilter.CaptureHatBaseline = null;
-                _searchFilter.CapturePreviousButtons = null;
-                _searchFilter.CapturePreviousHats = null;
-                _searchFilter.CaptureBaselineFrames = 0;
-                _searchFilter.CapturePendingModifier = null;
+                StartButtonCapture();
                 _searchFilter.SearchBoxFocused = false;
-                _ctx.SuppressForwarding = true;
             }
             else
             {
-                _searchFilter.CaptureWaitingForRelease = false;
-                _searchFilter.CaptureReleasePendingInput = null;
-                _ctx.SuppressForwarding = false;
+                StopButtonCapture();
             }
             _scInstall.DropdownOpen = false;
             _searchFilter.FilterDropdownOpen = false;

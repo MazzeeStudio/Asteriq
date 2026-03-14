@@ -462,9 +462,11 @@ public partial class SCBindingsTabController
             _searchFilter.ButtonCaptureActive = !_searchFilter.ButtonCaptureActive;
             if (_searchFilter.ButtonCaptureActive)
             {
-                // Enter capture mode — reset baseline so detection starts fresh
+                // Enter capture mode — reset all capture state so detection starts fresh
                 _searchFilter.CaptureButtonBaseline = null;
                 _searchFilter.CaptureHatBaseline = null;
+                _searchFilter.CapturePreviousButtons = null;
+                _searchFilter.CapturePreviousHats = null;
                 _searchFilter.CaptureBaselineFrames = 0;
                 _searchFilter.CapturePendingModifier = null;
                 _searchFilter.SearchBoxFocused = false;

@@ -574,6 +574,8 @@ public partial class SCBindingsTabController : ITabController
             _searchFilter.ButtonCaptureActive = false;
             _searchFilter.CaptureButtonBaseline = null;
             _searchFilter.CaptureHatBaseline = null;
+            _searchFilter.CapturePreviousButtons = null;
+            _searchFilter.CapturePreviousHats = null;
             _searchFilter.CapturePendingModifier = null;
             _searchFilter.CaptureWaitingForRelease = false;
             _searchFilter.CaptureReleasePendingInput = null;
@@ -601,7 +603,7 @@ public partial class SCBindingsTabController : ITabController
             CheckSCBindingInput();
         if (_searchFilter.ButtonCaptureActive)
             CheckButtonCaptureInput();
-        if (_searchFilter.CaptureWaitingForRelease)
+        else if (_searchFilter.CaptureWaitingForRelease)
             CheckCaptureRelease();
     }
 
@@ -756,8 +758,12 @@ public partial class SCBindingsTabController : ITabController
         public bool ButtonCaptureActive;
         public bool ButtonCaptureHovered;
         public SKRect ButtonCaptureBounds;
+        // Initial button/hat state at the END of warmup — buttons present here are ignored entirely
         public Dictionary<Guid, bool[]>? CaptureButtonBaseline;
         public Dictionary<Guid, int[]>? CaptureHatBaseline;
+        // Previous-frame state for transition detection (new-press = was false last frame, true now)
+        public Dictionary<Guid, bool[]>? CapturePreviousButtons;
+        public Dictionary<Guid, int[]>? CapturePreviousHats;
         public int CaptureBaselineFrames;
         // Set when a physical modifier button is detected — wait for the target button next
         public string? CapturePendingModifier;

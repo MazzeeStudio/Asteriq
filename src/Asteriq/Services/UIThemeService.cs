@@ -98,7 +98,7 @@ public class UIThemeService : IUIThemeService
 
     private class ThemeSettings
     {
-        public FUITheme Theme { get; set; } = FUITheme.Midnight;
+        public FUITheme Theme { get; set; } = FUITheme.Drake;
         public int GridStrength { get; set; } = 30;
         public int GlowIntensity { get; set; } = 80;
         public int NoiseIntensity { get; set; } = 15;

@@ -540,18 +540,14 @@ public class DevicesTabController : ITabController
             }
         }
 
-        // Bottom row: "SHOW ALL DEVICES" label + "Include hidden" checkbox (only when on physical devices tab)
+        // Bottom row: "Include hidden" checkbox (only when on physical devices tab)
         if (_devCat.Active == 0)
         {
             const float checkboxSize = 14f;
             float rowY = bounds.Bottom - pad - 20;
             float rowMidY = rowY + 5f;
 
-            FUIRenderer.DrawText(canvas, "SHOW ALL DEVICES",
-                new SKPoint(contentBounds.Left + pad, rowMidY), FUIColors.TextDim, 13f);
-
-            float labelW = FUIRenderer.MeasureText("SHOW ALL DEVICES", 13f);
-            float cbX = contentBounds.Left + pad + labelW + 12f;
+            float cbX = contentBounds.Left + pad;
             float cbY = rowY - (checkboxSize - 10f) / 2f;
             _showHiddenCheckboxBounds = new SKRect(cbX, cbY, cbX + checkboxSize, cbY + checkboxSize);
             bool cbHovered = _showHiddenCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
@@ -859,17 +855,17 @@ public class DevicesTabController : ITabController
                     _actions.ClearMappingsBounds = SKRect.Empty;
                 }
 
-                // Hide device from view — Asteriq-level UI preference (separate from HidHide driver hiding)
-                y += 16f;
+                // Hide Device — Asteriq-level UI preference, bottom-anchored (separate from HidHide driver hiding)
                 {
                     bool isHiddenFromView = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
                     float toggleWidth = 44f;
                     float toggleHeight = 24f;
+                    float toggleY = contentBounds.Bottom - pad - toggleHeight;
                     float toggleX = contentBounds.Right - pad - toggleWidth;
-                    float textY = y + toggleHeight / 2f;
-                    FUIRenderer.DrawText(canvas, "Hide from view",
+                    float textY = toggleY + toggleHeight / 2f;
+                    FUIRenderer.DrawText(canvas, "Hide Device",
                         new SKPoint(contentBounds.Left + pad, textY), FUIColors.TextDim, 12f);
-                    _actions.HideFromViewBounds = new SKRect(toggleX, y, toggleX + toggleWidth, y + toggleHeight);
+                    _actions.HideFromViewBounds = new SKRect(toggleX, toggleY, toggleX + toggleWidth, toggleY + toggleHeight);
                     FUIWidgets.DrawToggleSwitch(canvas, _actions.HideFromViewBounds, isHiddenFromView ? 1f : 0f, _ctx.MousePosition);
                 }
             }

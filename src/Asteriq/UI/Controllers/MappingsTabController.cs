@@ -285,9 +285,10 @@ public partial class MappingsTabController : ITabController
         if (_hoveredMappingCategory >= 0)
         {
             _mappingCategory = _hoveredMappingCategory;
-            _selectedMappingRow = -1; // Reset selection when switching categories
-            _listScroll.ScrollOffset = 0; // Reset scroll when switching categories
+            _selectedMappingRow = -1;
+            _listScroll.ScrollOffset = 0;
             CancelInputListening();
+            SelectFirstRowIfUnselected();
             return;
         }
 
@@ -458,10 +459,11 @@ public partial class MappingsTabController : ITabController
         {
             _ctx.SelectedVJoyDeviceIndex--;
             _selectedMappingRow = -1;
-            _listScroll.ScrollOffset = 0; // Reset scroll when changing device
-            _highlight.ControlDef = null; // Clear silhouette lead line for previous device
+            _listScroll.ScrollOffset = 0;
+            _highlight.ControlDef = null;
             CancelInputListening();
             _ctx.UpdateMappingsPrimaryDeviceMap();
+            SelectFirstRowIfUnselected();
             _ctx.MarkDirty();
             return;
         }
@@ -469,10 +471,11 @@ public partial class MappingsTabController : ITabController
         {
             _ctx.SelectedVJoyDeviceIndex++;
             _selectedMappingRow = -1;
-            _listScroll.ScrollOffset = 0; // Reset scroll when changing device
-            _highlight.ControlDef = null; // Clear silhouette lead line for previous device
+            _listScroll.ScrollOffset = 0;
+            _highlight.ControlDef = null;
             CancelInputListening();
             _ctx.UpdateMappingsPrimaryDeviceMap();
+            SelectFirstRowIfUnselected();
             _ctx.MarkDirty();
             return;
         }
@@ -840,6 +843,16 @@ public partial class MappingsTabController : ITabController
         _highlight.Debounce.Clear();
         _highlight.Row = -1;
         _ctx.UpdateMappingsPrimaryDeviceMap();
+        SelectFirstRowIfUnselected();
+    }
+
+    private void SelectFirstRowIfUnselected()
+    {
+        if (_selectedMappingRow >= 0) return;
+        if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return;
+        _selectedMappingRow = 0;
+        LoadOutputTypeStateForRow();
+        LoadAxisSettingsForRow();
     }
 
     public void OnDeactivated()

@@ -93,6 +93,8 @@ public class SettingsTabController : ITabController, IDisposable
     private HidHideInstallPhase _hidHideInstallPhase;
     private int _hidHideDownloadProgress;
     private CancellationTokenSource? _hidHideDownloadCts;
+    // Per-device HidHide toggle rows in the Settings panel
+    private readonly List<(SKRect Bounds, PhysicalDeviceInfo Device)> _hidHideDeviceToggleBounds = new();
 
     private enum HidHideInstallPhase { Idle, Downloading, Launching, Error }
 
@@ -522,7 +524,7 @@ public class SettingsTabController : ITabController, IDisposable
 
         // HidHide status row + DRIVER SETUP button
         {
-            string hidHideStatusStr = driverStatus.HidHideInstalled ? "Available" : "Not installed";
+            string hidHideStatusStr = driverStatus.HidHideInstalled ? "Driver active" : "Not installed";
             var hidHideColor = driverStatus.HidHideInstalled ? FUIColors.Success : FUIColors.Warning;
             float dotY = y + (statusLineHeight / 2);
             float textY = y + (statusLineHeight / 2) + 4;
@@ -789,7 +791,7 @@ public class SettingsTabController : ITabController, IDisposable
             StoreThemeButtonBounds(8 + i, themeBounds);
             FUIWidgets.DrawThemeButton(canvas, themeBounds, mfrNames2[i], mfrColors2[i], FUIColors.CurrentTheme == mfrThemes2[i], _ctx.MousePosition);
         }
-        y += themeBtnHeight + 14f;
+        y += themeBtnHeight + 20f;
 
         // ── Colour Palette preview ─────────────────────────────────────────
         FUIRenderer.DrawText(canvas, "PALETTE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -847,10 +849,10 @@ public class SettingsTabController : ITabController, IDisposable
                 new SKPoint(sx + swatchW / 2f - lblW / 2f, rect.Bottom - 2f),
                 new SKColor(0xFF, 0xFF, 0xFF, 200), 9f);
         }
-        y += swatchH + sectionSpacing;
+        y += swatchH + 20f;
         // ── end palette ────────────────────────────────────────────────────
 
-        // Background effects section — directly below themes
+        // Background effects section
         FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         y += sectionSpacing + 8;
 
@@ -1239,6 +1241,37 @@ public class SettingsTabController : ITabController, IDisposable
             : "Whitelisted apps can see devices.";
         FUIRenderer.DrawText(canvas, descText, new SKPoint(leftMargin, y + 4f),
             FUIColors.TextDim.WithAlpha(160), 11f);
+        y += 20f + sectionGap;
+
+        // Per-device HidHide toggle rows
+        var physicalDevices = _ctx.Devices.Where(d => !d.IsVirtual && d.IsConnected).ToList();
+        _hidHideDeviceToggleBounds.Clear();
+        if (physicalDevices.Count > 0)
+        {
+            FUIRenderer.DrawText(canvas, "DEVICE HIDING", new SKPoint(leftMargin, y + 4f),
+                FUIColors.TextDim, 11f);
+            y += rowH;
+
+            var hiddenPaths = _ctx.HidHide!.GetHiddenDevices();
+            foreach (var device in physicalDevices)
+            {
+                var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+                var pattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
+                bool isHidden = pattern is not null &&
+                    hiddenPaths.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+
+                string shortName = device.Name.Length > 22
+                    ? string.Concat(device.Name.AsSpan(0, 20), "..") : device.Name;
+                FUIRenderer.DrawTextTruncated(canvas, shortName,
+                    new SKPoint(leftMargin, y + rowH / 2f + 4f),
+                    rightMargin - leftMargin - toggleW - 8f, FUIColors.TextPrimary, 12f);
+
+                var tBounds = new SKRect(rightMargin - toggleW, y, rightMargin, y + rowH);
+                FUIWidgets.DrawToggleSwitch(canvas, tBounds, isHidden ? 1f : 0f, _ctx.MousePosition);
+                _hidHideDeviceToggleBounds.Add((tBounds, device));
+                y += rowH + 4f;
+            }
+        }
 
         canvas.Restore();
     }
@@ -1417,7 +1450,7 @@ public class SettingsTabController : ITabController, IDisposable
                     bool thisConnected = netMode == NetworkInputMode.Remote && connectedIp == p.IpAddress;
                     var pColor = thisConnected ? FUIColors.Active
                                : p.IsStale    ? FUIColors.TextDim : FUIColors.TextPrimary;
-                    string peerLabel = $"  {p.MachineName}  {p.IpAddress}";
+                    string peerLabel = $"{p.MachineName}  {p.IpAddress}";
 
                     float tglY = y + (rowH - btnH) / 2f;
                     var toggleRect = new SKRect(rightMargin - toggleW, tglY, rightMargin, tglY + btnH);
@@ -1678,6 +1711,16 @@ public class SettingsTabController : ITabController, IDisposable
                     _ctx.HidHide.DisableInverseMode();
                 _ctx.InvalidateCanvas();
                 return;
+            }
+
+            // Per-device HidHide toggle rows
+            foreach (var (bounds, device) in _hidHideDeviceToggleBounds)
+            {
+                if (bounds.Contains(pt))
+                {
+                    _ctx.ToggleHidHideForDevice?.Invoke(device);
+                    return;
+                }
             }
         }
 

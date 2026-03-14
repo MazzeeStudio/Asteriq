@@ -1620,7 +1620,7 @@ public partial class MainForm : Form
         }
 
         // ── Local forwarding — process through MappingEngine ─────────────────
-        if (_isForwarding && _mappingEngine.IsRunning)
+        if (_isForwarding && _mappingEngine.IsRunning && !_tabContext.SuppressForwarding)
         {
             _mappingEngine.ProcessInput(state);
         }

@@ -194,11 +194,39 @@ public partial class SCBindingsTabController
                 SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == _searchFilter.ActionMapFilter).ToList();
         }
 
-        // Apply search filter if set - search multiple fields like SCVirtStick
+        // Apply search filter if set
         if (!string.IsNullOrEmpty(_searchFilter.SearchText))
         {
-            var searchLower = _searchFilter.SearchText.ToLowerInvariant();
-            actions = actions.Where(a => ActionMatchesSearch(a, searchLower)).ToList();
+            // Button-capture mode: exact match on the captured input restricted to the
+            // highlighted column.  This prevents "button3" from matching "button30" etc.
+            // Text-entry mode: broad substring search across names, categories and bindings.
+            if (_searchFilter.ButtonCaptureTextActive
+                && _grid.Columns is not null
+                && _colImport.HighlightedColumn >= 0
+                && _colImport.HighlightedColumn < _grid.Columns.Count)
+            {
+                var col = _grid.Columns[_colImport.HighlightedColumn];
+                string captured = _searchFilter.SearchText;
+                // Strip modifier prefix to get the raw input name
+                string capturedInput = captured.Contains('+')
+                    ? captured[(captured.LastIndexOf('+') + 1)..]
+                    : captured;
+                string? capturedModifier = captured.Contains('+')
+                    ? captured[..captured.LastIndexOf('+')]
+                    : null;
+
+                uint? vjoyId = (col.IsJoystick && !col.IsPhysical) ? col.VJoyDeviceId : null;
+                string? physId = col.IsPhysical ? col.PhysicalDevice?.HidDevicePath : null;
+
+                actions = actions.Where(a => SCBindingsSearch.MatchesButtonCapture(
+                    a, _scExportProfile.Bindings, capturedInput, capturedModifier, vjoyId, physId)).ToList();
+            }
+            else
+            {
+                var searchLower = _searchFilter.SearchText.ToLowerInvariant();
+                actions = actions.Where(a => SCBindingsSearch.MatchesTextSearch(
+                    a, _scExportProfile.Bindings, searchLower)).ToList();
+            }
         }
 
         // Apply "show bound only" filter if enabled
@@ -221,65 +249,6 @@ public partial class SCBindingsTabController
         _scSelectedActionIndex = -1;  // Clear selection
     }
 
-    private bool ActionMatchesSearch(SCAction action, string searchLower)
-    {
-        // Check action name (raw)
-        if (action.ActionName.ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check formatted action name (display name)
-        if (SCCategoryMapper.FormatActionName(action.ActionName).ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check category name
-        if (SCCategoryMapper.GetCategoryName(action.ActionMap).ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check actionmap name (raw)
-        if (action.ActionMap.ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check ALL user bindings for this action (all device types, all device columns).
-        // The old GetBinding() only returned the first joystick binding, causing misses when
-        // the matching binding wasn't first in the list.
-        foreach (var b in _scExportProfile.Bindings.Where(b =>
-            b.ActionMap == action.ActionMap && b.ActionName == action.ActionName))
-        {
-            if (b.InputName.ToLowerInvariant().Contains(searchLower))
-                return true;
-            foreach (var modifier in b.Modifiers)
-            {
-                if (modifier.ToLowerInvariant().Contains(searchLower))
-                    return true;
-            }
-            // Also check the composed full string e.g. "rctrl+button3" so a capture
-            // search of "rctrl+button3" matches a binding that stores them separately.
-            if (b.Modifiers.Count > 0)
-            {
-                string full = (string.Join("+", b.Modifiers) + "+" + b.InputName).ToLowerInvariant();
-                if (full.Contains(searchLower))
-                    return true;
-            }
-        }
-
-        // Check default binding input names
-        foreach (var binding in action.DefaultBindings)
-        {
-            if (binding.Input.ToLowerInvariant().Contains(searchLower))
-                return true;
-
-            if (binding.FullInput.ToLowerInvariant().Contains(searchLower))
-                return true;
-
-            foreach (var modifier in binding.Modifiers)
-            {
-                if (modifier.ToLowerInvariant().Contains(searchLower))
-                    return true;
-            }
-        }
-
-        return false;
-    }
 
     /// <summary>
     /// Rebuilds the shared-cell lookup from the current export profile.

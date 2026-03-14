@@ -292,17 +292,32 @@ public partial class SCBindingsTabController
         _scListening.BaselineFrames = 0;
     }
 
+    // Number of warmup frames before active detection starts.
+    // During warmup both the initial-ignore baseline AND the previous-frame snapshot are
+    // updated every frame — matching the InputDetectionService warmup pattern so that
+    // buttons pressed during this window (e.g. passing through button4 on a multi-stage
+    // trigger to reach button5) are absorbed and never fire as false detections.
+    private const int CaptureBaselineWarmupFrames = 5; // ~83 ms at 60 Hz
+
     /// <summary>
     /// Polls all physical devices for button/hat presses while button capture mode is active.
     /// On first detected press, fills the search box and exits capture mode.
+    ///
+    /// Uses the same two-phase approach as <see cref="InputDetectionService"/>:
+    ///   Phase 1 (warmup): snapshot and continuously update both the ignore-baseline and the
+    ///     previous-frame state so pass-through buttons are absorbed before detection begins.
+    ///   Phase 2 (detection): only fires on a NEW transition — button was not pressed last
+    ///     frame AND is pressed now AND was not in the initial-ignore baseline.
     /// </summary>
     private void CheckButtonCaptureInput()
     {
-        // First call: snapshot baseline across all physical devices
+        // First call: initialise both the ignore-baseline and the previous-frame state.
         if (_searchFilter.CaptureButtonBaseline is null)
         {
             _searchFilter.CaptureButtonBaseline = new Dictionary<Guid, bool[]>();
             _searchFilter.CaptureHatBaseline = new Dictionary<Guid, int[]>();
+            _searchFilter.CapturePreviousButtons = new Dictionary<Guid, bool[]>();
+            _searchFilter.CapturePreviousHats = new Dictionary<Guid, int[]>();
             _searchFilter.CaptureBaselineFrames = 0;
 
             for (int idx = 0; idx < _ctx.Devices.Count; idx++)
@@ -313,14 +328,34 @@ public partial class SCBindingsTabController
                 if (state is null) continue;
                 _searchFilter.CaptureButtonBaseline[device.InstanceGuid] = (bool[])state.Buttons.Clone();
                 _searchFilter.CaptureHatBaseline[device.InstanceGuid] = (int[])state.Hats.Clone();
+                _searchFilter.CapturePreviousButtons[device.InstanceGuid] = (bool[])state.Buttons.Clone();
+                _searchFilter.CapturePreviousHats[device.InstanceGuid] = (int[])state.Hats.Clone();
             }
-            return; // first frame — just capture baseline
+            return;
         }
 
         _searchFilter.CaptureBaselineFrames++;
-        if (_searchFilter.CaptureBaselineFrames < 3)
-            return; // let baseline stabilise
 
+        // Warmup phase: keep refreshing both dictionaries so any button that is active
+        // during this window lands in the ignore-baseline and won't trigger detection.
+        if (_searchFilter.CaptureBaselineFrames < CaptureBaselineWarmupFrames)
+        {
+            for (int idx = 0; idx < _ctx.Devices.Count; idx++)
+            {
+                var device = _ctx.Devices[idx];
+                if (device.IsVirtual || !device.IsConnected) continue;
+                var state = _ctx.InputService.GetDeviceState(idx);
+                if (state is null) continue;
+                _searchFilter.CaptureButtonBaseline[device.InstanceGuid] = (bool[])state.Buttons.Clone();
+                _searchFilter.CaptureHatBaseline![device.InstanceGuid] = (int[])state.Hats.Clone();
+                _searchFilter.CapturePreviousButtons![device.InstanceGuid] = (bool[])state.Buttons.Clone();
+                _searchFilter.CapturePreviousHats![device.InstanceGuid] = (int[])state.Hats.Clone();
+            }
+            return;
+        }
+
+        // Detection phase: transition-based — only fire on buttons that were NOT pressed
+        // last frame and are NOT in the ignore-baseline.
         for (int idx = 0; idx < _ctx.Devices.Count; idx++)
         {
             var device = _ctx.Devices[idx];
@@ -330,26 +365,33 @@ public partial class SCBindingsTabController
 
             _searchFilter.CaptureButtonBaseline.TryGetValue(device.InstanceGuid, out var baseButtons);
             _searchFilter.CaptureHatBaseline!.TryGetValue(device.InstanceGuid, out var baseHats);
+            _searchFilter.CapturePreviousButtons!.TryGetValue(device.InstanceGuid, out var prevButtons);
+            _searchFilter.CapturePreviousHats!.TryGetValue(device.InstanceGuid, out var prevHats);
 
             // Buttons
             for (int i = 0; i < state.Buttons.Length; i++)
             {
-                bool wasPressed = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
-                if (!state.Buttons[i] || wasPressed) continue;
+                // Ignore buttons that were already active at the end of warmup
+                bool inBaseline = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
+                if (inBaseline) continue;
+
+                // Only fire on the NEW-press transition (was not pressed last frame)
+                bool wasPressedLastFrame = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
+                if (!state.Buttons[i] || wasPressedLastFrame) continue;
 
                 string buttonName = $"button{i + 1}";
-                var modKey = (device.InstanceGuid, i); // device-aware modifier lookup
+                var modKey = (device.InstanceGuid, i);
 
-                // If this specific (device, button) pair is mapped to a keyboard modifier,
-                // treat it as the modifier and wait for the actual target button.
-                // Using device.InstanceGuid means button31 on the LEFT stick ≠ button31 on the RIGHT stick.
+                // If this (device, button) pair maps to a keyboard modifier, record it and
+                // re-baseline so the modifier press is absorbed before the target is detected.
                 if (_scModifierPhysicalButtons.Contains(modKey) && _searchFilter.CapturePendingModifier is null)
                 {
                     _searchFilter.CapturePendingModifier = _scModifierButtonToModifiers.TryGetValue(modKey, out var mods) && mods.Count > 0
                         ? mods[0] : null;
-                    // Re-baseline so modifier is included in next baseline (won't fire again)
                     _searchFilter.CaptureButtonBaseline = null;
                     _searchFilter.CaptureHatBaseline = null;
+                    _searchFilter.CapturePreviousButtons = null;
+                    _searchFilter.CapturePreviousHats = null;
                     _searchFilter.CaptureBaselineFrames = 0;
                     _ctx.MarkDirty();
                     return;
@@ -365,9 +407,14 @@ public partial class SCBindingsTabController
             // Hats
             for (int i = 0; i < state.Hats.Length; i++)
             {
-                int baseHat = baseHats is not null && i < baseHats.Length ? baseHats[i] : -1;
+                bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
+                if (hatInBaseline) continue;
+
+                int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
                 int currHat = state.Hats[i];
-                if (currHat >= 0 && baseHat < 0)
+
+                // New hat transition: was centred (or unknown) last frame, now has direction
+                if (currHat >= 0 && prevHat < 0)
                 {
                     string dir = GetHatDirection(HatAngleToDiscrete(currHat));
                     string modPrefix = _searchFilter.CapturePendingModifier is not null
@@ -377,6 +424,11 @@ public partial class SCBindingsTabController
                     return;
                 }
             }
+
+            // No detection for this device this frame — update the previous-frame snapshot
+            // so that buttons held from a previous frame do not re-trigger as new presses.
+            _searchFilter.CapturePreviousButtons![device.InstanceGuid] = (bool[])state.Buttons.Clone();
+            _searchFilter.CapturePreviousHats![device.InstanceGuid] = (int[])state.Hats.Clone();
         }
     }
 
@@ -475,8 +527,10 @@ public partial class SCBindingsTabController
         _ctx.MarkDirty();
     }
 
-    // After capture, wait up to ~2 seconds (at ~20 Hz tick) for the button to be released
-    private const int CaptureReleaseTimeoutTicks = 40;
+    // After capture, wait up to ~2 seconds (at ~60 Hz tick) for the button to be released
+    private const int CaptureReleaseTimeoutTicks = 120;
+    // Minimum ticks before polling for release — prevents same-frame or fast-tap false completion
+    private const int CaptureReleaseMinTicks = 3;
 
     /// <summary>
     /// Polls SDL2 after a button capture to detect when the captured button is physically released.
@@ -493,6 +547,10 @@ public partial class SCBindingsTabController
             FinishCaptureRelease();
             return;
         }
+
+        // Minimum wait before polling — prevents false completion on a fast tap or same-frame evaluation
+        if (_searchFilter.CaptureReleaseWaitTicks < CaptureReleaseMinTicks)
+            return;
 
         string? hidPath = _searchFilter.CaptureDeviceHidPath;
         string? inputName = _searchFilter.CaptureReleasePendingInput;

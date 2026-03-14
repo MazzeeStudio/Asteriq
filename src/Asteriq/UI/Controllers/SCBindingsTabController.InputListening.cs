@@ -292,6 +292,11 @@ public partial class SCBindingsTabController
         _scListening.BaselineFrames = 0;
     }
 
+    // How long after the last detected button press to wait before committing the candidate.
+    // This covers multi-stage triggers (e.g. VIRPIL button4→button5): if a higher button
+    // follows within this window the candidate is updated to it before committing.
+    private const int CaptureDebounceMs = 80;
+
     /// <summary>
     /// Activates button capture mode: subscribes to the 500 Hz InputReceived event so that
     /// the detection loop runs at full SDL2 polling rate rather than the 60 Hz UI timer.
@@ -316,6 +321,9 @@ public partial class SCBindingsTabController
         _capturePrevButtons = null;
         _capturePrevHats = null;
         _capturePendingModifierBg = null;
+        _captureCandidateInput = null;
+        _captureCandidatePath = null;
+        _captureCandidateDebounceUntil = default;
         _captureWarmupUntil = DateTime.UtcNow + TimeSpan.FromMilliseconds(83); // ~5 frames @ 60 Hz
 
         // Subscribe — arm the flag BEFORE adding the handler so the first event is never missed.
@@ -348,6 +356,8 @@ public partial class SCBindingsTabController
         _capturePrevButtons = null;
         _capturePrevHats = null;
         _capturePendingModifierBg = null;
+        _captureCandidateInput = null;
+        _captureCandidatePath = null;
 
         // Clear search filter state.
         _searchFilter.ButtonCaptureActive = false;
@@ -359,14 +369,16 @@ public partial class SCBindingsTabController
     /// <summary>
     /// Button capture event handler — runs on the SDL2 background thread at ~500 Hz.
     ///
-    /// Uses the same two-phase approach as <see cref="InputDetectionService"/>:
-    ///   Warmup (~83 ms): both the ignore-baseline and previous-frame snapshot are refreshed
-    ///     on every event, absorbing any pass-through buttons pressed during this window.
-    ///   Detection: only fires on a NEW transition (not in baseline, was false last event,
-    ///     is true now). Posts the result to the UI thread via BeginInvoke.
+    /// Phase 1 — Warmup (~83 ms): both the ignore-baseline and previous-frame snapshot are
+    ///   refreshed on every event, absorbing any pass-through buttons pressed in this window.
+    /// Phase 2 — Detection with debounce: on each new-press transition the candidate is
+    ///   updated and the debounce window is extended by <see cref="CaptureDebounceMs"/>.
+    ///   Once the debounce window expires with no new presses, the final candidate is
+    ///   committed via BeginInvoke. This correctly handles multi-stage triggers where button N
+    ///   fires transiently on the way to button M — the last button pressed wins.
     ///
     /// Thread-safety: all detection dicts are written/read exclusively on this thread.
-    /// The only cross-thread write is the Interlocked flag that gates the result post.
+    /// The only cross-thread operation is the Interlocked flag + BeginInvoke for the result.
     /// </summary>
     private void OnCaptureInputReceived(object? sender, DeviceInputState state)
     {
@@ -378,7 +390,8 @@ public partial class SCBindingsTabController
         if (guidMap is null || !guidMap.TryGetValue(state.InstanceGuid, out string? hidPath)) return;
 
         var guid = state.InstanceGuid;
-        bool inWarmup = DateTime.UtcNow < _captureWarmupUntil;
+        var now = DateTime.UtcNow;
+        bool inWarmup = now < _captureWarmupUntil;
 
         // Lazily initialise dicts on the first event we receive.
         _captureButtonBaseline ??= new Dictionary<Guid, bool[]>();
@@ -396,13 +409,29 @@ public partial class SCBindingsTabController
             return;
         }
 
+        // Debounce check: if a candidate was recorded and the window has elapsed, commit it.
+        if (_captureCandidateInput is not null && now >= _captureCandidateDebounceUntil)
+        {
+            string finalInput = _captureCandidateInput;
+            string? finalPath = _captureCandidatePath;
+            if (Interlocked.Exchange(ref _captureHandlerActive, 0) == 1)
+            {
+                _ctx.InputService.InputReceived -= _captureEventHandler;
+                _captureEventHandler = null;
+                _ctx.OwnerForm.BeginInvoke(() => ApplyButtonCaptureResult(finalInput, finalPath));
+            }
+            return;
+        }
+
         // Detection phase.
         _captureButtonBaseline.TryGetValue(guid, out var baseButtons);
         _captureHatBaseline.TryGetValue(guid, out var baseHats);
         _capturePrevButtons.TryGetValue(guid, out var prevButtons);
         _capturePrevHats.TryGetValue(guid, out var prevHats);
 
-        // Buttons
+        bool detectedThisEvent = false;
+
+        // Buttons — scan all buttons; last new-press in this event wins the candidate.
         for (int i = 0; i < state.Buttons.Length; i++)
         {
             bool inBaseline = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
@@ -411,7 +440,7 @@ public partial class SCBindingsTabController
             bool wasPrev = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
             if (!state.Buttons[i] || wasPrev) continue;
 
-            // New button press detected.
+            // New button press transition detected.
             string buttonName = $"button{i + 1}";
             var modKey = (guid, i);
 
@@ -425,55 +454,50 @@ public partial class SCBindingsTabController
                 _captureHatBaseline = null;
                 _capturePrevButtons = null;
                 _capturePrevHats = null;
-                _captureWarmupUntil = DateTime.UtcNow + TimeSpan.FromMilliseconds(83);
+                _captureCandidateInput = null;
+                _captureCandidatePath = null;
+                _captureWarmupUntil = now + TimeSpan.FromMilliseconds(83);
                 return;
             }
 
             string modPrefix = _capturePendingModifierBg is not null
                 ? _capturePendingModifierBg + "+"
                 : GetHeldModifierPrefix();
-            string inputName = modPrefix + buttonName;
 
-            // Win the race and post result to UI thread.
-            if (Interlocked.Exchange(ref _captureHandlerActive, 0) == 1)
-            {
-                _ctx.InputService.InputReceived -= _captureEventHandler;
-                _captureEventHandler = null;
-                string capturedPath = hidPath;
-                _ctx.OwnerForm.BeginInvoke(() => ApplyButtonCaptureResult(inputName, capturedPath));
-            }
-            return;
+            // Update candidate and extend debounce. Continue iterating — if another button
+            // becomes newly active in the same event it also updates the candidate.
+            _captureCandidateInput = modPrefix + buttonName;
+            _captureCandidatePath = hidPath;
+            _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+            detectedThisEvent = true;
         }
 
-        // Hats
-        for (int i = 0; i < state.Hats.Length; i++)
+        // Hats — only check if no button was already detected this event.
+        if (!detectedThisEvent)
         {
-            bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
-            if (hatInBaseline) continue;
-
-            int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
-            int currHat = state.Hats[i];
-
-            if (currHat >= 0 && prevHat < 0)
+            for (int i = 0; i < state.Hats.Length; i++)
             {
-                string dir = GetHatDirection(HatAngleToDiscrete(currHat));
-                string modPrefix = _capturePendingModifierBg is not null
-                    ? _capturePendingModifierBg + "+"
-                    : GetHeldModifierPrefix();
-                string inputName = modPrefix + $"hat{i + 1}_{dir}";
+                bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
+                if (hatInBaseline) continue;
 
-                if (Interlocked.Exchange(ref _captureHandlerActive, 0) == 1)
+                int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
+                int currHat = state.Hats[i];
+
+                if (currHat >= 0 && prevHat < 0)
                 {
-                    _ctx.InputService.InputReceived -= _captureEventHandler;
-                    _captureEventHandler = null;
-                    string capturedPath = hidPath;
-                    _ctx.OwnerForm.BeginInvoke(() => ApplyButtonCaptureResult(inputName, capturedPath));
+                    string dir = GetHatDirection(HatAngleToDiscrete(currHat));
+                    string modPrefix = _capturePendingModifierBg is not null
+                        ? _capturePendingModifierBg + "+"
+                        : GetHeldModifierPrefix();
+                    _captureCandidateInput = modPrefix + $"hat{i + 1}_{dir}";
+                    _captureCandidatePath = hidPath;
+                    _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+                    break; // one hat direction per event
                 }
-                return;
             }
         }
 
-        // No detection this event — update previous-frame snapshot for this device.
+        // Always update previous-frame snapshot for this device.
         _capturePrevButtons![guid] = (bool[])state.Buttons.Clone();
         _capturePrevHats![guid] = (int[])state.Hats.Clone();
     }
@@ -504,6 +528,8 @@ public partial class SCBindingsTabController
         _capturePrevButtons = null;
         _capturePrevHats = null;
         _capturePendingModifierBg = null;
+        _captureCandidateInput = null;
+        _captureCandidatePath = null;
 
         // Keep SuppressForwarding=true until the captured button is physically released,
         // then clear snapshots and resume. This prevents the held button from being

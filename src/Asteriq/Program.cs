@@ -190,6 +190,8 @@ static class Program
         // Skip driver check on post-update relaunch — drivers were already present
         bool postUpdate = args.Contains("--post-update");
         bool forceDriverSetup = args.Contains("--driver-setup");
+        Log.Information("Startup args: postUpdate={PostUpdate} forceDriverSetup={Force} allArgs={Args}",
+            postUpdate, forceDriverSetup, string.Join(" ", args));
         if (!postUpdate && !CheckRequiredDrivers(serviceProvider, forceDriverSetup))
         {
             // User cancelled driver setup - exit
@@ -269,20 +271,27 @@ static class Program
         var appSettings = serviceProvider.GetRequiredService<IApplicationSettingsService>();
         var status = driverSetup.GetSetupStatus();
 
+        Log.Information("Driver check: vJoyInstalled={VJoy} HidHideInstalled={HidHide} IsComplete={Complete} forceShow={Force} SkipDriverSetup={Skip} ClientOnlyMode={Client}",
+            status.VJoyInstalled, status.HidHideInstalled, status.IsComplete, forceShow,
+            appSettings.SkipDriverSetup, appSettings.ClientOnlyMode);
+
         if (status.IsComplete && !forceShow)
         {
+            Log.Information("Driver setup modal skipped: vJoy is already installed");
             return true; // All required drivers are installed
         }
 
         // Client-only mode: user has no local HOTAS, skip driver check entirely
         if (appSettings.ClientOnlyMode && !forceShow)
         {
+            Log.Information("Driver setup modal skipped: ClientOnlyMode is enabled");
             return true;
         }
 
         // If user previously chose "Don't show again" and this isn't a forced show, skip the modal
         if (appSettings.SkipDriverSetup && !forceShow)
         {
+            Log.Information("Driver setup modal skipped: SkipDriverSetup is set");
             return true; // User opted out — configuration-only mode
         }
 
@@ -293,9 +302,14 @@ static class Program
         var uiTheme = serviceProvider.GetRequiredService<Services.Abstractions.IUIThemeService>();
         UI.FUIColors.SetTheme(uiTheme.Theme);
 
+        Log.Information("Showing driver setup modal");
+
         // Show driver setup form (passing appSettings so checkbox persists immediately)
         using var setupForm = new UI.DriverSetupForm(driverSetup, uiTheme, appSettings);
         var result = setupForm.ShowDialog();
+
+        Log.Information("Driver setup modal closed: result={Result} SetupComplete={Complete} SkippedVJoy={Skipped}",
+            result, setupForm.SetupComplete, setupForm.SkippedVJoy);
 
         if (result != DialogResult.OK || !setupForm.SetupComplete)
             return false; // User closed or cancelled

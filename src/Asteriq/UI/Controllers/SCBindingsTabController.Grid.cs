@@ -194,11 +194,39 @@ public partial class SCBindingsTabController
                 SCCategoryMapper.GetCategoryNameForAction(a.ActionMap, a.ActionName) == _searchFilter.ActionMapFilter).ToList();
         }
 
-        // Apply search filter if set - search multiple fields like SCVirtStick
+        // Apply search filter if set
         if (!string.IsNullOrEmpty(_searchFilter.SearchText))
         {
-            var searchLower = _searchFilter.SearchText.ToLowerInvariant();
-            actions = actions.Where(a => ActionMatchesSearch(a, searchLower)).ToList();
+            // Button-capture mode: exact match on the captured input restricted to the
+            // highlighted column.  This prevents "button3" from matching "button30" etc.
+            // Text-entry mode: broad substring search across names, categories and bindings.
+            if (_searchFilter.ButtonCaptureTextActive
+                && _grid.Columns is not null
+                && _colImport.HighlightedColumn >= 0
+                && _colImport.HighlightedColumn < _grid.Columns.Count)
+            {
+                var col = _grid.Columns[_colImport.HighlightedColumn];
+                string captured = _searchFilter.SearchText;
+                // Strip modifier prefix to get the raw input name
+                string capturedInput = captured.Contains('+')
+                    ? captured[(captured.LastIndexOf('+') + 1)..]
+                    : captured;
+                string? capturedModifier = captured.Contains('+')
+                    ? captured[..captured.LastIndexOf('+')]
+                    : null;
+
+                uint? vjoyId = (col.IsJoystick && !col.IsPhysical) ? col.VJoyDeviceId : null;
+                string? physId = col.IsPhysical ? col.PhysicalDevice?.HidDevicePath : null;
+
+                actions = actions.Where(a => SCBindingsSearch.MatchesButtonCapture(
+                    a, _scExportProfile.Bindings, capturedInput, capturedModifier, vjoyId, physId)).ToList();
+            }
+            else
+            {
+                var searchLower = _searchFilter.SearchText.ToLowerInvariant();
+                actions = actions.Where(a => SCBindingsSearch.MatchesTextSearch(
+                    a, _scExportProfile.Bindings, searchLower)).ToList();
+            }
         }
 
         // Apply "show bound only" filter if enabled
@@ -221,57 +249,6 @@ public partial class SCBindingsTabController
         _scSelectedActionIndex = -1;  // Clear selection
     }
 
-    private bool ActionMatchesSearch(SCAction action, string searchLower)
-    {
-        // Check action name (raw)
-        if (action.ActionName.ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check formatted action name (display name)
-        if (SCCategoryMapper.FormatActionName(action.ActionName).ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check category name
-        if (SCCategoryMapper.GetCategoryName(action.ActionMap).ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check actionmap name (raw)
-        if (action.ActionMap.ToLowerInvariant().Contains(searchLower))
-            return true;
-
-        // Check user binding input names
-        var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
-        if (userBinding is not null)
-        {
-            if (userBinding.InputName.ToLowerInvariant().Contains(searchLower))
-                return true;
-
-            // Check modifiers
-            foreach (var modifier in userBinding.Modifiers)
-            {
-                if (modifier.ToLowerInvariant().Contains(searchLower))
-                    return true;
-            }
-        }
-
-        // Check default binding input names
-        foreach (var binding in action.DefaultBindings)
-        {
-            if (binding.Input.ToLowerInvariant().Contains(searchLower))
-                return true;
-
-            if (binding.FullInput.ToLowerInvariant().Contains(searchLower))
-                return true;
-
-            foreach (var modifier in binding.Modifiers)
-            {
-                if (modifier.ToLowerInvariant().Contains(searchLower))
-                    return true;
-            }
-        }
-
-        return false;
-    }
 
     /// <summary>
     /// Rebuilds the shared-cell lookup from the current export profile.
@@ -1055,7 +1032,7 @@ public partial class SCBindingsTabController
     private void UpdateModifierKeys()
     {
         _scModifierKeys.Clear();
-        _scModifierPhysicalButtonNames.Clear();
+        _scModifierPhysicalButtons.Clear();
         _scModifierButtonToModifiers.Clear();
 
         var profile = _ctx.ProfileManager.ActiveProfile;
@@ -1071,18 +1048,19 @@ public partial class SCBindingsTabController
             string modName = keyName.ToLowerInvariant();
             _scModifierKeys.TryAdd(vkCode, modName);
 
-            // Record which physical buttons trigger this modifier key so they can be
-            // identified during joystick listen mode — pressing one skips it as the
-            // binding target and waits for the actual target button instead.
+            // Record which (device, button) pairs trigger this modifier key so that
+            // button31 on the LEFT stick is treated as a modifier only for that device —
+            // the same button index on a DIFFERENT device is not affected.
             foreach (var input in mapping.Inputs)
             {
                 if (input.Type != InputType.Button) continue;
-                string btnName = $"button{input.Index + 1}";
-                _scModifierPhysicalButtonNames.Add(btnName);
-                if (!_scModifierButtonToModifiers.TryGetValue(btnName, out var mods))
+                if (!Guid.TryParse(input.DeviceId, out var deviceGuid)) continue;
+                var key = (deviceGuid, input.Index); // 0-based index
+                _scModifierPhysicalButtons.Add(key);
+                if (!_scModifierButtonToModifiers.TryGetValue(key, out var mods))
                 {
                     mods = new List<string>();
-                    _scModifierButtonToModifiers[btnName] = mods;
+                    _scModifierButtonToModifiers[key] = mods;
                 }
                 if (!mods.Contains(modName))
                     mods.Add(modName);
@@ -1091,7 +1069,7 @@ public partial class SCBindingsTabController
 
         System.Diagnostics.Debug.WriteLine(
             $"[SCBindings] UpdateModifierKeys: {_scModifierKeys.Count} modifier(s), " +
-            $"{_scModifierPhysicalButtonNames.Count} modifier button(s): {string.Join(", ", _scModifierPhysicalButtonNames)}");
+            $"{_scModifierPhysicalButtons.Count} modifier (device,button) pair(s)");
     }
 
     /// <summary>

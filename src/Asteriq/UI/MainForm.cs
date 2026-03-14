@@ -116,6 +116,9 @@ public partial class MainForm : Form
     private float _pulsePhase = 0f;
     private float _leadLineProgress = 0f;
 
+    // Custom form icon (tracked separately so we never accidentally Dispose the shared WinForms DefaultIcon)
+    private Icon? _customFormIcon;
+
     // Performance optimization
     private bool _isDirty = true;  // Force initial render
     private bool _enableAnimations = true;  // Can be toggled for performance
@@ -346,6 +349,9 @@ public partial class MainForm : Form
 
         // Wire up network conflict check (delegated to SCBindingsTabController)
         _tabContext.CheckNetworkSwitchConflicts = _scBindingsController.CheckNetworkSwitchConflictsPublic;
+
+        // Wire up forwarding snapshot clear (for button capture mode)
+        _tabContext.ClearForwardingSnapshots = _networkVjoy.ClearAllSnapshotButtons;
     }
 
     private void SyncTabContext()
@@ -1329,8 +1335,13 @@ public partial class MainForm : Form
     {
         try
         {
-            var oldIcon = Icon;
-            Icon = _trayIcon.CreateFormIcon();
+            // Track our custom icon separately so we never accidentally Dispose the shared
+            // WinForms static DefaultIcon (Form.DefaultIcon) that is returned by Form.Icon
+            // when no custom icon has been set yet. Disposing DefaultIcon corrupts all
+            // undecorated dialogs (e.g. FUIConfirmDialog) that inherit it during CreateHandle.
+            var oldIcon = _customFormIcon;
+            _customFormIcon = _trayIcon.CreateFormIcon();
+            Icon = _customFormIcon;
             oldIcon?.Dispose();
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidOperationException)
@@ -1596,9 +1607,11 @@ public partial class MainForm : Form
 
         // ── Master mode: run MappingEngine in capture mode, send snapshot ────
         // ForwardingMode is set exclusively by ConnectAsMasterAsync — no role setting required.
+        // SuppressForwarding is true while SC Bindings button-capture is active — skip ProcessInput
+        // entirely so the captured button press never reaches the snapshot or the remote machine.
         if (_networkMode == NetworkInputMode.Remote && _networkVjoy.ForwardingMode)
         {
-            if (_mappingEngine.IsRunning)
+            if (_mappingEngine.IsRunning && !_tabContext.SuppressForwarding)
                 _mappingEngine.ProcessInput(state);
 
             // Do NOT send here — the 20 Hz heartbeat handles transmission.
@@ -1607,7 +1620,7 @@ public partial class MainForm : Form
         }
 
         // ── Local forwarding — process through MappingEngine ─────────────────
-        if (_isForwarding && _mappingEngine.IsRunning)
+        if (_isForwarding && _mappingEngine.IsRunning && !_tabContext.SuppressForwarding)
         {
             _mappingEngine.ProcessInput(state);
         }
@@ -2226,6 +2239,7 @@ public partial class MainForm : Form
         {
             Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnSystemThemeChanged;
             _renderTimer?.Dispose();
+            _customFormIcon?.Dispose();
             _background?.Dispose();
             _logoSvg?.Dispose();
             _joystickSvg?.Dispose();

@@ -85,11 +85,34 @@ public partial class SCBindingsTabController : ITabController
     // Modifier keys detected from Mappings profile (vkCode → SC modifier name, e.g. {0xA3: "rctrl"})
     private Dictionary<int, string> _scModifierKeys = new();
 
-    // Physical button names (e.g. "button31") that are mapped to keyboard modifier keys.
-    private HashSet<string> _scModifierPhysicalButtonNames = new();
+    // (InstanceGuid, 0-based buttonIndex) pairs that are mapped to keyboard modifier keys.
+    // Keyed by device instance so button31 on the left stick ≠ button31 on the right stick.
+    private HashSet<(Guid DeviceGuid, int ButtonIndex)> _scModifierPhysicalButtons = new();
 
-    // Maps physical button name → list of SC modifier names (e.g. "button31" → ["rctrl"])
-    private Dictionary<string, List<string>> _scModifierButtonToModifiers = new();
+    // Maps (InstanceGuid, 0-based buttonIndex) → list of SC modifier names (e.g. ["rctrl"])
+    private Dictionary<(Guid DeviceGuid, int ButtonIndex), List<string>> _scModifierButtonToModifiers = new();
+
+    // ── Button capture — 500 Hz event subscription ───────────────────────────
+    // Delegate reference kept for unsubscription; null when capture is inactive.
+    private EventHandler<DeviceInputState>? _captureEventHandler;
+    // GUID → HID path for physical devices, built on UI thread at subscription time.
+    // Read-only on background thread. Null when capture is inactive.
+    private Dictionary<Guid, string>? _captureGuidToHidPath;
+    // Warmup/detection dicts — written and read exclusively on the background event-handler thread.
+    private Dictionary<Guid, bool[]>? _captureButtonBaseline;
+    private Dictionary<Guid, int[]>? _captureHatBaseline;
+    private Dictionary<Guid, bool[]>? _capturePrevButtons;
+    private Dictionary<Guid, int[]>? _capturePrevHats;
+    // Pending modifier name detected mid-capture (e.g. "rctrl"), set on bg thread.
+    private string? _capturePendingModifierBg;
+    // End of the warmup window. Events arriving before this time update baseline+previous.
+    private DateTime _captureWarmupUntil;
+    // Latest detected input candidate (updated on each new press; committed after debounce expires).
+    private string? _captureCandidateInput;
+    private string? _captureCandidatePath;
+    private DateTime _captureCandidateDebounceUntil;
+    // Interlocked flag: 1 = handler processes events, 0 = inactive/cancelled.
+    private volatile int _captureHandlerActive;
 
     // Public properties for MainForm mouse dispatch
     public bool IsDraggingVScroll => _scroll.IsDraggingVScroll;
@@ -353,10 +376,12 @@ public partial class SCBindingsTabController : ITabController
             }
         }
 
-        // Text input fields - IBeam cursor
+        // Text input fields - IBeam cursor, Hand over the × clear button
         if (_searchFilter.SearchBoxBounds.Contains(e.X, e.Y))
         {
-            _ctx.OwnerForm.Cursor = Cursors.IBeam;
+            bool overClear = !string.IsNullOrEmpty(_searchFilter.SearchText)
+                && e.X > _searchFilter.SearchBoxBounds.Right - 24;
+            _ctx.OwnerForm.Cursor = overClear ? Cursors.Hand : Cursors.IBeam;
         }
 
         // Panel header hover (collapsed panel expand buttons)
@@ -565,6 +590,13 @@ public partial class SCBindingsTabController : ITabController
 
     public bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        var key = keyData & Keys.KeyCode;
+        if (_searchFilter.ButtonCaptureActive && key == Keys.Escape)
+        {
+            StopButtonCapture();
+            _ctx.MarkDirty();
+            return true;
+        }
         if (_searchFilter.SearchBoxFocused)
             return HandleSearchBoxKey(keyData);
         if (_scExportFilenameBoxFocused)
@@ -582,9 +614,9 @@ public partial class SCBindingsTabController : ITabController
     public void OnTick()
     {
         if (_scListening.IsListening)
-        {
             CheckSCBindingInput();
-        }
+        if (_searchFilter.CaptureWaitingForRelease)
+            CheckCaptureRelease();
     }
 
     public void OnActivated()
@@ -733,6 +765,21 @@ public partial class SCBindingsTabController : ITabController
         public List<string> ActionMaps = new();
         public SKRect ShowJSRefBounds;
         public bool ShowJSRefHovered;
+
+        // Button capture mode — press a physical button to search for it
+        public bool ButtonCaptureActive;
+        public bool ButtonCaptureHovered;
+        public SKRect ButtonCaptureBounds;
+        // HID path of the device whose button was captured — used to restrict search results
+        public string? CaptureDeviceHidPath;
+        // True when SearchText was filled by button capture — render as pill
+        public bool ButtonCaptureTextActive;
+        // Set after capture result is applied — keeps SuppressForwarding=true until the button is released
+        public bool CaptureWaitingForRelease;
+        // Raw input name (no modifier prefix) used to poll for release, e.g. "button13" or "hat1_up"
+        public string? CaptureReleasePendingInput;
+        // Tick counter for release-wait timeout (safety valve if device disconnects mid-capture)
+        public int CaptureReleaseWaitTicks;
     }
 
     private sealed class ScrollState

@@ -151,6 +151,20 @@ public sealed class NetworkVJoyService : IVJoyService
     public VJoyOutputSnapshot[] GetAllSnapshots()
         => [.. _snapshots.Values];
 
+    /// <summary>
+    /// Clears all button and hat states in every snapshot, leaving axis values intact.
+    /// Call this when ending an input-capture session to ensure the remote machine does not
+    /// see spurious button presses from buttons held during capture.
+    /// </summary>
+    public void ClearAllSnapshotButtons()
+    {
+        foreach (var snap in _snapshots.Values)
+        {
+            Array.Clear(snap.Buttons);
+            Array.Clear(snap.Hats);
+        }
+    }
+
     public void Dispose() => _inner.Dispose();
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -274,8 +274,11 @@ public partial class MainForm : Form
                 if (_networkMode != NetworkInputMode.Remote || !_networkVjoy.ForwardingMode)
                     break;
 
-                foreach (var snapshot in _networkVjoy.GetAllSnapshots())
-                    _networkInput.SendVJoyState(snapshot);
+                if (!_tabContext.SuppressForwarding)
+                {
+                    foreach (var snapshot in _networkVjoy.GetAllSnapshots())
+                        _networkInput.SendVJoyState(snapshot);
+                }
             }
         }
         catch (OperationCanceledException) { }

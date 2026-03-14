@@ -144,22 +144,7 @@ public class DevicesTabController : ITabController
         if (!_showHiddenCheckboxBounds.IsEmpty && _showHiddenCheckboxBounds.Contains(e.X, e.Y))
         {
             _showHiddenDevices = !_showHiddenDevices;
-
-            // If hiding was turned off and the selected device is now invisible, move to first visible
-            if (!_showHiddenDevices && _ctx.SelectedDevice >= 0 && _ctx.SelectedDevice < _ctx.Devices.Count)
-            {
-                var selected = _ctx.Devices[_ctx.SelectedDevice];
-                if (!selected.IsVirtual && _ctx.AppSettings.IsDeviceHidden(selected.InstanceGuid.ToString()))
-                {
-                    var next = _ctx.Devices
-                        .Where(d => !d.IsVirtual && !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))
-                        .FirstOrDefault();
-                    _ctx.SelectedDevice = next is not null ? _ctx.Devices.IndexOf(next) : -1;
-                    if (next is not null)
-                        _ctx.LoadDeviceMapForDevice(next);
-                }
-            }
-
+            EnsureVisibleDeviceSelected();
             _ctx.MarkDirty();
             return;
         }
@@ -1145,20 +1130,38 @@ public class DevicesTabController : ITabController
         var device = _ctx.Devices[_ctx.SelectedDevice];
         bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
         _ctx.AppSettings.SetDeviceHidden(device.InstanceGuid.ToString(), !currentlyHidden);
+        EnsureVisibleDeviceSelected();
+        _ctx.MarkDirty();
+    }
 
-        // If hiding the selected device and it will no longer be visible, move selection to the next visible device
-        if (!currentlyHidden && !_showHiddenDevices)
+    /// <summary>
+    /// Ensures a visible physical device is selected whenever the visible list is non-empty.
+    /// Clears selection only when the visible list is genuinely empty.
+    /// </summary>
+    private void EnsureVisibleDeviceSelected()
+    {
+        var visible = _ctx.Devices
+            .Where(d => !d.IsVirtual &&
+                (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString())))
+            .ToList();
+
+        if (visible.Count == 0)
         {
-            var visibleDevices = _ctx.Devices
-                .Where(d => !d.IsVirtual && !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))
-                .ToList();
-            var next = visibleDevices.FirstOrDefault();
-            _ctx.SelectedDevice = next is not null ? _ctx.Devices.IndexOf(next) : -1;
-            if (next is not null)
-                _ctx.LoadDeviceMapForDevice(next);
+            _ctx.SelectedDevice = -1;
+            return;
         }
 
-        _ctx.MarkDirty();
+        // If current selection is still in the visible list, keep it
+        if (_ctx.SelectedDevice >= 0 && _ctx.SelectedDevice < _ctx.Devices.Count)
+        {
+            var current = _ctx.Devices[_ctx.SelectedDevice];
+            if (visible.Contains(current)) return;
+        }
+
+        // Otherwise pick the first visible device
+        var first = visible[0];
+        _ctx.SelectedDevice = _ctx.Devices.IndexOf(first);
+        _ctx.LoadDeviceMapForDevice(first);
     }
 
     /// <summary>

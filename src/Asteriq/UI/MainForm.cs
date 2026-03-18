@@ -1420,7 +1420,11 @@ public partial class MainForm : Form
         _inputService.DeviceDisconnected += OnDeviceDisconnected;
         LoadDisconnectedDevices();
         RefreshDevices();
-        _inputService.StartPolling(500);
+
+        // Only use the high-frequency poll rate when physical devices are actually connected.
+        // With no devices, 10 Hz is enough for hot-plug detection and avoids timeBeginPeriod(1).
+        int physicalCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
+        _inputService.StartPolling(physicalCount > 0 ? 500 : 10);
     }
 
     private void InitializeRenderLoop()
@@ -1729,6 +1733,14 @@ public partial class MainForm : Form
             // Restore selection by identity
             RestoreDeviceSelection(selectedGuid, selectedName);
 
+            // First physical device connected — bump poll rate for responsive input
+            if (_networkMode != NetworkInputMode.Receiving)
+            {
+                int physCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
+                if (physCount > 0)
+                    _inputService.SetPollRate(500);
+            }
+
             MarkDirty();
         });
     }
@@ -1768,6 +1780,14 @@ public partial class MainForm : Form
 
             // Restore selection by identity
             RestoreDeviceSelection(selectedGuid, selectedName);
+
+            // All physical devices gone — drop to low-rate hot-plug detection
+            if (_networkMode != NetworkInputMode.Receiving)
+            {
+                int physCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
+                if (physCount == 0)
+                    _inputService.SetPollRate(10);
+            }
 
             MarkDirty();
         });

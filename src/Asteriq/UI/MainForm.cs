@@ -123,6 +123,7 @@ public partial class MainForm : Form
     private bool _isDirty = true;  // Force initial render
     private bool _enableAnimations = true;  // Can be toggled for performance
     private bool _isResizing = false;  // Suppress renders during resize
+    private int _unfocusedFrameCount;  // Tracks ticks for background frame-rate throttle
 
     // Phase 2: Render caching
     private SKBitmap? _cachedBackground;  // Cached background layer
@@ -1434,6 +1435,9 @@ public partial class MainForm : Form
 
     private void OnAnimationTick(object? sender, EventArgs e)
     {
+        // Form is hidden to the system tray — skip all work, nothing to display.
+        if (!Visible) return;
+
         bool needsUpdate = false;
 
         // Only update animations if enabled
@@ -1478,8 +1482,12 @@ public partial class MainForm : Form
         if (_enableAnimations)
             _settingsController.OnTick();
 
+        // Throttle redraws to ~10 FPS when the window is in the background.
+        // SC Bindings input detection (OnTick above) still runs every tick.
+        bool shouldRedraw = ContainsFocus || (++_unfocusedFrameCount % 6 == 0);
+
         // Only invalidate if animations ran or something is dirty, and we're not resizing
-        if ((needsUpdate || _isDirty) && !_isResizing)
+        if (shouldRedraw && (needsUpdate || _isDirty) && !_isResizing)
         {
             _canvas.Invalidate();
             _isDirty = false;

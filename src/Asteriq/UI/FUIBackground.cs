@@ -12,6 +12,7 @@ public class FUIBackground : IDisposable
     // Cached bitmaps for static elements
     private SKBitmap? _gridBitmap;
     private SKBitmap? _glowBitmap;
+    private SKBitmap? _scanlineBitmap;
     private SKBitmap? _vignetteBitmap;
     private SKBitmap? _noiseBitmap;
     private SKSize _cachedSize;
@@ -84,10 +85,16 @@ public class FUIBackground : IDisposable
             canvas.DrawBitmap(_noiseBitmap, bounds.Left, bounds.Top, noisePaint);
         }
 
-        // Layer 4: Scanlines (intensity-based)
-        if (ScanlineIntensity > 0)
+        // Layer 4: Scanlines (intensity-based, cached bitmap with Overlay blend)
+        if (ScanlineIntensity > 0 && _scanlineBitmap is not null)
         {
-            DrawScanlines(canvas, bounds);
+            byte alpha = (byte)(20 * ScanlineOpacity);
+            using var scanPaint = new SKPaint
+            {
+                Color = SKColors.White.WithAlpha(alpha),
+                BlendMode = SKBlendMode.Overlay
+            };
+            canvas.DrawBitmap(_scanlineBitmap, bounds.Left, bounds.Top, scanPaint);
         }
 
         // Layer 5: Vignette (intensity-based)
@@ -112,6 +119,10 @@ public class FUIBackground : IDisposable
         // Regenerate ambient glows (static — bake at full opacity; alpha applied at draw time)
         _glowBitmap?.Dispose();
         _glowBitmap = GenerateGlowBitmap(width, height);
+
+        // Regenerate scanlines (static — bake white lines; alpha + blend applied at draw time)
+        _scanlineBitmap?.Dispose();
+        _scanlineBitmap = GenerateScanlineBitmap(width, height);
 
         // Regenerate vignette
         _vignetteBitmap?.Dispose();
@@ -268,30 +279,35 @@ public class FUIBackground : IDisposable
         return bitmap;
     }
 
-    private void DrawScanlines(SKCanvas canvas, SKRect bounds)
+    private SKBitmap GenerateScanlineBitmap(int width, int height)
     {
-        // Scale alpha based on intensity (max ~20 for subtle effect)
-        byte alpha = (byte)(20 * ScanlineOpacity);
+        var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+
+        // Bake white lines at full alpha — intensity alpha + Overlay blend applied at draw time
         using var paint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = SKColors.White.WithAlpha(alpha),
+            Color = SKColors.White,
             StrokeWidth = 1f,
-            BlendMode = SKBlendMode.Overlay
+            IsAntialias = false
         };
 
-        // Horizontal scanlines every 2-3 pixels based on intensity
         int spacing = ScanlineIntensity > 50 ? 2 : 3;
-        for (float y = bounds.Top; y < bounds.Bottom; y += spacing)
+        for (int y = 0; y < height; y += spacing)
         {
-            canvas.DrawLine(bounds.Left, y, bounds.Right, y, paint);
+            canvas.DrawLine(0, y, width, y, paint);
         }
+
+        return bitmap;
     }
 
     public void Dispose()
     {
         _gridBitmap?.Dispose();
         _glowBitmap?.Dispose();
+        _scanlineBitmap?.Dispose();
         _vignetteBitmap?.Dispose();
         _noiseBitmap?.Dispose();
         GC.SuppressFinalize(this);

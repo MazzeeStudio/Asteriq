@@ -36,6 +36,8 @@ public class InputService : IInputService
     // Track which SDL instance IDs we've opened to detect new devices
     private readonly HashSet<int> _knownInstanceIds = new();
     private volatile bool _isPolling;
+    private volatile int _pollDelayMs;
+    private bool _highResTimerActive;
     private Task? _pollTask;
     private CancellationTokenSource? _pollCts;
     private bool _isInitialized;
@@ -413,14 +415,19 @@ public class InputService : IInputService
         if (_isPolling) return;
 
         _pollRateHz = pollRateHz;
+        _pollDelayMs = 1000 / pollRateHz;
         _isPolling = true;
         _pollCts = new CancellationTokenSource();
-        int delayMs = 1000 / pollRateHz;
         var ct = _pollCts.Token;
 
-        // Request 1ms Windows timer resolution so Task.Delay fires accurately at high poll rates.
-        // Without this, the default ~15.6ms resolution turns a 500Hz (2ms) request into ~64Hz.
-        timeBeginPeriod(1);
+        // Request 1ms Windows timer resolution only when the poll rate actually needs it.
+        // The default Windows resolution is ~15.6ms; rates above ~64Hz require higher precision.
+        // Activating this unconditionally wastes CPU system-wide and prevents deep sleep states.
+        if (_pollDelayMs < 16)
+        {
+            timeBeginPeriod(1);
+            _highResTimerActive = true;
+        }
 
         _pollTask = Task.Run(async () =>
         {
@@ -429,7 +436,7 @@ public class InputService : IInputService
                 PollAllDevices();
                 try
                 {
-                    await Task.Delay(delayMs, ct);
+                    await Task.Delay(_pollDelayMs, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -437,6 +444,32 @@ public class InputService : IInputService
                 }
             }
         }, ct);
+    }
+
+    /// <summary>
+    /// Adjust the polling rate while polling is active. Safe to call from any thread.
+    /// Automatically manages the high-resolution Windows timer period.
+    /// </summary>
+    public void SetPollRate(int pollRateHz)
+    {
+        if (!_isPolling) return;
+
+        int newDelayMs = 1000 / pollRateHz;
+        bool needsHighRes = newDelayMs < 16;
+
+        if (needsHighRes && !_highResTimerActive)
+        {
+            timeBeginPeriod(1);
+            _highResTimerActive = true;
+        }
+        else if (!needsHighRes && _highResTimerActive)
+        {
+            timeEndPeriod(1);
+            _highResTimerActive = false;
+        }
+
+        _pollRateHz = pollRateHz;
+        _pollDelayMs = newDelayMs;
     }
 
     /// <summary>
@@ -464,11 +497,12 @@ public class InputService : IInputService
         _pollCts?.Dispose();
         _pollCts = null;
 
-        if (_pollRateHz > 0)
+        if (_highResTimerActive)
         {
             timeEndPeriod(1);
-            _pollRateHz = 0;
+            _highResTimerActive = false;
         }
+        _pollRateHz = 0;
     }
 
     /// <summary>
@@ -497,11 +531,12 @@ public class InputService : IInputService
         _pollCts?.Dispose();
         _pollCts = null;
 
-        if (_pollRateHz > 0)
+        if (_highResTimerActive)
         {
             timeEndPeriod(1);
-            _pollRateHz = 0;
+            _highResTimerActive = false;
         }
+        _pollRateHz = 0;
     }
 
     /// <summary>

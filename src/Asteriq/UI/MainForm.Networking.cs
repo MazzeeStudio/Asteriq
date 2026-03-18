@@ -294,6 +294,8 @@ public partial class MainForm : Form
             _networkMode, _tabContext.ConnectedPeerIp ?? "none");
         StopNetworkHeartbeat();
         _networkVjoy.ForwardingMode = false;      // resume local vJoy writes on disconnect
+        if (_networkMode == NetworkInputMode.Receiving)
+            _inputService.SetPollRate(500);       // restore full rate leaving client mode
         _networkMode = NetworkInputMode.Local;
         BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", "Network connection lost"));
         BeginInvoke(() =>
@@ -361,6 +363,7 @@ public partial class MainForm : Form
         _isClientConnected   = true;
         _connectedMasterName = masterName;
         _networkMode         = NetworkInputMode.Receiving;
+        _inputService.SetPollRate(10);            // only hot-plug detection needed in client mode
         _tabContext.NetworkMode       = _networkMode;
         _tabContext.IsClientConnected = _isClientConnected;
 

@@ -59,6 +59,12 @@ public interface IInputService : IDisposable
     void StartPolling(int pollRateHz = 500);
 
     /// <summary>
+    /// Adjust the polling rate while polling is active. Manages the high-resolution Windows
+    /// timer period automatically — only activates it when the rate actually requires it.
+    /// </summary>
+    void SetPollRate(int pollRateHz);
+
+    /// <summary>
     /// Stop polling for input
     /// </summary>
     void StopPolling();

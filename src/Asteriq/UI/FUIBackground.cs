@@ -11,6 +11,7 @@ public class FUIBackground : IDisposable
 {
     // Cached bitmaps for static elements
     private SKBitmap? _gridBitmap;
+    private SKBitmap? _glowBitmap;
     private SKBitmap? _vignetteBitmap;
     private SKBitmap? _noiseBitmap;
     private SKSize _cachedSize;
@@ -63,10 +64,11 @@ public class FUIBackground : IDisposable
             canvas.DrawBitmap(_gridBitmap, bounds.Left, bounds.Top, gridPaint);
         }
 
-        // Layer 2: Ambient glows (intensity-based)
-        if (GlowIntensity > 0)
+        // Layer 2: Ambient glows (intensity-based, baked into a cached bitmap)
+        if (GlowIntensity > 0 && _glowBitmap is not null)
         {
-            DrawAmbientGlows(canvas, bounds);
+            using var glowPaint = new SKPaint { Color = SKColors.White.WithAlpha((byte)(255 * GlowOpacity)) };
+            canvas.DrawBitmap(_glowBitmap, bounds.Left, bounds.Top, glowPaint);
         }
 
         // Layer 3: Noise/grain (intensity-based)
@@ -106,6 +108,10 @@ public class FUIBackground : IDisposable
         // Regenerate grid
         _gridBitmap?.Dispose();
         _gridBitmap = GenerateGridBitmap(width, height);
+
+        // Regenerate ambient glows (static — bake at full opacity; alpha applied at draw time)
+        _glowBitmap?.Dispose();
+        _glowBitmap = GenerateGlowBitmap(width, height);
 
         // Regenerate vignette
         _vignetteBitmap?.Dispose();
@@ -228,25 +234,26 @@ public class FUIBackground : IDisposable
         return scaledBitmap;
     }
 
-    private void DrawAmbientGlows(SKCanvas canvas, SKRect bounds)
+    private static SKBitmap GenerateGlowBitmap(int width, int height)
     {
-        var glowColor = FUIColors.Glow;
-        float intensityScale = GlowOpacity;  // 0-1 based on GlowIntensity setting
+        var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
 
-        // Create several ambient glow spots
-        // Center glow sized relative to screen but capped for visibility
-        float centerRadius = MathF.Min(bounds.Width, bounds.Height) * 0.35f;
+        var glowColor = FUIColors.Glow;
+        float centerRadius = MathF.Min(width, height) * 0.35f;
+
+        // Bake at full opacity — GlowOpacity is applied as a paint alpha at draw time
         var glowSpots = new[]
         {
-            (x: bounds.Left + bounds.Width * 0.25f, y: bounds.Top + bounds.Height * 0.75f, r: 100f, opacity: 0.30f),
-            (x: bounds.Left + bounds.Width * 0.75f, y: bounds.Top + bounds.Height * 0.20f, r: 70f, opacity: 0.25f),
-            (x: bounds.Left + bounds.Width * 0.5f, y: bounds.Top + bounds.Height * 0.5f, r: centerRadius, opacity: 0.35f),  // Center
+            (x: width * 0.25f, y: height * 0.75f, r: 100f, opacity: 0.30f),
+            (x: width * 0.75f, y: height * 0.20f, r: 70f,  opacity: 0.25f),
+            (x: width * 0.5f,  y: height * 0.5f,  r: centerRadius, opacity: 0.35f),
         };
 
         foreach (var spot in glowSpots)
         {
-            // Apply intensity scale to opacity (doubled for better visibility at mid-range)
-            byte alpha = (byte)(400 * spot.opacity * intensityScale);
+            byte alpha = (byte)(400 * spot.opacity);
             using var shader = SKShader.CreateRadialGradient(
                 new SKPoint(spot.x, spot.y),
                 spot.r,
@@ -254,10 +261,11 @@ public class FUIBackground : IDisposable
                 new[] { 0f, 1f },
                 SKShaderTileMode.Clamp
             );
-
             using var paint = new SKPaint { Shader = shader };
             canvas.DrawCircle(spot.x, spot.y, spot.r, paint);
         }
+
+        return bitmap;
     }
 
     private void DrawScanlines(SKCanvas canvas, SKRect bounds)
@@ -283,6 +291,7 @@ public class FUIBackground : IDisposable
     public void Dispose()
     {
         _gridBitmap?.Dispose();
+        _glowBitmap?.Dispose();
         _vignetteBitmap?.Dispose();
         _noiseBitmap?.Dispose();
         GC.SuppressFinalize(this);

@@ -67,17 +67,31 @@ public class DevicesTabController : ITabController
         var detailsBounds = new SKRect(centerStart, contentTop, centerEnd, contentBottom);
         DrawDeviceDetailsPanel(canvas, detailsBounds);
 
-        // Right panel: Split into Device Actions (top) and Status (bottom)
+        // Right panel: S1 pinned to bottom at natural height; D3 fills above
         if (layout.ShowRightPanel)
         {
             float rightPanelX = bounds.Right - pad - layout.RightPanelWidth;
-            float rightPanelMid = contentTop + (contentBottom - contentTop) / 2f;
             float panelGap = FUIRenderer.SpaceSM;
+            float rightEdge = bounds.Right - pad;
 
-            var deviceActionsBounds = new SKRect(rightPanelX, contentTop, bounds.Right - pad, rightPanelMid - panelGap / 2f);
+            // S1 natural height: title + 3 items + button + padding (24px items, 12f font)
+            const float s1FrameInset = 5f;
+            const float s1TitleH = 32f;
+            const float s1ItemH = 24f;
+            const float s1ItemCount = 3f;
+            float s1Height = s1FrameInset * 2
+                + s1TitleH
+                + FUIRenderer.PanelPadding
+                + s1ItemCount * s1ItemH
+                + (s1ItemCount - 1) * FUIRenderer.SpaceSM
+                + FUIRenderer.SpaceLG
+                + 36f
+                + FUIRenderer.SpaceLG
+                + s1FrameInset;
+
+            var statusBounds = new SKRect(rightPanelX, contentBottom - s1Height, rightEdge, contentBottom);
+            var deviceActionsBounds = new SKRect(rightPanelX, contentTop, rightEdge, statusBounds.Top - panelGap);
             DrawDeviceActionsPanel(canvas, deviceActionsBounds);
-
-            var statusBounds = new SKRect(rightPanelX, rightPanelMid + panelGap / 2f, bounds.Right - pad, contentBottom);
             DrawStatusPanel(canvas, statusBounds);
         }
     }
@@ -989,25 +1003,21 @@ public class DevicesTabController : ITabController
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, "S1", "STATUS");
 
-        float statusItemHeight = 32f;
+        float statusItemHeight = 24f;
         float itemY = contentBounds.Top + titleBarHeight + pad;
 
         bool vjoyActive = _ctx.VJoyService.IsInitialized;
         FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "VJOY DRIVER",
-            vjoyActive ? "ACTIVE" : "NOT FOUND", vjoyActive ? FUIColors.Active : FUIColors.Danger);
+            vjoyActive ? "ACTIVE" : "NOT FOUND", vjoyActive ? FUIColors.Active : FUIColors.Danger, fontSize: 12f);
         itemY += statusItemHeight + itemGap;
 
         FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "FORWARDING",
-            _ctx.IsForwarding ? "RUNNING" : "STOPPED", _ctx.IsForwarding ? FUIColors.Active : FUIColors.TextDim);
+            _ctx.IsForwarding ? "RUNNING" : "STOPPED", _ctx.IsForwarding ? FUIColors.Active : FUIColors.TextDim, fontSize: 12f);
         itemY += statusItemHeight + itemGap;
 
         int pollHz = _ctx.InputService.PollRateHz;
         string pollRateText = pollHz > 0 ? $"{pollHz} HZ" : "—";
-        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "POLL RATE", pollRateText, FUIColors.TextPrimary);
-        itemY += statusItemHeight + itemGap;
-
-        string profileName = _ctx.ProfileManager.ActiveProfile?.Name ?? "NONE";
-        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "CONFIG", profileName.ToUpper(), FUIColors.TextPrimary);
+        FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "POLL RATE", pollRateText, FUIColors.TextPrimary, fontSize: 12f);
 
         float buttonHeight = 36f;
         float buttonWidth = contentBounds.Width - pad * 2;

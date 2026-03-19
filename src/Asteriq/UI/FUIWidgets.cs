@@ -1069,4 +1069,100 @@ internal static class FUIWidgets
             canvas.DrawCircle(centerX, midY, r, fill);
         }
     }
+
+    // ─── FUI Folder Icon ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws a futuristic folder icon centred in the given bounds.
+    /// Chamfered body, tab notch with circle nodes, diagonal hatching, inner parallel line.
+    /// </summary>
+    internal static void DrawFUIFolderIcon(SKCanvas canvas, SKRect bounds, SKColor strokeColor, SKColor accentColor)
+    {
+        float w = bounds.Width;
+        float h = bounds.Height;
+        float x = bounds.Left;
+        float y = bounds.Top;
+
+        // Key proportions (relative to bounds)
+        float chamfer = Math.Min(w, h) * 0.10f;   // corner chamfer size
+        float tabW    = w * 0.38f;                  // tab width
+        float tabH    = h * 0.16f;                  // tab height above body
+        float nodeR   = Math.Min(w, h) * 0.045f;   // circle node radius
+
+        // Body top-left Y (below tab)
+        float bodyTop = y + tabH;
+
+        // ── Outer body path (chamfered rectangle with tab notch) ──
+        using var bodyPath = new SKPath();
+
+        // Start at top-left of tab (with small chamfer)
+        float tabChamfer = chamfer * 0.6f;
+        bodyPath.MoveTo(x + tabChamfer, y);
+
+        // Tab top edge → tab right corner with step-down
+        bodyPath.LineTo(x + tabW - tabChamfer, y);
+        bodyPath.LineTo(x + tabW, y + tabChamfer);
+
+        // Tab step-down to body level (notch)
+        float notchW = w * 0.06f;
+        bodyPath.LineTo(x + tabW + notchW, bodyTop);
+
+        // Body top edge → top-right chamfer
+        bodyPath.LineTo(x + w - chamfer, bodyTop);
+        bodyPath.LineTo(x + w, bodyTop + chamfer);
+
+        // Right edge → bottom-right chamfer
+        bodyPath.LineTo(x + w, y + h - chamfer);
+        bodyPath.LineTo(x + w - chamfer, y + h);
+
+        // Bottom edge → bottom-left chamfer
+        bodyPath.LineTo(x + chamfer, y + h);
+        bodyPath.LineTo(x, y + h - chamfer);
+
+        // Left edge back up → top-left tab chamfer
+        bodyPath.LineTo(x, y + tabChamfer);
+        bodyPath.Close();
+
+        using var strokePaint = FUIRenderer.CreateStrokePaint(strokeColor, 1.2f);
+        canvas.DrawPath(bodyPath, strokePaint);
+
+        // ── Circle nodes at tab junction ──
+        float node1X = x + tabW;
+        float node1Y = y + tabChamfer;
+        float node2X = x + tabW + notchW * 0.5f;
+        float node2Y = bodyTop - (bodyTop - y - tabChamfer) * 0.4f;
+
+        using var nodePaint = FUIRenderer.CreateStrokePaint(accentColor, 1.0f);
+        canvas.DrawCircle(node1X, node1Y, nodeR, nodePaint);
+        canvas.DrawCircle(node2X, node2Y, nodeR, nodePaint);
+
+        // ── Inner parallel line (left + bottom edge, inset) ──
+        float inset = Math.Max(2.5f, Math.Min(w, h) * 0.06f);
+        using var innerPath = new SKPath();
+        float innerChamfer = chamfer * 0.7f;
+
+        // Left edge inner line (from partway down to bottom-left chamfer, then along bottom)
+        float innerStartY = bodyTop + h * 0.15f;
+        innerPath.MoveTo(x + inset, innerStartY);
+        innerPath.LineTo(x + inset, y + h - innerChamfer - inset);
+        innerPath.LineTo(x + inset + innerChamfer, y + h - inset);
+        innerPath.LineTo(x + w * 0.45f, y + h - inset);
+
+        using var innerPaint = FUIRenderer.CreateStrokePaint(strokeColor.WithAlpha(120), 1.0f);
+        canvas.DrawPath(innerPath, innerPaint);
+
+        // ── Diagonal hatching strip (left side of body) ──
+        float hatchX = x + inset + 1f;
+        float hatchW = w * 0.08f;
+        float hatchTop = bodyTop + h * 0.22f;
+        float hatchBot = y + h - inset - innerChamfer - 2f;
+        float hatchStep = Math.Max(3f, h * 0.06f);
+
+        using var hatchPaint = FUIRenderer.CreateStrokePaint(accentColor.WithAlpha(140), 0.9f);
+        for (float hy = hatchTop; hy < hatchBot; hy += hatchStep)
+        {
+            float hy2 = Math.Min(hy + hatchStep * 0.6f, hatchBot);
+            canvas.DrawLine(hatchX, hy2, hatchX + hatchW, hy, hatchPaint);
+        }
+    }
 }

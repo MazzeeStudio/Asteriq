@@ -541,6 +541,9 @@ public partial class SCBindingsTabController
         // SuppressForwarding remains true — CheckCaptureRelease() clears it on release
         _searchFilter.CaptureDeviceHidPath = hidPath;
         _searchFilter.SearchText = inputName;
+        _searchFilter.CursorPos = inputName.Length;
+        _searchFilter.SelectionStart = -1;
+        _searchFilter.SelectionEnd = -1;
         _searchFilter.ButtonCaptureTextActive = true;
 
         // Highlight the column corresponding to the detected device (same as clicking the column header).

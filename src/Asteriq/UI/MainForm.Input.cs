@@ -409,8 +409,9 @@ public partial class MainForm
                 return; // Was still dragging, now released
         }
 
-        // Release SC Bindings scrollbar dragging (delegated to SC Bindings controller)
-        if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll)
+        // Release SC Bindings scrollbar dragging or search text selection (delegated to SC Bindings controller)
+        if (_scBindingsController.IsDraggingVScroll || _scBindingsController.IsDraggingHScroll
+            || _scBindingsController.IsDraggingSearchSelection)
         {
             SyncTabContext();
             _scBindingsController.OnMouseUp(se);

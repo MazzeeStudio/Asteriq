@@ -912,12 +912,15 @@ public partial class SCBindingsTabController
             // Accurate height: 8px padding + rows (24px each) + per-section header (16px for sec1, 26px for others: 4+6+16)
             const float sec1HeaderH = 16f;
             const float sepHeaderH  = 26f;
+            const float emptyFolderH = 88f; // 20px pad + 48px icon + 20px pad
+            float savedProfilesH = sec1HeaderH + (asteriqCount > 0 ? asteriqCount * 24f : 20f); // 20f for "No saved profiles" text
+            float scSectionH = scFileCount > 0 ? sepHeaderH + scFileCount * 24f : sepHeaderH + emptyFolderH;
             float listHeight = 8f
-                + (asteriqCount > 0 ? sec1HeaderH + asteriqCount * 24f : 0f)
-                + (scFileCount > 0 ? sepHeaderH + scFileCount * 24f : 0f)
+                + savedProfilesH
+                + scSectionH
                 + (remoteCount > 0 ? sepHeaderH + remoteCount * 24f : 0f);
             listHeight = Math.Min(Math.Max(listHeight, 36f), 280f);
-            _profileMgmt.DropdownListBounds = new SKRect(leftMargin, _profileMgmt.DropdownBounds.Bottom + 2, rightMargin, _profileMgmt.DropdownBounds.Bottom + 2 + listHeight);
+            _profileMgmt.DropdownListBounds = new SKRect(leftMargin, _profileMgmt.DropdownBounds.Bottom + 4, rightMargin, _profileMgmt.DropdownBounds.Bottom + 4 + listHeight);
         }
 
         // Selected action info with ASSIGN/CLEAR buttons (hidden when column actions panel is active)
@@ -1300,15 +1303,18 @@ public partial class SCBindingsTabController
 
         // Items
         float rowHeight = 24f;
-        float y = bounds.Top + 4;
+        float y = bounds.Top + 8;
         _profileMgmt.HoveredProfileIndex = -1;
         _profileMgmt.DropdownDeleteProfileName = "";
 
-        // Section 1: Asteriq saved profiles (all of them, including the active one)
-        if (_profileMgmt.ExportProfiles.Count > 0)
+        // Section 1: Asteriq saved profiles (always shown)
+        FUIRenderer.DrawText(canvas, "SAVED PROFILES", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
+        y += 16f;
+
+        if (_profileMgmt.ExportProfiles.Count == 0)
         {
-            FUIRenderer.DrawText(canvas, "SAVED PROFILES", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
-            y += 16f;
+            FUIRenderer.DrawText(canvas, "No saved profiles", new SKPoint(bounds.Left + 14, y + 12f), FUIColors.TextDim, 11f);
+            y += 20f;
         }
 
         for (int i = 0; i < _profileMgmt.ExportProfiles.Count && y + rowHeight <= bounds.Bottom; i++)
@@ -1361,8 +1367,7 @@ public partial class SCBindingsTabController
             y += rowHeight;
         }
 
-        // Section 2: SC mapping files from mappings folder (if any)
-        if (_scAvailableProfiles.Count > 0 && y + rowHeight <= bounds.Bottom)
+        // Section 2: SC mapping files from mappings folder (always shown with separator)
         {
             // Separator line (FUI style)
             y += 4f;
@@ -1377,34 +1382,48 @@ public partial class SCBindingsTabController
 
             y += 6f;
 
-            // Section label: make it clear these are SC files to import from, not Asteriq profiles
+            // Section label
             FUIRenderer.DrawText(canvas, "IMPORT FROM SC", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
             y += 16f;
 
-            // SC mapping files
-            int scFileIndexOffset = _profileMgmt.ExportProfiles.Count + 1000; // Use offset to distinguish from Asteriq profiles
-            for (int i = 0; i < _scAvailableProfiles.Count && y + rowHeight <= bounds.Bottom; i++)
+            if (_scAvailableProfiles.Count > 0)
             {
-                var scFile = _scAvailableProfiles[i];
-                var rowBounds = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
-                bool isHovered = rowBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-                if (isHovered)
+                // SC mapping files
+                int scFileIndexOffset = _profileMgmt.ExportProfiles.Count + 1000; // Use offset to distinguish from Asteriq profiles
+                for (int i = 0; i < _scAvailableProfiles.Count && y + rowHeight <= bounds.Bottom; i++)
                 {
-                    _profileMgmt.HoveredProfileIndex = scFileIndexOffset + i;
-                    using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
-                    canvas.DrawRect(rowBounds, hoverPaint);
-                    using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
-                    canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
+                    var scFile = _scAvailableProfiles[i];
+                    var rowBounds = new SKRect(bounds.Left + 4, y, bounds.Right - 4, y + rowHeight);
+                    bool isHovered = rowBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+                    if (isHovered)
+                    {
+                        _profileMgmt.HoveredProfileIndex = scFileIndexOffset + i;
+                        using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+                        canvas.DrawRect(rowBounds, hoverPaint);
+                        using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
+                        canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
+                    }
+
+                    var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
+                    float maxTextWidth = rowBounds.Width - 20f;
+                    string displayName = scFile.DisplayName;
+                    displayName = FUIWidgets.TruncateTextToWidth(displayName, maxTextWidth, 10f);
+                    FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);
+
+                    y += rowHeight;
                 }
-
-                var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-                float maxTextWidth = rowBounds.Width - 20f;
-                string displayName = scFile.DisplayName;
-                displayName = FUIWidgets.TruncateTextToWidth(displayName, maxTextWidth, 10f);
-                FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);
-
-                y += rowHeight;
+            }
+            else
+            {
+                // Empty state: FUI folder icon centred in the section
+                float iconW = 72f;
+                float iconH = 48f;
+                float iconX = bounds.MidX - iconW / 2f;
+                float iconY = y + 20f;
+                var iconBounds = new SKRect(iconX, iconY, iconX + iconW, iconY + iconH);
+                FUIWidgets.DrawFUIFolderIcon(canvas, iconBounds, FUIColors.FrameDim.WithAlpha(180), FUIColors.Active.WithAlpha(90));
+                y += 20f + iconH + 20f; // 20px pad top + icon + 20px pad bottom
             }
         }
 

@@ -666,12 +666,13 @@ public partial class SCBindingsTabController
                             {
                                 bindingComponents = SCBindingsRenderer.GetBindingComponents(binding.InputName, binding.Modifiers);
                                 inputType = binding.InputType;
-                                // Check for conflicts and cross-column action duplicates (joystick only)
-                                if (col.IsJoystick && !isCellShared)
+                                // Check for conflicts and cross-column action duplicates
+                                if (!isCellShared)
                                 {
                                     isConflicting = _conflicts.ConflictingBindings.Contains(binding.Key)
                                         || _conflicts.NetworkConflictKeys.Contains(binding.Key);
-                                    isDuplicateAction = _conflicts.DuplicateActionBindings.Contains(binding.Key);
+                                    if (col.IsJoystick)
+                                        isDuplicateAction = _conflicts.DuplicateActionBindings.Contains(binding.Key);
                                 }
                             }
 

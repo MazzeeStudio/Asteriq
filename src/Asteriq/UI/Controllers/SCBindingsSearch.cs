@@ -88,18 +88,26 @@ public static class SCBindingsSearch
     /// <param name="vjoyDeviceId">vJoy device ID of the highlighted column, or null if the column is not
     ///   a vJoy joystick (physical / keyboard / mouse / no column selected).</param>
     /// <param name="physicalDeviceId">HID device path of the highlighted physical column, or null.</param>
+    /// <param name="captureDeviceType">Device type for KB/Mouse captures; null for joystick captures.</param>
     public static bool MatchesButtonCapture(
         SCAction action,
         IEnumerable<SCActionBinding> bindings,
         string capturedInput,
         string? capturedModifier,
         uint? vjoyDeviceId,
-        string? physicalDeviceId)
+        string? physicalDeviceId,
+        SCDeviceType? captureDeviceType = null)
     {
         foreach (var b in bindings.Where(b => b.ActionMap == action.ActionMap && b.ActionName == action.ActionName))
         {
             // ── Column filter ───────────────────────────────────────────────
-            if (vjoyDeviceId.HasValue)
+            if (captureDeviceType.HasValue)
+            {
+                // KB or Mouse capture: must match the specific device type
+                if (b.DeviceType != captureDeviceType.Value)
+                    continue;
+            }
+            else if (vjoyDeviceId.HasValue)
             {
                 // vJoy column: must match this specific vJoy slot (not a physical binding)
                 if (b.DeviceType != SCDeviceType.Joystick
@@ -115,9 +123,7 @@ public static class SCBindingsSearch
             }
             else
             {
-                // No column constraint (device not matched to a column) — accept any joystick binding
-                if (b.DeviceType != SCDeviceType.Joystick)
-                    continue;
+                // No column constraint — accept any binding
             }
 
             // ── Exact input name match ──────────────────────────────────────

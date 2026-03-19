@@ -99,10 +99,10 @@ public partial class SCBindingsTabController : ITabController
     // Read-only on background thread. Null when capture is inactive.
     private Dictionary<Guid, string>? _captureGuidToHidPath;
     // Warmup/detection dicts — written and read exclusively on the background event-handler thread.
-    private Dictionary<Guid, bool[]>? _captureButtonBaseline;
-    private Dictionary<Guid, int[]>? _captureHatBaseline;
     private Dictionary<Guid, bool[]>? _capturePrevButtons;
     private Dictionary<Guid, int[]>? _capturePrevHats;
+    // Mouse wheel pending for capture — set on UI thread via OnMouseWheel, read on bg thread.
+    private volatile string? _captureMouseWheelPending;
     // Pending modifier name detected mid-capture (e.g. "rctrl"), set on bg thread.
     private string? _capturePendingModifierBg;
     // End of the warmup window. Events arriving before this time update baseline+previous.
@@ -577,6 +577,18 @@ public partial class SCBindingsTabController : ITabController
 
     public void OnMouseWheel(MouseEventArgs e)
     {
+        // Mouse wheel listening — capture for mouse column binding or button capture
+        if (_scListening.IsListening && _cell.ListeningColumn is { IsMouse: true } && e.Delta != 0)
+        {
+            _scListening.PendingMouseWheel = e.Delta > 0 ? "mwheel_up" : "mwheel_down";
+            return;
+        }
+        if (_searchFilter.ButtonCaptureActive && e.Delta != 0)
+        {
+            _captureMouseWheelPending = e.Delta > 0 ? "mwheel_up" : "mwheel_down";
+            return;
+        }
+
         // Action map filter dropdown scroll
         if (_searchFilter.FilterDropdownOpen && _searchFilter.FilterDropdownBounds.Contains(e.X, e.Y))
         {
@@ -701,6 +713,8 @@ public partial class SCBindingsTabController : ITabController
         public Dictionary<Guid, bool[]>? ButtonBaseline;
         public Dictionary<Guid, int[]>? HatBaseline;
         public int BaselineFrames;
+        // Mouse wheel detection — set by OnMouseWheel, consumed by DetectMouseInput
+        public string? PendingMouseWheel;
     }
 
     private sealed class ColumnImportState

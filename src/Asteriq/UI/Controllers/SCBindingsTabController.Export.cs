@@ -366,6 +366,10 @@ public partial class SCBindingsTabController
 
                 filename = newName + ".xml";
                 exportPath = Path.Combine(installation.MappingsPath, filename);
+
+                // Update the profile name so the XML profileName attribute matches the chosen name
+                _scExportProfile.ProfileName = newName;
+                _scExportProfileService?.SaveProfile(_scExportProfile);
             }
         }
 
@@ -642,6 +646,17 @@ public partial class SCBindingsTabController
         if (name is null || name == oldName)
             return;
 
+        // Block rename if a different profile already has the target name
+        if (_scExportProfileService is not null && _scExportProfileService.ProfileExists(name))
+        {
+            using var existsDialog = new FUIConfirmDialog(
+                "Profile Exists",
+                $"A profile named '{name}' already exists.",
+                "OK", "Cancel");
+            existsDialog.ShowDialog(_ctx.OwnerForm);
+            return;
+        }
+
         // Rename on disk if the old profile was saved
         if (!string.IsNullOrEmpty(oldName) && _scExportProfileService is not null &&
             _scExportProfileService.ProfileExists(oldName))
@@ -653,7 +668,72 @@ public partial class SCBindingsTabController
         _scExportProfile.ProfileName = name;
         _scProfileDirty = false;
         _scExportProfileService?.SaveProfile(_scExportProfile);
+
+        // Update profileName attribute in any exported SC XML files that reference the old name.
+        // The export filename can be custom (user-entered) so we scan all XMLs in the Mappings folder.
+        if (!string.IsNullOrEmpty(oldName) && _scInstall.Installations.Count > 0)
+        {
+            var installation = _scInstall.Installations[_scInstall.SelectedInstallation];
+            if (!string.IsNullOrEmpty(installation.MappingsPath) && Directory.Exists(installation.MappingsPath))
+            {
+                UpdateProfileNameInMappingsFolder(installation.MappingsPath, oldName, name);
+            }
+        }
+
         _ctx.InvalidateCanvas();
+    }
+
+    /// <summary>
+    /// Scans the SC Mappings folder for XML files that have the old profileName and updates them in-place.
+    /// </summary>
+    private static void UpdateProfileNameInMappingsFolder(string mappingsPath, string oldName, string newName)
+    {
+        try
+        {
+            foreach (var xmlFile in Directory.EnumerateFiles(mappingsPath, "*.xml"))
+            {
+                try
+                {
+                    var doc = System.Xml.Linq.XDocument.Load(xmlFile);
+                    if (doc.Root is null || doc.Root.Name.LocalName != "ActionMaps")
+                        continue;
+
+                    var profileAttr = doc.Root.Attribute("profileName");
+                    if (profileAttr is null || profileAttr.Value != oldName)
+                        continue;
+
+                    // Update profileName on ActionMaps root
+                    profileAttr.Value = newName;
+
+                    // Update label on CustomisationUIHeader if it matches
+                    var header = doc.Root.Element("CustomisationUIHeader");
+                    var labelAttr = header?.Attribute("label");
+                    if (labelAttr is not null && labelAttr.Value == oldName)
+                        labelAttr.Value = newName;
+
+                    // Save back without XML declaration (SC requirement)
+                    var settings = new System.Xml.XmlWriterSettings
+                    {
+                        Indent = true,
+                        IndentChars = "  ",
+                        Encoding = new System.Text.UTF8Encoding(false),
+                        OmitXmlDeclaration = true,
+                    };
+                    using var writer = System.Xml.XmlWriter.Create(xmlFile, settings);
+                    doc.Save(writer);
+
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Updated profileName in {Path.GetFileName(xmlFile)}: '{oldName}' → '{newName}'");
+                }
+                catch (Exception ex) when (ex is System.Xml.XmlException or IOException or UnauthorizedAccessException)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SCBindings] Skipping {Path.GetFileName(xmlFile)}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to scan mappings folder: {ex.Message}");
+        }
     }
 
     private void ClearColumnBindings()

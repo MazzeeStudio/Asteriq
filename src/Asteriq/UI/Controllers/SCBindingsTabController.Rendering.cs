@@ -216,7 +216,10 @@ public partial class SCBindingsTabController
             captureBadges = badges;
         }
         FUIWidgets.DrawSearchBox(canvas, _searchFilter.SearchBoxBounds, _searchFilter.SearchText, _searchFilter.SearchBoxFocused, _ctx.MousePosition, searchPlaceholder,
-            captureBadges: captureBadges);
+            captureBadges: captureBadges,
+            cursorPos: _searchFilter.CursorPos,
+            selectionStart: _searchFilter.SelectionStart,
+            selectionEnd: _searchFilter.SelectionEnd);
 
         // Button capture toggle button [🎮] — right of search box
         float capBtnX = _searchFilter.SearchBoxBounds.Right + captureButtonGap;

@@ -117,6 +117,7 @@ public partial class SCBindingsTabController : ITabController
     // Public properties for MainForm mouse dispatch
     public bool IsDraggingVScroll => _scroll.IsDraggingVScroll;
     public bool IsDraggingHScroll => _scroll.IsDraggingHScroll;
+    public bool IsDraggingSearchSelection => _searchFilter.SearchDragging;
     public bool IsSearchBoxFocused => _searchFilter.SearchBoxFocused;
     public bool IsExportFilenameBoxFocused => _scExportFilenameBoxFocused;
 
@@ -264,6 +265,18 @@ public partial class SCBindingsTabController : ITabController
 
     public void OnMouseMove(MouseEventArgs e)
     {
+        // Handle search box text selection drag
+        if (_searchFilter.SearchDragging && !string.IsNullOrEmpty(_searchFilter.SearchText))
+        {
+            float contentX = _searchFilter.SearchBoxBounds.Left + 24f;
+            float clickOffset = e.X - contentX;
+            int pos = HitTestSearchCursorPos(_searchFilter.SearchText, clickOffset, 13f);
+            _searchFilter.SelectionEnd = pos;
+            _searchFilter.CursorPos = pos;
+            _ctx.MarkDirty();
+            return;
+        }
+
         // Handle scrollbar dragging
         if (_scroll.IsDraggingVScroll)
         {
@@ -546,6 +559,14 @@ public partial class SCBindingsTabController : ITabController
 
     public void OnMouseUp(MouseEventArgs e)
     {
+        if (_searchFilter.SearchDragging)
+        {
+            _searchFilter.SearchDragging = false;
+            // If start == end, no text was actually selected — clear selection markers
+            if (_searchFilter.SelectionStart == _searchFilter.SelectionEnd)
+                ClearSearchSelection();
+        }
+
         if (_scroll.IsDraggingVScroll || _scroll.IsDraggingHScroll)
         {
             _scroll.IsDraggingVScroll = false;
@@ -751,6 +772,11 @@ public partial class SCBindingsTabController : ITabController
     private sealed class SearchFilterState
     {
         public string SearchText = "";
+        public int CursorPos;
+        public int SelectionStart = -1; // -1 = no selection
+        public int SelectionEnd = -1;
+        public bool SearchDragging;
+        public DateTime LastSearchClickTime;
         public SKRect SearchBoxBounds;
         public bool SearchBoxFocused;
         public SKRect ShowBoundOnlyBounds;

@@ -687,7 +687,8 @@ internal static class FUIWidgets
 
 
     internal static void DrawSearchBox(SKCanvas canvas, SKRect bounds, string text, bool focused, Point mousePosition,
-        string placeholder = "Search actions...", IReadOnlyList<string>? captureBadges = null)
+        string placeholder = "Search actions...", IReadOnlyList<string>? captureBadges = null,
+        int cursorPos = -1, int selectionStart = -1, int selectionEnd = -1)
     {
         var bgColor = focused ? FUIColors.Background2.WithAlpha(180) : FUIColors.Background2.WithAlpha(100);
         var borderColor = focused ? FUIColors.Active : FUIColors.Frame;
@@ -701,9 +702,11 @@ internal static class FUIWidgets
 
         float contentX = bounds.Left + 24f;
         float textY = bounds.MidY + 4f;
+        const float textFontSize = 13f;
+
         if (string.IsNullOrEmpty(text))
         {
-            FUIRenderer.DrawText(canvas, placeholder, new SKPoint(contentX, textY), FUIColors.TextDim, 13f);
+            FUIRenderer.DrawText(canvas, placeholder, new SKPoint(contentX, textY), FUIColors.TextDim, textFontSize);
         }
         else if (captureBadges is not null && captureBadges.Count > 0)
         {
@@ -741,7 +744,19 @@ internal static class FUIWidgets
         }
         else
         {
-            FUIRenderer.DrawText(canvas, text, new SKPoint(contentX, textY), FUIColors.TextPrimary, 13f);
+            // Draw selection highlight behind text
+            if (focused && selectionStart >= 0 && selectionEnd >= 0 && selectionStart != selectionEnd)
+            {
+                int sS = Math.Clamp(Math.Min(selectionStart, selectionEnd), 0, text.Length);
+                int sE = Math.Clamp(Math.Max(selectionStart, selectionEnd), 0, text.Length);
+                float selStartX = contentX + (sS > 0 ? FUIRenderer.MeasureText(text[..sS], textFontSize) : 0);
+                float selEndX = contentX + FUIRenderer.MeasureText(text[..sE], textFontSize);
+                var selRect = new SKRect(selStartX, bounds.Top + 4, selEndX, bounds.Bottom - 4);
+                using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+                canvas.DrawRect(selRect, selPaint);
+            }
+
+            FUIRenderer.DrawText(canvas, text, new SKPoint(contentX, textY), FUIColors.TextPrimary, textFontSize);
 
             if (bounds.Contains(mousePosition.X, mousePosition.Y))
             {
@@ -755,7 +770,8 @@ internal static class FUIWidgets
 
         if (focused)
         {
-            float cursorX = contentX + (string.IsNullOrEmpty(text) ? 0 : FUIRenderer.MeasureText(text, 13f));
+            int cPos = cursorPos >= 0 ? Math.Clamp(cursorPos, 0, text?.Length ?? 0) : (text?.Length ?? 0);
+            float cursorX = contentX + (string.IsNullOrEmpty(text) || cPos == 0 ? 0 : FUIRenderer.MeasureText(text[..cPos], textFontSize));
             if ((DateTime.Now.Millisecond / 500) % 2 == 0)
             {
                 using var cursorPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active);

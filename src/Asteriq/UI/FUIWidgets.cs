@@ -758,14 +758,12 @@ internal static class FUIWidgets
 
             FUIRenderer.DrawText(canvas, text, new SKPoint(contentX, textY), FUIColors.TextPrimary, textFontSize);
 
-            if (bounds.Contains(mousePosition.X, mousePosition.Y))
-            {
-                float clearX = bounds.Right - 18f;
-                float clearY = bounds.MidY;
-                using var clearPaint = FUIRenderer.CreateStrokePaint(FUIColors.TextDim, 1.5f);
-                canvas.DrawLine(clearX - 4, clearY - 4, clearX + 4, clearY + 4, clearPaint);
-                canvas.DrawLine(clearX + 4, clearY - 4, clearX - 4, clearY + 4, clearPaint);
-            }
+            // × clear button — always visible when text is present
+            float clearX = bounds.Right - 18f;
+            float clearY = bounds.MidY;
+            using var clearPaint = FUIRenderer.CreateStrokePaint(FUIColors.TextDim, 1.5f);
+            canvas.DrawLine(clearX - 4, clearY - 4, clearX + 4, clearY + 4, clearPaint);
+            canvas.DrawLine(clearX + 4, clearY - 4, clearX - 4, clearY + 4, clearPaint);
         }
 
         if (focused)

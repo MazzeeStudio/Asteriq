@@ -393,14 +393,18 @@ internal static class SCBindingsRenderer
             return "";
 
         var lower = modifier.ToLowerInvariant();
-        if (lower.Contains("shift")) return "SHFT";
-        if (lower.Contains("ctrl") || lower.Contains("control")) return "CTRL";
-        if (lower.Contains("alt")) return "ALT";
+
+        // Preserve L/R distinction for modifiers
+        string prefix = lower.StartsWith('l') ? "L-" : lower.StartsWith('r') ? "R-" : "";
+
+        if (lower.Contains("shift")) return $"{prefix}SHIFT";
+        if (lower.Contains("ctrl") || lower.Contains("control")) return $"{prefix}CTRL";
+        if (lower.Contains("alt")) return $"{prefix}ALT";
 
         var cleaned = lower.TrimStart('l', 'r').ToUpperInvariant();
         if (cleaned.Length > 4)
             cleaned = cleaned.Substring(0, 4);
-        return cleaned;
+        return prefix + cleaned;
     }
 
     internal static string FormatInputName(string input)
@@ -430,6 +434,11 @@ internal static class SCBindingsRenderer
 
         if (input.StartsWith("mouse", StringComparison.OrdinalIgnoreCase))
             return $"M{input.Substring(5)}";
+
+        // Standalone modifier keys displayed as input (not as modifier prefix)
+        var inputLower = input.ToLowerInvariant();
+        if (inputLower is "lshift" or "rshift" or "lctrl" or "rctrl" or "lalt" or "ralt")
+            return FormatModifierName(input);
 
         if (input.Length == 1)
             return input.ToUpper();

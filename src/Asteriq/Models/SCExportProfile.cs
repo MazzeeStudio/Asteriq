@@ -161,6 +161,14 @@ public class SCExportProfile
     }
 
     /// <summary>
+    /// Returns true if the action has any user binding (joystick, keyboard, or mouse).
+    /// </summary>
+    public bool HasAnyBinding(string actionMap, string actionName)
+    {
+        return Bindings.Any(b => b.ActionMap == actionMap && b.ActionName == actionName);
+    }
+
+    /// <summary>
     /// Gets a binding for an action with specific device type
     /// </summary>
     public SCActionBinding? GetBinding(string actionMap, string actionName, SCDeviceType deviceType)
@@ -293,6 +301,25 @@ public class SCExportProfile
         return Bindings.Where(b =>
             b.DeviceType == SCDeviceType.Joystick &&
             b.PhysicalDeviceId == physicalDeviceId &&
+            b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
+            ModifierSetsMatch(b.Modifiers, modifiers) &&
+            !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Gets all keyboard or mouse bindings that conflict with the given input.
+    /// Two bindings conflict if they share the same input name and modifier set.
+    /// </summary>
+    public List<SCActionBinding> GetConflictingBindings(
+        SCDeviceType deviceType,
+        string inputName,
+        string? excludeActionMap = null,
+        string? excludeActionName = null,
+        List<string>? modifiers = null)
+    {
+        return Bindings.Where(b =>
+            b.DeviceType == deviceType &&
             b.InputName.Equals(inputName, StringComparison.OrdinalIgnoreCase) &&
             ModifierSetsMatch(b.Modifiers, modifiers) &&
             !(b.ActionMap == excludeActionMap && b.ActionName == excludeActionName))

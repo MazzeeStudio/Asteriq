@@ -217,9 +217,12 @@ public partial class SCBindingsTabController
 
                 uint? vjoyId = (col.IsJoystick && !col.IsPhysical) ? col.VJoyDeviceId : null;
                 string? physId = col.IsPhysical ? col.PhysicalDevice?.HidDevicePath : null;
+                SCDeviceType? capDevType = col.IsKeyboard ? SCDeviceType.Keyboard
+                    : col.IsMouse ? SCDeviceType.Mouse
+                    : null;
 
                 actions = actions.Where(a => SCBindingsSearch.MatchesButtonCapture(
-                    a, _scExportProfile.Bindings, capturedInput, capturedModifier, vjoyId, physId)).ToList();
+                    a, _scExportProfile.Bindings, capturedInput, capturedModifier, vjoyId, physId, capDevType)).ToList();
             }
             else
             {
@@ -229,11 +232,11 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Apply "show bound only" filter if enabled
+        // Apply "show bound only" filter if enabled — includes JS, KB, and Mouse bindings
         if (_ctx.AppSettings.SCBindingsShowBoundOnly)
         {
             actions = actions.Where(a =>
-                _scExportProfile.GetBinding(a.ActionMap, a.ActionName) is not null
+                _scExportProfile.HasAnyBinding(a.ActionMap, a.ActionName)
             ).ToList();
         }
 
@@ -336,18 +339,24 @@ public partial class SCBindingsTabController
         // Key: "js1_button5" or "phys:path_button5" etc., Value: list of binding keys that use it
         var inputUsage = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
-        // Check user bindings from export profile
+        // Check user bindings from export profile (joystick, keyboard, and mouse)
         foreach (var binding in _scExportProfile.Bindings)
         {
-            if (binding.DeviceType != SCDeviceType.Joystick) continue;
-
             // Include modifiers in the key so rctrl+button13 and button13 are separate slots
             string modPrefix = binding.Modifiers is { Count: > 0 }
                 ? string.Join("+", binding.Modifiers.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)) + "+"
                 : "";
 
             string inputKey;
-            if (binding.PhysicalDeviceId is not null)
+            if (binding.DeviceType == SCDeviceType.Keyboard)
+            {
+                inputKey = $"kb_{modPrefix}{binding.InputName}";
+            }
+            else if (binding.DeviceType == SCDeviceType.Mouse)
+            {
+                inputKey = $"mouse_{modPrefix}{binding.InputName}";
+            }
+            else if (binding.PhysicalDeviceId is not null)
             {
                 int scInstance = _scExportProfile.GetSCInstanceForPhysical(binding.PhysicalDeviceId);
                 inputKey = $"js{scInstance}_{modPrefix}{binding.InputName}";
@@ -1009,6 +1018,12 @@ public partial class SCBindingsTabController
             Keys.OemPeriod => "period",
             Keys.OemQuestion or Keys.Oem2 => "slash",
             Keys.Oemtilde or Keys.Oem3 => "grave",
+            Keys.LShiftKey => "lshift",
+            Keys.RShiftKey => "rshift",
+            Keys.LControlKey => "lctrl",
+            Keys.RControlKey => "rctrl",
+            Keys.LMenu => "lalt",
+            Keys.RMenu => "ralt",
             _ => key.ToString().ToLower()
         };
     }
@@ -1093,6 +1108,12 @@ public partial class SCBindingsTabController
         // Find the binding for the selected cell.
         // For shared/rerouted cells there is no direct binding on the secondary column —
         // fall back to the primary binding so conflict links reflect what the cell routes to.
+        // Determine the device type for lookup
+        SCDeviceType? cellDeviceType = col.IsKeyboard ? SCDeviceType.Keyboard
+            : col.IsMouse ? SCDeviceType.Mouse
+            : col.IsJoystick ? SCDeviceType.Joystick
+            : null;
+
         SCActionBinding? selectedBinding = col.IsPhysical
             ? _scExportProfile.Bindings.FirstOrDefault(b =>
                 b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
@@ -1102,7 +1123,11 @@ public partial class SCBindingsTabController
                     b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
                     b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
                     b.VJoyDevice == col.VJoyDeviceId)
-                : null;
+                : cellDeviceType.HasValue
+                    ? _scExportProfile.Bindings.FirstOrDefault(b =>
+                        b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
+                        b.DeviceType == cellDeviceType.Value)
+                    : null;
 
         // If no direct binding, check whether this is a shared/rerouted cell and use the primary binding
         if (selectedBinding is null && col.IsJoystick && !col.IsPhysical)
@@ -1122,11 +1147,22 @@ public partial class SCBindingsTabController
 
         // Find all other bindings with the same device + inputName + modifier set.
         // Use the binding's own VJoyDevice (may be the primary device for rerouted cells).
-        var conflicts = col.IsPhysical
-            ? _scExportProfile.GetConflictingBindings(col.PhysicalDevice!.HidDevicePath,
-                selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers)
-            : _scExportProfile.GetConflictingBindings(selectedBinding.VJoyDevice,
+        List<SCActionBinding> conflicts;
+        if (col.IsPhysical)
+        {
+            conflicts = _scExportProfile.GetConflictingBindings(col.PhysicalDevice!.HidDevicePath,
                 selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
+        }
+        else if (col.IsKeyboard || col.IsMouse)
+        {
+            conflicts = _scExportProfile.GetConflictingBindings(selectedBinding.DeviceType,
+                selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
+        }
+        else
+        {
+            conflicts = _scExportProfile.GetConflictingBindings(selectedBinding.VJoyDevice,
+                selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
+        }
 
         foreach (var conflict in conflicts)
             _conflicts.ConflictLinks.Add((conflict.ActionMap, conflict.ActionName));

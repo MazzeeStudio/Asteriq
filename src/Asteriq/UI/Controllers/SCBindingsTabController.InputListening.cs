@@ -61,7 +61,7 @@ public partial class SCBindingsTabController
             // the REAL target button.  This avoids all timing races between SDL2 button state
             // and GetAsyncKeyState, which caused the old two-phase approach to be unreliable.
 
-            var detectedJoystick = DetectJoystickInput(col);
+            var detectedJoystick = DetectJoystickInput(col, action.InputType);
             if (detectedJoystick is not null)
             {
                 var (inputName, deviceGuid) = detectedJoystick.Value;
@@ -104,17 +104,23 @@ public partial class SCBindingsTabController
     {
         // Collect held modifiers
         var modifiers = new List<string>();
+        bool rAltHeld = IsKeyHeld(0xA5); // VK_RMENU (R-Alt / AltGr)
+
         if (IsKeyHeld(0xA0) || IsKeyHeld(0xA1)) // VK_LSHIFT, VK_RSHIFT
         {
             modifiers.Add(IsKeyHeld(0xA1) ? "rshift" : "lshift");
         }
         if (IsKeyHeld(0xA2) || IsKeyHeld(0xA3)) // VK_LCONTROL, VK_RCONTROL
         {
-            modifiers.Add(IsKeyHeld(0xA3) ? "rctrl" : "lctrl");
+            // AltGr sends a phantom L-Ctrl — suppress it when R-Alt is held
+            if (IsKeyHeld(0xA3))
+                modifiers.Add("rctrl");
+            else if (!rAltHeld)
+                modifiers.Add("lctrl");
         }
-        if (IsKeyHeld(0xA4) || IsKeyHeld(0xA5)) // VK_LMENU, VK_RMENU (Alt)
+        if (IsKeyHeld(0xA4) || rAltHeld) // VK_LMENU, VK_RMENU (Alt)
         {
-            modifiers.Add(IsKeyHeld(0xA5) ? "ralt" : "lalt");
+            modifiers.Add(rAltHeld ? "ralt" : "lalt");
         }
 
         // Check for regular keys (A-Z)
@@ -157,10 +163,19 @@ public partial class SCBindingsTabController
             }
         }
 
+        // Standalone modifier keys — if a modifier is newly pressed with no other key,
+        // return it as the key itself (e.g., LShift bound as "lshift" in SC)
+        if (IsKeyPressed(0xA0)) return (Keys.LShiftKey, new List<string>());
+        if (IsKeyPressed(0xA1)) return (Keys.RShiftKey, new List<string>());
+        if (IsKeyPressed(0xA2)) return (Keys.LControlKey, new List<string>());
+        if (IsKeyPressed(0xA3)) return (Keys.RControlKey, new List<string>());
+        if (IsKeyPressed(0xA4)) return (Keys.LMenu, new List<string>());
+        if (IsKeyPressed(0xA5)) return (Keys.RMenu, new List<string>());
+
         return null;
     }
 
-    private static string? DetectMouseInput()
+    private string? DetectMouseInput()
     {
         if (IsKeyPressed(0x01)) return "mouse1"; // VK_LBUTTON
         if (IsKeyPressed(0x02)) return "mouse2"; // VK_RBUTTON
@@ -168,13 +183,18 @@ public partial class SCBindingsTabController
         if (IsKeyPressed(0x05)) return "mouse4"; // VK_XBUTTON1
         if (IsKeyPressed(0x06)) return "mouse5"; // VK_XBUTTON2
 
-        // Mouse wheel detection would need WM_MOUSEWHEEL messages which we don't have here
-        // For now, mouse wheel bindings need to be entered differently
+        // Mouse wheel — captured by OnMouseWheel and stored as pending
+        var wheel = _scListening.PendingMouseWheel;
+        if (wheel is not null)
+        {
+            _scListening.PendingMouseWheel = null;
+            return wheel;
+        }
 
         return null;
     }
 
-    private (string inputName, Guid deviceGuid)? DetectJoystickInput(SCGridColumn col)
+    private (string inputName, Guid deviceGuid)? DetectJoystickInput(SCGridColumn col, SCInputType expectedType = SCInputType.Button)
     {
         const float AxisThreshold = 0.15f; // 15% threshold like SCVirtStick/Gremlin
 
@@ -230,53 +250,57 @@ public partial class SCBindingsTabController
             _scListening.ButtonBaseline!.TryGetValue(device.InstanceGuid, out var baselineButtons);
             _scListening.HatBaseline!.TryGetValue(device.InstanceGuid, out var baselineHats);
 
-            // Check for button presses - immediately return on first press
-            for (int i = 0; i < state.Buttons.Length; i++)
+            // Only detect the input type the action expects.
+            // Axis actions only listen for axes; button actions listen for buttons/hats.
+            if (expectedType == SCInputType.Axis)
             {
-                bool wasPressed = baselineButtons is not null && i < baselineButtons.Length && baselineButtons[i];
-                bool isPressed = state.Buttons[i];
-
-                if (isPressed && !wasPressed)
+                for (int i = 0; i < state.Axes.Length; i++)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected button {i + 1} on {device.Name}");
-                    ResetJoystickDetectionState();
-                    return ($"button{i + 1}", device.InstanceGuid);
+                    float baselineValue = baselineAxes is not null && i < baselineAxes.Length ? baselineAxes[i] : 0f;
+                    float currValue = state.Axes[i];
+                    float deflection = Math.Abs(currValue - baselineValue);
+
+                    if (deflection > AxisThreshold)
+                    {
+                        string axisName = col.IsPhysical
+                            ? GetSCAxisNameFromDevice(i, device)
+                            : GetVJoyAxisNameFromMapping(device, i, col);
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> {axisName} on {device.Name}, deflection: {deflection:F2}");
+                        ResetJoystickDetectionState();
+                        return (axisName, device.InstanceGuid);
+                    }
                 }
             }
-
-            // Check for axis movement
-            for (int i = 0; i < state.Axes.Length; i++)
+            else
             {
-                float baselineValue = baselineAxes is not null && i < baselineAxes.Length ? baselineAxes[i] : 0f;
-                float currValue = state.Axes[i];
-                float deflection = Math.Abs(currValue - baselineValue);
-
-                if (deflection > AxisThreshold)
+                // Button/Hat actions — only detect buttons and hats, ignore axis movement
+                for (int i = 0; i < state.Buttons.Length; i++)
                 {
-                    // For physical columns, use HID axis type info directly
-                    // For vJoy columns, look up the vJoy output axis from the mapping profile
-                    string axisName = col.IsPhysical
-                        ? GetSCAxisNameFromDevice(i, device)
-                        : GetVJoyAxisNameFromMapping(device, i, col);
-                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> {axisName} on {device.Name}, deflection: {deflection:F2}");
-                    ResetJoystickDetectionState();
-                    return (axisName, device.InstanceGuid);
+                    bool wasPressed = baselineButtons is not null && i < baselineButtons.Length && baselineButtons[i];
+                    bool isPressed = state.Buttons[i];
+
+                    if (isPressed && !wasPressed)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected button {i + 1} on {device.Name}");
+                        ResetJoystickDetectionState();
+                        return ($"button{i + 1}", device.InstanceGuid);
+                    }
                 }
-            }
 
-            // Check for hat movement
-            for (int i = 0; i < state.Hats.Length; i++)
-            {
-                int baselineHat = baselineHats is not null && i < baselineHats.Length ? baselineHats[i] : -1;
-                int currHat = state.Hats[i];
-
-                // Hat changed from centered to a direction
-                if (currHat >= 0 && baselineHat < 0)
+                // Check for hat movement (also button-type input)
+                for (int i = 0; i < state.Hats.Length; i++)
                 {
-                    string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
-                    System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected hat {i + 1} {hatDir} on {device.Name}");
-                    ResetJoystickDetectionState();
-                    return ($"hat{i + 1}_{hatDir}", device.InstanceGuid);
+                    int baselineHat = baselineHats is not null && i < baselineHats.Length ? baselineHats[i] : -1;
+                    int currHat = state.Hats[i];
+
+                    // Hat changed from centered to a direction
+                    if (currHat >= 0 && baselineHat < 0)
+                    {
+                        string hatDir = GetHatDirection(HatAngleToDiscrete(currHat));
+                        System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected hat {i + 1} {hatDir} on {device.Name}");
+                        ResetJoystickDetectionState();
+                        return ($"hat{i + 1}_{hatDir}", device.InstanceGuid);
+                    }
                 }
             }
         }
@@ -316,8 +340,6 @@ public partial class SCBindingsTabController
         }
 
         // Reset all detection state before subscribing.
-        _captureButtonBaseline = null;
-        _captureHatBaseline = null;
         _capturePrevButtons = null;
         _capturePrevHats = null;
         _capturePendingModifierBg = null;
@@ -351,10 +373,9 @@ public partial class SCBindingsTabController
 
         // Clear detection state — safe now that the handler is detached.
         _captureGuidToHidPath = null;
-        _captureButtonBaseline = null;
-        _captureHatBaseline = null;
         _capturePrevButtons = null;
         _capturePrevHats = null;
+        _captureMouseWheelPending = null;
         _capturePendingModifierBg = null;
         _captureCandidateInput = null;
         _captureCandidatePath = null;
@@ -394,18 +415,24 @@ public partial class SCBindingsTabController
         bool inWarmup = now < _captureWarmupUntil;
 
         // Lazily initialise dicts on the first event we receive.
-        _captureButtonBaseline ??= new Dictionary<Guid, bool[]>();
-        _captureHatBaseline ??= new Dictionary<Guid, int[]>();
         _capturePrevButtons ??= new Dictionary<Guid, bool[]>();
         _capturePrevHats ??= new Dictionary<Guid, int[]>();
 
         if (inWarmup)
         {
-            // Keep refreshing both dicts so any held button is absorbed into the baseline.
-            _captureButtonBaseline[guid] = (bool[])state.Buttons.Clone();
-            _captureHatBaseline[guid] = (int[])state.Hats.Clone();
+            // During warmup, only update previous-frame snapshots for edge detection.
+            // No baseline — buttons held during warmup are NOT permanently locked out.
+            // They simply won't trigger until released and re-pressed (edge detection).
             _capturePrevButtons[guid] = (bool[])state.Buttons.Clone();
             _capturePrevHats[guid] = (int[])state.Hats.Clone();
+            // Clear "was pressed" state for KB/mouse so the click that started capture
+            // doesn't immediately trigger detection once warmup ends.
+            GetAsyncKeyState(0x01); // VK_LBUTTON
+            GetAsyncKeyState(0x02); // VK_RBUTTON
+            GetAsyncKeyState(0x04); // VK_MBUTTON
+            GetAsyncKeyState(0x05); // VK_XBUTTON1
+            GetAsyncKeyState(0x06); // VK_XBUTTON2
+            ClearStaleKeyPresses();
             return;
         }
 
@@ -423,9 +450,7 @@ public partial class SCBindingsTabController
             return;
         }
 
-        // Detection phase.
-        _captureButtonBaseline.TryGetValue(guid, out var baseButtons);
-        _captureHatBaseline.TryGetValue(guid, out var baseHats);
+        // Detection phase — edge detection only (current vs previous frame).
         _capturePrevButtons.TryGetValue(guid, out var prevButtons);
         _capturePrevHats.TryGetValue(guid, out var prevHats);
 
@@ -434,9 +459,6 @@ public partial class SCBindingsTabController
         // Buttons — scan all buttons; last new-press in this event wins the candidate.
         for (int i = 0; i < state.Buttons.Length; i++)
         {
-            bool inBaseline = baseButtons is not null && i < baseButtons.Length && baseButtons[i];
-            if (inBaseline) continue;
-
             bool wasPrev = prevButtons is not null && i < prevButtons.Length && prevButtons[i];
             if (!state.Buttons[i] || wasPrev) continue;
 
@@ -450,8 +472,6 @@ public partial class SCBindingsTabController
                 // so the modifier hold is absorbed before the target button is detected.
                 _capturePendingModifierBg = _scModifierButtonToModifiers.TryGetValue(modKey, out var mods) && mods.Count > 0
                     ? mods[0] : null;
-                _captureButtonBaseline = null;
-                _captureHatBaseline = null;
                 _capturePrevButtons = null;
                 _capturePrevHats = null;
                 _captureCandidateInput = null;
@@ -477,9 +497,6 @@ public partial class SCBindingsTabController
         {
             for (int i = 0; i < state.Hats.Length; i++)
             {
-                bool hatInBaseline = baseHats is not null && i < baseHats.Length && baseHats[i] >= 0;
-                if (hatInBaseline) continue;
-
                 int prevHat = prevHats is not null && i < prevHats.Length ? prevHats[i] : -1;
                 int currHat = state.Hats[i];
 
@@ -494,6 +511,48 @@ public partial class SCBindingsTabController
                     _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
                     break; // one hat direction per event
                 }
+            }
+        }
+
+        // Keyboard detection — poll for newly pressed keys (not modifiers)
+        if (!detectedThisEvent)
+        {
+            var kbResult = DetectKeyboardInput();
+            if (kbResult is not null)
+            {
+                var (key, mods) = kbResult.Value;
+                string scInput = KeyToSCInput(key);
+                string modPrefix = mods.Count > 0 ? string.Join("+", mods) + "+" : "";
+                // Prefix with "kb:" so ApplyButtonCaptureResult can identify the device type
+                _captureCandidateInput = $"kb:{modPrefix}{scInput}";
+                _captureCandidatePath = null; // no HID path for KB
+                _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+                detectedThisEvent = true;
+            }
+        }
+
+        // Mouse button detection — poll for newly pressed mouse buttons
+        if (!detectedThisEvent)
+        {
+            // Check mouse buttons via GetAsyncKeyState
+            string? mouseResult = null;
+            if (IsKeyPressed(0x04)) mouseResult = "mouse3"; // VK_MBUTTON
+            else if (IsKeyPressed(0x05)) mouseResult = "mouse4"; // VK_XBUTTON1
+            else if (IsKeyPressed(0x06)) mouseResult = "mouse5"; // VK_XBUTTON2
+
+            // Check mouse wheel (set by OnMouseWheel on UI thread)
+            var wheelPending = _captureMouseWheelPending;
+            if (wheelPending is not null)
+            {
+                _captureMouseWheelPending = null;
+                mouseResult = wheelPending;
+            }
+
+            if (mouseResult is not null)
+            {
+                _captureCandidateInput = $"mouse:{mouseResult}";
+                _captureCandidatePath = null;
+                _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
             }
         }
 
@@ -523,71 +582,107 @@ public partial class SCBindingsTabController
         _searchFilter.ButtonCaptureActive = false;
         // Clear controller-level detection state (handler already unsubscribed before posting this call).
         _captureGuidToHidPath = null;
-        _captureButtonBaseline = null;
-        _captureHatBaseline = null;
         _capturePrevButtons = null;
         _capturePrevHats = null;
         _capturePendingModifierBg = null;
         _captureCandidateInput = null;
         _captureCandidatePath = null;
 
+        // Detect device type prefix from capture (kb: or mouse: for non-joystick captures)
+        string displayName = inputName;
+        string? captureDevicePrefix = null;
+        if (inputName.StartsWith("kb:"))
+        {
+            captureDevicePrefix = "kb";
+            displayName = inputName[3..];
+        }
+        else if (inputName.StartsWith("mouse:"))
+        {
+            captureDevicePrefix = "mouse";
+            displayName = inputName[6..];
+        }
+
         // Keep SuppressForwarding=true until the captured button is physically released,
         // then clear snapshots and resume. This prevents the held button from being
         // forwarded to the remote machine the instant forwarding resumes.
-        string rawInput = inputName.Contains('+') ? inputName[(inputName.LastIndexOf('+') + 1)..] : inputName;
+        string rawInput = displayName.Contains('+') ? displayName[(displayName.LastIndexOf('+') + 1)..] : displayName;
         _searchFilter.CaptureReleasePendingInput = rawInput;
         _searchFilter.CaptureReleaseWaitTicks = 0;
-        _searchFilter.CaptureWaitingForRelease = true;
-        // SuppressForwarding remains true — CheckCaptureRelease() clears it on release
+        _searchFilter.CaptureWaitingForRelease = captureDevicePrefix is null; // only wait for JS release
         _searchFilter.CaptureDeviceHidPath = hidPath;
-        _searchFilter.SearchText = inputName;
-        _searchFilter.CursorPos = inputName.Length;
+        _searchFilter.SearchText = displayName;
+        _searchFilter.CursorPos = displayName.Length;
         _searchFilter.SelectionStart = -1;
         _searchFilter.SelectionEnd = -1;
         _searchFilter.ButtonCaptureTextActive = true;
+        if (captureDevicePrefix is null)
+        {
+            // SuppressForwarding remains true — CheckCaptureRelease() clears it on release
+        }
+        else
+        {
+            // KB/Mouse: release forwarding immediately (no physical release to wait for)
+            _ctx.SuppressForwarding = false;
+        }
 
-        // Highlight the column corresponding to the detected device (same as clicking the column header).
-        // Two cases:
-        //   - No vJoy setup: physical columns exist directly → match by HID path.
-        //   - vJoy setup (typical): physical devices route through vJoy. Find the vJoy column whose
-        //     primary physical device (from the active Mappings profile) matches the captured device.
-        if (hidPath is not null && _grid.Columns is not null)
+        // Highlight the column corresponding to the detected device
+        if (_grid.Columns is not null)
         {
             int foundCol = -1;
 
-            // Case 1: physical column (no-vJoy setup)
-            for (int c = 0; c < _grid.Columns.Count; c++)
+            if (captureDevicePrefix == "kb")
             {
-                var col = _grid.Columns[c];
-                if (col.IsPhysical && col.PhysicalDevice!.HidDevicePath == hidPath)
+                // Find the KB column
+                for (int c = 0; c < _grid.Columns.Count; c++)
                 {
-                    foundCol = c;
-                    break;
+                    if (_grid.Columns[c].IsKeyboard) { foundCol = c; break; }
                 }
             }
-
-            // Case 2: vJoy column — find via VJoyPrimaryDevices in the active Mappings profile
-            if (foundCol < 0)
+            else if (captureDevicePrefix == "mouse")
             {
-                var physDevice = _ctx.Devices.FirstOrDefault(d => !d.IsVirtual && d.HidDevicePath == hidPath);
-                var activeProfile = _ctx.ProfileManager.ActiveProfile;
-                if (physDevice is not null && activeProfile is not null)
+                // Find the Mouse column
+                for (int c = 0; c < _grid.Columns.Count; c++)
                 {
-                    string physGuid = physDevice.InstanceGuid.ToString();
-                    foreach (var kv in activeProfile.VJoyPrimaryDevices)
+                    if (_grid.Columns[c].IsMouse) { foundCol = c; break; }
+                }
+            }
+            else if (hidPath is not null)
+            {
+                // Joystick: find by HID path
+                // Case 1: physical column (no-vJoy setup)
+                for (int c = 0; c < _grid.Columns.Count; c++)
+                {
+                    var col = _grid.Columns[c];
+                    if (col.IsPhysical && col.PhysicalDevice!.HidDevicePath == hidPath)
                     {
-                        if (!kv.Value.Equals(physGuid, StringComparison.OrdinalIgnoreCase)) continue;
-                        uint vjoyId = kv.Key;
-                        for (int c = 0; c < _grid.Columns.Count; c++)
-                        {
-                            var col = _grid.Columns[c];
-                            if (col.IsJoystick && !col.IsPhysical && col.VJoyDeviceId == vjoyId)
-                            {
-                                foundCol = c;
-                                break;
-                            }
-                        }
+                        foundCol = c;
                         break;
+                    }
+                }
+
+                // Case 2: vJoy column — find via VJoyPrimaryDevices in the active Mappings profile
+                if (foundCol < 0)
+                {
+                    var physDevice = _ctx.Devices.FirstOrDefault(d => !d.IsVirtual && d.HidDevicePath == hidPath);
+                    var activeProfile = _ctx.ProfileManager.ActiveProfile;
+                    if (physDevice is not null && activeProfile is not null)
+                    {
+                        string physGuid = physDevice.InstanceGuid.ToString();
+                        foreach (var kv in activeProfile.VJoyPrimaryDevices)
+                        {
+                            if (!kv.Value.Equals(physGuid, StringComparison.OrdinalIgnoreCase)) continue;
+                            uint vjoyId = kv.Key;
+                            for (int c = 0; c < _grid.Columns.Count; c++)
+                            {
+                                var col = _grid.Columns[c];
+                                if (col.IsJoystick && !col.IsPhysical && col.VJoyDeviceId == vjoyId)
+                                {
+                                    foundCol = c;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
                     }
                 }
             }

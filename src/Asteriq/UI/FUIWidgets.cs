@@ -69,19 +69,20 @@ internal static class FUIWidgets
     // ─── Forwarding / Status ──────────────────────────────────────────────────
 
 
-    internal static void DrawStatusItem(SKCanvas canvas, float x, float y, float width, string label, string value, SKColor valueColor)
+    internal static void DrawStatusItem(SKCanvas canvas, float x, float y, float width, string label, string value, SKColor valueColor, float fontSize = 14f)
     {
-        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y + 12), FUIColors.TextDim, 14f);
+        float textOffsetY = fontSize <= 12f ? 9f : 12f;
+        FUIRenderer.DrawText(canvas, label, new SKPoint(x, y + textOffsetY), FUIColors.TextDim, fontSize);
 
         var dotColor = valueColor == FUIColors.Active ? valueColor : FUIColors.Primary.WithAlpha(100);
         float dotX = x + width - 110;
-        FUIRenderer.DrawGlowingDot(canvas, new SKPoint(dotX, y + 8), dotColor, 2f, 4f);
+        FUIRenderer.DrawGlowingDot(canvas, new SKPoint(dotX, y + (fontSize <= 12f ? 6f : 8f)), dotColor, 2f, 4f);
 
         float textStartX = dotX + 10;
         float rightEdge = x + width;
         float maxValueWidth = rightEdge - textStartX - 8;
 
-        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, 14f);
+        using var measurePaint = FUIRenderer.CreateTextPaint(valueColor, fontSize);
         string displayValue = value;
         float textWidth = measurePaint.MeasureText(displayValue);
 
@@ -94,7 +95,7 @@ internal static class FUIWidgets
             displayValue += "…";
         }
 
-        FUIRenderer.DrawText(canvas, displayValue, new SKPoint(textStartX, y + 12), valueColor, 14f);
+        FUIRenderer.DrawText(canvas, displayValue, new SKPoint(textStartX, y + textOffsetY), valueColor, fontSize);
     }
 
     internal static void DrawLayerIndicator(SKCanvas canvas, float x, float y, float width, string name, bool isActive)

@@ -536,7 +536,9 @@ public partial class SCBindingsTabController
         {
             // Check mouse buttons via GetAsyncKeyState
             string? mouseResult = null;
-            if (IsKeyPressed(0x04)) mouseResult = "mouse3"; // VK_MBUTTON
+            if (IsKeyPressed(0x01)) mouseResult = "mouse1"; // VK_LBUTTON
+            else if (IsKeyPressed(0x02)) mouseResult = "mouse2"; // VK_RBUTTON
+            else if (IsKeyPressed(0x04)) mouseResult = "mouse3"; // VK_MBUTTON
             else if (IsKeyPressed(0x05)) mouseResult = "mouse4"; // VK_XBUTTON1
             else if (IsKeyPressed(0x06)) mouseResult = "mouse5"; // VK_XBUTTON2
 

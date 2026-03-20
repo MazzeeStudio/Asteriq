@@ -1303,6 +1303,9 @@ internal static class FUIWidgets
         {
             LeftMargin = m.LeftMargin,
             RightMargin = m.RightMargin,
+            ContentWidth = m.ContentWidth,
+            RowHeight = m.RowHeight,
+            SectionSpacing = m.SectionSpacing,
             Y = y
         };
     }

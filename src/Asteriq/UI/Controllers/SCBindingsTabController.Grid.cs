@@ -487,24 +487,25 @@ public partial class SCBindingsTabController
         SetStatus($"Bound {action.ActionName} to kb1_{inputName}");
     }
 
-    private void AssignMouseBinding(SCAction action, string inputName)
+    private void AssignMouseBinding(SCAction action, string inputName, List<string>? modifiers = null)
     {
-        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning Mouse binding: {action.ActionName} = {inputName}");
+        string modDisplay = modifiers is { Count: > 0 } ? string.Join("+", modifiers) + "+" : "";
+        System.Diagnostics.Debug.WriteLine($"[SCBindings] Assigning Mouse binding: {action.ActionName} = {modDisplay}{inputName}");
 
-        // Store in the export profile (persisted and clearable)
         var binding = new SCActionBinding
         {
             ActionMap = action.ActionMap,
             ActionName = action.ActionName,
             DeviceType = SCDeviceType.Mouse,
             InputName = inputName,
-            InputType = SCInputType.Button
+            InputType = SCInputType.Button,
+            Modifiers = modifiers ?? new List<string>()
         };
 
         _scExportProfile.SetBinding(action.ActionMap, action.ActionName, binding);
         _scExportProfileService?.SaveProfile(_scExportProfile);
 
-        SetStatus($"Bound {action.ActionName} to mo1_{inputName}");
+        SetStatus($"Bound {action.ActionName} to mo1_{modDisplay}{inputName}");
     }
 
     private void AssignJoystickBinding(SCAction action, SCGridColumn col, string inputName, List<string>? modifiers = null)

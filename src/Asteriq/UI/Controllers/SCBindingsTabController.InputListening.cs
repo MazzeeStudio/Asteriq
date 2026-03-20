@@ -48,9 +48,9 @@ public partial class SCBindingsTabController
             var detectedMouse = DetectMouseInput();
             if (detectedMouse is not null)
             {
-                var mouse = detectedMouse;
+                var (inputName, modifiers) = detectedMouse.Value;
                 CancelSCInputListening();
-                AssignMouseBinding(action, mouse);
+                AssignMouseBinding(action, inputName, modifiers);
             }
         }
         else if (col.IsJoystick)
@@ -175,23 +175,45 @@ public partial class SCBindingsTabController
         return null;
     }
 
-    private string? DetectMouseInput()
+    private (string inputName, List<string> modifiers)? DetectMouseInput()
     {
-        if (IsKeyPressed(0x01)) return "mouse1"; // VK_LBUTTON
-        if (IsKeyPressed(0x02)) return "mouse2"; // VK_RBUTTON
-        if (IsKeyPressed(0x04)) return "mouse3"; // VK_MBUTTON
-        if (IsKeyPressed(0x05)) return "mouse4"; // VK_XBUTTON1
-        if (IsKeyPressed(0x06)) return "mouse5"; // VK_XBUTTON2
+        string? mouse = null;
+        if (IsKeyPressed(0x01)) mouse = "mouse1"; // VK_LBUTTON
+        else if (IsKeyPressed(0x02)) mouse = "mouse2"; // VK_RBUTTON
+        else if (IsKeyPressed(0x04)) mouse = "mouse3"; // VK_MBUTTON
+        else if (IsKeyPressed(0x05)) mouse = "mouse4"; // VK_XBUTTON1
+        else if (IsKeyPressed(0x06)) mouse = "mouse5"; // VK_XBUTTON2
 
         // Mouse wheel — captured by OnMouseWheel and stored as pending
-        var wheel = _scListening.PendingMouseWheel;
-        if (wheel is not null)
+        if (mouse is null)
         {
-            _scListening.PendingMouseWheel = null;
-            return wheel;
+            var wheel = _scListening.PendingMouseWheel;
+            if (wheel is not null)
+            {
+                _scListening.PendingMouseWheel = null;
+                mouse = wheel;
+            }
         }
 
-        return null;
+        if (mouse is null)
+            return null;
+
+        // Collect held keyboard modifiers (same logic as DetectKeyboardInput)
+        var modifiers = new List<string>();
+        bool rAltHeld = IsKeyHeld(0xA5); // VK_RMENU
+        if (IsKeyHeld(0xA0) || IsKeyHeld(0xA1))
+            modifiers.Add(IsKeyHeld(0xA1) ? "rshift" : "lshift");
+        if (IsKeyHeld(0xA2) || IsKeyHeld(0xA3))
+        {
+            if (IsKeyHeld(0xA3))
+                modifiers.Add("rctrl");
+            else if (!rAltHeld)
+                modifiers.Add("lctrl");
+        }
+        if (IsKeyHeld(0xA4) || rAltHeld)
+            modifiers.Add(rAltHeld ? "ralt" : "lalt");
+
+        return (mouse, modifiers);
     }
 
     private (string inputName, Guid deviceGuid)? DetectJoystickInput(SCGridColumn col, SCInputType expectedType = SCInputType.Button)

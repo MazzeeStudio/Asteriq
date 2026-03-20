@@ -50,6 +50,8 @@ public partial class MappingsTabController
         bool showDeviceOrder = profile is not null && existingSlots.Count > 0;
 
         ref var doAnim = ref _deviceOrder.Anim;
+        if (doAnim.Update(!_deviceOrder.IsExpanded, showDeviceOrder))
+            _ctx.MarkDirty();
         float vertGap = 8f;
         float doFrameInset = 5f;
 

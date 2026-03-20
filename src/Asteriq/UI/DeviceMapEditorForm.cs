@@ -398,53 +398,26 @@ public class DeviceMapEditorForm : Form
 
         // New button
         _newButtonBounds = new SKRect(x, y, x + 60, y + 30);
-        DrawButton(canvas, _newButtonBounds, "NEW", _newButtonHovered);
+        FUIRenderer.DrawButton(canvas, _newButtonBounds, "NEW", _newButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         x += 70;
 
         // Load button
         _loadButtonBounds = new SKRect(x, y, x + 60, y + 30);
-        DrawButton(canvas, _loadButtonBounds, "LOAD", _loadButtonHovered);
+        FUIRenderer.DrawButton(canvas, _loadButtonBounds, "LOAD", _loadButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         x += 80;
 
         // Mirror checkbox
         FUIRenderer.DrawText(canvas, "Mirror (L):", new SKPoint(x, y + 12), FUIColors.TextDim, 13f);
         x += 65;
         _mirrorCheckboxBounds = new SKRect(x, y + 3, x + 24, y + 27);
-        DrawCheckbox(canvas, _mirrorCheckboxBounds, _deviceMap.Mirror, _mirrorCheckboxHovered);
+        FUIWidgets.DrawSCCheckbox(canvas, _mirrorCheckboxBounds, _deviceMap.Mirror, _mirrorCheckboxHovered);
         x += 40;
 
         // Save button (right side)
         _saveButtonBounds = new SKRect(_toolbarBounds.Right - 100, y, _toolbarBounds.Right - 20, y + 30);
-        DrawButton(canvas, _saveButtonBounds, "SAVE", _saveButtonHovered, true);
+        FUIRenderer.DrawButton(canvas, _saveButtonBounds, "SAVE", _saveButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
-    private static void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool hovered)
-    {
-        var bgColor = hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2;
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        var frameColor = isChecked ? FUIColors.Active : (hovered ? FUIColors.Primary : FUIColors.Frame);
-        using var framePaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = frameColor, StrokeWidth = hovered ? 2f : 1f };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
-        if (isChecked)
-        {
-            // Draw checkmark
-            using var checkPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active,
-                StrokeWidth = 2.5f,
-                IsAntialias = true,
-                StrokeCap = SKStrokeCap.Round
-            };
-            float cx = bounds.MidX;
-            float cy = bounds.MidY;
-            canvas.DrawLine(cx - 5, cy, cx - 1, cy + 4, checkPaint);
-            canvas.DrawLine(cx - 1, cy + 4, cx + 6, cy - 4, checkPaint);
-        }
-    }
 
     private void DrawSvgPanel(SKCanvas canvas)
     {
@@ -773,23 +746,23 @@ public class DeviceMapEditorForm : Form
         // Shelf Side with toggle button
         FUIRenderer.DrawText(canvas, "Side:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         _shelfSideButtonBounds = new SKRect(leftMargin + labelWidth, y - 12, leftMargin + labelWidth + 60, y + 8);
-        DrawSmallButton(canvas, _shelfSideButtonBounds, ll?.ShelfSide ?? "right");
+        FUIRenderer.DrawButton(canvas, _shelfSideButtonBounds, ll?.ShelfSide ?? "right", FUIRenderer.ButtonState.Normal);
         y += 24;
 
         // Shelf Length with +/- buttons
         FUIRenderer.DrawText(canvas, "Shelf:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         float btnX = leftMargin + labelWidth;
         _shelfLengthMinusBounds = new SKRect(btnX, y - 12, btnX + 24, y + 8);
-        DrawSmallButton(canvas, _shelfLengthMinusBounds, "-");
+        FUIRenderer.DrawButton(canvas, _shelfLengthMinusBounds, "-", FUIRenderer.ButtonState.Normal);
         FUIRenderer.DrawText(canvas, (ll?.ShelfLength ?? 80).ToString("F0"), new SKPoint(btnX + 32, y), FUIColors.TextPrimary, 13f);
         _shelfLengthPlusBounds = new SKRect(btnX + 60, y - 12, btnX + 84, y + 8);
-        DrawSmallButton(canvas, _shelfLengthPlusBounds, "+");
+        FUIRenderer.DrawButton(canvas, _shelfLengthPlusBounds, "+", FUIRenderer.ButtonState.Normal);
         y += 24;
 
         // Segments section
         FUIRenderer.DrawText(canvas, "Segments:", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
         _addSegmentButtonBounds = new SKRect(rightMargin - 50, y - 12, rightMargin, y + 8);
-        DrawSmallButton(canvas, _addSegmentButtonBounds, "+ Add");
+        FUIRenderer.DrawButton(canvas, _addSegmentButtonBounds, "+ Add", FUIRenderer.ButtonState.Normal);
         y += 22;
 
         _segmentButtonBounds.Clear();
@@ -806,19 +779,19 @@ public class DeviceMapEditorForm : Form
                 float angX = leftMargin + 30;
                 FUIRenderer.DrawText(canvas, "A:", new SKPoint(angX, y), FUIColors.TextDim, 12f);
                 var angMinus = new SKRect(angX + 16, y - 10, angX + 36, y + 6);
-                DrawSmallButton(canvas, angMinus, "-");
+                FUIRenderer.DrawButton(canvas, angMinus, "-", FUIRenderer.ButtonState.Normal);
                 FUIRenderer.DrawText(canvas, seg.Angle.ToString("F0"), new SKPoint(angX + 40, y), FUIColors.TextPrimary, 12f);
                 var angPlus = new SKRect(angX + 65, y - 10, angX + 85, y + 6);
-                DrawSmallButton(canvas, angPlus, "+");
+                FUIRenderer.DrawButton(canvas, angPlus, "+", FUIRenderer.ButtonState.Normal);
 
                 // Length controls
                 float lenX = angX + 95;
                 FUIRenderer.DrawText(canvas, "L:", new SKPoint(lenX, y), FUIColors.TextDim, 12f);
                 var lenMinus = new SKRect(lenX + 16, y - 10, lenX + 36, y + 6);
-                DrawSmallButton(canvas, lenMinus, "-");
+                FUIRenderer.DrawButton(canvas, lenMinus, "-", FUIRenderer.ButtonState.Normal);
                 FUIRenderer.DrawText(canvas, seg.Length.ToString("F0"), new SKPoint(lenX + 40, y), FUIColors.TextPrimary, 12f);
                 var lenPlus = new SKRect(lenX + 65, y - 10, lenX + 85, y + 6);
-                DrawSmallButton(canvas, lenPlus, "+");
+                FUIRenderer.DrawButton(canvas, lenPlus, "+", FUIRenderer.ButtonState.Normal);
 
                 _segmentButtonBounds.Add((angMinus, angPlus, lenMinus, lenPlus));
                 y += 20;
@@ -826,7 +799,7 @@ public class DeviceMapEditorForm : Form
 
             // Remove segment button
             _removeSegmentButtonBounds = new SKRect(leftMargin + 30, y - 2, leftMargin + 100, y + 14);
-            DrawSmallButton(canvas, _removeSegmentButtonBounds, "- Remove");
+            FUIRenderer.DrawButton(canvas, _removeSegmentButtonBounds, "- Remove", FUIRenderer.ButtonState.Normal);
             y += 20;
         }
         else
@@ -842,11 +815,6 @@ public class DeviceMapEditorForm : Form
         FUIRenderer.DrawText(canvas, "        45=diag-up, -45=diag-down", new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
     }
 
-    private static void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text)
-    {
-        FUIRenderer.DrawRoundedPanel(canvas, bounds, FUIColors.Background2, FUIColors.Frame);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, FUIColors.TextPrimary, 12f);
-    }
 
 
     private static void DrawPropertyRow(SKCanvas canvas, ref float y, string label, string value,
@@ -953,11 +921,11 @@ public class DeviceMapEditorForm : Form
         float btnX = _controlsListBounds.Left + 16;
 
         _addControlButtonBounds = new SKRect(btnX, btnY, btnX + btnWidth, btnY + 26);
-        DrawButton(canvas, _addControlButtonBounds, "+ ADD", _addControlHovered);
+        FUIRenderer.DrawButton(canvas, _addControlButtonBounds, "+ ADD", _addControlHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         _deleteControlButtonBounds = new SKRect(btnX + btnWidth + btnGap, btnY,
             btnX + btnWidth * 2 + btnGap, btnY + 26);
-        DrawButton(canvas, _deleteControlButtonBounds, "DELETE", _deleteControlHovered);
+        FUIRenderer.DrawButton(canvas, _deleteControlButtonBounds, "DELETE", _deleteControlHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal, isDanger: true);
     }
 
     private void DrawStatusBar(SKCanvas canvas)
@@ -1064,27 +1032,6 @@ public class DeviceMapEditorForm : Form
         FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
     }
 
-    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool primary = false)
-    {
-        var bgColor = primary
-            ? (hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Active.WithAlpha(30))
-            : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-
-        using var bgPaint = new SKPaint { Style = SKPaintStyle.Fill, Color = bgColor };
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        var frameColor = primary ? FUIColors.Active : (hovered ? FUIColors.Primary : FUIColors.Frame);
-        using var framePaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = frameColor,
-            StrokeWidth = hovered ? 2f : 1f
-        };
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
-        var textColor = primary ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
-    }
 
     private static SKRect MeasureText(string text, float size)
     {

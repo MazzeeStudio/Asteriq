@@ -286,7 +286,7 @@ public class SCAssignmentDialog : FUIBaseDialog
 
             var noDeviceCancelBounds = new SKRect(bounds.MidX - 50, bounds.Height - 60, bounds.MidX + 50, bounds.Height - 30);
             buttons.Add(noDeviceCancelBounds);
-            DrawButton(canvas, noDeviceCancelBounds, "CANCEL", _hoveredButton == 0, false);
+            FUIRenderer.DrawButton(canvas, noDeviceCancelBounds, "CANCEL", _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             _buttonBounds = buttons.ToArray();
             return;
         }
@@ -303,7 +303,7 @@ public class SCAssignmentDialog : FUIBaseDialog
         buttons.Add(prevDeviceBtn);  // 0
         buttons.Add(nextDeviceBtn);  // 1
 
-        DrawSmallButton(canvas, prevDeviceBtn, "<", _hoveredButton == 0, _selectedDevice > 0);
+        FUIRenderer.DrawButton(canvas, prevDeviceBtn, "<", _selectedDevice > 0 ? (_hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal) : FUIRenderer.ButtonState.Disabled);
 
         // Truncate device display name to fit between the < > buttons
         float nameAreaLeft = pad + labelWidth + 38;
@@ -321,7 +321,7 @@ public class SCAssignmentDialog : FUIBaseDialog
 
         FUIRenderer.DrawTextCentered(canvas, displayName,
             new SKRect(nameAreaLeft, y, nameAreaRight, y + 28), FUIColors.TextBright, 14f);
-        DrawSmallButton(canvas, nextDeviceBtn, ">", _hoveredButton == 1, _selectedDevice < _devices.Count - 1);
+        FUIRenderer.DrawButton(canvas, nextDeviceBtn, ">", _selectedDevice < _devices.Count - 1 ? (_hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal) : FUIRenderer.ButtonState.Disabled);
 
         y += 44;
 
@@ -334,11 +334,11 @@ public class SCAssignmentDialog : FUIBaseDialog
         buttons.Add(prevInputBtn);  // 2
         buttons.Add(nextInputBtn);  // 3
 
-        DrawSmallButton(canvas, prevInputBtn, "<", _hoveredButton == 2, _selectedInputIndex > 0);
+        FUIRenderer.DrawButton(canvas, prevInputBtn, "<", _selectedInputIndex > 0 ? (_hoveredButton == 2 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal) : FUIRenderer.ButtonState.Disabled);
         string inputDisplay = GetInputDisplayName(_selectedInputIndex);
         FUIRenderer.DrawTextCentered(canvas, inputDisplay,
             new SKRect(pad + 150, y, pad + 270, y + 28), FUIColors.TextBright, 15f);
-        DrawSmallButton(canvas, nextInputBtn, ">", _hoveredButton == 3, _selectedInputIndex < 40);
+        FUIRenderer.DrawButton(canvas, nextInputBtn, ">", _selectedInputIndex < 40 ? (_hoveredButton == 3 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal) : FUIRenderer.ButtonState.Disabled);
 
         y += 44;
 
@@ -347,7 +347,10 @@ public class SCAssignmentDialog : FUIBaseDialog
         {
             var checkboxBounds = new SKRect(pad, y, pad + 120, y + 28);
             buttons.Add(checkboxBounds);  // 4
-            DrawCheckbox(canvas, checkboxBounds, "Inverted", _inverted, _hoveredButton == 4);
+            var checkboxBoxBounds = new SKRect(pad, y + 4, pad + 20, y + 24);
+            FUIWidgets.DrawSCCheckbox(canvas, checkboxBoxBounds, _inverted, _hoveredButton == 4);
+            FUIRenderer.DrawText(canvas, "Inverted", new SKPoint(pad + 26, y + 18),
+                _inverted ? FUIColors.TextBright : FUIColors.TextDim, 13f);
             y += 36;
         }
         else
@@ -362,64 +365,12 @@ public class SCAssignmentDialog : FUIBaseDialog
         buttons.Add(cancelBounds);  // 5
         buttons.Add(assignBounds);  // 6
 
-        DrawButton(canvas, cancelBounds, "CANCEL", _hoveredButton == 5, false);
-        DrawButton(canvas, assignBounds, "ASSIGN", _hoveredButton == 6, true);
+        FUIRenderer.DrawButton(canvas, cancelBounds, "CANCEL", _hoveredButton == 5 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        FUIRenderer.DrawButton(canvas, assignBounds, "ASSIGN", _hoveredButton == 6 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         _buttonBounds = buttons.ToArray();
     }
 
-    private static void DrawSmallButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool enabled)
-    {
-        var bgColor = enabled
-            ? (hovered ? FUIColors.Primary.WithAlpha(60) : FUIColors.Background2)
-            : FUIColors.Background1;
-        var frameColor = enabled
-            ? (hovered ? FUIColors.FrameBright : FUIColors.Frame)
-            : FUIColors.FrameDim;
-        var textColor = enabled ? FUIColors.TextPrimary : FUIColors.TextDisabled;
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 15f);
-    }
-
-    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
-    {
-        var bgColor = isPrimary
-            ? (hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Active.WithAlpha(50))
-            : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-        var frameColor = isPrimary
-            ? (hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(180))
-            : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = isPrimary ? FUIColors.TextBright : FUIColors.TextPrimary;
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
-    }
-
-    private static void DrawCheckbox(SKCanvas canvas, SKRect bounds, string text, bool isChecked, bool isHovered)
-    {
-        var bgColor = isChecked ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
-        var frameColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = isChecked ? FUIColors.TextBright : FUIColors.TextDim;
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
-        canvas.DrawRect(bounds, framePaint);
-
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
-    }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {

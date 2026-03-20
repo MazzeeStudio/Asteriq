@@ -121,33 +121,14 @@ public class FUIConfirmDialog : FUIBaseDialog
 
         // Cancel button (left)
         _cancelButtonBounds = new SKRect(buttonsStartX, buttonsY, buttonsStartX + buttonWidth, buttonsY + buttonHeight);
-        DrawButton(canvas, _cancelButtonBounds, _cancelText, _hoveredButton == 1, false);
+        FUIRenderer.DrawButton(canvas, _cancelButtonBounds, _cancelText, _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Confirm button (right)
         _confirmButtonBounds = new SKRect(buttonsStartX + buttonWidth + buttonGap, buttonsY,
             buttonsStartX + buttonWidth * 2 + buttonGap, buttonsY + buttonHeight);
-        DrawButton(canvas, _confirmButtonBounds, _confirmText, _hoveredButton == 0, true);
+        FUIRenderer.DrawButton(canvas, _confirmButtonBounds, _confirmText, _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
-    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
-    {
-        var bgColor = isPrimary
-            ? (hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Active.WithAlpha(40))
-            : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRoundRect(bounds, 4, 4, bgPaint);
-
-        var frameColor = isPrimary
-            ? FUIColors.Active
-            : (hovered ? FUIColors.Primary : FUIColors.Frame);
-
-        using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, hovered ? 2f : 1f);
-        canvas.DrawRoundRect(bounds, 4, 4, framePaint);
-
-        var textColor = isPrimary ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 14f);
-    }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {

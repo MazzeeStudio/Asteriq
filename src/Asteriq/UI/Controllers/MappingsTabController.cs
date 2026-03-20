@@ -976,11 +976,6 @@ public partial class MappingsTabController : ITabController
                 _highlight.FlashText = null;
         }
 
-        // Animate Mapping Settings / Device Order panel split
-        bool showDO = _ctx.ProfileManager.ActiveProfile is not null
-            && _ctx.VJoyDevices.Any(v => v.Exists);
-        if (_deviceOrder.Anim.Update(!_deviceOrder.IsExpanded, showDO))
-            _ctx.MarkDirty();
     }
 
     public void OnActivated()

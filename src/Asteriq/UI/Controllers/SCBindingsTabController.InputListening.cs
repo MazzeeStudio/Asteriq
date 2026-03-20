@@ -574,7 +574,9 @@ public partial class SCBindingsTabController
 
             if (mouseResult is not null)
             {
-                _captureCandidateInput = $"mouse:{mouseResult}";
+                // Collect held keyboard modifiers for mouse actions (e.g. R-ALT+Mouse1)
+                string modPrefix = GetHeldModifierPrefix();
+                _captureCandidateInput = $"mouse:{modPrefix}{mouseResult}";
                 _captureCandidatePath = null;
                 _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
             }

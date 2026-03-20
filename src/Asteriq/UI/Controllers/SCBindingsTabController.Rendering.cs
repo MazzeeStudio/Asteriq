@@ -66,8 +66,7 @@ public partial class SCBindingsTabController
         // RIGHT 2 — Control Profiles (clipped to bounds during animation)
         bool cpExpanded = !anim.UseAnimatedLayout || _cpPanel.IsExpanded || anim.IsAnimatingOut;
         bool cpCollapsible = anim.UseAnimatedLayout && !anim.IsAnimatingOut;
-        canvas.Save();
-        canvas.ClipRect(controlProfilesBounds);
+        canvas.SaveLayer(controlProfilesBounds, null);
         DrawSCExportPanelCompact(canvas, controlProfilesBounds, frameInset,
             isExpanded: cpExpanded, isCollapsible: cpCollapsible);
         canvas.Restore();
@@ -76,8 +75,7 @@ public partial class SCBindingsTabController
         if (anim.UseAnimatedLayout)
         {
             bool contextualExpanded = !_cpPanel.IsExpanded && !anim.IsAnimatingOut;
-            canvas.Save();
-            canvas.ClipRect(contextualBounds);
+            canvas.SaveLayer(contextualBounds, null);
             if (showColumnActions)
                 DrawColumnActionsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
             else if (showCellDetails)

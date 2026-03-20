@@ -335,7 +335,7 @@ public partial class MainForm : Form
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
-        _mappingsController = new MappingsTabController(_tabContext);
+        _mappingsController = new MappingsTabController(_tabContext, scExportProfileService, directInputService);
         _scBindingsController = new SCBindingsTabController(
             _tabContext, scInstallationService, scProfileCacheService,
             scSchemaService, scExportService, scExportProfileService,
@@ -356,6 +356,9 @@ public partial class MainForm : Form
 
         // Wire up forwarding snapshot clear (for button capture mode)
         _tabContext.ClearForwardingSnapshots = _networkVjoy.ClearAllSnapshotButtons;
+
+        // Wire up SC export profile access (for Device Order in Mappings tab)
+        _tabContext.GetActiveSCExportProfile = () => _scBindingsController.ActiveSCExportProfile;
     }
 
     private void SyncTabContext()

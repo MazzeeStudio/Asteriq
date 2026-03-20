@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Asteriq.DirectInput;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
@@ -13,6 +14,8 @@ namespace Asteriq.UI.Controllers;
 public partial class MappingsTabController : ITabController
 {
     private readonly TabContext _ctx;
+    private readonly SCExportProfileService? _scExportProfileService;
+    private readonly DirectInputService? _directInputService;
 
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
     private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
@@ -77,6 +80,7 @@ public partial class MappingsTabController : ITabController
     private readonly AutoScrollState _autoScroll = new();
     private readonly NetworkSwitchState _netSwitch = new();
     private readonly ListScrollState _listScroll = new();
+    private readonly DeviceOrderState _deviceOrder = new();
 
     // Legacy compatibility — computed alias kept for use in axis logic
     private float _axisDeadzone
@@ -249,9 +253,14 @@ public partial class MappingsTabController : ITabController
     private static bool IsModifierKeyName(string? keyName) =>
         keyName is not null && s_scModifierKeyNames.Contains(keyName);
 
-    public MappingsTabController(TabContext ctx)
+    public MappingsTabController(
+        TabContext ctx,
+        SCExportProfileService? scExportProfileService = null,
+        DirectInputService? directInputService = null)
     {
         _ctx = ctx;
+        _scExportProfileService = scExportProfileService;
+        _directInputService = directInputService;
     }
     public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
     {
@@ -438,6 +447,85 @@ public partial class MappingsTabController : ITabController
             {
                 _deadzone.SelectedHandle = -1;
                 _ctx.MarkDirty();
+                return;
+            }
+        }
+
+        // Mapping Settings / Device Order accordion — header clicks toggle which is expanded
+        // When Device Order is expanded, clicking the Mapping Settings collapsed header collapses Device Order
+        // (Mapping Settings bounds are set by DrawMappingSettingsPanel — the collapsed header fills the full bounds)
+        if (_deviceOrder.IsExpanded)
+        {
+            // Check if the click is in the collapsed Mapping Settings header area (top 52px of right panel)
+            // We don't store separate bounds for this — check if click is above the Device Order header
+            if (!_deviceOrder.HeaderBounds.IsEmpty && e.Y < _deviceOrder.HeaderBounds.Top)
+            {
+                _deviceOrder.IsExpanded = false;
+                _deviceOrder.OpenRow = -1;
+                _ctx.MarkDirty();
+                return;
+            }
+        }
+
+        // Device Order panel — header click to expand/collapse
+        if (!_deviceOrder.HeaderBounds.IsEmpty && _deviceOrder.HeaderBounds.Contains(e.X, e.Y))
+        {
+            _deviceOrder.IsExpanded = !_deviceOrder.IsExpanded;
+            _deviceOrder.OpenRow = -1;
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // Device Order panel — dropdown open/close
+        if (_deviceOrder.OpenRow >= 0)
+        {
+            if (!_deviceOrder.DropdownBounds.IsEmpty && _deviceOrder.DropdownBounds.Contains(e.X, e.Y))
+            {
+                float itemH = 28f;
+                int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
+                var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
+                var profile = _ctx.GetActiveSCExportProfile?.Invoke();
+                if (idx >= 0 && idx < existingSlots.Count && profile is not null)
+                    AssignDeviceOrderSlot(profile, idx + 1, existingSlots[idx].Id);
+                _deviceOrder.OpenRow = -1;
+                _deviceOrder.HoveredIndex = -1;
+                _ctx.MarkDirty();
+                return;
+            }
+            else
+            {
+                _deviceOrder.OpenRow = -1;
+                _deviceOrder.HoveredIndex = -1;
+                _ctx.MarkDirty();
+                for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
+                {
+                    if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(e.X, e.Y))
+                        return;
+                }
+            }
+        }
+
+        // Device Order — auto-detect button (only when expanded)
+        if (_deviceOrder.IsExpanded && !_deviceOrder.AutoDetectBounds.IsEmpty && _deviceOrder.AutoDetectBounds.Contains(e.X, e.Y)
+            && _directInputService is not null)
+        {
+            RunDeviceOrderAutoDetect();
+            return;
+        }
+
+        // Device Order — row selector clicks (only when expanded)
+        if (_deviceOrder.IsExpanded)
+        for (int row = 0; row < _deviceOrder.SelectorBounds.Length; row++)
+        {
+            if (!_deviceOrder.SelectorBounds[row].IsEmpty && _deviceOrder.SelectorBounds[row].Contains(e.X, e.Y))
+            {
+                int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
+                if (vjoyCount > 1)
+                {
+                    _deviceOrder.OpenRow = _deviceOrder.OpenRow == row ? -1 : row;
+                    _deviceOrder.HoveredIndex = -1;
+                    _ctx.MarkDirty();
+                }
                 return;
             }
         }
@@ -670,6 +758,54 @@ public partial class MappingsTabController : ITabController
             }
         }
 
+        // Device Order: header hover
+        if (!_deviceOrder.HeaderBounds.IsEmpty && _deviceOrder.HeaderBounds.Contains(e.X, e.Y))
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Device Order: auto-detect button hover
+        _deviceOrder.AutoDetectHovered = !_deviceOrder.AutoDetectBounds.IsEmpty
+            && _deviceOrder.AutoDetectBounds.Contains(e.X, e.Y);
+        if (_deviceOrder.AutoDetectHovered)
+        {
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+
+        // Device Order: row selector hover
+        for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
+        {
+            if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(e.X, e.Y))
+            {
+                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                return;
+            }
+        }
+
+        // Device Order: open dropdown hover
+        if (_deviceOrder.OpenRow >= 0 && !_deviceOrder.DropdownBounds.IsEmpty
+            && _deviceOrder.DropdownBounds.Contains(e.X, e.Y))
+        {
+            float itemH = 28f;
+            int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
+            int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
+            int newHovered = idx >= 0 && idx < vjoyCount ? idx : -1;
+            if (newHovered != _deviceOrder.HoveredIndex)
+            {
+                _deviceOrder.HoveredIndex = newHovered;
+                _ctx.MarkDirty();
+            }
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return;
+        }
+        else if (_deviceOrder.OpenRow >= 0 && _deviceOrder.HoveredIndex >= 0)
+        {
+            _deviceOrder.HoveredIndex = -1;
+            _ctx.MarkDirty();
+        }
+
         // Left panel: NET SWITCH action button
         if (!_netSwitch.ActionBounds.IsEmpty && _netSwitch.ActionBounds.Contains(e.X, e.Y))
         {
@@ -864,6 +1000,60 @@ public partial class MappingsTabController : ITabController
     {
         _buttonMode.DraggingPulse = false;
         _buttonMode.DraggingHold = false;
+    }
+
+    // ── Device Order Logic ────────────────────────────────────────────────────
+
+    private void AssignDeviceOrderSlot(SCExportProfile profile, int scInst, uint newVJoySlotId)
+    {
+        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).ToList();
+        if (existingSlots.Count == 0) return;
+
+        uint? prevSlotId = null;
+        foreach (var slot in existingSlots)
+        {
+            if (profile.GetSCInstance(slot.Id) == scInst)
+            {
+                prevSlotId = slot.Id;
+                break;
+            }
+        }
+
+        if (prevSlotId == newVJoySlotId) return;
+
+        int newSlotCurrentInst = profile.GetSCInstance(newVJoySlotId);
+        profile.SetSCInstance(newVJoySlotId, scInst);
+        if (prevSlotId.HasValue)
+            profile.SetSCInstance(prevSlotId.Value, newSlotCurrentInst);
+
+        if (!string.IsNullOrEmpty(profile.ProfileName))
+            _scExportProfileService?.SaveProfile(profile);
+        _ctx.MarkDirty();
+    }
+
+    private void RunDeviceOrderAutoDetect()
+    {
+        if (_directInputService is null) return;
+        var profile = _ctx.GetActiveSCExportProfile?.Invoke();
+        if (profile is null) return;
+
+        try
+        {
+            var diDevices = _directInputService.EnumerateDevices();
+            var vjoySlots = _ctx.VJoyDevices.Where(v => v.Exists);
+            var mapping = VJoyDirectInputOrderService.DetectVJoyDiOrder(vjoySlots, diDevices);
+
+            foreach (var (vjoyId, scInstance) in mapping)
+                profile.SetSCInstance(vjoyId, scInstance);
+
+            if (!string.IsNullOrEmpty(profile.ProfileName))
+                _scExportProfileService?.SaveProfile(profile);
+            _ctx.MarkDirty();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            // Auto-detect failed — silently ignore (no status bar in Mappings tab)
+        }
     }
 
     /// <summary>Public entry point for cross-tab callback.</summary>
@@ -1100,5 +1290,17 @@ public partial class MappingsTabController : ITabController
         public float ScrollOffset;
         public float ContentHeight;
         public SKRect ListBounds;
+    }
+
+    private sealed class DeviceOrderState
+    {
+        public int OpenRow = -1;
+        public SKRect[] SelectorBounds = Array.Empty<SKRect>();
+        public SKRect DropdownBounds = SKRect.Empty;
+        public int HoveredIndex = -1;
+        public SKRect AutoDetectBounds = SKRect.Empty;
+        public bool AutoDetectHovered;
+        public bool IsExpanded;
+        public SKRect HeaderBounds;
     }
 }

@@ -103,8 +103,48 @@ public partial class MappingsTabController
         // CENTER PANEL - Device Visualization
         DrawDeviceVisualizationPanel(canvas, centerBounds, frameInset);
 
-        // RIGHT PANEL - Settings
-        DrawMappingSettingsPanel(canvas, rightBounds, frameInset);
+        // RIGHT PANEL — Mapping Settings + Device Order (accordion: one expanded, one collapsed)
+        var profile = _ctx.GetActiveSCExportProfile?.Invoke();
+        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
+        bool showDeviceOrder = profile is not null && existingSlots.Count > 0;
+
+        if (showDeviceOrder)
+        {
+            const float CollapsedH = 52f;
+            float vertGap = 8f;
+            float doFrameInset = 5f;
+
+            SKRect settingsBounds;
+            SKRect deviceOrderBounds;
+
+            if (_deviceOrder.IsExpanded)
+            {
+                // Device Order expanded: Mapping Settings = collapsed header at top, Device Order fills rest
+                settingsBounds = new SKRect(rightBounds.Left, rightBounds.Top,
+                    rightBounds.Right, rightBounds.Top + CollapsedH);
+                deviceOrderBounds = new SKRect(rightBounds.Left, settingsBounds.Bottom + vertGap,
+                    rightBounds.Right, rightBounds.Bottom);
+            }
+            else
+            {
+                // Mapping Settings expanded: Device Order = collapsed header at bottom
+                deviceOrderBounds = new SKRect(rightBounds.Left, rightBounds.Bottom - CollapsedH,
+                    rightBounds.Right, rightBounds.Bottom);
+                settingsBounds = new SKRect(rightBounds.Left, rightBounds.Top,
+                    rightBounds.Right, deviceOrderBounds.Top - vertGap);
+            }
+
+            DrawMappingSettingsPanel(canvas, settingsBounds, frameInset);
+            DrawDeviceOrderPanel(canvas, deviceOrderBounds, doFrameInset, profile!, existingSlots);
+
+            // Device Order dropdown drawn last (on top)
+            if (_deviceOrder.IsExpanded && _deviceOrder.OpenRow >= 0)
+                DrawDeviceOrderDropdown(canvas, profile!, existingSlots);
+        }
+        else
+        {
+            DrawMappingSettingsPanel(canvas, rightBounds, frameInset);
+        }
     }
 
     private void DrawBindingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -691,11 +731,14 @@ public partial class MappingsTabController
 
     private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
+        bool isCollapsed = bounds.Height <= 52f;
+        float cornerLen = isCollapsed ? Math.Min(16f, bounds.Height * 0.35f) : 30f;
+
         // Panel background
         using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
         canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
             bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, 30f, 8f);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, cornerLen, 8f);
 
         float y = bounds.Top + frameInset + 10;
         float leftMargin = bounds.Left + frameInset + 16;
@@ -703,6 +746,20 @@ public partial class MappingsTabController
 
         // Title
         FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 17f, true);
+
+        // Expand/collapse indicator (only when Device Order exists)
+        if (_ctx.GetActiveSCExportProfile is not null && _ctx.VJoyDevices.Any(v => v.Exists))
+        {
+            bool headerHovered = isCollapsed && bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            string indicator = isCollapsed ? "+" : "-";
+            float indW = FUIRenderer.MeasureText(indicator, 13f);
+            FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y + 12),
+                headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isCollapsed ? (byte)180 : (byte)100),
+                13f, true);
+        }
+
+        if (isCollapsed) return;
+
         y += 36;
 
         // Reset net-switch bounds each frame (set later in DrawButtonSettings if applicable)
@@ -1128,8 +1185,8 @@ public partial class MappingsTabController
         }
         y += 4f;
 
-        // Deadzone section
-        if (y + 100 < bottom)
+        // Deadzone section — draw if at least the header + slider fits (50px)
+        if (y + 50 < bottom)
         {
             // Header row: "DEADZONE" label + preset buttons + selected handle indicator
             FUIRenderer.DrawText(canvas, "DEADZONE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
@@ -2775,4 +2832,157 @@ public partial class MappingsTabController
             goesRight, opacity, fakeInput, _ctx.SvgMirrored, _ctx.SvgScale);
     }
 
+    // ─── Device Order Panel (bottom-anchored in right panel) ────────────────
+
+    private void DrawDeviceOrderPanel(SKCanvas canvas, SKRect bounds, float frameInset,
+        SCExportProfile profile, List<VJoyDeviceInfo> existingSlots)
+    {
+        float cornerLen = _deviceOrder.IsExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
+
+        // Header bounds for click-to-expand
+        _deviceOrder.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
+        bool headerHovered = !_deviceOrder.IsExpanded
+            && _deviceOrder.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "DEVICE ORDER");
+
+        // Expand/collapse indicator
+        string indicator = _deviceOrder.IsExpanded ? "-" : "+";
+        float indW = FUIRenderer.MeasureText(indicator, 13f);
+        FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
+            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(_deviceOrder.IsExpanded ? (byte)100 : (byte)180),
+            13f, true);
+
+        if (!_deviceOrder.IsExpanded) return;
+
+        y += 14f;
+
+        // Resize selector bounds array if needed
+        if (_deviceOrder.SelectorBounds.Length != existingSlots.Count)
+            _deviceOrder.SelectorBounds = new SKRect[existingSlots.Count];
+
+        // Build reverse mapping: SC instance → vJoy slot ID
+        var vjoyForSCInst = new Dictionary<int, uint>();
+        foreach (var slot in existingSlots)
+        {
+            int inst = profile.GetSCInstance(slot.Id);
+            if (!vjoyForSCInst.ContainsKey(inst))
+                vjoyForSCInst[inst] = slot.Id;
+        }
+
+        float selectorH = 24f;
+        float labelW = 32f;
+        float selectorW = rightMargin - leftMargin - labelW - 6f;
+
+        for (int row = 0; row < existingSlots.Count; row++)
+        {
+            int scInst = row + 1;
+            vjoyForSCInst.TryGetValue(scInst, out uint vjoySlotId);
+
+            FUIRenderer.DrawText(canvas, $"JS{scInst}", new SKPoint(leftMargin, y + selectorH / 2f + 4f),
+                FUIColors.Active, 12f, true);
+
+            var selectorBounds = new SKRect(leftMargin + labelW, y, leftMargin + labelW + selectorW, y + selectorH);
+            _deviceOrder.SelectorBounds[row] = selectorBounds;
+
+            bool isOpen = _deviceOrder.OpenRow == row;
+            bool isHovered = selectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || isOpen;
+            bool deviceMode = _ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+            string? assignedDevName = vjoySlotId > 0 ? GetPhysicalDeviceNameForVJoyId(vjoySlotId) : null;
+            string selectorLabel = vjoySlotId > 0
+                ? (deviceMode && assignedDevName is not null
+                    ? FUIWidgets.TruncateTextToWidth(assignedDevName, selectorW - 20f, 11f)
+                    : $"vJoy {vjoySlotId}")
+                : "—";
+            FUIWidgets.DrawSelector(canvas, selectorBounds, selectorLabel, isHovered, existingSlots.Count > 1);
+
+            if (!deviceMode && assignedDevName is not null)
+            {
+                float nameX = selectorBounds.Right + 6f;
+                float maxNameW = rightMargin - nameX;
+                if (maxNameW > 10f)
+                {
+                    string truncated = FUIWidgets.TruncateTextToWidth(assignedDevName, maxNameW, 10f);
+                    FUIRenderer.DrawText(canvas, truncated,
+                        new SKPoint(nameX, y + selectorH / 2f + 4f),
+                        FUIColors.TextDim, 10f);
+                }
+            }
+
+            y += selectorH + 4f;
+        }
+
+        // Auto-detect button anchored near the bottom
+        float btnH = 26f;
+        float btnY = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - btnH;
+        _deviceOrder.AutoDetectBounds = new SKRect(leftMargin, btnY, rightMargin, btnY + btnH);
+        _deviceOrder.AutoDetectHovered = _deviceOrder.AutoDetectBounds.Contains(
+            _ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+        bool canAutoDetect = _directInputService is not null;
+        if (canAutoDetect)
+        {
+            FUIRenderer.DrawButton(canvas, _deviceOrder.AutoDetectBounds, "AUTO-DETECT",
+                _deviceOrder.AutoDetectHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        }
+        else
+        {
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
+            canvas.DrawRect(_deviceOrder.AutoDetectBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "AUTO-DETECT", _deviceOrder.AutoDetectBounds,
+                FUIColors.TextDim.WithAlpha(100), 12f);
+        }
+    }
+
+    private void DrawDeviceOrderDropdown(SKCanvas canvas, SCExportProfile profile, List<VJoyDeviceInfo> existingSlots)
+    {
+        if (_deviceOrder.OpenRow < 0 || _deviceOrder.OpenRow >= _deviceOrder.SelectorBounds.Length) return;
+
+        int scInst = _deviceOrder.OpenRow + 1;
+        var vjoyForSCInst = new Dictionary<int, uint>();
+        foreach (var slot in existingSlots)
+        {
+            int inst = profile.GetSCInstance(slot.Id);
+            if (!vjoyForSCInst.ContainsKey(inst))
+                vjoyForSCInst[inst] = slot.Id;
+        }
+        vjoyForSCInst.TryGetValue(scInst, out uint selectedVJoyId);
+        int selectedIdx = existingSlots.FindIndex(s => s.Id == selectedVJoyId);
+
+        float itemH = 28f;
+        var selectorBounds = _deviceOrder.SelectorBounds[_deviceOrder.OpenRow];
+        _deviceOrder.DropdownBounds = new SKRect(
+            selectorBounds.Left,
+            selectorBounds.Bottom + 2,
+            selectorBounds.Right,
+            selectorBounds.Bottom + 2 + existingSlots.Count * itemH + 8f);
+
+        bool deviceMode = _ctx.AppSettings.SCBindingsShowPhysicalHeaders;
+        var items = existingSlots.Select(s =>
+        {
+            if (deviceMode)
+            {
+                string? name = GetPhysicalDeviceNameForVJoyId(s.Id);
+                return name ?? $"vJoy {s.Id}";
+            }
+            return $"vJoy {s.Id}";
+        }).ToList();
+        FUIWidgets.DrawDropdownPanel(canvas, _deviceOrder.DropdownBounds, items,
+            selectedIdx, _deviceOrder.HoveredIndex, itemH);
+    }
+
+    private string? GetPhysicalDeviceNameForVJoyId(uint vjoySlotId)
+    {
+        var mappingProfile = _ctx.ProfileManager.ActiveProfile;
+        if (mappingProfile is null) return null;
+        if (!mappingProfile.VJoyPrimaryDevices.TryGetValue(vjoySlotId, out var guid)) return null;
+
+        var device = _ctx.Devices.Concat(_ctx.DisconnectedDevices)
+            .FirstOrDefault(d => d.InstanceGuid.ToString().Equals(guid, StringComparison.OrdinalIgnoreCase));
+        return device?.Name;
+    }
 }

@@ -1,4 +1,4 @@
-using Asteriq.Models;
+﻿using Asteriq.Models;
 using Asteriq.Services;
 using SkiaSharp;
 
@@ -11,7 +11,7 @@ public partial class SCBindingsTabController
         float frameInset = 5f;
         var contentBounds = new SKRect(pad, contentTop, bounds.Right - pad, contentBottom);
 
-        // Two-panel layout: Left (bindings table) | Right (Installation + Device Order/Profiles stacked)
+        // Two-panel layout: Left (bindings table) | Right (Game Environment + Control Profiles + contextual panel)
         float rightPanelWidth = Math.Min(500f, Math.Max(280f, contentBounds.Width * 0.24f));
         float gap = 10f;
 
@@ -21,86 +21,72 @@ public partial class SCBindingsTabController
             contentBounds.Right, contentBounds.Bottom);
 
         // Right panel stacking order (top → bottom):
-        //   1. SC Installation (compact: no title, just dropdown)
-        //   2. Device Order and Control Profiles — mutually exclusive expand/collapse
-        //   3. Column Actions (fixed 235px at bottom, when a vJoy column is selected)
+        //   1. Game Environment (fixed, always visible)
+        //   2. Control Profiles (fills remaining, collapses when contextual panel is expanded)
+        //   3. Column Actions or Cell Details (contextual, bottom-anchored, mutually exclusive)
         float verticalGap = 8f;
         float installationHeight = 90f;
+        const float CollapsedPanelH = 52f;
 
         var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
             rightBounds.Right, rightBounds.Top + installationHeight);
 
-        const float CollapsedPanelH = 52f;
-        float columnActionsHeight = 235f;
-        float verticalGap2 = 8f;
-
-        int vjoyDeviceCount = _ctx.VJoyDevices.Count(v => v.Exists);
-        bool hasDeviceOrder = vjoyDeviceCount > 0;
-
-        bool showColumnActions = _colImport.HighlightedColumn >= 0
-            && _grid.Columns is not null
-            && _colImport.HighlightedColumn < _grid.Columns.Count
-            && _grid.Columns[_colImport.HighlightedColumn].IsJoystick
-            && !_grid.Columns[_colImport.HighlightedColumn].IsPhysical
-            && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
+        // Determine which contextual panel is active (mutually exclusive)
+        bool showColumnActions = IsColumnActionsVisible();
+        bool showCellDetails = !showColumnActions
+            && _cell.SelectedCell.actionIndex >= 0
+            && _cell.SelectedCell.colIndex >= 0
+            && _scFilteredActions is not null
+            && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
+        bool hasContextualPanel = showColumnActions || showCellDetails;
 
         float afterInstall = installationBounds.Bottom + verticalGap;
         float bottomAreaBottom = rightBounds.Bottom;
-        SKRect columnActionsBounds = SKRect.Empty;
-        if (showColumnActions)
-        {
-            columnActionsBounds = new SKRect(rightBounds.Left, bottomAreaBottom - columnActionsHeight,
-                rightBounds.Right, bottomAreaBottom);
-            bottomAreaBottom = columnActionsBounds.Top - verticalGap2;
-        }
 
-        // Accordion layout: Device Order always on top, Control Profiles always on bottom.
-        // Only one is expanded at a time; the collapsed panel shows a fixed-height title bar.
-        SKRect deviceOrderBounds = SKRect.Empty;
+        // Layout: one panel is expanded (fills space), the other is collapsed (52px header).
+        // When no contextual panel exists, Control Profiles fills everything.
         SKRect controlProfilesBounds;
-        if (hasDeviceOrder)
+        SKRect contextualBounds = SKRect.Empty;
+        if (hasContextualPanel && !_cpPanel.IsExpanded)
         {
-            if (_deviceOrder.IsExpanded)
-            {
-                // Control Profiles: collapsed title bar anchored at the very bottom
-                float cpTop = bottomAreaBottom - CollapsedPanelH;
-                controlProfilesBounds = new SKRect(rightBounds.Left, cpTop, rightBounds.Right, bottomAreaBottom);
-                // Device Order: fills from top down to just above Control Profiles
-                float devH = Math.Max(CollapsedPanelH, cpTop - verticalGap - afterInstall);
-                deviceOrderBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, afterInstall + devH);
-            }
-            else
-            {
-                // Device Order: collapsed title bar at the top
-                deviceOrderBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, afterInstall + CollapsedPanelH);
-                // Control Profiles: fills the rest
-                controlProfilesBounds = new SKRect(rightBounds.Left, deviceOrderBounds.Bottom + verticalGap,
-                    rightBounds.Right, bottomAreaBottom);
-            }
+            // Contextual panel expanded: Control Profiles = collapsed header at top, contextual fills the rest
+            controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
+                rightBounds.Right, afterInstall + CollapsedPanelH);
+            contextualBounds = new SKRect(rightBounds.Left, controlProfilesBounds.Bottom + verticalGap,
+                rightBounds.Right, bottomAreaBottom);
+        }
+        else if (hasContextualPanel && _cpPanel.IsExpanded)
+        {
+            // Control Profiles expanded: contextual = collapsed header at bottom, CP fills the rest
+            contextualBounds = new SKRect(rightBounds.Left, bottomAreaBottom - CollapsedPanelH,
+                rightBounds.Right, bottomAreaBottom);
+            controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
+                rightBounds.Right, contextualBounds.Top - verticalGap);
         }
         else
         {
+            // No contextual panel: Control Profiles fills all remaining space
             controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, bottomAreaBottom);
         }
 
         // LEFT PANEL
         DrawSCBindingsTablePanel(canvas, leftBounds, frameInset);
 
-        // RIGHT 1 — SC Installation (no title, just dropdown)
+        // RIGHT 1 — Game Environment (always visible)
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
-        // RIGHT 2 — Device Order (collapsible, collapsed by default)
-        if (hasDeviceOrder)
-            DrawDeviceOrderPanel(canvas, deviceOrderBounds, frameInset, _deviceOrder.IsExpanded);
-
-        // RIGHT 3 — Control Profiles (expanded when Device Order is collapsed)
-        bool controlProfilesExpanded = !hasDeviceOrder || !_deviceOrder.IsExpanded;
+        // RIGHT 2 — Control Profiles
+        bool cpExpanded = !hasContextualPanel || _cpPanel.IsExpanded;
+        bool cpCollapsible = hasContextualPanel;
         DrawSCExportPanelCompact(canvas, controlProfilesBounds, frameInset,
-            suppressActionInfo: showColumnActions, isExpanded: controlProfilesExpanded, isCollapsible: hasDeviceOrder);
+            isExpanded: cpExpanded, isCollapsible: cpCollapsible);
 
-        // RIGHT 4 — Column Actions (when a vJoy column is selected)
+        // RIGHT 3 — Contextual panel (Column Actions or Cell Details)
+        bool contextualExpanded = hasContextualPanel && !_cpPanel.IsExpanded;
         if (showColumnActions)
-            DrawColumnActionsPanel(canvas, columnActionsBounds, frameInset);
+            DrawColumnActionsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
+        else if (showCellDetails)
+            DrawCellDetailsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
 
         // Draw dropdowns last (on top) so they render over all panels
         if (_profileMgmt.DropdownOpen && !_profileMgmt.DropdownListBounds.IsEmpty)
@@ -113,8 +99,19 @@ public partial class SCBindingsTabController
             DrawColImportProfileDropdown(canvas);
         if (showColumnActions && _colImport.ColumnDropdownOpen && _colImport.SourceColumns.Count > 0)
             DrawColImportColumnDropdown(canvas);
-        if (_deviceOrder.IsExpanded && _deviceOrder.OpenRow >= 0)
-            DrawDeviceOrderDropdown(canvas);
+    }
+
+    /// <summary>
+    /// Returns true when the Column Actions panel should be visible (vJoy column selected).
+    /// </summary>
+    private bool IsColumnActionsVisible()
+    {
+        return _colImport.HighlightedColumn >= 0
+            && _grid.Columns is not null
+            && _colImport.HighlightedColumn < _grid.Columns.Count
+            && _grid.Columns[_colImport.HighlightedColumn].IsJoystick
+            && !_grid.Columns[_colImport.HighlightedColumn].IsPhysical
+            && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
     }
 
     private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -802,7 +799,7 @@ public partial class SCBindingsTabController
     }
 
     private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset,
-        bool suppressActionInfo = false, bool isExpanded = true, bool isCollapsible = false)
+        bool isExpanded = true, bool isCollapsible = false)
     {
         float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
@@ -811,16 +808,16 @@ public partial class SCBindingsTabController
         float rightMargin = m.RightMargin;
         float buttonGap = 6f;
 
-        // Header bounds for click-to-expand handling (when part of the mutual-exclusive group)
-        _deviceOrder.ControlProfilesHeaderBounds = isCollapsible
+        // Header bounds for click-to-expand handling
+        _cpPanel.HeaderBounds = isCollapsible
             ? new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f)
             : SKRect.Empty;
         bool headerHovered = isCollapsible && !isExpanded
-            && _deviceOrder.ControlProfilesHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            && _cpPanel.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
         FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "CONTROL PROFILES");
 
-        // Expand/collapse indicator (only shown when part of the mutual-exclusive group)
+        // Expand/collapse indicator (only shown when collapsible)
         if (isCollapsible)
         {
             string indicator = isExpanded ? "-" : "+";
@@ -925,148 +922,6 @@ public partial class SCBindingsTabController
                 + (remoteCount > 0 ? sepHeaderH + remoteCount * 24f : 0f);
             listHeight = Math.Min(Math.Max(listHeight, 36f), 280f);
             _profileMgmt.DropdownListBounds = new SKRect(leftMargin, _profileMgmt.DropdownBounds.Bottom + 4, rightMargin, _profileMgmt.DropdownBounds.Bottom + 4 + listHeight);
-        }
-
-        // Selected action info with ASSIGN/CLEAR buttons (hidden when column actions panel is active)
-        if (!suppressActionInfo && _scSelectedActionIndex >= 0 && _scFilteredActions is not null && _scSelectedActionIndex < _scFilteredActions.Count)
-        {
-            var selectedAction = _scFilteredActions[_scSelectedActionIndex];
-            float lineHeight = 15f;
-
-            // Whitespace separator from profile controls above
-            y += 12f;
-
-            FUIRenderer.DrawText(canvas, "SELECTED ACTION", new SKPoint(leftMargin, y), FUIColors.Active, 12f, true);
-            y += lineHeight;
-
-            string actionDisplay = FUIWidgets.TruncateTextToWidth(selectedAction.ActionName, rightMargin - leftMargin - 10, 10f);
-            FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 13f);
-            y += lineHeight;
-
-            FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-            y += lineHeight;
-
-            // Detect if the selected cell is a shared cell
-            bool isCellSharedInPanel = false;
-            uint panelSharedPrimaryVJoy = 0;
-            string panelSharedPrimaryInput = "";
-            if (_cell.SelectedCell.colIndex >= 0 && _grid.Columns is not null && _cell.SelectedCell.colIndex < _grid.Columns.Count)
-            {
-                var panelCol = _grid.Columns[_cell.SelectedCell.colIndex];
-                if (panelCol.IsJoystick && !panelCol.IsPhysical)
-                {
-                    string panelSharedKey = $"{selectedAction.Key}|{panelCol.VJoyDeviceId}";
-                    if (_conflicts.SharedCells.TryGetValue(panelSharedKey, out var panelSharedInfo))
-                    {
-                        isCellSharedInPanel = true;
-                        (panelSharedPrimaryVJoy, panelSharedPrimaryInput, _) = panelSharedInfo;
-                    }
-                }
-            }
-
-            if (isCellSharedInPanel)
-            {
-                int panelPrimaryInstance = _scExportProfile.GetSCInstance(panelSharedPrimaryVJoy);
-                string panelPrimaryFormatted = SCBindingsRenderer.FormatInputName(panelSharedPrimaryInput);
-                FUIRenderer.DrawText(canvas, $"Routed to JS{panelPrimaryInstance} / {panelPrimaryFormatted}",
-                    new SKPoint(leftMargin, y), FUIColors.Primary.WithAlpha(200), 11f, true);
-                y += lineHeight;
-            }
-
-            y += 6f;
-
-            // Assign/Clear buttons
-            float btnWidth = (rightMargin - leftMargin - 8) / 2;
-            float btnHeight = 24f;
-
-            _scAssignInputButtonBounds = new SKRect(leftMargin, y, leftMargin + btnWidth, y + btnHeight);
-            _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-            if (_scListening.IsListening)
-            {
-                // Show "listening" state when cell listener is active
-                using var waitBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
-                canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
-                FUIRenderer.DrawTextCentered(canvas, "LISTENING...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
-            }
-            else if (isCellSharedInPanel)
-            {
-                // Shared cell — ASSIGN is disabled; user must unshare first
-                using var disabledAssignPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
-                canvas.DrawRect(_scAssignInputButtonBounds, disabledAssignPaint);
-                FUIRenderer.DrawTextCentered(canvas, "ASSIGN", _scAssignInputButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
-            }
-            else
-            {
-                FUIRenderer.DrawButton(canvas, _scAssignInputButtonBounds, "ASSIGN",
-                    _scAssignInputButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-            }
-
-            _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 8, y, rightMargin, y + btnHeight);
-            _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-            if (isCellSharedInPanel)
-            {
-                // Shared cell — CLEAR becomes UNSHARE (always enabled)
-                FUIRenderer.DrawButton(canvas, _scClearBindingButtonBounds, "UNSHARE",
-                    _scClearBindingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-            }
-            else
-            {
-                // Check for existing binding on currently selected cell's column
-                SCActionBinding? existingBinding = null;
-                if (_cell.SelectedCell.colIndex >= 0 && _grid.Columns is not null && _cell.SelectedCell.colIndex < _grid.Columns.Count)
-                {
-                    var selCol = _grid.Columns[_cell.SelectedCell.colIndex];
-                    if (selCol.IsPhysical)
-                    {
-                        existingBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
-                            b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
-                            b.DeviceType == SCDeviceType.Joystick &&
-                            b.PhysicalDeviceId == selCol.PhysicalDevice!.HidDevicePath);
-                    }
-                    else if (selCol.IsJoystick)
-                    {
-                        existingBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
-                            b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
-                            b.DeviceType == SCDeviceType.Joystick &&
-                            b.PhysicalDeviceId is null &&
-                            _scExportProfile.GetSCInstance(b.VJoyDevice) == selCol.SCInstance);
-                    }
-                    else
-                    {
-                        existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
-                    }
-                }
-                else
-                {
-                    existingBinding = _scExportProfile.GetBinding(selectedAction.ActionMap, selectedAction.ActionName);
-                }
-
-                bool hasBinding = existingBinding is not null;
-
-                if (hasBinding)
-                {
-                    FUIRenderer.DrawButton(canvas, _scClearBindingButtonBounds, "CLEAR",
-                        _scClearBindingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-                }
-                else
-                {
-                    // Disabled clear button
-                    using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
-                    canvas.DrawRect(_scClearBindingButtonBounds, disabledPaint);
-                    FUIRenderer.DrawTextCentered(canvas, "CLEAR", _scClearBindingButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
-                }
-            }
-
-            y += btnHeight + 10f;
-
-            // Conflict links panel — shown when the selected binding conflicts with other actions
-            if (_conflicts.ConflictLinks.Count > 0)
-            {
-                y += 16f;
-                DrawConflictLinksPanel(canvas, leftMargin, rightMargin, y, bounds.Bottom - frameInset - 100f);
-            }
         }
 
         // Button group — built bottom-up so every button has a consistent anchor
@@ -1565,18 +1420,35 @@ public partial class SCBindingsTabController
         }
     }
 
-    private void DrawColumnActionsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawColumnActionsPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded)
     {
         if (_grid.Columns is null || _colImport.HighlightedColumn < 0 || _colImport.HighlightedColumn >= _grid.Columns.Count)
             return;
 
         var col = _grid.Columns[_colImport.HighlightedColumn];
 
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "COLUMN ACTIONS", withDivider: true);
+
+        // Header bounds for click-to-collapse
+        _colImport.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
+
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "COLUMN ACTIONS");
+
+        // Expand/collapse indicator
+        string indicator = isExpanded ? "-" : "+";
+        float indW = FUIRenderer.MeasureText(indicator, 13f);
+        bool headerHovered = !isExpanded && _colImport.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
+            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isExpanded ? (byte)100 : (byte)180),
+            13f, true);
+
+        if (!isExpanded) return;
+
+        y += 14f;
 
         // Column label + device name
         string colLabel = $"JS{col.SCInstance}";
@@ -1673,9 +1545,9 @@ public partial class SCBindingsTabController
         float dropdownH = Math.Min(totalSources * itemH + 8f, 200f);
         _colImport.ProfileDropdownBounds = new SKRect(
             _colImport.ProfileSelectorBounds.Left,
-            _colImport.ProfileSelectorBounds.Top - 2 - dropdownH,
+            _colImport.ProfileSelectorBounds.Bottom + 2,
             _colImport.ProfileSelectorBounds.Right,
-            _colImport.ProfileSelectorBounds.Top - 2);
+            _colImport.ProfileSelectorBounds.Bottom + 2 + dropdownH);
 
         var items = savedProfiles.Select(p => p.ProfileName)
             .Concat(xmlFiles.Select(f => $"[SC] {f.DisplayName}"))
@@ -1710,19 +1582,19 @@ public partial class SCBindingsTabController
         float dropdownH = Math.Min(_colImport.SourceColumns.Count * itemH + 8f, 200f);
         _colImport.ColumnDropdownBounds = new SKRect(
             _colImport.ColumnSelectorBounds.Left,
-            _colImport.ColumnSelectorBounds.Top - 2 - dropdownH,
+            _colImport.ColumnSelectorBounds.Bottom + 2,
             _colImport.ColumnSelectorBounds.Right,
-            _colImport.ColumnSelectorBounds.Top - 2);
+            _colImport.ColumnSelectorBounds.Bottom + 2 + dropdownH);
 
         var items = _colImport.SourceColumns.Select(c => c.Label).ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _colImport.ColumnDropdownBounds, items,
             _colImport.ColumnIndex, _colImport.ColumnHoveredIndex, itemH);
     }
 
-    private void DrawDeviceOrderPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded)
+    private void DrawCellDetailsPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded)
     {
-        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
-        if (existingSlots.Count == 0) return;
+        if (_scFilteredActions is null || _cell.SelectedCell.actionIndex < 0 || _cell.SelectedCell.actionIndex >= _scFilteredActions.Count)
+            return;
 
         float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
@@ -1730,152 +1602,165 @@ public partial class SCBindingsTabController
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
 
-        // Header bounds for click-to-expand handling
-        _deviceOrder.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
-        bool headerHovered = !isExpanded && _deviceOrder.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        // Header bounds for click-to-collapse
+        _cellDetails.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
 
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "DEVICE ORDER");
+        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "BINDING DETAILS");
 
         // Expand/collapse indicator
         string indicator = isExpanded ? "-" : "+";
         float indW = FUIRenderer.MeasureText(indicator, 13f);
+        bool headerHovered = !isExpanded && _cellDetails.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
             headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isExpanded ? (byte)100 : (byte)180),
             13f, true);
 
         if (!isExpanded) return;
 
-        y += 4f;
+        y += 14f;
 
-        // Resize selector bounds array if needed
-        if (_deviceOrder.SelectorBounds.Length != existingSlots.Count)
-            _deviceOrder.SelectorBounds = new SKRect[existingSlots.Count];
+        var selectedAction = _scFilteredActions[_cell.SelectedCell.actionIndex];
+        float lineHeight = 15f;
 
-        // Build reverse mapping: SC instance → vJoy slot ID
-        var vjoyForSCInst = new Dictionary<int, uint>();
-        foreach (var slot in existingSlots)
+        // Action name + type
+        string actionDisplay = FUIWidgets.TruncateTextToWidth(selectedAction.ActionName, rightMargin - leftMargin - 10, 10f);
+        FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 13f);
+        y += lineHeight;
+
+        FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
+        y += lineHeight;
+
+        // Detect shared cell state
+        bool isCellShared = false;
+        uint sharedPrimaryVJoy = 0;
+        string sharedPrimaryInput = "";
+        SCActionBinding? existingBinding = null;
+
+        if (_cell.SelectedCell.colIndex >= 0 && _grid.Columns is not null && _cell.SelectedCell.colIndex < _grid.Columns.Count)
         {
-            int inst = _scExportProfile.GetSCInstance(slot.Id);
-            if (!vjoyForSCInst.ContainsKey(inst))
-                vjoyForSCInst[inst] = slot.Id;
-        }
+            var selCol = _grid.Columns[_cell.SelectedCell.colIndex];
 
-        float selectorH = 24f;
-        float labelW = 32f;   // "JS1 " label
-        float selectorW = rightMargin - leftMargin - labelW - 6f;
-
-        for (int row = 0; row < existingSlots.Count; row++)
-        {
-            int scInst = row + 1;
-            vjoyForSCInst.TryGetValue(scInst, out uint vjoySlotId);
-
-            // JS label
-            FUIRenderer.DrawText(canvas, $"JS{scInst}", new SKPoint(leftMargin, y + selectorH / 2f + 4f),
-                FUIColors.Active, 12f, true);
-
-            // Selector
-            var selectorBounds = new SKRect(leftMargin + labelW, y, leftMargin + labelW + selectorW, y + selectorH);
-            _deviceOrder.SelectorBounds[row] = selectorBounds;
-
-            bool isOpen = _deviceOrder.OpenRow == row;
-            bool isHovered = selectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || isOpen;
-            bool deviceMode = _ctx.AppSettings.SCBindingsShowPhysicalHeaders;
-            string? assignedDevName = vjoySlotId > 0 ? GetPhysicalDeviceNameForVJoyId(vjoySlotId) : null;
-            string selectorLabel = vjoySlotId > 0
-                ? (deviceMode && assignedDevName is not null
-                    ? FUIWidgets.TruncateTextToWidth(assignedDevName, selectorW - 20f, 11f)
-                    : $"vJoy {vjoySlotId}")
-                : "—";
-            FUIWidgets.DrawSelector(canvas, selectorBounds, selectorLabel, isHovered, existingSlots.Count > 1);
-
-            // In JS-ref mode, show the device name as a dim hint after the selector
-            if (!deviceMode && assignedDevName is not null)
+            // Check shared cell
+            if (selCol.IsJoystick && !selCol.IsPhysical)
             {
-                float nameX = selectorBounds.Right + 6f;
-                float maxNameW = rightMargin - nameX;
-                if (maxNameW > 10f)
+                string sharedKey = $"{selectedAction.Key}|{selCol.VJoyDeviceId}";
+                if (_conflicts.SharedCells.TryGetValue(sharedKey, out var sharedInfo))
                 {
-                    string truncated = FUIWidgets.TruncateTextToWidth(assignedDevName, maxNameW, 10f);
-                    FUIRenderer.DrawText(canvas, truncated,
-                        new SKPoint(nameX, y + selectorH / 2f + 4f),
-                        FUIColors.TextDim, 10f);
+                    isCellShared = true;
+                    (sharedPrimaryVJoy, sharedPrimaryInput, _) = sharedInfo;
                 }
             }
 
-            y += selectorH + 4f;
+            // Find existing binding
+            existingBinding = FindBindingForCell(selectedAction, selCol);
         }
 
-        // Auto-detect button anchored near the bottom
-        float btnH = 26f;
-        float btnY = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - btnH;
-        _deviceOrder.AutoDetectBounds = new SKRect(leftMargin, btnY, rightMargin, btnY + btnH);
-        _deviceOrder.AutoDetectHovered = _deviceOrder.AutoDetectBounds.Contains(
-            _ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-        bool canAutoDetect = _directInputService is not null;
-        if (canAutoDetect)
+        if (isCellShared)
         {
-            FUIRenderer.DrawButton(canvas, _deviceOrder.AutoDetectBounds, "AUTO-DETECT",
-                _deviceOrder.AutoDetectHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+            int primaryInstance = _scExportProfile.GetSCInstance(sharedPrimaryVJoy);
+            string primaryFormatted = SCBindingsRenderer.FormatInputName(sharedPrimaryInput);
+            FUIRenderer.DrawText(canvas, $"Routed to JS{primaryInstance} / {primaryFormatted}",
+                new SKPoint(leftMargin, y), FUIColors.Primary.WithAlpha(200), 11f, true);
+            y += lineHeight;
+        }
+
+        y += 6f;
+
+        // Activation mode segmented control (only for button-type actions with a binding)
+        bool isButtonAction = selectedAction.InputType != SCInputType.Axis;
+        if (isButtonAction)
+        {
+            FUIRenderer.DrawText(canvas, "ACTIVATION MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f, true);
+            y += 14f;
+
+            var activationLabels = new[] { "PRESS", "HOLD", "2TAP", "3TAP", "DELAY" };
+            int selectedMode = existingBinding is not null ? (int)existingBinding.ActivationMode : 0;
+            bool modeEnabled = existingBinding is not null && !isCellShared;
+
+            var segBounds = new SKRect(leftMargin, y, rightMargin, y + 24f);
+            var segRects = FUIWidgets.DrawSegmentedControl(canvas, segBounds, activationLabels,
+                selectedMode, _cellDetails.HoveredModeIndex, modeEnabled);
+
+            // Store bounds for hit-testing
+            for (int i = 0; i < segRects.Length && i < _cellDetails.ActivationModeBounds.Length; i++)
+                _cellDetails.ActivationModeBounds[i] = segRects[i];
+
+            y += 28f;
+        }
+
+        // ASSIGN / CLEAR buttons — anchored to panel bottom
+        float btnWidth = (rightMargin - leftMargin - 8) / 2;
+        float btnHeight = 24f;
+        float btnY = bounds.Bottom - frameInset - FUIRenderer.SpaceLG - btnHeight;
+
+        _scAssignInputButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnWidth, btnY + btnHeight);
+        _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+        if (_scListening.IsListening)
+        {
+            using var waitBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+            canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
+            FUIRenderer.DrawTextCentered(canvas, "LISTENING...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
+        }
+        else if (isCellShared)
+        {
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
+            canvas.DrawRect(_scAssignInputButtonBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "ASSIGN", _scAssignInputButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
+        }
+        else
+        {
+            FUIRenderer.DrawButton(canvas, _scAssignInputButtonBounds, "ASSIGN",
+                _scAssignInputButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        }
+
+        _scClearBindingButtonBounds = new SKRect(leftMargin + btnWidth + 8, btnY, rightMargin, btnY + btnHeight);
+        _scClearBindingButtonHovered = _scClearBindingButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+
+        if (isCellShared)
+        {
+            FUIRenderer.DrawButton(canvas, _scClearBindingButtonBounds, "UNSHARE",
+                _scClearBindingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        }
+        else if (existingBinding is not null)
+        {
+            FUIRenderer.DrawButton(canvas, _scClearBindingButtonBounds, "CLEAR",
+                _scClearBindingButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }
         else
         {
             using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
-            canvas.DrawRect(_deviceOrder.AutoDetectBounds, disabledPaint);
-            FUIRenderer.DrawTextCentered(canvas, "AUTO-DETECT", _deviceOrder.AutoDetectBounds,
-                FUIColors.TextDim.WithAlpha(100), 12f);
+            canvas.DrawRect(_scClearBindingButtonBounds, disabledPaint);
+            FUIRenderer.DrawTextCentered(canvas, "CLEAR", _scClearBindingButtonBounds, FUIColors.TextDim.WithAlpha(100), 13f);
         }
+
+        // Conflict links panel — fills space between content and buttons
+        y += 6f;
+        if (_conflicts.ConflictLinks.Count > 0)
+            DrawConflictLinksPanel(canvas, leftMargin, rightMargin, y, btnY - 10f);
     }
 
-    private void DrawDeviceOrderDropdown(SKCanvas canvas)
+    /// <summary>
+    /// Finds the binding for a specific cell (action + column).
+    /// </summary>
+    private SCActionBinding? FindBindingForCell(SCAction action, SCGridColumn col)
     {
-        if (_deviceOrder.OpenRow < 0) return;
-
-        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
-        if (existingSlots.Count == 0 || _deviceOrder.OpenRow >= _deviceOrder.SelectorBounds.Length) return;
-
-        // Determine currently selected vJoy slot for this row's SC instance
-        int scInst = _deviceOrder.OpenRow + 1;
-        var vjoyForSCInst = new Dictionary<int, uint>();
-        foreach (var slot in existingSlots)
+        if (col.IsPhysical)
         {
-            int inst = _scExportProfile.GetSCInstance(slot.Id);
-            if (!vjoyForSCInst.ContainsKey(inst))
-                vjoyForSCInst[inst] = slot.Id;
+            return _scExportProfile.Bindings.FirstOrDefault(b =>
+                b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath);
         }
-        vjoyForSCInst.TryGetValue(scInst, out uint selectedVJoyId);
-        int selectedIdx = existingSlots.FindIndex(s => s.Id == selectedVJoyId);
-
-        float itemH = 28f;
-        var selectorBounds = _deviceOrder.SelectorBounds[_deviceOrder.OpenRow];
-        _deviceOrder.DropdownBounds = new SKRect(
-            selectorBounds.Left,
-            selectorBounds.Bottom + 2,
-            selectorBounds.Right,
-            selectorBounds.Bottom + 2 + existingSlots.Count * itemH + 8f);
-
-        bool deviceMode = _ctx.AppSettings.SCBindingsShowPhysicalHeaders;
-        var items = existingSlots.Select(s =>
+        if (col.IsJoystick)
         {
-            if (deviceMode)
-            {
-                string? name = GetPhysicalDeviceNameForVJoyId(s.Id);
-                return name ?? $"vJoy {s.Id}";
-            }
-            return $"vJoy {s.Id}";
-        }).ToList();
-        FUIWidgets.DrawDropdownPanel(canvas, _deviceOrder.DropdownBounds, items,
-            selectedIdx, _deviceOrder.HoveredIndex, itemH);
+            return _scExportProfile.Bindings.FirstOrDefault(b =>
+                b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
+                b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId is null &&
+                _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
+        }
+        return _scExportProfile.GetBinding(action.ActionMap, action.ActionName);
     }
 
-    private string? GetPhysicalDeviceNameForVJoyId(uint vjoySlotId)
-    {
-        var profile = _ctx.ProfileManager.ActiveProfile;
-        if (profile is null) return null;
-        if (!profile.VJoyPrimaryDevices.TryGetValue(vjoySlotId, out var guid)) return null;
-
-        var device = _ctx.Devices.Concat(_ctx.DisconnectedDevices)
-            .FirstOrDefault(d => d.InstanceGuid.ToString().Equals(guid, StringComparison.OrdinalIgnoreCase));
-        return device?.Name;
-    }
 }

@@ -975,6 +975,12 @@ public partial class MappingsTabController : ITabController
             else
                 _highlight.FlashText = null;
         }
+
+        // Animate Mapping Settings / Device Order panel split
+        bool showDO = _ctx.ProfileManager.ActiveProfile is not null
+            && _ctx.VJoyDevices.Any(v => v.Exists);
+        if (_deviceOrder.Anim.Update(!_deviceOrder.IsExpanded, showDO))
+            _ctx.MarkDirty();
     }
 
     public void OnActivated()
@@ -1301,6 +1307,7 @@ public partial class MappingsTabController : ITabController
         public SKRect AutoDetectBounds = SKRect.Empty;
         public bool AutoDetectHovered;
         public bool IsExpanded;
+        public FUIWidgets.PanelSplitAnimator Anim = new() { T = 1f };
         public SKRect HeaderBounds;
     }
 }

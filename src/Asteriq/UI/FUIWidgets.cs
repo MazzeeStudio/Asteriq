@@ -1401,4 +1401,64 @@ internal static class FUIWidgets
         using var thumbPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(200));
         canvas.DrawRoundRect(thumbRect, cornerRadius, cornerRadius, thumbPaint);
     }
+
+    // ─── Panel Split Animator ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Drives animated expand/collapse for a two-panel split layout.
+    /// T lerps from 0 (panel A collapsed, B expanded) to 1 (A expanded, B collapsed).
+    /// Call <see cref="Update"/> each tick. Use <see cref="ComputeBounds"/> to get animated bounds.
+    /// </summary>
+    internal struct PanelSplitAnimator
+    {
+        /// <summary>Current animation position: 0 = panel A collapsed, 1 = panel A expanded.</summary>
+        public float T;
+
+        /// <summary>True when panel B exists in the layout.</summary>
+        public bool HasPanelB;
+
+        /// <summary>True when panel B existed last frame (used to animate disappearance).</summary>
+        public bool HadPanelB;
+
+        private const float LerpSpeed = 0.18f;
+
+        /// <summary>
+        /// Call each tick. Returns true if the animation is still in progress (caller should MarkDirty).
+        /// </summary>
+        public bool Update(bool panelAExpanded, bool hasPanelB)
+        {
+            HasPanelB = hasPanelB;
+            float target = (!hasPanelB || panelAExpanded) ? 1f : 0f;
+            if (MathF.Abs(T - target) > 0.001f)
+            {
+                T += (target - T) * LerpSpeed;
+                if (MathF.Abs(T - target) < 0.001f) T = target;
+                return true;
+            }
+            if (!hasPanelB && T >= 0.999f)
+                HadPanelB = false;
+            else if (hasPanelB)
+                HadPanelB = true;
+            return false;
+        }
+
+        /// <summary>Whether the two-panel animated layout should be used.</summary>
+        public readonly bool UseAnimatedLayout => HasPanelB || (HadPanelB && T < 0.999f);
+
+        /// <summary>Whether panel B is animating out.</summary>
+        public readonly bool IsAnimatingOut => !HasPanelB && HadPanelB && T < 0.999f;
+
+        /// <summary>
+        /// Computes the two panel bounds. Panel A height proportional to T, panel B gets the rest.
+        /// </summary>
+        public readonly (SKRect boundsA, SKRect boundsB) ComputeBounds(
+            SKRect area, float gap, float collapsedH)
+        {
+            float expandableH = area.Height - 2 * collapsedH - gap;
+            float aH = collapsedH + expandableH * T;
+            var boundsA = new SKRect(area.Left, area.Top, area.Right, area.Top + aH);
+            var boundsB = new SKRect(area.Left, boundsA.Bottom + gap, area.Right, area.Bottom);
+            return (boundsA, boundsB);
+        }
+    }
 }

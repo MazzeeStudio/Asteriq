@@ -337,9 +337,8 @@ internal static class SCBindingsRenderer
         if (lower.Contains("alt")) return $"{prefix}ALT";
 
         var cleaned = lower.TrimStart('l', 'r').ToUpperInvariant();
-        if (cleaned.Length > 4)
-            cleaned = cleaned.Substring(0, 4);
-        return prefix + cleaned;
+        var full = prefix + cleaned;
+        return FUIWidgets.TruncateTextToWidth(full, 35f, 13f);
     }
 
     internal static string FormatInputName(string input)
@@ -388,8 +387,6 @@ internal static class SCBindingsRenderer
             return $"Sl{input.Substring(6)}";
 
         var result = char.ToUpper(input[0]) + (input.Length > 1 ? input.Substring(1) : "");
-        if (result.Length > 8)
-            result = result.Substring(0, 8);
-        return result;
+        return FUIWidgets.TruncateTextToWidth(result, 60f, 13f);
     }
 }

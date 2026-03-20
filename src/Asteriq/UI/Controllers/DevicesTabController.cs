@@ -1262,6 +1262,16 @@ public class DevicesTabController : ITabController
     /// </summary>
     private void RemoveVJoyDevice(uint vjoyId)
     {
+        // Prevent removal of the last vJoy device — vJoy requires at least one device
+        int existingCount = _ctx.VJoyDevices.Count(v => v.Exists);
+        if (existingCount <= 1)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                "Cannot remove the last vJoy device.\nvJoy requires at least one device to be configured.",
+                "Remove Blocked");
+            return;
+        }
+
         // Build per-device mapping breakdown for the warning dialog
         var profile = _ctx.ProfileManager.ActiveProfile;
         int mappingCount = 0;

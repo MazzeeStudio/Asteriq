@@ -630,6 +630,16 @@ public partial class SCBindingsTabController : ITabController
             CheckSCBindingInput();
         if (_searchFilter.CaptureWaitingForRelease)
             CheckCaptureRelease();
+
+        // Animate panel expand/collapse
+        float target = _cpPanel.IsExpanded ? 1f : 0f;
+        if (MathF.Abs(_cpPanel.ExpandT - target) > 0.001f)
+        {
+            _cpPanel.ExpandT += (target - _cpPanel.ExpandT) * 0.18f;
+            if (MathF.Abs(_cpPanel.ExpandT - target) < 0.001f)
+                _cpPanel.ExpandT = target;
+            _ctx.MarkDirty();
+        }
     }
 
     public void OnActivated()
@@ -735,6 +745,8 @@ public partial class SCBindingsTabController : ITabController
     private sealed class ControlProfilesPanelState
     {
         public bool IsExpanded = true;
+        /// <summary>Animated split position: 0=collapsed (contextual expanded), 1=expanded. Lerps toward IsExpanded.</summary>
+        public float ExpandT = 1f;
         public SKRect HeaderBounds;
     }
 

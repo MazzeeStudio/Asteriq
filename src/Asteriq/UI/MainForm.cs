@@ -361,6 +361,12 @@ public partial class MainForm : Form
         _tabContext.GetActiveSCExportProfile = () => _scBindingsController.ActiveSCExportProfile;
     }
 
+    /// <summary>
+    /// SyncTabContext pushes MainForm-owned state into TabContext so controllers
+    /// can read it during Draw/OnTick. Fields listed here are OWNED by MainForm.
+    /// Some fields (e.g. _devices, _networkMode) are also read on the SDL2 thread
+    /// via OnInputReceived — the MainForm local field is the authoritative copy.
+    /// </summary>
     private void SyncTabContext()
     {
         _tabContext.Devices = _devices;
@@ -392,6 +398,12 @@ public partial class MainForm : Form
         _tabContext.Profiles = _profiles;
     }
 
+    /// <summary>
+    /// SyncFromTabContext pulls controller-modified state back into MainForm.
+    /// Fields listed here can be MODIFIED by tab controllers via TabContext.
+    /// Note: fields also read on the SDL2 thread (OnInputReceived) must remain
+    /// as local MainForm fields — accessing TabContext from the SDL2 thread is unsafe.
+    /// </summary>
     private void SyncFromTabContext()
     {
         _backgroundDirty = _tabContext.BackgroundDirty;

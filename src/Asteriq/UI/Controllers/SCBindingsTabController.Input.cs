@@ -325,6 +325,53 @@ public partial class SCBindingsTabController
             }
         }
 
+        // Determine if CP panel content is visible (not collapsed behind a contextual panel)
+        bool showCellDetails = !showColumnActions
+            && _cell.SelectedCell.actionIndex >= 0 && _cell.SelectedCell.colIndex >= 0
+            && _scFilteredActions is not null && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
+        bool hasContextualPanel = showColumnActions || showCellDetails;
+        bool cpContentVisible = !hasContextualPanel || _cpPanel.IsExpanded;
+
+        // CP panel content handlers — must run BEFORE header click, since header bounds overlap content
+        if (cpContentVisible)
+        {
+            // Profile edit icon click (inside dropdown box)
+            if (_profileMgmt.ProfileEditBounds != SKRect.Empty && _profileMgmt.ProfileEditBounds.Contains(point))
+            {
+                EditSCProfileName();
+                return;
+            }
+
+            // SC Export profile dropdown toggle click
+            if (_profileMgmt.DropdownBounds.Contains(point))
+            {
+                _profileMgmt.DropdownOpen = !_profileMgmt.DropdownOpen;
+                _scInstall.DropdownOpen = false;
+                _searchFilter.FilterDropdownOpen = false;
+                _searchFilter.SearchBoxFocused = false;
+                return;
+            }
+
+            // SC Export profile management buttons
+            if (_profileMgmt.SaveProfileBounds.Contains(point))
+            {
+                SaveSCExportProfile();
+                return;
+            }
+
+            if (_profileMgmt.NewProfileBounds.Contains(point))
+            {
+                CreateNewSCExportProfile();
+                return;
+            }
+
+            if (_profileMgmt.ImportProfileBounds.Contains(point))
+            {
+                BrowseAndImportSCConfig();
+                return;
+            }
+        }
+
         // Panel header clicks — Control Profiles / contextual panel mutual-exclusive expand
         if (!_cpPanel.HeaderBounds.IsEmpty && _cpPanel.HeaderBounds.Contains(point))
         {
@@ -393,42 +440,6 @@ public partial class SCBindingsTabController
             _scInstall.DropdownOpen = false;
             _profileMgmt.DropdownOpen = false;
             _searchFilter.SearchBoxFocused = false;
-            return;
-        }
-
-        // Profile edit icon click (inside dropdown box)
-        if (_profileMgmt.ProfileEditBounds != SKRect.Empty && _profileMgmt.ProfileEditBounds.Contains(point))
-        {
-            EditSCProfileName();
-            return;
-        }
-
-        // SC Export profile dropdown toggle click
-        if (_profileMgmt.DropdownBounds.Contains(point))
-        {
-            _profileMgmt.DropdownOpen = !_profileMgmt.DropdownOpen;
-            _scInstall.DropdownOpen = false;
-            _searchFilter.FilterDropdownOpen = false;
-            _searchFilter.SearchBoxFocused = false;
-            return;
-        }
-
-        // SC Export profile management buttons
-        if (_profileMgmt.SaveProfileBounds.Contains(point))
-        {
-            SaveSCExportProfile();
-            return;
-        }
-
-        if (_profileMgmt.NewProfileBounds.Contains(point))
-        {
-            CreateNewSCExportProfile();
-            return;
-        }
-
-        if (_profileMgmt.ImportProfileBounds.Contains(point))
-        {
-            BrowseAndImportSCConfig();
             return;
         }
 
@@ -516,30 +527,31 @@ public partial class SCBindingsTabController
             return;
         }
 
-        // Export button
-        if (_scExportButtonBounds.Contains(point))
+        // Export / Clear All / Reset Defaults — inside CP panel, guard against stale bounds
+        if (cpContentVisible)
         {
-            if (_conflicts.DuplicateActionBindings.Count > 0)
+            if (_scExportButtonBounds.Contains(point))
             {
-                SetStatus("Resolve duplicate action bindings across joystick columns before exporting", SCStatusKind.Error);
+                if (_conflicts.DuplicateActionBindings.Count > 0)
+                {
+                    SetStatus("Resolve duplicate action bindings across joystick columns before exporting", SCStatusKind.Error);
+                    return;
+                }
+                ExportToSC();
                 return;
             }
-            ExportToSC();
-            return;
-        }
 
-        // Clear All bindings button
-        if (_scClearAllButtonBounds.Contains(point) && _scExportProfile.Bindings.Count > 0)
-        {
-            ClearAllBindings();
-            return;
-        }
+            if (_scClearAllButtonBounds.Contains(point) && _scExportProfile.Bindings.Count > 0)
+            {
+                ClearAllBindings();
+                return;
+            }
 
-        // Reset Defaults button
-        if (_scResetDefaultsButtonBounds.Contains(point))
-        {
-            ResetToDefaults();
-            return;
+            if (_scResetDefaultsButtonBounds.Contains(point))
+            {
+                ResetToDefaults();
+                return;
+            }
         }
 
         // Conflict link clicks — navigate to the conflicting action

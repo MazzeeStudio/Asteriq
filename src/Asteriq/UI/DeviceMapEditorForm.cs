@@ -385,7 +385,7 @@ public class DeviceMapEditorForm : Form
         x += 36;
 
         _svgDropdownBounds = new SKRect(x, y, x + 180, y + 30);
-        DrawDropdown(canvas, _svgDropdownBounds, _deviceMap.SvgFile ?? "Select SVG...", _svgDropdownOpen);
+        FUIWidgets.DrawDropdown(canvas, _svgDropdownBounds, _deviceMap.SvgFile ?? "Select SVG...", _svgDropdownOpen);
         x += 200;
 
         // JSON filename
@@ -950,19 +950,6 @@ public class DeviceMapEditorForm : Form
         }
     }
 
-    private static void DrawDropdown(SKCanvas canvas, SKRect bounds, string text, bool open)
-    {
-        FUIRenderer.DrawRoundedPanel(canvas, bounds,
-            open ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2,
-            open ? FUIColors.Primary : FUIColors.Frame,
-            4f);
-
-        FUIRenderer.DrawText(canvas, text, new SKPoint(bounds.Left + 8, bounds.MidY + 4), FUIColors.TextPrimary, 13f);
-
-        // Dropdown arrow
-        var arrow = open ? "^" : "v";
-        FUIRenderer.DrawText(canvas, arrow, new SKPoint(bounds.Right - 18, bounds.MidY + 4), FUIColors.TextDim, 13f);
-    }
 
     private void DrawSvgDropdownMenu(SKCanvas canvas)
     {

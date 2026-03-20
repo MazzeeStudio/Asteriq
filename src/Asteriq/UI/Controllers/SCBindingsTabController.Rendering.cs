@@ -75,19 +75,24 @@ public partial class SCBindingsTabController
         // RIGHT 1 — Game Environment (always visible)
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
-        // RIGHT 2 — Control Profiles
-        // Show content when panel has enough height (threshold slightly above collapsed header)
-        bool cpExpanded = !hasContextualPanel || controlProfilesBounds.Height > FUIRenderer.CollapsedPanelHeight + 20;
+        // RIGHT 2 — Control Profiles (clipped to bounds during animation)
+        bool cpExpanded = !hasContextualPanel || _cpPanel.IsExpanded;
         bool cpCollapsible = hasContextualPanel;
+        canvas.Save();
+        canvas.ClipRect(controlProfilesBounds);
         DrawSCExportPanelCompact(canvas, controlProfilesBounds, frameInset,
             isExpanded: cpExpanded, isCollapsible: cpCollapsible);
+        canvas.Restore();
 
-        // RIGHT 3 — Contextual panel (Column Actions or Cell Details)
-        bool contextualExpanded = hasContextualPanel && contextualBounds.Height > FUIRenderer.CollapsedPanelHeight + 20;
+        // RIGHT 3 — Contextual panel (Column Actions or Cell Details, clipped to bounds)
+        bool contextualExpanded = hasContextualPanel && !_cpPanel.IsExpanded;
+        canvas.Save();
+        canvas.ClipRect(contextualBounds);
         if (showColumnActions)
             DrawColumnActionsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
         else if (showCellDetails)
             DrawCellDetailsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
+        canvas.Restore();
 
         // Draw dropdowns last (on top) so they render over all panels
         if (_profileMgmt.DropdownOpen && !_profileMgmt.DropdownListBounds.IsEmpty)

@@ -61,8 +61,9 @@ public partial class MappingsTabController
             var (settingsBounds, deviceOrderBounds) = doAnim.ComputeBounds(
                 rightBounds, vertGap, FUIRenderer.CollapsedPanelHeight);
 
+            bool settingsExpanded = !_deviceOrder.IsExpanded;
             canvas.SaveLayer(settingsBounds, null);
-            DrawMappingSettingsPanel(canvas, settingsBounds, frameInset);
+            DrawMappingSettingsPanel(canvas, settingsBounds, frameInset, settingsExpanded);
             canvas.Restore();
 
             canvas.SaveLayer(deviceOrderBounds, null);
@@ -650,9 +651,9 @@ public partial class MappingsTabController
         }
     }
 
-    private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded = true)
     {
-        bool isCollapsed = bounds.Height <= 52f;
+        bool isCollapsed = !isExpanded;
         float cornerLen = isCollapsed ? Math.Min(16f, bounds.Height * 0.35f) : 30f;
 
         // Panel background

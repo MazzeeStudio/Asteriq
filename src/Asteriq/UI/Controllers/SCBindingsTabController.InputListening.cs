@@ -536,27 +536,10 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Keyboard detection — poll for newly pressed keys (not modifiers)
+        // Mouse button detection — check BEFORE keyboard so that modifier+mouse combos
+        // (e.g. L-ALT+Mouse1) are captured as mouse actions, not as standalone modifier keys.
         if (!detectedThisEvent)
         {
-            var kbResult = DetectKeyboardInput();
-            if (kbResult is not null)
-            {
-                var (key, mods) = kbResult.Value;
-                string scInput = KeyToSCInput(key);
-                string modPrefix = mods.Count > 0 ? string.Join("+", mods) + "+" : "";
-                // Prefix with "kb:" so ApplyButtonCaptureResult can identify the device type
-                _captureCandidateInput = $"kb:{modPrefix}{scInput}";
-                _captureCandidatePath = null; // no HID path for KB
-                _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
-                detectedThisEvent = true;
-            }
-        }
-
-        // Mouse button detection — poll for newly pressed mouse buttons
-        if (!detectedThisEvent)
-        {
-            // Check mouse buttons via GetAsyncKeyState
             string? mouseResult = null;
             if (IsKeyPressed(0x01)) mouseResult = "mouse1"; // VK_LBUTTON
             else if (IsKeyPressed(0x02)) mouseResult = "mouse2"; // VK_RBUTTON
@@ -574,11 +557,27 @@ public partial class SCBindingsTabController
 
             if (mouseResult is not null)
             {
-                // Collect held keyboard modifiers for mouse actions (e.g. R-ALT+Mouse1)
                 string modPrefix = GetHeldModifierPrefix();
                 _captureCandidateInput = $"mouse:{modPrefix}{mouseResult}";
                 _captureCandidatePath = null;
                 _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+                detectedThisEvent = true;
+            }
+        }
+
+        // Keyboard detection — poll for newly pressed keys
+        if (!detectedThisEvent)
+        {
+            var kbResult = DetectKeyboardInput();
+            if (kbResult is not null)
+            {
+                var (key, mods) = kbResult.Value;
+                string scInput = KeyToSCInput(key);
+                string modPrefix = mods.Count > 0 ? string.Join("+", mods) + "+" : "";
+                _captureCandidateInput = $"kb:{modPrefix}{scInput}";
+                _captureCandidatePath = null;
+                _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
+                detectedThisEvent = true;
             }
         }
 

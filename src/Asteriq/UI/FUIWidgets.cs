@@ -1306,4 +1306,99 @@ internal static class FUIWidgets
             Y = y
         };
     }
+
+    // ─── Scrollbar ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws a scrollbar (vertical or horizontal) and returns the track and thumb bounds
+    /// for hit-testing. When <paramref name="isHovered"/> is true the scrollbar uses
+    /// brighter colours to indicate interactivity.
+    /// </summary>
+    /// <param name="canvas">Target canvas.</param>
+    /// <param name="trackBounds">Full track rectangle (caller decides position and size).</param>
+    /// <param name="scrollOffset">Current scroll position (0 = start).</param>
+    /// <param name="contentSize">Total content size (height for vertical, width for horizontal).</param>
+    /// <param name="viewSize">Visible viewport size along the scroll axis.</param>
+    /// <param name="isHovered">Whether the scrollbar is hovered or being dragged.</param>
+    /// <param name="thumbBounds">Receives the computed thumb rectangle.</param>
+    /// <param name="isHorizontal">True for a horizontal scrollbar.</param>
+    /// <param name="cornerRadius">Rounding radius for track and thumb.</param>
+    /// <param name="drawTrack">When false, only the thumb is drawn (useful for minimal indicators).</param>
+    internal static void DrawScrollbar(
+        SKCanvas canvas,
+        SKRect trackBounds,
+        float scrollOffset,
+        float contentSize,
+        float viewSize,
+        bool isHovered,
+        out SKRect thumbBounds,
+        bool isHorizontal = false,
+        float cornerRadius = 4f,
+        bool drawTrack = true)
+    {
+        float trackLen = isHorizontal ? trackBounds.Width : trackBounds.Height;
+        float minThumb = 30f;
+        float thumbLen = Math.Max(minThumb, trackLen * (viewSize / contentSize));
+        float maxScroll = Math.Max(0, contentSize - viewSize);
+        float ratio = maxScroll > 0 ? scrollOffset / maxScroll : 0;
+        float thumbOffset = ratio * (trackLen - thumbLen);
+
+        if (isHorizontal)
+        {
+            thumbBounds = new SKRect(
+                trackBounds.Left + thumbOffset, trackBounds.Top,
+                trackBounds.Left + thumbOffset + thumbLen, trackBounds.Bottom);
+        }
+        else
+        {
+            thumbBounds = new SKRect(
+                trackBounds.Left, trackBounds.Top + thumbOffset,
+                trackBounds.Right, trackBounds.Top + thumbOffset + thumbLen);
+        }
+
+        // Track
+        if (drawTrack)
+        {
+            using var trackPaint = FUIRenderer.CreateFillPaint(
+                FUIColors.Background2.WithAlpha(isHovered ? (byte)120 : (byte)80));
+            canvas.DrawRoundRect(trackBounds, cornerRadius, cornerRadius, trackPaint);
+        }
+
+        // Thumb
+        var thumbColour = isHovered
+            ? FUIColors.Active
+            : FUIColors.Frame.WithAlpha(180);
+        using var thumbPaint = FUIRenderer.CreateFillPaint(thumbColour);
+        canvas.DrawRoundRect(thumbBounds, cornerRadius, cornerRadius, thumbPaint);
+    }
+
+    /// <summary>
+    /// Draws a minimal passive scroll indicator (no track, no hover state).
+    /// Suitable for read-only lists that scroll but have no interactive scrollbar.
+    /// </summary>
+    internal static void DrawScrollIndicator(
+        SKCanvas canvas,
+        SKRect trackBounds,
+        float scrollOffset,
+        float contentSize,
+        float viewSize,
+        float cornerRadius = 1.5f)
+    {
+        float trackLen = trackBounds.Height;
+        float thumbLen = Math.Max(20f, trackLen * (viewSize / contentSize));
+        float maxScroll = Math.Max(0, contentSize - viewSize);
+        float ratio = maxScroll > 0 ? scrollOffset / maxScroll : 0;
+        float thumbOffset = ratio * (trackLen - thumbLen);
+
+        // Subtle track
+        using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Frame.WithAlpha(40));
+        canvas.DrawRoundRect(trackBounds, cornerRadius, cornerRadius, trackPaint);
+
+        // Thumb
+        var thumbRect = new SKRect(
+            trackBounds.Left, trackBounds.Top + thumbOffset,
+            trackBounds.Right, trackBounds.Top + thumbOffset + thumbLen);
+        using var thumbPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(200));
+        canvas.DrawRoundRect(thumbRect, cornerRadius, cornerRadius, thumbPaint);
+    }
 }

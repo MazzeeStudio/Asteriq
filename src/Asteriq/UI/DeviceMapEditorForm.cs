@@ -878,13 +878,11 @@ public class DeviceMapEditorForm : Form
         // Draw scroll indicator if needed
         if (totalContentHeight > contentBounds.Height)
         {
-            float scrollbarHeight = (contentBounds.Height / totalContentHeight) * contentBounds.Height;
-            float scrollbarY = contentTop + (_controlsListScroll / totalContentHeight) * contentBounds.Height;
-            var scrollbarBounds = new SKRect(_controlsListBounds.Right - 6, scrollbarY,
-                _controlsListBounds.Right - 2, scrollbarY + scrollbarHeight);
-
-            using var scrollPaint = FUIRenderer.CreateFillPaint(FUIColors.Frame.WithAlpha(100));
-            canvas.DrawRoundRect(scrollbarBounds, 2, 2, scrollPaint);
+            var trackBounds = new SKRect(_controlsListBounds.Right - 6, contentTop,
+                _controlsListBounds.Right - 2, contentTop + contentBounds.Height);
+            FUIWidgets.DrawScrollbar(canvas, trackBounds, _controlsListScroll,
+                totalContentHeight, contentBounds.Height, isHovered: false, out _,
+                cornerRadius: 2f, drawTrack: false);
         }
 
         // Add/Delete buttons

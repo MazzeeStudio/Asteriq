@@ -272,7 +272,13 @@ public partial class MappingsTabController
         // Draw scroll indicator if content overflows
         if (_listScroll.ContentHeight > bounds.Height)
         {
-            DrawScrollIndicator(canvas, bounds, _listScroll.ScrollOffset, _listScroll.ContentHeight);
+            float trackHeight = bounds.Height - 20;
+            float trackX = bounds.Right + 8;
+            float trackTop = bounds.Top + 10;
+            float trackWidth = 3f;
+            var trackBounds = new SKRect(trackX, trackTop, trackX + trackWidth, trackTop + trackHeight);
+            FUIWidgets.DrawScrollIndicator(canvas, trackBounds, _listScroll.ScrollOffset,
+                _listScroll.ContentHeight, bounds.Height);
         }
     }
 
@@ -366,26 +372,6 @@ public partial class MappingsTabController
         return mapping.Output.Index; // 0-based output index = row index in button category
     }
 
-    private static void DrawScrollIndicator(SKCanvas canvas, SKRect bounds, float scrollOffset, float contentHeight)
-    {
-        float trackHeight = bounds.Height - 20;
-        float thumbRatio = bounds.Height / contentHeight;
-        float thumbHeight = Math.Max(20, trackHeight * thumbRatio);
-        float thumbOffset = (scrollOffset / (contentHeight - bounds.Height)) * (trackHeight - thumbHeight);
-
-        // Position track outside the list bounds, aligned with corner frame edge
-        float trackX = bounds.Right + 8; // Outside cells, inline with frame
-        float trackTop = bounds.Top + 10;
-        float trackWidth = 3f;
-
-        // Track (subtle)
-        using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Frame.WithAlpha(40));
-        canvas.DrawRoundRect(new SKRect(trackX, trackTop, trackX + trackWidth, trackTop + trackHeight), 1.5f, 1.5f, trackPaint);
-
-        // Thumb
-        using var thumbPaint = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(200));
-        canvas.DrawRoundRect(new SKRect(trackX, trackTop + thumbOffset, trackX + trackWidth, trackTop + thumbOffset + thumbHeight), 1.5f, 1.5f, thumbPaint);
-    }
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
         bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false,

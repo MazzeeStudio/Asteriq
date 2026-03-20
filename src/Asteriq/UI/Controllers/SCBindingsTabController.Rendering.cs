@@ -754,23 +754,14 @@ public partial class SCBindingsTabController
         _scroll.VThumbBounds = SKRect.Empty;
         if (_scBindingsContentHeight > _scBindingsListBounds.Height)
         {
-            float scrollbarWidth = 8f;  // Slightly wider for easier clicking
+            float scrollbarWidth = 8f;
             float scrollbarX = rightMargin - scrollbarWidth + 10;
-            float scrollbarHeight = _scBindingsListBounds.Height;
-            float thumbHeight = Math.Max(30f, scrollbarHeight * (_scBindingsListBounds.Height / _scBindingsContentHeight));
-            float maxVScroll = _scBindingsContentHeight - _scBindingsListBounds.Height;
-            float thumbY = listTop + (maxVScroll > 0 ? (_scBindingsScrollOffset / maxVScroll) * (scrollbarHeight - thumbHeight) : 0);
-
-            _scroll.VScrollBounds = new SKRect(scrollbarX, listTop, scrollbarX + scrollbarWidth, listTop + scrollbarHeight);
-            _scroll.VThumbBounds = new SKRect(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight);
+            _scroll.VScrollBounds = new SKRect(scrollbarX, listTop, scrollbarX + scrollbarWidth, listTop + _scBindingsListBounds.Height);
 
             bool vScrollHovered = _scroll.VScrollBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || _scroll.IsDraggingVScroll;
-
-            using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(vScrollHovered ? (byte)120 : (byte)80));
-            canvas.DrawRoundRect(_scroll.VScrollBounds, 4f, 4f, trackPaint);
-
-            using var thumbPaint = FUIRenderer.CreateFillPaint(vScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180));
-            canvas.DrawRoundRect(_scroll.VThumbBounds, 4f, 4f, thumbPaint);
+            FUIWidgets.DrawScrollbar(canvas, _scroll.VScrollBounds, _scBindingsScrollOffset,
+                _scBindingsContentHeight, _scBindingsListBounds.Height, vScrollHovered, out var vThumb);
+            _scroll.VThumbBounds = vThumb;
         }
 
         // Horizontal scrollbar if needed
@@ -778,23 +769,14 @@ public partial class SCBindingsTabController
         _scroll.HThumbBounds = SKRect.Empty;
         if (needsHorizontalScroll)
         {
-            float scrollbarHeight = 8f;  // Slightly taller for easier clicking
+            float scrollbarHeight = 8f;
             float scrollbarY = listBottom + 5f;
-            float scrollbarWidth = visibleDeviceWidth;
-            float thumbWidth = Math.Max(30f, scrollbarWidth * (visibleDeviceWidth / totalDeviceColsWidth));
-            float maxHScroll = totalDeviceColsWidth - visibleDeviceWidth;
-            float thumbX = deviceColsStart + (maxHScroll > 0 ? (_grid.HorizontalScroll / maxHScroll) * (scrollbarWidth - thumbWidth) : 0);
-
-            _scroll.HScrollBounds = new SKRect(deviceColsStart, scrollbarY, deviceColsStart + scrollbarWidth, scrollbarY + scrollbarHeight);
-            _scroll.HThumbBounds = new SKRect(thumbX, scrollbarY, thumbX + thumbWidth, scrollbarY + scrollbarHeight);
+            _scroll.HScrollBounds = new SKRect(deviceColsStart, scrollbarY, deviceColsStart + visibleDeviceWidth, scrollbarY + scrollbarHeight);
 
             bool hScrollHovered = _scroll.HScrollBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y) || _scroll.IsDraggingHScroll;
-
-            using var trackPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(hScrollHovered ? (byte)120 : (byte)80));
-            canvas.DrawRoundRect(_scroll.HScrollBounds, 4f, 4f, trackPaint);
-
-            using var thumbPaint = FUIRenderer.CreateFillPaint(hScrollHovered ? FUIColors.Active : FUIColors.Frame.WithAlpha(180));
-            canvas.DrawRoundRect(_scroll.HThumbBounds, 4f, 4f, thumbPaint);
+            FUIWidgets.DrawScrollbar(canvas, _scroll.HScrollBounds, _grid.HorizontalScroll,
+                totalDeviceColsWidth, visibleDeviceWidth, hScrollHovered, out var hThumb, isHorizontal: true);
+            _scroll.HThumbBounds = hThumb;
         }
     }
 

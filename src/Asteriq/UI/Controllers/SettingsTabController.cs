@@ -64,11 +64,11 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _applyButtonBounds;
 
     // Toggle knob animation positions (0 = off, 1 = on); initialized from current settings
-    private float _autoLoadT;
-    private float _closeToTrayT;
-    private float _clientOnlyT;
-    private float _networkEnabledT;
-    private float _checkUpdatesT;
+    private ToggleAnim _autoLoadT;
+    private ToggleAnim _closeToTrayT;
+    private ToggleAnim _clientOnlyT;
+    private ToggleAnim _networkEnabledT;
+    private ToggleAnim _checkUpdatesT;
     private const float ToggleLerpSpeed = 0.14f;  // per 60Hz tick ≈ ~120 ms transition
 
     // Settings right panel accordion state — "visual" | "network" | "hidhide"
@@ -84,8 +84,8 @@ public class SettingsTabController : ITabController, IDisposable
     private bool _hidHideCloaking;
     private bool _hidHideInverse;
     private bool _hidHideStateLoaded;
-    private float _cloakingT;
-    private float _inverseT;
+    private ToggleAnim _cloakingT;
+    private ToggleAnim _inverseT;
     private string? _hidHideInstalledVersion;
     private string? _hidHideLatestVersion;
     private string? _hidHideInstallerUrl;
@@ -98,15 +98,27 @@ public class SettingsTabController : ITabController, IDisposable
 
     private enum HidHideInstallPhase { Idle, Downloading, Launching, Error }
 
+    private struct ToggleAnim
+    {
+        public float T;
+
+        public void Update(bool target, float speed = 0.14f)
+        {
+            float goal = target ? 1f : 0f;
+            T += (goal - T) * speed;
+            if (MathF.Abs(T - goal) < 0.001f) T = goal;
+        }
+    }
+
     public SettingsTabController(TabContext ctx)
     {
         _ctx = ctx;
         // Snap to current settings on first construction — no animation on startup
-        _autoLoadT      = ctx.AppSettings.AutoLoadLastProfile ? 1f : 0f;
-        _closeToTrayT   = ctx.AppSettings.CloseToTray ? 1f : 0f;
-        _clientOnlyT    = ctx.AppSettings.ClientOnlyMode ? 1f : 0f;
-        _networkEnabledT = ctx.AppSettings.NetworkEnabled ? 1f : 0f;
-        _checkUpdatesT  = ctx.AppSettings.AutoCheckUpdates ? 1f : 0f;
+        _autoLoadT      = new ToggleAnim { T = ctx.AppSettings.AutoLoadLastProfile ? 1f : 0f };
+        _closeToTrayT   = new ToggleAnim { T = ctx.AppSettings.CloseToTray ? 1f : 0f };
+        _clientOnlyT    = new ToggleAnim { T = ctx.AppSettings.ClientOnlyMode ? 1f : 0f };
+        _networkEnabledT = new ToggleAnim { T = ctx.AppSettings.NetworkEnabled ? 1f : 0f };
+        _checkUpdatesT  = new ToggleAnim { T = ctx.AppSettings.AutoCheckUpdates ? 1f : 0f };
         var savedPanel = ctx.AppSettings.SettingsRightPanel ?? "visual";
         _settingsRightPanelActive = (savedPanel == "network" && !ctx.AppSettings.NetworkEnabled) ? "visual" : savedPanel;
     }
@@ -263,13 +275,13 @@ public class SettingsTabController : ITabController, IDisposable
     public void OnMouseLeave() { }
     public void OnTick()
     {
-        _autoLoadT      = LerpToggle(_autoLoadT,      _ctx.AppSettings.AutoLoadLastProfile);
-        _closeToTrayT   = LerpToggle(_closeToTrayT,   _ctx.AppSettings.CloseToTray);
-        _clientOnlyT    = LerpToggle(_clientOnlyT,    _ctx.AppSettings.ClientOnlyMode);
-        _networkEnabledT = LerpToggle(_networkEnabledT, _ctx.AppSettings.NetworkEnabled);
-        _checkUpdatesT  = LerpToggle(_checkUpdatesT,  _ctx.AppSettings.AutoCheckUpdates);
-        _cloakingT      = LerpToggle(_cloakingT,      _hidHideCloaking);
-        _inverseT       = LerpToggle(_inverseT,        _hidHideInverse);
+        _autoLoadT.Update(_ctx.AppSettings.AutoLoadLastProfile);
+        _closeToTrayT.Update(_ctx.AppSettings.CloseToTray);
+        _clientOnlyT.Update(_ctx.AppSettings.ClientOnlyMode);
+        _networkEnabledT.Update(_ctx.AppSettings.NetworkEnabled);
+        _checkUpdatesT.Update(_ctx.AppSettings.AutoCheckUpdates);
+        _cloakingT.Update(_hidHideCloaking);
+        _inverseT.Update(_hidHideInverse);
 
         // Per-peer connection toggles
         bool netConnected  = _ctx.NetworkMode == NetworkInputMode.Remote;
@@ -295,12 +307,6 @@ public class SettingsTabController : ITabController, IDisposable
             _peerToggleT.Remove(key);
     }
 
-    private static float LerpToggle(float current, bool on)
-    {
-        float target = on ? 1f : 0f;
-        float delta = target - current;
-        return MathF.Abs(delta) < 0.002f ? target : current + delta * ToggleLerpSpeed;
-    }
     public void OnActivated() { }
     public void OnDeactivated() { }
 
@@ -471,7 +477,7 @@ public class SettingsTabController : ITabController, IDisposable
             autoLoadLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float toggleY = y + (rowHeight - toggleHeight) / 2;
         _autoLoadToggleBounds = new SKRect(rightMargin - toggleWidth, toggleY, rightMargin, toggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _autoLoadToggleBounds, _autoLoadT, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _autoLoadToggleBounds, _autoLoadT.T, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Close to Tray toggle
@@ -481,7 +487,7 @@ public class SettingsTabController : ITabController, IDisposable
             closeToTrayLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float closeToTrayToggleY = y + (rowHeight - toggleHeight) / 2;
         _closeToTrayToggleBounds = new SKRect(rightMargin - toggleWidth, closeToTrayToggleY, rightMargin, closeToTrayToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _closeToTrayT, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _closeToTrayToggleBounds, _closeToTrayT.T, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Client Only Mode toggle
@@ -491,7 +497,7 @@ public class SettingsTabController : ITabController, IDisposable
             clientOnlyLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float clientOnlyToggleY = y + (rowHeight - toggleHeight) / 2;
         _clientOnlyToggleBounds = new SKRect(rightMargin - toggleWidth, clientOnlyToggleY, rightMargin, clientOnlyToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _clientOnlyToggleBounds, _clientOnlyT, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _clientOnlyToggleBounds, _clientOnlyT.T, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // DRIVERS section
@@ -569,7 +575,7 @@ public class SettingsTabController : ITabController, IDisposable
                 netLabelMaxWidth, FUIColors.TextPrimary, 14f);
             float netToggleY = y + (rowHeight - toggleHeight) / 2;
             _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
-            FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT, _ctx.MousePosition);
+            FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT.T, _ctx.MousePosition);
             y += rowHeight + sectionSpacing;
         }
         else
@@ -588,7 +594,7 @@ public class SettingsTabController : ITabController, IDisposable
             autoCheckLabelMaxWidth, FUIColors.TextPrimary, 14f);
         float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
         _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
-        FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _checkUpdatesT, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _checkUpdatesT.T, _ctx.MousePosition);
         y += rowHeight + sectionSpacing;
 
         // Version row: "v0.8.289" left, [Check for updates] button right
@@ -991,8 +997,8 @@ public class SettingsTabController : ITabController, IDisposable
         {
             _hidHideCloaking = _ctx.HidHide!.IsCloakingEnabled();
             _hidHideInverse  = _ctx.HidHide!.IsInverseMode();
-            _cloakingT = _hidHideCloaking ? 1f : 0f;
-            _inverseT  = _hidHideInverse  ? 1f : 0f;
+            _cloakingT = new ToggleAnim { T = _hidHideCloaking ? 1f : 0f };
+            _inverseT  = new ToggleAnim { T = _hidHideInverse  ? 1f : 0f };
             _hidHideStateLoaded = true;
         }
 
@@ -1225,14 +1231,14 @@ public class SettingsTabController : ITabController, IDisposable
         FUIRenderer.DrawTextTruncated(canvas, "Cloaking",
             new SKPoint(leftMargin, y + rowH / 2f + 4f), rightMargin - leftMargin - toggleW - 8f, FUIColors.TextPrimary, 13f);
         _hidHideCloakingToggleBounds = new SKRect(rightMargin - toggleW, y, rightMargin, y + rowH);
-        FUIWidgets.DrawToggleSwitch(canvas, _hidHideCloakingToggleBounds, _cloakingT, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _hidHideCloakingToggleBounds, _cloakingT.T, _ctx.MousePosition);
         y += rowH + sectionGap;
 
         // INVERSE MODE toggle
         FUIRenderer.DrawTextTruncated(canvas, "Inverse mode",
             new SKPoint(leftMargin, y + rowH / 2f + 4f), rightMargin - leftMargin - toggleW - 8f, FUIColors.TextPrimary, 13f);
         _hidHideInverseToggleBounds = new SKRect(rightMargin - toggleW, y, rightMargin, y + rowH);
-        FUIWidgets.DrawToggleSwitch(canvas, _hidHideInverseToggleBounds, _inverseT, _ctx.MousePosition);
+        FUIWidgets.DrawToggleSwitch(canvas, _hidHideInverseToggleBounds, _inverseT.T, _ctx.MousePosition);
         y += rowH + sectionGap;
 
         // Description of inverse mode

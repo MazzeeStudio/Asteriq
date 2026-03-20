@@ -653,36 +653,30 @@ public partial class MappingsTabController
 
     private void DrawMappingSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded = true)
     {
-        bool isCollapsed = !isExpanded;
-        float cornerLen = isCollapsed ? Math.Min(16f, bounds.Height * 0.35f) : 30f;
+        bool isCollapsible = _ctx.GetActiveSCExportProfile is not null && _ctx.VJoyDevices.Any(v => v.Exists);
+        float y, leftMargin, rightMargin;
 
-        // Panel background
-        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Background1.WithAlpha(140));
-        canvas.DrawRect(new SKRect(bounds.Left + frameInset, bounds.Top + frameInset,
-            bounds.Right - frameInset, bounds.Bottom - frameInset), bgPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Frame, cornerLen, 8f);
-
-        float y = bounds.Top + frameInset + 10;
-        float leftMargin = bounds.Left + frameInset + 16;
-        float rightMargin = bounds.Right - frameInset - 16;
-
-        // Title
-        FUIRenderer.DrawText(canvas, "MAPPING SETTINGS", new SKPoint(leftMargin, y + 12), FUIColors.TextBright, 17f, true);
-
-        // Expand/collapse indicator (only when Device Order exists)
-        if (_ctx.GetActiveSCExportProfile is not null && _ctx.VJoyDevices.Any(v => v.Exists))
+        if (isCollapsible)
         {
-            bool headerHovered = isCollapsed && bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            string indicator = isCollapsed ? "+" : "-";
-            float indW = FUIRenderer.MeasureText(indicator, 13f);
-            FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y + 12),
-                headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isCollapsed ? (byte)180 : (byte)100),
-                13f, true);
+            bool headerHovered = !isExpanded
+                && new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + FUIRenderer.PanelHeaderHeight)
+                    .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "MAPPING SETTINGS",
+                isExpanded, headerHovered, out _);
+            if (!isExpanded) return;
+            y = m.Y;
+            leftMargin = m.LeftMargin;
+            rightMargin = m.RightMargin;
         }
-
-        if (isCollapsed) return;
-
-        y += 36;
+        else
+        {
+            // No collapsible header — Mapping Settings fills the whole right panel
+            var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+            y = m.Y;
+            leftMargin = m.LeftMargin;
+            rightMargin = m.RightMargin;
+            FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "MAPPING SETTINGS");
+        }
 
         // Reset net-switch bounds each frame (set later in DrawButtonSettings if applicable)
         _netSwitch.ActionBounds = SKRect.Empty;

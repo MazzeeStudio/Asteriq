@@ -49,37 +49,29 @@ public partial class MappingsTabController
         var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
         bool showDeviceOrder = profile is not null && existingSlots.Count > 0;
 
-        if (showDeviceOrder)
+        ref var doAnim = ref _deviceOrder.Anim;
+        float vertGap = 8f;
+        float doFrameInset = 5f;
+
+        if (doAnim.UseAnimatedLayout)
         {
-            float CollapsedH = FUIRenderer.CollapsedPanelHeight;
-            float vertGap = 8f;
-            float doFrameInset = 5f;
+            // Animated two-panel split: Mapping Settings (A) / Device Order (B)
+            var (settingsBounds, deviceOrderBounds) = doAnim.ComputeBounds(
+                rightBounds, vertGap, FUIRenderer.CollapsedPanelHeight);
 
-            SKRect settingsBounds;
-            SKRect deviceOrderBounds;
-
-            if (_deviceOrder.IsExpanded)
-            {
-                // Device Order expanded: Mapping Settings = collapsed header at top, Device Order fills rest
-                settingsBounds = new SKRect(rightBounds.Left, rightBounds.Top,
-                    rightBounds.Right, rightBounds.Top + CollapsedH);
-                deviceOrderBounds = new SKRect(rightBounds.Left, settingsBounds.Bottom + vertGap,
-                    rightBounds.Right, rightBounds.Bottom);
-            }
-            else
-            {
-                // Mapping Settings expanded: Device Order = collapsed header at bottom
-                deviceOrderBounds = new SKRect(rightBounds.Left, rightBounds.Bottom - CollapsedH,
-                    rightBounds.Right, rightBounds.Bottom);
-                settingsBounds = new SKRect(rightBounds.Left, rightBounds.Top,
-                    rightBounds.Right, deviceOrderBounds.Top - vertGap);
-            }
-
+            canvas.Save();
+            canvas.ClipRect(settingsBounds);
             DrawMappingSettingsPanel(canvas, settingsBounds, frameInset);
-            DrawDeviceOrderPanel(canvas, deviceOrderBounds, doFrameInset, profile!, existingSlots);
+            canvas.Restore();
+
+            canvas.Save();
+            canvas.ClipRect(deviceOrderBounds);
+            if (showDeviceOrder)
+                DrawDeviceOrderPanel(canvas, deviceOrderBounds, doFrameInset, profile!, existingSlots);
+            canvas.Restore();
 
             // Device Order dropdown drawn last (on top)
-            if (_deviceOrder.IsExpanded && _deviceOrder.OpenRow >= 0)
+            if (_deviceOrder.IsExpanded && _deviceOrder.OpenRow >= 0 && showDeviceOrder)
                 DrawDeviceOrderDropdown(canvas, profile!, existingSlots);
         }
         else

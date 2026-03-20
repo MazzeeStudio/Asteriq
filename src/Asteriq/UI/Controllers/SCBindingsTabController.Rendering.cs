@@ -39,36 +39,22 @@ public partial class SCBindingsTabController
             && _scFilteredActions is not null
             && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
         bool hasContextualPanel = showColumnActions || showCellDetails;
-
-        // Track contextual panel transitions for animation
-        bool animatingOut = !hasContextualPanel && _cpPanel.ExpandT < 0.999f && _cpPanel.HadContextualPanel;
-        bool useAnimatedLayout = hasContextualPanel || animatingOut;
-        _cpPanel.HadContextualPanel = hasContextualPanel;
+        ref var anim = ref _cpPanel.Anim;
 
         float afterInstall = installationBounds.Bottom + verticalGap;
         float bottomAreaBottom = rightBounds.Bottom;
+        var splitArea = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, bottomAreaBottom);
 
-        // Layout: panels share space with animated split. ExpandT lerps the split position.
-        // T=1: CP fills entire space. T=0: CP = collapsed header, contextual fills rest.
-        // useAnimatedLayout keeps the two-panel layout alive during appear/disappear animation.
         SKRect controlProfilesBounds;
         SKRect contextualBounds = SKRect.Empty;
-        if (useAnimatedLayout)
+        if (anim.UseAnimatedLayout)
         {
-            float t = _cpPanel.ExpandT;
-            float totalH = bottomAreaBottom - afterInstall;
-            float collapsedH = FUIRenderer.CollapsedPanelHeight;
-
-            float cpFullH = totalH - collapsedH - verticalGap;
-            float cpH = collapsedH + (cpFullH - collapsedH) * t;
-            controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
-                rightBounds.Right, afterInstall + cpH);
-            contextualBounds = new SKRect(rightBounds.Left, controlProfilesBounds.Bottom + verticalGap,
-                rightBounds.Right, bottomAreaBottom);
+            (controlProfilesBounds, contextualBounds) = anim.ComputeBounds(
+                splitArea, verticalGap, FUIRenderer.CollapsedPanelHeight);
         }
         else
         {
-            controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, bottomAreaBottom);
+            controlProfilesBounds = splitArea;
         }
 
         // LEFT PANEL
@@ -78,8 +64,8 @@ public partial class SCBindingsTabController
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
         // RIGHT 2 — Control Profiles (clipped to bounds during animation)
-        bool cpExpanded = !useAnimatedLayout || _cpPanel.IsExpanded || animatingOut;
-        bool cpCollapsible = useAnimatedLayout && !animatingOut;
+        bool cpExpanded = !anim.UseAnimatedLayout || _cpPanel.IsExpanded || anim.IsAnimatingOut;
+        bool cpCollapsible = anim.UseAnimatedLayout && !anim.IsAnimatingOut;
         canvas.Save();
         canvas.ClipRect(controlProfilesBounds);
         DrawSCExportPanelCompact(canvas, controlProfilesBounds, frameInset,
@@ -87,9 +73,9 @@ public partial class SCBindingsTabController
         canvas.Restore();
 
         // RIGHT 3 — Contextual panel (Column Actions or Cell Details, clipped to bounds)
-        if (useAnimatedLayout)
+        if (anim.UseAnimatedLayout)
         {
-            bool contextualExpanded = !_cpPanel.IsExpanded && !animatingOut;
+            bool contextualExpanded = !_cpPanel.IsExpanded && !anim.IsAnimatingOut;
             canvas.Save();
             canvas.ClipRect(contextualBounds);
             if (showColumnActions)

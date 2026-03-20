@@ -14,6 +14,9 @@ public class NetworkPeer
     /// <summary>TCP port the remote instance is listening on.</summary>
     public int TcpPort { get; set; }
 
+    /// <summary>Network role advertised by the remote instance (Master, Client, or None if unconfigured).</summary>
+    public NetworkRole Role { get; set; } = NetworkRole.None;
+
     /// <summary>UTC timestamp of the last broadcast received from this peer.</summary>
     public DateTime LastSeen { get; set; }
 

@@ -41,7 +41,7 @@ public partial class MainForm : Form
         var port = _appSettings.NetworkListenPort;
 
         if (_networkDiscovery is NetworkDiscoveryService nds)
-            nds.Configure(machineName, port);
+            nds.Configure(machineName, port, _appSettings.NetworkRole);
 
         _networkInput.ConnectionLost      += OnNetworkConnectionLost;
         _networkInput.ClientConnected     += OnClientConnected;
@@ -323,6 +323,19 @@ public partial class MainForm : Form
     {
         BeginInvoke(() =>
         {
+            // Bring the form to front so the dialog is visible — ShowDialog on a
+            // hidden form renders off-screen and the user never sees the request.
+            if (!Visible)
+            {
+                Show();
+                if (WindowState == FormWindowState.Minimized)
+                    WindowState = FormWindowState.Normal;
+            }
+            Activate();
+            BringToFront();
+
+            _trayIcon.ShowBalloonTip("Asteriq", $"{e.PeerName} is requesting to connect");
+
             using var dlg = new TrustRequestDialog(e.PeerName, e.Code);
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {

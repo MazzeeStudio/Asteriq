@@ -288,7 +288,13 @@ public class SettingsTabController : ITabController, IDisposable
         bool netConnecting = _ctx.IsNetworkConnecting;
         string? connectedIp  = _ctx.ConnectedPeerIp;
         string? connectingIp = _connectingPeerIp;
-        var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+        var allDiscoveredPeers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+        var myRole = _ctx.AppSettings.NetworkRole;
+        var peers = myRole == NetworkRole.Master
+            ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Client).ToList()
+            : myRole == NetworkRole.Client
+                ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Master).ToList()
+                : allDiscoveredPeers;
         var visibleIps = new HashSet<string>(peers.Select(p => p.IpAddress));
 
         foreach (var p in peers)
@@ -1442,7 +1448,15 @@ public class SettingsTabController : ITabController, IDisposable
                 regenHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
             y += btnH + sectionGap;
 
-            var peers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+            // Only show peers that have a compatible role — TX sees Client peers, RX sees Master peers.
+            // Peers with Role=None (unconfigured) are hidden to avoid failed connection attempts.
+            var allPeers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
+            var myRole = _ctx.AppSettings.NetworkRole;
+            var peers = myRole == NetworkRole.Master
+                ? allPeers.Where(p => p.Role == NetworkRole.Client).ToList()
+                : myRole == NetworkRole.Client
+                    ? allPeers.Where(p => p.Role == NetworkRole.Master).ToList()
+                    : allPeers; // None: show all (user hasn't configured yet)
             var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
             bool isConnecting = _ctx.IsNetworkConnecting;
             string? connectedIp = _ctx.ConnectedPeerIp;

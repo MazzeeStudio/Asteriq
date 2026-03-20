@@ -143,15 +143,15 @@ public class SCSharedBindingDialog : FUIBaseDialog
 
         // Cancel (left)
         _cancelButtonBounds = new SKRect(16, buttonY, 104, buttonY + buttonHeight);
-        DrawButton(canvas, _cancelButtonBounds, "CANCEL", _hoveredButton == 0, false);
+        FUIRenderer.DrawButton(canvas, _cancelButtonBounds, "CANCEL", _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Share (middle) — primary-colored
         _shareButtonBounds = new SKRect(160, buttonY, 280, buttonY + buttonHeight);
-        DrawShareButton(canvas, _shareButtonBounds, "SHARE", _hoveredButton == 1);
+        FUIRenderer.DrawButton(canvas, _shareButtonBounds, "SHARE", _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Replace (right)
         _replaceButtonBounds = new SKRect(350, buttonY, 460, buttonY + buttonHeight);
-        DrawButton(canvas, _replaceButtonBounds, "REPLACE", _hoveredButton == 2, false);
+        FUIRenderer.DrawButton(canvas, _replaceButtonBounds, "REPLACE", _hoveredButton == 2 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
     private static void DrawLinkIcon(SKCanvas canvas, SKPoint center, SKColor color)
@@ -171,33 +171,6 @@ public class SCSharedBindingDialog : FUIBaseDialog
         canvas.DrawRoundRect(center.X - 4, center.Y - r, 10, r * 2, 3, 3, paint);
     }
 
-    private static void DrawButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool primary)
-    {
-        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Background2.WithAlpha(220) : FUIColors.Background2.WithAlpha(120));
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        canvas.DrawRect(bounds, borderPaint);
-
-        float textWidth = FUIRenderer.MeasureText(text, 13f);
-        float textX = bounds.MidX - textWidth / 2;
-        FUIRenderer.DrawText(canvas, text, new SKPoint(textX, bounds.MidY + 4),
-            hovered ? FUIColors.TextBright : FUIColors.TextPrimary, 13f, true);
-    }
-
-    private static void DrawShareButton(SKCanvas canvas, SKRect bounds, string text, bool hovered)
-    {
-        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Active.WithAlpha(70) : FUIColors.Active.WithAlpha(35));
-        canvas.DrawRect(bounds, bgPaint);
-
-        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(160));
-        canvas.DrawRect(bounds, borderPaint);
-
-        float textWidth = FUIRenderer.MeasureText(text, 13f);
-        float textX = bounds.MidX - textWidth / 2;
-        FUIRenderer.DrawText(canvas, text, new SKPoint(textX, bounds.MidY + 4),
-            hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(210), 13f, true);
-    }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {

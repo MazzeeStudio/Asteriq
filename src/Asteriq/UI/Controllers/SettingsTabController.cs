@@ -291,9 +291,9 @@ public class SettingsTabController : ITabController, IDisposable
         var allDiscoveredPeers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
         var myRole = _ctx.AppSettings.NetworkRole;
         var peers = myRole == NetworkRole.Master
-            ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Client).ToList()
+            ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Client || p.Role == NetworkRole.None).ToList()
             : myRole == NetworkRole.Client
-                ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Master).ToList()
+                ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Master || p.Role == NetworkRole.None).ToList()
                 : allDiscoveredPeers;
         var visibleIps = new HashSet<string>(peers.Select(p => p.IpAddress));
 
@@ -1450,13 +1450,16 @@ public class SettingsTabController : ITabController, IDisposable
 
             // Only show peers that have a compatible role — TX sees Client peers, RX sees Master peers.
             // Peers with Role=None (unconfigured) are hidden to avoid failed connection attempts.
+            // Show peers with a compatible role. Peers with Role=None (unconfigured or
+            // running an older version without role broadcast) are always shown so they
+            // remain discoverable — the connection will fail gracefully if incompatible.
             var allPeers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
             var myRole = _ctx.AppSettings.NetworkRole;
             var peers = myRole == NetworkRole.Master
-                ? allPeers.Where(p => p.Role == NetworkRole.Client).ToList()
+                ? allPeers.Where(p => p.Role == NetworkRole.Client || p.Role == NetworkRole.None).ToList()
                 : myRole == NetworkRole.Client
-                    ? allPeers.Where(p => p.Role == NetworkRole.Master).ToList()
-                    : allPeers; // None: show all (user hasn't configured yet)
+                    ? allPeers.Where(p => p.Role == NetworkRole.Master || p.Role == NetworkRole.None).ToList()
+                    : allPeers;
             var netMode = _ctx.NetworkInput?.Mode ?? NetworkInputMode.Local;
             bool isConnecting = _ctx.IsNetworkConnecting;
             string? connectedIp = _ctx.ConnectedPeerIp;
@@ -1753,6 +1756,13 @@ public class SettingsTabController : ITabController, IDisposable
                 if (_netRoleButtonBounds[ri].Contains(pt))
                 {
                     _ctx.AppSettings.NetworkRole = roleValues[ri];
+                    // Update the discovery broadcast so peers see the new role immediately
+                    if (_ctx.NetworkDiscovery is NetworkDiscoveryService nds)
+                    {
+                        var name = string.IsNullOrEmpty(_ctx.AppSettings.NetworkMachineName)
+                            ? Environment.MachineName : _ctx.AppSettings.NetworkMachineName;
+                        nds.Configure(name, _ctx.AppSettings.NetworkListenPort, roleValues[ri]);
+                    }
                     _ctx.InvalidateCanvas();
                     return;
                 }

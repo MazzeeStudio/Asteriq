@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteriq | HOTAS Management for Star Citizen</title>
+    <meta name="description" content="Asteriq replaces JoystickGremlin and separate vJoy/HidHide GUI tools with a single application for Star Citizen HOTAS setups.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ===== Sticky top bar ===== -->
+    <div class="top-bar">
+        <div class="dev-banner">
+            <span class="dev-banner__icon">&#9651;</span>
+            <span class="dev-banner__text">Asteriq is in active development and has not reached a fit-and-finish state. Expect rough edges, visual imperfections, and the occasional unknown issue. Device silhouettes are currently only available for Virpil and VKB hardware. All other devices display a generic placeholder.</span>
+        </div>
+        <nav class="site-nav">
+            <div class="nav-inner">
+                <a href="#/" class="nav-brand">ASTERIQ</a>
+                <div class="nav-actions">
+                    <a href="#/devices" class="nav-link" data-nav>Devices</a>
+                    <a href="#/mappings" class="nav-link" data-nav>Mappings</a>
+                    <a href="#/bindings" class="nav-link" data-nav>Bindings</a>
+                    <a href="#/settings" class="nav-link" data-nav>Settings</a>
+                    <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.msi" class="btn-nav-download">
+                        Download
+                    </a>
+                </div>
+            </div>
+        </nav>
+    </div>
+
+    <main>
+
+    <!-- ============================================================ -->
+    <!-- PAGE: LANDING                                                 -->
+    <!-- ============================================================ -->
+    <div class="page-section" id="page-landing">
+
+    <!-- Hero -->
+    <section class="page-hero">
+        <div class="hero-content">
+            <span class="hero-eyebrow">HOTAS Management for Star Citizen</span>
+            <h1 class="hero-headline">One app.<br><em>Not three.</em></h1>
+            <p class="hero-sub">Assign devices, tune axis curves, and configure Star Citizen bindings, all in one application instead of three.</p>
+            <div class="hero-actions">
+                <div class="hero-download">
+                    <a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.msi" class="btn-hero-primary">
+                        Download Installer (.msi)
+                    </a>
+                    <span class="hero-download-alt"><a href="https://github.com/MazzeeStudio/Asteriq/releases/latest/download/Asteriq.zip">Or download portable ZIP</a></span>
+                </div>
+                <a href="https://github.com/MazzeeStudio/Asteriq" target="_blank" rel="noopener" class="btn-hero-secondary">
+                    View on GitHub &rarr;
+                </a>
+            </div>
+            <div class="hero-req">
+                <span class="req-label">REQUIRES</span>
+                <span class="req-chip">Windows 10/11 (64-bit)</span>
+                <span class="req-chip req-chip--opt"><a href="https://github.com/jshafer817/vJoy" target="_blank" rel="noopener">vJoy 2.x</a> <em>optional</em></span>
+                <span class="req-chip req-chip--opt"><a href="https://github.com/nefarius/HidHide" target="_blank" rel="noopener">HidHide</a> <em>optional</em></span>
+            </div>
+        </div>
+        <div class="hero-shot-wrap">
+            <img class="hero-shot" src="screenshots/carousel-devices.png" alt="Asteriq, Devices tab showing connected HOTAS hardware with device silhouette" loading="eager">
+            <div class="hero-shot-fade"></div>
+        </div>
+    </section>
+
+    <!-- Replaces strip -->
+    <div class="replaces-section">
+        <div class="replaces-inner">
+            <span class="replaces-label">Replaces</span>
+            <span class="replaces-tool">JoystickGremlin</span>
+            <span class="replaces-op">+</span>
+            <span class="replaces-tool">vJoy Configurator</span>
+            <span class="replaces-op">+</span>
+            <span class="replaces-tool">HidHide GUI</span>
+            <span class="replaces-arrow">&#8594;</span>
+            <span class="replaces-result">ASTERIQ</span>
+        </div>
+    </div>
+
+    <!-- Value props -->
+    <section class="value-props-section">
+        <div class="container">
+            <h2 class="section-label">Why Asteriq?</h2>
+            <div class="value-props">
+                <div class="value-card">
+                    <h3>One Application</h3>
+                    <p>No more juggling between multiple applications. Asteriq handles device assignment, input mapping, device hiding, and SC binding export in a single window.</p>
+                </div>
+                <div class="value-card">
+                    <h3>Stable Device Identity</h3>
+                    <p>Physical devices keep their identity across sessions. No more bindings shifting when you unplug a USB cable or reboot. Devices are tracked by hardware ID, not port order.</p>
+                </div>
+                <div class="value-card">
+                    <h3>Safe SC Integration</h3>
+                    <p>Asteriq reads SC's action definitions and can import existing mapping files. Exports are written as <code>actionmaps.xml</code> to your SC user folder, with a prompt before overwriting.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshots carousel -->
+    <section class="screenshots-section">
+        <span class="section-label">See It in Action</span>
+        <div class="carousel-track" id="carousel-track">
+            <div class="carousel-slide" data-page="devices">
+                <img src="screenshots/carousel-devices.png" alt="Devices tab" loading="eager">
+                <span class="slide-label">Device Management</span>
+            </div>
+            <div class="carousel-slide" data-page="mappings">
+                <img src="screenshots/carousel-mappings.png" alt="Mappings tab" loading="lazy">
+                <span class="slide-label">Axis Mapping &amp; Curves</span>
+            </div>
+            <div class="carousel-slide" data-page="bindings">
+                <img src="screenshots/carousel-bindings.png" alt="SC Bindings tab" loading="lazy">
+                <span class="slide-label">Star Citizen Bindings</span>
+            </div>
+            <div class="carousel-slide" data-page="settings">
+                <img src="screenshots/carousel-settings.png" alt="Settings tab" loading="lazy">
+                <span class="slide-label">Themes &amp; Configuration</span>
+            </div>
+            <div class="carousel-slide" data-page="settings">
+                <img src="screenshots/carousel-network.png" alt="Network forwarding" loading="lazy">
+                <span class="slide-label">Network Forwarding</span>
+            </div>
+        </div>
+        <div class="carousel-nav">
+            <button class="carousel-btn" id="carousel-prev" aria-label="Previous slide">&#8249;</button>
+            <div id="carousel-dots"></div>
+            <button class="carousel-btn" id="carousel-next" aria-label="Next slide">&#8250;</button>
+        </div>
+    </section>
+
+    <!-- Features overview -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-label">Features</h2>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Device Management</h3>
+                    <p>All connected joysticks, throttles, and pedals are detected automatically. Each device shows its name, connection status, and vJoy slot assignment.</p>
+                    <p>Disconnected devices remain in the list so your setup is preserved between sessions. Drag to reorder devices and control which vJoy slot each one maps to.</p>
+                    <p><a href="#/devices">Learn more &rarr;</a></p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-device-list.png" alt="Device list showing connected and disconnected hardware" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Axis Mapping &amp; Curves</h3>
+                    <p>Shape your stick response with interactive curve editors. Choose from linear, S-curve, exponential presets, or drag control points for a fully custom response. Adjust deadzone per-axis with centre or throttle modes.</p>
+                    <p>Multiple physical inputs can merge into one vJoy axis using average, minimum, maximum, or sum operations.</p>
+                    <p><a href="#/mappings">Learn more &rarr;</a></p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-axis-curve.png" alt="Axis curve editor" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Star Citizen Bindings</h3>
+                    <p>A full binding grid shows every SC action alongside your keyboard, mouse, and joystick assignments. Click a cell and press a button to assign. Asteriq detects the input automatically.</p>
+                    <p>Set activation modes (Hold, Double Tap, Triple Tap, Delayed Press) per binding. Import bindings from other profiles or SC XML files. Export generates a clean <code>actionmaps.xml</code> for Star Citizen.</p>
+                    <p><a href="#/bindings">Learn more &rarr;</a></p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-cell-details.png" alt="SC Bindings binding details with activation modes" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Visual Themes</h3>
+                    <p>Twelve colour themes inspired by Star Citizen manufacturers: Drake, Aegis, Anvil, Argo, Crusader, Origin, MISC, and RSI. Four core themes are also included: Midnight, Matrix, Amber, and Ice.</p>
+                    <p>Fine-tune background effects: grid overlay, glow, film grain, scanlines, and vignette. All changes apply instantly.</p>
+                    <p><a href="#/settings">Learn more &rarr;</a></p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-themes.png" alt="Theme selection grid" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Network Forwarding</h3>
+                    <p>Use your HOTAS on any machine on your network without disconnecting or re-connecting. The TX machine reads your physical devices and forwards vJoy state to whichever RX machine you select.</p>
+                    <p>Automatic peer discovery finds machines on your network. Assign a physical button as a TX toggle to switch between machines from your stick.</p>
+                    <p><a href="#/settings">Learn more &rarr;</a></p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-network-tx.png" alt="Network forwarding TX mode" loading="lazy">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Getting started -->
+    <section class="getting-started">
+        <div class="container">
+            <h2 class="section-label">Getting Started</h2>
+            <ol class="steps">
+                <li>
+                    <span class="step-num">1</span>
+                    <div class="step-body">
+                        <strong>Download and install</strong>
+                        <p>Grab the MSI installer or portable ZIP from GitHub. No admin rights needed for the portable version.</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="step-num">2</span>
+                    <div class="step-body">
+                        <strong>Install drivers</strong>
+                        <p>On first launch, Asteriq checks for vJoy and HidHide. Follow the prompts to download and install. Both are optional but recommended.</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="step-num">3</span>
+                    <div class="step-body">
+                        <strong>Assign devices</strong>
+                        <p>Your sticks and throttles appear automatically. Drag to reorder, then use <strong>1:1 Auto-Map</strong> for a quick passthrough setup.</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="step-num">4</span>
+                    <div class="step-body">
+                        <strong>Tune mappings</strong>
+                        <p>Open the Mappings tab to adjust curves, deadzone, and button modes. The live preview shows your physical input mapped through the response curve in real-time.</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="step-num">5</span>
+                    <div class="step-body">
+                        <strong>Export SC bindings</strong>
+                        <p>Switch to the SC Bindings tab, assign your actions, and click <strong>Export to SC</strong>. Load the exported profile in Star Citizen's keybind settings.</p>
+                    </div>
+                </li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- Support -->
+    <section class="support">
+        <div class="container">
+            <h2 class="section-label">Support</h2>
+            <div class="support-card">
+                <p>Asteriq is free for personal use. If it saves you time or makes your HOTAS setup easier, consider supporting development.</p>
+                <p><a href="https://buymeacoffee.com/mazzeestudio" target="_blank" rel="noopener">Buy me a coffee &rarr;</a></p>
+                <p class="referral-line">Star Citizen referral code: <code>STAR-MQHD-YNZK</code></p>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /page-landing -->
+
+
+    <!-- ============================================================ -->
+    <!-- PAGE: DEVICES                                                 -->
+    <!-- ============================================================ -->
+    <div class="page-section" id="page-devices">
+
+    <section class="section-hero">
+        <div class="section-hero-inner">
+            <div class="section-hero-text">
+                <a href="#/" class="section-back">&larr; Back to overview</a>
+                <h1>Device Management</h1>
+                <p>Enumerate, order, hide, and visualise all your connected HOTAS hardware. Interactive silhouettes show your exact device layout with labelled controls.</p>
+            </div>
+            <div class="section-hero-image">
+                <img src="screenshots/carousel-devices.png" alt="Devices tab overview" loading="lazy">
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Device Enumeration</h3>
+                    <p>All connected joysticks, throttles, pedals, and gamepads are detected automatically via SDL2. Each device shows its name, hardware ID (VID:PID), and connection status with a live indicator.</p>
+                    <p>Disconnected devices remain in the list so you don't lose your setup when unplugging for transport.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-device-list.png" alt="Device list with connection indicators" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Interactive Silhouettes</h3>
+                    <p>SVG-based device silhouettes render your exact hardware layout. Hover over a control to highlight it; click to select it for quick binding in the Mappings tab.</p>
+                    <p>Lead-lines connect each physical control to its label. Silhouettes mirror automatically for left-hand variants. Currently available for Virpil and VKB hardware, with generic placeholders for other devices.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-device-silhouette.png" alt="Device silhouette with lead-lines" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Live Input on Silhouettes</h3>
+                    <p>Silhouette lead-lines update in real-time as you interact with your hardware. Axis controls show a deflection bar, and buttons display their pressed or released state directly on the device image.</p>
+                    <p>Useful for verifying hardware works correctly before creating mappings, or for identifying which physical control corresponds to which input.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-device-actions.png" alt="Silhouette showing a ministick with live axis deflection bar" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Button Press Detection</h3>
+                    <p>When a button or hat is pressed, the corresponding lead-line on the silhouette highlights with a PRESSED indicator. This makes it easy to identify physical controls on unfamiliar hardware.</p>
+                    <p>The Devices tab also provides quick actions: create 1:1 passthrough mappings, clear all mappings, remove disconnected devices, and toggle HidHide per device.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-device-live-input.png" alt="Silhouette showing Thumb Hat with PRESSED indicator" loading="lazy">
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="detail-gallery-section">
+        <div class="container">
+            <h2 class="section-label">More Details</h2>
+            <div class="detail-gallery">
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-s1-status.png" alt="S1 status panel" loading="lazy">
+                    <figcaption>Status panel showing vJoy driver, forwarding, and device count at a glance.</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-device-order-mappings.png" alt="Device order in Mappings tab" loading="lazy">
+                    <figcaption>Device Order panel in the Mappings tab. Assign vJoy slots to SC joystick instances.</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-driver-setup.png" alt="Driver setup" loading="lazy">
+                    <figcaption>Driver setup checks for vJoy and HidHide on first launch, with one-click install.</figcaption>
+                </figure>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /page-devices -->
+
+
+    <!-- ============================================================ -->
+    <!-- PAGE: MAPPINGS                                                -->
+    <!-- ============================================================ -->
+    <div class="page-section" id="page-mappings">
+
+    <section class="section-hero">
+        <div class="section-hero-inner">
+            <div class="section-hero-text">
+                <a href="#/" class="section-back">&larr; Back to overview</a>
+                <h1>Mappings &amp; Curves</h1>
+                <p>Define how physical inputs translate to vJoy outputs. Shape axis response with interactive curves, set deadzone, configure button modes, and merge multiple inputs into one output.</p>
+            </div>
+            <div class="section-hero-image">
+                <img src="screenshots/carousel-mappings.png" alt="Mappings tab overview" loading="lazy">
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Response Curves</h3>
+                    <p>Shape your stick response with four curve types. Linear for raw passthrough, S-curve for precision in the centre with faster edges, exponential for responsiveness, or custom with draggable control points.</p>
+                    <p>A live preview shows your physical axis movement mapped through the curve in real-time, so you can feel the difference immediately.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-axis-curve.png" alt="Response curve editor with live preview" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Deadzone Control</h3>
+                    <p>Eliminate stick drift with precise deadzone adjustment. Centre mode creates a symmetric deadzone around the neutral point, which is ideal for joysticks. Throttle mode supports asymmetric deadzone for one-directional controls.</p>
+                    <p>Drag the handles directly on the slider, or use preset buttons (0%, 2%, 5%, 10%) for quick adjustment. Supports axis inversion.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-axis-deadzone.png" alt="Deadzone slider with centre mode" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Button Modes</h3>
+                    <p>Four output modes for button mappings:</p>
+                    <ul class="feature-list">
+                        <li><strong>Normal</strong>: output mirrors input (pressed while held)</li>
+                        <li><strong>Toggle</strong>: each press flips state (on/off)</li>
+                        <li><strong>Pulse</strong>: brief activation on press (100 to 1000 ms)</li>
+                        <li><strong>Hold-to-Activate</strong>: only fires after holding for a duration (200 to 2000 ms)</li>
+                    </ul>
+                    <p>Duration sliders let you fine-tune pulse and hold timing.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-button-modes.png" alt="Button mode selector" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Keyboard Output</h3>
+                    <p>Map any physical button to a keyboard key with full modifier support. Press the key you want to bind and Asteriq detects it automatically, including Ctrl, Shift, Alt, and AltGr combinations.</p>
+                    <p>Useful for mapping HOTAS buttons to keyboard shortcuts in games that don't support joystick input natively.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-keyboard-output.png" alt="Keyboard output with modifier capture" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Mapping List</h3>
+                    <p>The left panel lists all mappings for the selected vJoy device, with M1 (Buttons) and M2 (Axes) category tabs. Each row shows the mapped output and any assigned modifiers.</p>
+                    <p>Rows with active modifier keys display the modifier name alongside the button number. Use the vJoy device arrows at the top to switch between virtual devices.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-mappings-list.png" alt="Mapping list showing button outputs with modifier indicators" loading="lazy">
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    </div><!-- /page-mappings -->
+
+
+    <!-- ============================================================ -->
+    <!-- PAGE: SC BINDINGS                                             -->
+    <!-- ============================================================ -->
+    <div class="page-section" id="page-bindings">
+
+    <section class="section-hero">
+        <div class="section-hero-inner">
+            <div class="section-hero-text">
+                <a href="#/" class="section-back">&larr; Back to overview</a>
+                <h1>Star Citizen Bindings</h1>
+                <p>A complete binding grid for every SC action. Assign inputs by pressing buttons, set activation modes, resolve conflicts, and export a clean <code>actionmaps.xml</code>.</p>
+            </div>
+            <div class="section-hero-image">
+                <img src="screenshots/carousel-bindings.png" alt="SC Bindings tab overview" loading="lazy">
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Binding Grid</h3>
+                    <p>Every Star Citizen action displayed in a scrollable grid with columns for keyboard, mouse, and each joystick device. Actions are organised by category (Flight, Weapons, Vehicle, etc.) with collapsible headers.</p>
+                    <p>Search by action name, filter by category, or toggle "Bound only" to see just your assigned bindings.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-grid.png" alt="SC binding grid with categories" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Binding Details &amp; Activation Modes</h3>
+                    <p>Select any cell to open the Binding Details panel. See action info, current binding, and set the activation mode with a segmented control:</p>
+                    <ul class="feature-list">
+                        <li><strong>Press</strong>: standard press/release (default)</li>
+                        <li><strong>Hold</strong>: hold button to activate</li>
+                        <li><strong>Double Tap</strong>: tap twice quickly</li>
+                        <li><strong>Triple Tap</strong>: tap three times</li>
+                        <li><strong>Delayed Press</strong>: long press to activate</li>
+                    </ul>
+                    <p>Activation modes are stored per-binding and exported to SC's XML format.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-cell-details.png" alt="Binding Details with activation mode selector" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Column Import</h3>
+                    <p>Click a joystick column header to open Column Actions. Import bindings from another saved Asteriq profile or from a Star Citizen XML file. Select the source profile and column, then import.</p>
+                    <p>Useful for copying a known-good layout between profiles or migrating from an existing SC setup.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-column-actions.png" alt="Column import from profile" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Conflict Detection</h3>
+                    <p>Asteriq highlights binding conflicts in real-time. Amber cells indicate shared bindings across devices (allowed but warned). Red cells block export until resolved.</p>
+                    <p>Click a conflict cell to see all affected actions with navigation links. Jump directly to the conflicting binding to resolve it.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-conflicts.png" alt="Conflict highlighting with navigation" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Search &amp; Button Capture</h3>
+                    <p>Type to search actions by name. Use the button capture mode to press a physical button on your HOTAS. Asteriq filters the grid to show only actions bound to that exact input.</p>
+                    <p>Combined with the "Bound only" toggle and category filter, you can quickly find and manage any binding in a list of 1000+ SC actions.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-search.png" alt="Search with button capture" loading="lazy">
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="detail-gallery-section">
+        <div class="container">
+            <h2 class="section-label">More Details</h2>
+            <div class="detail-gallery">
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-sc-control-profiles.png" alt="Control profiles panel" loading="lazy">
+                    <figcaption>Control Profiles panel. Manage saved SC binding configurations with save, new, and import.</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-sc-activation-modes.png" alt="Activation mode selector" loading="lazy">
+                    <figcaption>Segmented control for activation modes: Press, Hold, 2Tap, 3Tap, Delay.</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-profiles.png" alt="Configuration management" loading="lazy">
+                    <figcaption>Configuration Management in Settings. Create, duplicate, import, export, and delete configurations.</figcaption>
+                </figure>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /page-bindings -->
+
+
+    <!-- ============================================================ -->
+    <!-- PAGE: SETTINGS                                                -->
+    <!-- ============================================================ -->
+    <div class="page-section" id="page-settings">
+
+    <section class="section-hero">
+        <div class="section-hero-inner">
+            <div class="section-hero-text">
+                <a href="#/" class="section-back">&larr; Back to overview</a>
+                <h1>Settings &amp; Configuration</h1>
+                <p>Profiles, visual themes, network forwarding, driver management, and auto-updates. Customise every aspect of Asteriq to suit your setup.</p>
+            </div>
+            <div class="section-hero-image">
+                <img src="screenshots/carousel-settings.png" alt="Settings tab overview" loading="lazy">
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Configuration Management</h3>
+                    <p>Create, duplicate, import, and export configurations as JSON files. Share your complete HOTAS setup with teammates. All mappings, curves, SC bindings, and device order are included.</p>
+                    <p>The panel shows your active configuration name, mapping statistics, and creation/modification dates.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-profiles.png" alt="Configuration management panel" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Colour Themes</h3>
+                    <p>Twelve colour themes inspired by Star Citizen manufacturers: Drake (default), Aegis, Anvil, Argo, Crusader, Origin, MISC, and RSI. Four core themes are also included: Midnight, Matrix, Amber, and Ice.</p>
+                    <p>Each theme changes accent colours, borders, and status indicators across the entire UI. Click to apply instantly.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-themes.png" alt="Theme grid with Drake selected" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Background Effects</h3>
+                    <p>Fine-tune the visual atmosphere with five adjustable background effects:</p>
+                    <ul class="feature-list">
+                        <li><strong>Grid</strong>: subtle grid pattern overlay</li>
+                        <li><strong>Glow</strong>: bloom on active UI elements</li>
+                        <li><strong>Noise</strong>: film grain texture</li>
+                        <li><strong>Scanline</strong>: horizontal CRT-style lines</li>
+                        <li><strong>Vignette</strong>: edge darkening for focus</li>
+                    </ul>
+                    <p>All sliders update in real-time with instant visual feedback.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-background-effects.png" alt="Background effect sliders" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Network Forwarding: TX Mode</h3>
+                    <p>Keep your HOTAS connected to one machine and use it on any other computer on your network. The TX machine reads your physical devices and forwards the vJoy state to whichever RX machine you choose.</p>
+                    <p>No disconnecting or re-connecting needed. Per-peer toggle switches let you select which machine receives input. Assign a physical HOTAS button as a TX Toggle to switch between machines without touching the keyboard.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-network-tx.png" alt="Network TX mode with peer list" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Network Forwarding: RX Mode</h3>
+                    <p>The client (RX) machine receives vJoy snapshots from the master. Once a trusted master is found on the network, the connection is established automatically. Your local vJoy devices then mirror the master's output.</p>
+                    <p>Devices and Mappings tabs lock to read-only while connected, preventing accidental changes. Use the Disconnect button to regain local control.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-network-rx.png" alt="Network RX mode with trust code" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Auto-Updates</h3>
+                    <p>Asteriq checks for updates automatically on startup. When a new version is available, download and apply it with two clicks. The app extracts, swaps, and relaunches without manual intervention.</p>
+                    <p>Toggle auto-check on or off, or trigger a manual check any time from the Settings panel.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-update-available.png" alt="Update notification" loading="lazy">
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="detail-gallery-section">
+        <div class="container">
+            <h2 class="section-label">More Details</h2>
+            <div class="detail-gallery">
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-driver-setup.png" alt="Driver setup" loading="lazy">
+                    <figcaption>Driver setup dialog. One-click install for vJoy and HidHide with status indicators.</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-tray-icon.png" alt="System tray" loading="lazy">
+                    <figcaption>System tray integration. Minimise to tray and keep forwarding active in the background.</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <img src="screenshots/detail-custom-chrome.png" alt="Custom window chrome" loading="lazy">
+                    <figcaption>Custom window chrome with profile dropdown and tab navigation. No standard title bar.</figcaption>
+                </figure>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /page-settings -->
+
+    </main>
+
+    <!-- ===== Footer ===== -->
+    <footer>
+        <div class="footer-links">
+            <a href="https://github.com/MazzeeStudio/Asteriq" target="_blank" rel="noopener">GitHub</a>
+            <span class="sep">|</span>
+            <a href="https://github.com/MazzeeStudio/Asteriq/releases" target="_blank" rel="noopener">Releases</a>
+            <span class="sep">|</span>
+            <a href="https://github.com/MazzeeStudio/Asteriq/blob/master/LICENCE" target="_blank" rel="noopener">Licence</a>
+        </div>
+        <p class="licence-note"><a href="https://polyformproject.org/licenses/noncommercial/1.0.0/" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a> | Copyright 2025-2026 MazzeeStudio</p>
+    </footer>
+
+    <!-- ===== SPA Router + Carousel ===== -->
+    <script>
+    (function() {
+        'use strict';
+
+        // ── SPA Router ──────────────────────────────────────────────
+        var routes = {
+            '/':         'page-landing',
+            '/devices':  'page-devices',
+            '/mappings': 'page-mappings',
+            '/bindings': 'page-bindings',
+            '/settings': 'page-settings'
+        };
+
+        function navigate() {
+            var hash = location.hash.replace(/^#/, '') || '/';
+            var pageId = routes[hash] || 'page-landing';
+
+            // Hide all pages, show target
+            document.querySelectorAll('.page-section').forEach(function(el) {
+                el.classList.remove('active');
+            });
+            var target = document.getElementById(pageId);
+            if (target) target.classList.add('active');
+
+            // Update nav link active states
+            document.querySelectorAll('[data-nav]').forEach(function(link) {
+                link.classList.toggle('active', link.getAttribute('href') === '#' + hash);
+            });
+
+            // Scroll to top
+            window.scrollTo(0, 0);
+
+            // Update page title
+            var titles = {
+                '/':         'Asteriq | HOTAS Management for Star Citizen',
+                '/devices':  'Devices | Asteriq',
+                '/mappings': 'Mappings & Curves | Asteriq',
+                '/bindings': 'Star Citizen Bindings | Asteriq',
+                '/settings': 'Settings & Configuration | Asteriq'
+            };
+            document.title = titles[hash] || titles['/'];
+        }
+
+        window.addEventListener('hashchange', navigate);
+        navigate(); // initial route
+
+
+        // ── Carousel ────────────────────────────────────────────────
+        var track = document.getElementById('carousel-track');
+        if (!track) return;
+
+        var slides = track.querySelectorAll('.carousel-slide');
+        var dotsContainer = document.getElementById('carousel-dots');
+        var prevBtn = document.getElementById('carousel-prev');
+        var nextBtn = document.getElementById('carousel-next');
+        var current = 0;
+        var autoTimer = null;
+        var gap = 20;
+
+        // Create dots
+        for (var i = 0; i < slides.length; i++) {
+            var dot = document.createElement('button');
+            dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+            dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+            dot.dataset.index = i;
+            dotsContainer.appendChild(dot);
+        }
+        var dots = dotsContainer.querySelectorAll('.carousel-dot');
+
+        function showSlide(idx) {
+            current = ((idx % slides.length) + slides.length) % slides.length;
+            slides.forEach(function(s, i) {
+                s.classList.toggle('active', i === current);
+            });
+            dots.forEach(function(d, i) {
+                d.classList.toggle('active', i === current);
+            });
+            centreSlide();
+        }
+
+        function centreSlide() {
+            var vw = window.innerWidth;
+            var slideW = slides[0].offsetWidth;
+            var offset = 0;
+            for (var i = 0; i < current; i++) {
+                offset += slides[i].offsetWidth + gap;
+            }
+            var centred = offset - (vw - slideW) / 2;
+            track.style.transform = 'translateX(' + (-centred) + 'px)';
+        }
+
+        function startAuto() {
+            stopAuto();
+            autoTimer = setInterval(function() { showSlide(current + 1); }, 5000);
+        }
+
+        function stopAuto() {
+            if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+        }
+
+        // Events
+        prevBtn.addEventListener('click', function() { stopAuto(); showSlide(current - 1); startAuto(); });
+        nextBtn.addEventListener('click', function() { stopAuto(); showSlide(current + 1); startAuto(); });
+
+        dotsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('carousel-dot')) {
+                stopAuto();
+                showSlide(parseInt(e.target.dataset.index));
+                startAuto();
+            }
+        });
+
+        slides.forEach(function(slide, idx) {
+            slide.addEventListener('click', function() {
+                if (idx === current) {
+                    // Click active slide to navigate to its page
+                    var page = slide.dataset.page;
+                    if (page) location.hash = '#/' + page;
+                } else {
+                    stopAuto();
+                    showSlide(idx);
+                    startAuto();
+                }
+            });
+        });
+
+        track.addEventListener('mouseenter', stopAuto);
+        track.addEventListener('mouseleave', startAuto);
+        window.addEventListener('resize', centreSlide);
+
+        showSlide(0);
+        startAuto();
+    })();
+    </script>
+
+</body>
+</html>

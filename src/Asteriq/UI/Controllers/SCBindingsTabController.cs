@@ -631,8 +631,11 @@ public partial class SCBindingsTabController : ITabController
         if (_searchFilter.CaptureWaitingForRelease)
             CheckCaptureRelease();
 
-        // Animate panel expand/collapse
-        float target = _cpPanel.IsExpanded ? 1f : 0f;
+        // Animate panel expand/collapse — ExpandT drives the split position.
+        // Target: 1.0 when CP is expanded (or no contextual panel), 0.0 when contextual is expanded.
+        bool hasContextual = IsColumnActionsVisible()
+            || (_cell.SelectedCell.actionIndex >= 0 && _cell.SelectedCell.colIndex >= 0);
+        float target = (!hasContextual || _cpPanel.IsExpanded) ? 1f : 0f;
         if (MathF.Abs(_cpPanel.ExpandT - target) > 0.001f)
         {
             _cpPanel.ExpandT += (target - _cpPanel.ExpandT) * 0.18f;
@@ -745,8 +748,10 @@ public partial class SCBindingsTabController : ITabController
     private sealed class ControlProfilesPanelState
     {
         public bool IsExpanded = true;
-        /// <summary>Animated split position: 0=collapsed (contextual expanded), 1=expanded. Lerps toward IsExpanded.</summary>
+        /// <summary>Animated split position: 0=collapsed (contextual expanded), 1=expanded. Lerps toward target.</summary>
         public float ExpandT = 1f;
+        /// <summary>True when a contextual panel was visible last frame — used to animate panel appear/disappear.</summary>
+        public bool HadContextualPanel;
         public SKRect HeaderBounds;
     }
 

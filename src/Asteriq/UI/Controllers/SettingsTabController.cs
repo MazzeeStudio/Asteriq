@@ -76,6 +76,10 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _visualPanelHeaderBounds;
     private SKRect _networkPanelHeaderBounds;
     private SKRect _hidHidePanelHeaderBounds;
+    // Panel expansion weights for animation (0=collapsed, 1=expanded). Lerp toward active panel.
+    private float _visualExpandW = 1f;
+    private float _networkExpandW;
+    private float _hidHideExpandW;
 
     // HidHide panel state
     private SKRect _hidHideCloakingToggleBounds;
@@ -311,6 +315,20 @@ public class SettingsTabController : ITabController, IDisposable
         // Remove stale entries
         foreach (var key in _peerToggleT.Keys.Where(k => !visibleIps.Contains(k)).ToList())
             _peerToggleT.Remove(key);
+
+        // Animate settings right-panel accordion weights
+        const float panelLerp = 0.18f;
+        float vTarget = _settingsRightPanelActive == "visual" ? 1f : 0f;
+        float nTarget = _settingsRightPanelActive == "network" ? 1f : 0f;
+        float hTarget = _settingsRightPanelActive == "hidhide" ? 1f : 0f;
+        _visualExpandW  += (vTarget - _visualExpandW) * panelLerp;
+        _networkExpandW += (nTarget - _networkExpandW) * panelLerp;
+        _hidHideExpandW += (hTarget - _hidHideExpandW) * panelLerp;
+        if (MathF.Abs(_visualExpandW - vTarget) < 0.001f) _visualExpandW = vTarget;
+        if (MathF.Abs(_networkExpandW - nTarget) < 0.001f) _networkExpandW = nTarget;
+        if (MathF.Abs(_hidHideExpandW - hTarget) < 0.001f) _hidHideExpandW = hTarget;
+        if (_visualExpandW != vTarget || _networkExpandW != nTarget || _hidHideExpandW != hTarget)
+            _ctx.MarkDirty();
     }
 
     public void OnActivated() { }
@@ -1075,49 +1093,62 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // 3-panel accordion: VISUAL + NETWORK + HIDHIDE
-        switch (_settingsRightPanelActive)
+        // Compute heights from animated expansion weights
         {
-            case "network":
+            float totalH = bounds.Height - 2 * gap;
+            float expandableH = totalH - 3 * RightPanelCollapsedH;
+            float wSum = _visualExpandW + _networkExpandW + _hidHideExpandW;
+            if (wSum < 0.001f) wSum = 1f; // safety
+
+            float visH = RightPanelCollapsedH + expandableH * (_visualExpandW / wSum);
+            float netH = RightPanelCollapsedH + expandableH * (_networkExpandW / wSum);
+            float hidH = RightPanelCollapsedH + expandableH * (_hidHideExpandW / wSum);
+
+            float visTop = bounds.Top;
+            float netTop = visTop + visH + gap;
+            float hidTop = netTop + netH + gap;
+
+            var visualBounds  = new SKRect(bounds.Left, visTop, bounds.Right, visTop + visH);
+            var networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, netTop + netH);
+            var hidHideBounds = new SKRect(bounds.Left, hidTop, bounds.Right, bounds.Bottom);
+
+            bool visExpanded = _settingsRightPanelActive == "visual";
+            bool netExpanded = _settingsRightPanelActive == "network";
+            bool hidExpanded = _settingsRightPanelActive == "hidhide";
+
+            // Visual panel
+            canvas.Save();
+            canvas.ClipRect(visualBounds);
+            if (visExpanded)
             {
-                float visBottom  = bounds.Top + RightPanelCollapsedH;
-                float hidHideTop = bounds.Bottom - RightPanelCollapsedH;
-                var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
-                var networkBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, hidHideTop - gap);
-                var hidHideBounds = new SKRect(bounds.Left, hidHideTop, bounds.Right, bounds.Bottom);
-                DrawVisualPanelCollapsed(canvas, visualBounds);
-                DrawNetworkSettingsPanel(canvas, networkBounds, frameInset);
-                DrawHidHidePanelCollapsed(canvas, hidHideBounds);
-                break;
-            }
-            case "hidhide":
-            {
-                float visBottom  = bounds.Top + RightPanelCollapsedH;
-                float netBottom  = visBottom + gap + RightPanelCollapsedH;
-                var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
-                var networkBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, netBottom);
-                var hidHideBounds = new SKRect(bounds.Left, netBottom + gap, bounds.Right, bounds.Bottom);
-                DrawVisualPanelCollapsed(canvas, visualBounds);
-                DrawNetworkPanelCollapsed(canvas, networkBounds);
-                DrawHidHideSettingsPanel(canvas, hidHideBounds, frameInset);
-                break;
-            }
-            default: // "visual"
-            {
-                float netTop     = bounds.Bottom - gap - RightPanelCollapsedH - gap - RightPanelCollapsedH;
-                float hidHideTop = bounds.Bottom - RightPanelCollapsedH;
-                var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, netTop - gap);
-                var networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, hidHideTop - gap);
-                var hidHideBounds = new SKRect(bounds.Left, hidHideTop, bounds.Right, bounds.Bottom);
                 DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
                 _visualPanelHeaderBounds = new SKRect(visualBounds.Left, visualBounds.Top, visualBounds.Right, visualBounds.Top + RightPanelCollapsedH);
                 bool visHov = _visualPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 float indW = FUIRenderer.MeasureText("-", 13f);
                 FUIRenderer.DrawText(canvas, "-", new SKPoint(visualBounds.Right - FUIRenderer.FrameInset - indW, visualBounds.Top + FUIRenderer.FrameInset + 18f),
                     visHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
-                DrawNetworkPanelCollapsed(canvas, networkBounds);
-                DrawHidHidePanelCollapsed(canvas, hidHideBounds);
-                break;
             }
+            else
+                DrawVisualPanelCollapsed(canvas, visualBounds);
+            canvas.Restore();
+
+            // Network panel
+            canvas.Save();
+            canvas.ClipRect(networkBounds);
+            if (netExpanded)
+                DrawNetworkSettingsPanel(canvas, networkBounds, frameInset);
+            else
+                DrawNetworkPanelCollapsed(canvas, networkBounds);
+            canvas.Restore();
+
+            // HidHide panel
+            canvas.Save();
+            canvas.ClipRect(hidHideBounds);
+            if (hidExpanded)
+                DrawHidHideSettingsPanel(canvas, hidHideBounds, frameInset);
+            else
+                DrawHidHidePanelCollapsed(canvas, hidHideBounds);
+            canvas.Restore();
         }
     }
 

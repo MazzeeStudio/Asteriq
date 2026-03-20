@@ -588,19 +588,24 @@ public partial class SCBindingsTabController
     }
 
     /// <summary>
-    /// Returns the currently held keyboard modifier prefix (e.g. "lctrl+", "rshift+")
+    /// Returns the currently held keyboard modifier prefix (e.g. "lshift+", "ralt+lctrl+")
     /// for composing a capture search string. Returns empty string if none are held.
-    /// Only one modifier is returned — the first one found in priority order.
+    /// Handles AltGr: suppresses phantom L-CTRL that Windows injects when R-ALT is held.
     /// </summary>
     private static string GetHeldModifierPrefix()
     {
-        if (IsKeyHeld(0xA2)) return "lctrl+";   // VK_LCONTROL
-        if (IsKeyHeld(0xA3)) return "rctrl+";   // VK_RCONTROL
-        if (IsKeyHeld(0xA0)) return "lshift+";  // VK_LSHIFT
-        if (IsKeyHeld(0xA1)) return "rshift+";  // VK_RSHIFT
-        if (IsKeyHeld(0xA4)) return "lalt+";    // VK_LMENU
-        if (IsKeyHeld(0xA5)) return "ralt+";    // VK_RMENU
-        return "";
+        bool rAltHeld = IsKeyHeld(0xA5); // VK_RMENU (R-Alt / AltGr)
+        var parts = new List<string>(3);
+
+        if (IsKeyHeld(0xA0)) parts.Add("lshift");
+        if (IsKeyHeld(0xA1)) parts.Add("rshift");
+        // AltGr sends phantom L-Ctrl — suppress it when R-Alt is held
+        if (IsKeyHeld(0xA3)) parts.Add("rctrl");
+        else if (IsKeyHeld(0xA2) && !rAltHeld) parts.Add("lctrl");
+        if (rAltHeld) parts.Add("ralt");
+        else if (IsKeyHeld(0xA4)) parts.Add("lalt");
+
+        return parts.Count > 0 ? string.Join("+", parts) + "+" : "";
     }
 
     private void ApplyButtonCaptureResult(string inputName, string? hidPath = null)

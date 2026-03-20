@@ -1258,4 +1258,52 @@ internal static class FUIWidgets
             canvas.DrawLine(hatchX, hy2, hatchX + hatchW, hy, hatchPaint);
         }
     }
+
+    // ─── Collapsible Panel ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws a collapsible panel header with title and expand/collapse indicator.
+    /// Sets <paramref name="headerBounds"/> for click hit-testing by the caller.
+    /// Returns the panel chrome metrics so the caller can draw content below.
+    /// </summary>
+    /// <param name="canvas">Target canvas.</param>
+    /// <param name="bounds">Full panel bounds (collapsed or expanded).</param>
+    /// <param name="title">Panel title text.</param>
+    /// <param name="isExpanded">Whether the panel content is visible.</param>
+    /// <param name="isHovered">Whether the header is currently hovered (collapsed state only).</param>
+    /// <param name="headerBounds">Output: the clickable header area for hit-testing.</param>
+    /// <returns>Panel chrome metrics (LeftMargin, RightMargin, Y after title).</returns>
+    internal static FUIRenderer.PanelMetrics DrawCollapsiblePanelHeader(
+        SKCanvas canvas,
+        SKRect bounds,
+        string title,
+        bool isExpanded,
+        bool isHovered,
+        out SKRect headerBounds)
+    {
+        float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
+        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        float y = m.Y;
+
+        headerBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right,
+            bounds.Top + FUIRenderer.PanelHeaderHeight);
+
+        DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, title);
+
+        // Expand/collapse indicator
+        string indicator = isExpanded ? "-" : "+";
+        float indW = FUIRenderer.MeasureText(indicator, 13f);
+        var indColour = isHovered && !isExpanded
+            ? FUIColors.TextBright
+            : FUIColors.Active.WithAlpha(isExpanded ? (byte)100 : (byte)180);
+        FUIRenderer.DrawText(canvas, indicator, new SKPoint(m.RightMargin - indW, y - 18f),
+            indColour, 13f, true);
+
+        return new FUIRenderer.PanelMetrics
+        {
+            LeftMargin = m.LeftMargin,
+            RightMargin = m.RightMargin,
+            Y = y
+        };
+    }
 }

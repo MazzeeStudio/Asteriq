@@ -110,7 +110,7 @@ public partial class MappingsTabController
 
         if (showDeviceOrder)
         {
-            const float CollapsedH = 52f;
+            float CollapsedH = FUIRenderer.CollapsedPanelHeight;
             float vertGap = 8f;
             float doFrameInset = 5f;
 
@@ -2837,27 +2837,16 @@ public partial class MappingsTabController
     private void DrawDeviceOrderPanel(SKCanvas canvas, SKRect bounds, float frameInset,
         SCExportProfile profile, List<VJoyDeviceInfo> existingSlots)
     {
-        float cornerLen = _deviceOrder.IsExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        bool headerHovered = !_deviceOrder.IsExpanded
+            && new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + FUIRenderer.PanelHeaderHeight)
+                .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "DEVICE ORDER",
+            _deviceOrder.IsExpanded, headerHovered, out var hdrBounds);
+        _deviceOrder.HeaderBounds = hdrBounds;
+        if (!_deviceOrder.IsExpanded) return;
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
-
-        // Header bounds for click-to-expand
-        _deviceOrder.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
-        bool headerHovered = !_deviceOrder.IsExpanded
-            && _deviceOrder.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "DEVICE ORDER");
-
-        // Expand/collapse indicator
-        string indicator = _deviceOrder.IsExpanded ? "-" : "+";
-        float indW = FUIRenderer.MeasureText(indicator, 13f);
-        FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
-            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(_deviceOrder.IsExpanded ? (byte)100 : (byte)180),
-            13f, true);
-
-        if (!_deviceOrder.IsExpanded) return;
 
         y += 14f;
 

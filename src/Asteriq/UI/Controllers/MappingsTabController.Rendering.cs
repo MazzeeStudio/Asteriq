@@ -61,13 +61,11 @@ public partial class MappingsTabController
             var (settingsBounds, deviceOrderBounds) = doAnim.ComputeBounds(
                 rightBounds, vertGap, FUIRenderer.CollapsedPanelHeight);
 
-            canvas.Save();
-            canvas.ClipRect(settingsBounds);
+            canvas.SaveLayer(settingsBounds, null);
             DrawMappingSettingsPanel(canvas, settingsBounds, frameInset);
             canvas.Restore();
 
-            canvas.Save();
-            canvas.ClipRect(deviceOrderBounds);
+            canvas.SaveLayer(deviceOrderBounds, null);
             if (showDeviceOrder)
                 DrawDeviceOrderPanel(canvas, deviceOrderBounds, doFrameInset, profile!, existingSlots);
             canvas.Restore();

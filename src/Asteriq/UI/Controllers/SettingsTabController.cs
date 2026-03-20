@@ -753,7 +753,7 @@ public class SettingsTabController : ITabController, IDisposable
             .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "VISUAL", true, headerHovered, out var hdrBounds);
         _visualPanelHeaderBounds = hdrBounds;
-        float y = m.Y;
+        float y = m.Y + 14f; // extra spacing before theme grid
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
         float contentWidth = m.ContentWidth;

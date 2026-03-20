@@ -2,6 +2,7 @@ using Asteriq.Models;
 using Asteriq.Services;
 using Microsoft.Win32;
 using SkiaSharp;
+using Svg.Skia;
 
 namespace Asteriq.UI;
 
@@ -1401,4 +1402,102 @@ public static class FUIRenderer
     }
 
     #endregion
+
+    // ─── SVG / Bitmap Drawing Helpers ───────────────────────────────────────
+
+    /// <summary>
+    /// Transform state produced by <see cref="DrawSvgInBounds"/> and <see cref="DrawBitmapInBounds"/>.
+    /// Callers can store these values for coordinate conversion (ViewBoxToScreen, etc.).
+    /// </summary>
+    public readonly struct SvgTransform
+    {
+        public float Scale { get; init; }
+        public SKPoint Offset { get; init; }
+        /// <summary>Source image width in viewBox units — used for mirror coordinate math.</summary>
+        public float SourceWidth { get; init; }
+        /// <summary>Scaled width in screen pixels — used by DeviceMapEditor for mirror math.</summary>
+        public float ScaledWidth { get; init; }
+    }
+
+    /// <summary>
+    /// Draws an SVG centred within <paramref name="bounds"/>, maintaining aspect ratio (95% fill).
+    /// Optionally mirrors horizontally. Returns the computed transform for coordinate conversion.
+    /// </summary>
+    public static SvgTransform DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
+    {
+        if (svg.Picture is null) return default;
+
+        var svgBounds = svg.Picture.CullRect;
+        if (svgBounds.Width <= 0 || svgBounds.Height <= 0) return default;
+
+        float scaleX = bounds.Width / svgBounds.Width;
+        float scaleY = bounds.Height / svgBounds.Height;
+        float scale = Math.Min(scaleX, scaleY) * 0.95f;
+
+        float scaledWidth = svgBounds.Width * scale;
+        float scaledHeight = svgBounds.Height * scale;
+
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
+
+        canvas.Save();
+        canvas.Translate(offsetX, offsetY);
+
+        if (mirror)
+        {
+            canvas.Translate(scaledWidth, 0);
+            canvas.Scale(-scale, scale);
+        }
+        else
+        {
+            canvas.Scale(scale);
+        }
+
+        canvas.DrawPicture(svg.Picture);
+        canvas.Restore();
+
+        return new SvgTransform
+        {
+            Scale = scale,
+            Offset = new SKPoint(offsetX, offsetY),
+            SourceWidth = svgBounds.Width,
+            ScaledWidth = scaledWidth
+        };
+    }
+
+    /// <summary>
+    /// Draws a bitmap centred within <paramref name="bounds"/>, maintaining aspect ratio (95% fill).
+    /// Uses explicit viewBox dimensions for scaling (may differ from bitmap pixel size).
+    /// Optionally mirrors horizontally. Returns the computed transform for coordinate conversion.
+    /// </summary>
+    public static SvgTransform DrawBitmapInBounds(SKCanvas canvas, SKBitmap bitmap, float viewBoxWidth, float viewBoxHeight, SKRect bounds, bool mirror = false)
+    {
+        if (viewBoxWidth <= 0 || viewBoxHeight <= 0) return default;
+
+        float scaleX = bounds.Width / viewBoxWidth;
+        float scaleY = bounds.Height / viewBoxHeight;
+        float scale = Math.Min(scaleX, scaleY) * 0.95f;
+
+        float scaledWidth = viewBoxWidth * scale;
+        float scaledHeight = viewBoxHeight * scale;
+
+        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2;
+        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2;
+
+        var destRect = new SKRect(offsetX, offsetY, offsetX + scaledWidth, offsetY + scaledHeight);
+
+        canvas.Save();
+        if (mirror)
+            canvas.Scale(-1, 1, offsetX + scaledWidth / 2, offsetY + scaledHeight / 2);
+        canvas.DrawBitmap(bitmap, destRect);
+        canvas.Restore();
+
+        return new SvgTransform
+        {
+            Scale = scale,
+            Offset = new SKPoint(offsetX, offsetY),
+            SourceWidth = viewBoxWidth,
+            ScaledWidth = scaledWidth
+        };
+    }
 }

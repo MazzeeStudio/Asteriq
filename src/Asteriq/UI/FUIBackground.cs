@@ -18,6 +18,7 @@ public class FUIBackground : IDisposable
     private SKSize _cachedSize;
 
     private readonly Random _random = new();
+    private FUITheme _cachedTheme;
 
     // Intensity controls (0-100 scale for UI)
     public int GridStrength { get; set; } = 35;        // 0 = off, 100 = max
@@ -50,12 +51,14 @@ public class FUIBackground : IDisposable
     /// </summary>
     public void Render(SKCanvas canvas, SKRect bounds)
     {
-        // Check if we need to regenerate cached elements
+        // Regenerate cached elements when size or theme changes
         var size = new SKSize(bounds.Width, bounds.Height);
-        if (_cachedSize != size)
+        var theme = FUIColors.CurrentTheme;
+        if (_cachedSize != size || _cachedTheme != theme)
         {
             RegenerateCaches(size);
             _cachedSize = size;
+            _cachedTheme = theme;
         }
 
         // Layer 1: Grid (intensity-based)

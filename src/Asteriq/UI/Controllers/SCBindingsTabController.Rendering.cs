@@ -233,7 +233,7 @@ public partial class SCBindingsTabController
 
         float boundOnlyLabelX = checkboxX + checkboxSize + 6f;
         FUIRenderer.DrawText(canvas, "Bound only", new SKPoint(boundOnlyLabelX, y + filterRowHeight / 2 + 4),
-            showBoundOnly ? FUIColors.Active : FUIColors.TextDim, 13f);
+            FUIColors.InteractiveColor(showBoundOnly), 13f);
 
         // "Show JS ref" checkbox — hidden in client mode (JS ref is always the header in that context)
         float boundOnlyLabelW = FUIRenderer.MeasureText("Bound only", 13f);
@@ -248,7 +248,7 @@ public partial class SCBindingsTabController
             FUIWidgets.DrawSCCheckbox(canvas, _searchFilter.ShowJSRefBounds, showJSRef, _searchFilter.ShowJSRefHovered);
             float jsRefLabelX = jsRefCheckboxX + checkboxSize + 6f;
             FUIRenderer.DrawText(canvas, "Show JS ref", new SKPoint(jsRefLabelX, y + filterRowHeight / 2 + 4),
-                showJSRef ? FUIColors.Active : FUIColors.TextDim, 13f);
+                FUIColors.InteractiveColor(showJSRef), 13f);
         }
         else
         {
@@ -363,7 +363,7 @@ public partial class SCBindingsTabController
                 else if (col.IsPhysical)
                 {
                     // Physical device column: device name on top, "JS{N}" sub-label below
-                    var headerColor = c == _colImport.HighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
+                    var headerColor = FUIColors.ContentColor(c == _colImport.HighlightedColumn);
                     float headerTextWidth = FUIRenderer.MeasureText(col.Header, 10f);
                     float centeredX = colX + (colW - headerTextWidth) / 2;
                     FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), headerColor, 10f, true);
@@ -374,7 +374,7 @@ public partial class SCBindingsTabController
                 else if (col.IsJoystick && !showJSRef)
                 {
                     // Device mode: show physical device name, or fall back to JS# if no device mapped
-                    var headerColor = c == _colImport.HighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
+                    var headerColor = FUIColors.ContentColor(c == _colImport.HighlightedColumn);
                     string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
                     if (deviceName is not null)
                     {
@@ -554,7 +554,7 @@ public partial class SCBindingsTabController
                     string displayName = SCCategoryMapper.FormatActionName(action.ActionName);
                     float maxNameWidth = actionColWidth - actionIndent - 10f;
                     displayName = FUIWidgets.TruncateTextToWidth(displayName, maxNameWidth, 10f);
-                    var nameColor = isSelected ? FUIColors.Active : FUIColors.TextPrimary;
+                    var nameColor = FUIColors.ContentColor(isSelected);
                     FUIRenderer.DrawText(canvas, displayName, new SKPoint(leftMargin + actionIndent, textY), nameColor, 13f);
 
                     // Draw device column cells (clipped)
@@ -830,7 +830,7 @@ public partial class SCBindingsTabController
             _profileMgmt.ProfileEditHovered = _profileMgmt.ProfileEditBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
             // Draw pencil icon
-            var iconColor = _profileMgmt.ProfileEditHovered ? FUIColors.Active : FUIColors.TextDim;
+            var iconColor = FUIColors.InteractiveColor(_profileMgmt.ProfileEditHovered);
             float cx = _profileMgmt.ProfileEditBounds.MidX;
             float cy = _profileMgmt.ProfileEditBounds.MidY;
             using var penPaint = new SKPaint
@@ -1188,7 +1188,7 @@ public partial class SCBindingsTabController
                 _profileMgmt.DropdownDeleteProfileName = profile.ProfileName;
                 bool delHovered = _profileMgmt.DropdownDeleteBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
                 FUIRenderer.DrawText(canvas, "×", new SKPoint(_profileMgmt.DropdownDeleteBounds.MidX - 3f, _profileMgmt.DropdownDeleteBounds.MidY + 4f),
-                    delHovered ? FUIColors.TextBright : FUIColors.TextDim, 14f);
+                    FUIColors.SecondaryColor(delHovered), 14f);
             }
 
             var textColor = isHovered ? FUIColors.TextBright : (isActive ? FUIColors.Active : FUIColors.TextPrimary);

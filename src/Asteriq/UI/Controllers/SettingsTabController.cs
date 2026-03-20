@@ -344,7 +344,7 @@ public class SettingsTabController : ITabController, IDisposable
                 _profileNameEditBounds = new SKRect(editX, editY, editX + editSize, editY + editSize);
                 _profileNameEditHovered = _profileNameEditBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-                var iconColor = _profileNameEditHovered ? FUIColors.Active : FUIColors.TextDim;
+                var iconColor = FUIColors.InteractiveColor(_profileNameEditHovered);
                 float cx = _profileNameEditBounds.MidX;
                 float cy = _profileNameEditBounds.MidY;
                 using var penPaint = new SKPaint
@@ -1517,7 +1517,7 @@ public class SettingsTabController : ITabController, IDisposable
             y += btnH + sectionGap;
 
             string statusText2 = isReceiving ? $"Connected to {trusted?.MachineName ?? "master"}" : "Waiting for master";
-            var statusColor2 = isReceiving ? FUIColors.Active : FUIColors.TextDim;
+            var statusColor2 = FUIColors.InteractiveColor(isReceiving);
             FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText2}",
                 new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, statusColor2, 13f);
         }
@@ -1526,7 +1526,7 @@ public class SettingsTabController : ITabController, IDisposable
             if (_ctx.NetworkDiscovery is not null)
             {
                 int peerCount = _ctx.NetworkDiscovery.KnownPeers.Count;
-                var peerColor = peerCount > 0 ? FUIColors.Active : FUIColors.TextDim;
+                var peerColor = FUIColors.InteractiveColor(peerCount > 0);
                 FUIRenderer.DrawTextTruncated(canvas, $"Peers visible: {peerCount}",
                     new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, peerColor, 13f);
             }

@@ -108,7 +108,7 @@ internal static class FUIWidgets
         FUIRenderer.FillFrame(canvas, bounds, fillColor, 4f);
         FUIRenderer.DrawFrame(canvas, bounds, frameColor, 4f, 1f, isActive);
 
-        var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+        var textColor = FUIColors.SecondaryColor(isActive);
         FUIRenderer.DrawTextCentered(canvas, name, bounds, textColor, 13f, isActive);
     }
 
@@ -384,7 +384,7 @@ internal static class FUIWidgets
 
         float handleX = bounds.Left + fillWidth;
         float handleRadius = dragging ? 8f : 6f;
-        using var handlePaint = FUIRenderer.CreateFillPaint(dragging ? FUIColors.Active : FUIColors.TextPrimary);
+        using var handlePaint = FUIRenderer.CreateFillPaint(FUIColors.ContentColor(dragging));
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handlePaint);
 
         using var handleStroke = FUIRenderer.CreateStrokePaint(FUIColors.Active, 1.5f);
@@ -428,7 +428,7 @@ internal static class FUIWidgets
             ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
             : (hovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
         var frameColor = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = active ? FUIColors.TextBright : FUIColors.TextDim;
+        var textColor = FUIColors.SecondaryColor(active);
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
@@ -648,7 +648,7 @@ internal static class FUIWidgets
         var frameColor = isActive
             ? previewColor
             : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+        var textColor = FUIColors.SecondaryColor(isActive);
 
         using var themeBgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, themeBgPaint);

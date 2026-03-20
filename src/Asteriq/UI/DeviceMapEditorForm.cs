@@ -535,7 +535,7 @@ public class DeviceMapEditorForm : Form
             var metrics = textPaint.FontMetrics;
             float textY = labelScreen.Y - metrics.Ascent; // Adjust for baseline
             FUIRenderer.DrawText(canvas, labelText, new SKPoint(labelScreen.X, textY),
-                isSelected ? FUIColors.Active : FUIColors.TextPrimary, 14f);
+                FUIColors.ContentColor(isSelected), 14f);
         }
 #pragma warning restore CA2000
     }
@@ -866,7 +866,7 @@ public class DeviceMapEditorForm : Form
 
                 var indicator = isSelected ? "> " : "  ";
                 FUIRenderer.DrawText(canvas, indicator + kvp.Key, new SKPoint(itemBounds.Left + 5, y + 14),
-                    isSelected ? FUIColors.Active : FUIColors.TextPrimary, 13f);
+                    FUIColors.ContentColor(isSelected), 13f);
             }
 
             y += itemHeight + itemGap;

@@ -344,13 +344,13 @@ public partial class MainForm
         // Profile name text
         float textY = y + height / 2 + 4;
         FUIRenderer.DrawText(canvas, profileName, new SKPoint(x + 8, textY),
-            _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary, 14f);
+            FUIColors.ContentColor(_profileDropdownOpen), 14f);
 
         // Dropdown arrow on right side (custom drawn triangle)
         float arrowSize = 4f;
         float arrowX = x + width - 12f;
         float arrowY = y + height / 2;
-        var arrowColor = _profileDropdownOpen ? FUIColors.Active : FUIColors.TextPrimary;
+        var arrowColor = FUIColors.ContentColor(_profileDropdownOpen);
 
         using var arrowPaint = FUIRenderer.CreateFillPaint(arrowColor);
 

@@ -460,7 +460,7 @@ public partial class MappingsTabController
         // Output name (centered vertically)
         float leftTextX = bounds.Left + 12;
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftTextX, bounds.MidY + 5),
-            isSelected ? FUIColors.Active : FUIColors.TextPrimary, 15f, true);
+            FUIColors.ContentColor(isSelected), 15f, true);
 
         // Right side indicator: keyboard keycaps or binding dot
         if (hasKeyParts)
@@ -634,7 +634,7 @@ public partial class MappingsTabController
         _autoScroll.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
         FUIWidgets.DrawCheckbox(canvas, _autoScroll.CheckboxBounds, _autoScroll.Enabled, _ctx.MousePosition);
 
-        var labelColor = _autoScroll.CheckboxHovered ? FUIColors.TextBright : FUIColors.TextDim;
+        var labelColor = FUIColors.SecondaryColor(_autoScroll.CheckboxHovered);
         FUIRenderer.DrawText(canvas, "AUTO-SCROLL TO MAPPING",
             new SKPoint(leftMargin + checkboxSize + 7, checkboxY + checkboxSize - 1),
             labelColor, 13f);
@@ -858,7 +858,7 @@ public partial class MappingsTabController
 
         string addText = isListening ? "Cancel" : "+ Add Input";
         FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
-            addHovered ? FUIColors.Active : FUIColors.TextPrimary, 14f);
+            FUIColors.ContentColor(addHovered), 14f);
         y += 28 + 8;  // Button height + small gap
 
         // Merge operation selector (only for axes with 2+ inputs)
@@ -1087,7 +1087,7 @@ public partial class MappingsTabController
             var frameColor = isActive
                 ? FUIColors.Active
                 : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-            var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+            var textColor = FUIColors.SecondaryColor(isActive);
 
             using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
             canvas.DrawRect(presetBounds, bgPaint);
@@ -1463,7 +1463,7 @@ public partial class MappingsTabController
                 canvas.DrawRoundRect(modeBounds, 3, 3, modeFramePaint);
 
                 FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds,
-                    selected ? FUIColors.Active : FUIColors.TextPrimary, 12f);
+                    FUIColors.ContentColor(selected), 12f);
 
                 _buttonMode.ModeBounds[i] = modeBounds;
             }
@@ -2566,7 +2566,7 @@ public partial class MappingsTabController
         // Output name (left)
         float textY = bounds.MidY + 5;
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(bounds.Left + 10, textY),
-            isEditing ? FUIColors.Active : FUIColors.TextPrimary, 15f);
+            FUIColors.ContentColor(isEditing), 15f);
 
         // Binding (center)
         float bindingX = bounds.Left + 100;

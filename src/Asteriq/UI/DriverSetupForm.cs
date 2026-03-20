@@ -315,7 +315,7 @@ public class DriverSetupForm : FUIBaseDialog
         float cbLabelX = Pad + cbSize + 8f;
         float cbLabelY = btnY + btnH / 2 + 5f;
         FUIRenderer.DrawText(canvas, "Don't show again", new SKPoint(cbLabelX, cbLabelY),
-            _hoveredRegion == 6 ? FUIColors.TextBright : FUIColors.TextDim, 13f);
+            FUIColors.SecondaryColor(_hoveredRegion == 6), 13f);
 
         // L-corner decorations
         FUIRenderer.DrawLCornerFrame(canvas, b.Inset(-4, -4), FUIColors.Frame.WithAlpha(100), 20f, 6f, 1f);

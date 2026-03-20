@@ -570,7 +570,7 @@ public class DevicesTabController : ITabController
 
             float includeLabelX = cbX + checkboxSize + 5f;
             FUIRenderer.DrawText(canvas, "Include hidden", new SKPoint(includeLabelX, rowCenterY + 4f),
-                _showHiddenDevices ? FUIColors.Active : FUIColors.TextDim, 12f);
+                FUIColors.InteractiveColor(_showHiddenDevices), 12f);
         }
         else
         {
@@ -955,7 +955,7 @@ public class DevicesTabController : ITabController
         itemY += statusItemHeight + itemGap;
 
         FUIWidgets.DrawStatusItem(canvas, bounds.Left + pad, itemY, bounds.Width - pad * 2, "FORWARDING",
-            _ctx.IsForwarding ? "RUNNING" : "STOPPED", _ctx.IsForwarding ? FUIColors.Active : FUIColors.TextDim, fontSize: 12f);
+            _ctx.IsForwarding ? "RUNNING" : "STOPPED", FUIColors.InteractiveColor(_ctx.IsForwarding), fontSize: 12f);
         itemY += statusItemHeight + itemGap;
 
         int pollHz = _ctx.InputService.PollRateHz;

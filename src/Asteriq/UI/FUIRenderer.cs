@@ -1169,7 +1169,7 @@ public static class FUIRenderer
 
     public static void DrawStatusBadge(SKCanvas canvas, SKRect bounds, string text, bool isPositive)
     {
-        var bgColor = isPositive ? FUIColors.Success.WithAlpha(40) : FUIColors.Danger.WithAlpha(40);
+        var bgColor = isPositive ? FUIColors.Success.WithAlpha(40) : FUIColors.DangerTint;
         var textColor = isPositive ? FUIColors.Success : FUIColors.Danger;
 
         using var bgPaint = CreateFillPaint(bgColor);

@@ -787,7 +787,7 @@ public partial class MappingsTabController
                 bool removeHovered = _hoveredInputSourceRemove == i;
 
                 FUIRenderer.DrawRoundedPanel(canvas, removeBounds,
-                    removeHovered ? FUIColors.Warning.WithAlpha(40) : FUIColors.Background2,
+                    removeHovered ? FUIColors.WarningTint : FUIColors.Background2,
                     removeHovered ? FUIColors.Warning : FUIColors.Frame);
 
                 FUIRenderer.DrawTextCentered(canvas, "X", removeBounds,
@@ -812,7 +812,7 @@ public partial class MappingsTabController
                 var listenBounds = new SKRect(leftMargin, y, rightMargin, y + rowHeight);
                 byte alpha = (byte)(180 + MathF.Sin(_ctx.PulsePhase * 3) * 60);
 
-                using var listenBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+                using var listenBgPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
                 canvas.DrawRoundRect(listenBounds, 3, 3, listenBgPaint);
 
                 // Draw timeout progress bar
@@ -826,7 +826,7 @@ public partial class MappingsTabController
                         listenBounds.Top + 3,
                         listenBounds.Left + 3 + progressWidth,
                         listenBounds.Bottom - 3);
-                    using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+                    using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBgStrong);
                     canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
                 }
 
@@ -844,7 +844,7 @@ public partial class MappingsTabController
         _addInputButtonBounds = addBounds;
         bool addHovered = _addInputButtonHovered;
 
-        using var addBgPaint = FUIRenderer.CreateFillPaint(addHovered ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2);
+        using var addBgPaint = FUIRenderer.CreateFillPaint(addHovered ? FUIColors.SelectionBg : FUIColors.Background2);
         canvas.DrawRoundRect(addBounds, 3, 3, addBgPaint);
 
         using var addFramePaint = new SKPaint
@@ -906,7 +906,7 @@ public partial class MappingsTabController
             bool isActive = axisMapping.MergeOp == ops[i];
             bool isHovered = _hoveredMergeOpButton == i;
 
-            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (isHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
             var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
@@ -1082,7 +1082,7 @@ public partial class MappingsTabController
             bool isHovered = presetBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
             var bgColor = isActive
-                ? FUIColors.Active.WithAlpha(60)
+                ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
                 : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
             var frameColor = isActive
                 ? FUIColors.Active
@@ -1205,7 +1205,7 @@ public partial class MappingsTabController
         float trackHeight = 8f;
         float trackY = bounds.MidY - trackHeight / 2;
 
-        using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(150));
+        using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBorder);
 
         if (_deadzone.CenterEnabled)
         {
@@ -1333,7 +1333,7 @@ public partial class MappingsTabController
             bool hovered = _keyboardOutput.HoveredOutputType == i;
 
             var bgColor = selected
-                ? FUIColors.Active.WithAlpha(60)
+                ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
                 : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
             var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
@@ -1368,7 +1368,7 @@ public partial class MappingsTabController
 
             // Draw key capture field background
             var keyBgColor = _keyboardOutput.IsCapturing
-                ? FUIColors.Active.WithAlpha(40)
+                ? FUIColors.SelectionBg
                 : (_keyboardOutput.CaptureHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
             using var keyBgPaint = FUIRenderer.CreateFillPaint(keyBgColor);
@@ -1390,7 +1390,7 @@ public partial class MappingsTabController
                         _keyboardOutput.CaptureBounds.Top + 3,
                         _keyboardOutput.CaptureBounds.Left + 3 + progressWidth,
                         _keyboardOutput.CaptureBounds.Bottom - 3);
-                    using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+                    using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBgStrong);
                     canvas.DrawRoundRect(progressRect, 2, 2, progressPaint);
                 }
             }
@@ -1445,7 +1445,7 @@ public partial class MappingsTabController
                 // Disabled appearance — clear bounds so hover and click don't fire
                 FUIRenderer.DrawRoundedPanel(canvas, modeBounds, FUIColors.Background2.WithAlpha(100), FUIColors.Frame.WithAlpha(100));
 
-                FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 12f);
+                FUIRenderer.DrawTextCentered(canvas, modes[i], modeBounds, FUIColors.TextDimSubtle, 12f);
                 _buttonMode.ModeBounds[i] = SKRect.Empty;
             }
             else
@@ -1453,7 +1453,7 @@ public partial class MappingsTabController
                 bool selected = i == (int)_buttonMode.SelectedMode;
                 bool hovered = i == _buttonMode.HoveredMode;
 
-                SKColor bgColor = selected ? FUIColors.Active.WithAlpha(60) :
+                SKColor bgColor = selected ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) :
                     (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
                 using var modeBgPaint = FUIRenderer.CreateFillPaint(bgColor);
@@ -1624,7 +1624,7 @@ public partial class MappingsTabController
         using var refPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame.WithAlpha(50),
+            Color = FUIColors.FrameSubtle,
             StrokeWidth = 1f,
             PathEffect = SKPathEffect.CreateDash(new[] { 4f, 4f }, 0)
         };
@@ -1799,14 +1799,14 @@ public partial class MappingsTabController
                     ? new SKRect(barBounds.MidX, barBounds.Top, barX, barBounds.Bottom)
                     : new SKRect(barX, barBounds.Top, barBounds.MidX, barBounds.Bottom);
 
-                using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
+                using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.ActiveStrong);
                 canvas.DrawRect(fillBounds, fillPaint);
             }
             else
             {
                 // Fill from left edge to current position (for sliders/throttles)
                 var fillBounds = new SKRect(barBounds.Left, barBounds.Top, barX, barBounds.Bottom);
-                using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
+                using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.ActiveStrong);
                 canvas.DrawRect(fillBounds, fillPaint);
             }
 
@@ -2142,7 +2142,7 @@ public partial class MappingsTabController
     {
         // Background
         var bgColor = _inputDetection.IsListening
-            ? FUIColors.Warning.WithAlpha(40)
+            ? FUIColors.WarningTint
             : FUIColors.Background2;
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
@@ -2335,7 +2335,7 @@ public partial class MappingsTabController
                 using var disabledFramePaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame.WithAlpha(100));
                 canvas.DrawRect(modeBounds, disabledFramePaint);
 
-                FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDim.WithAlpha(120), 13f);
+                FUIRenderer.DrawTextCentered(canvas, labels[i], modeBounds, FUIColors.TextDimSubtle, 13f);
                 _buttonMode.ModeBounds[i] = SKRect.Empty;
             }
             else
@@ -2346,7 +2346,7 @@ public partial class MappingsTabController
                 bool hovered = _buttonMode.HoveredMode == i;
 
                 var bgColor = selected
-                    ? FUIColors.Active.WithAlpha(60)
+                    ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
                     : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
                 var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
@@ -2377,7 +2377,7 @@ public partial class MappingsTabController
             bool hovered = _keyboardOutput.HoveredOutputType == i;
 
             var bgColor = selected
-                ? FUIColors.Active.WithAlpha(60)
+                ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
                 : (hovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
             var textColor = selected ? FUIColors.Active : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
@@ -2395,7 +2395,7 @@ public partial class MappingsTabController
     {
         // Background
         var bgColor = _keyboardOutput.IsCapturing
-            ? FUIColors.Warning.WithAlpha(40)
+            ? FUIColors.WarningTint
             : (_keyboardOutput.CaptureHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
@@ -2546,20 +2546,20 @@ public partial class MappingsTabController
         // Background
         SKColor bgColor;
         if (isEditing)
-            bgColor = FUIColors.Active.WithAlpha(60);
+            bgColor = FUIColors.Active.WithAlpha(FUIColors.AlphaGlow);
         else if (isSelected)
-            bgColor = FUIColors.Active.WithAlpha(40);
+            bgColor = FUIColors.SelectionBg;
         else if (isHovered)
             bgColor = FUIColors.Primary.WithAlpha(30);
         else
-            bgColor = FUIColors.Background2.WithAlpha(60);
+            bgColor = FUIColors.DisabledBg;
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);
 
         // Frame
         using var framePaint = FUIRenderer.CreateStrokePaint(
-            isEditing ? FUIColors.Active : (isSelected ? FUIColors.Active.WithAlpha(150) : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(80))),
+            isEditing ? FUIColors.Active : (isSelected ? FUIColors.SelectionBorder : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(FUIColors.AlphaHoverStrong))),
             isEditing ? 2f : (isSelected ? 1.5f : 1f));
         canvas.DrawRect(bounds, framePaint);
 
@@ -2849,7 +2849,7 @@ public partial class MappingsTabController
         }
         else
         {
-            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
+            using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.DisabledBg);
             canvas.DrawRect(_deviceOrder.AutoDetectBounds, disabledPaint);
             FUIRenderer.DrawTextCentered(canvas, "AUTO-DETECT", _deviceOrder.AutoDetectBounds,
                 FUIColors.TextDim.WithAlpha(100), 12f);

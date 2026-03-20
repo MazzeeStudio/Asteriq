@@ -527,7 +527,7 @@ public class DeviceMapEditorForm : Form
 
             // Draw label background
             FUIRenderer.DrawRoundedPanel(canvas, labelRect,
-                isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Background1.WithAlpha(200),
+                isSelected ? FUIColors.SelectionBg : FUIColors.Background1.WithAlpha(200),
                 isSelected ? FUIColors.Active : FUIColors.Frame);
 
             // Draw label text (baseline adjusted)
@@ -621,7 +621,7 @@ public class DeviceMapEditorForm : Form
 
     private void DrawSegmentHandles(SKCanvas canvas, SKPoint anchor, LeadLineDefinition leadLine)
     {
-        using var handleFill = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
+        using var handleFill = FUIRenderer.CreateFillPaint(FUIColors.ActiveStrong);
         using var handleStroke = FUIRenderer.CreateStrokePaint(FUIColors.Active, 2f);
         using var handleHover = FUIRenderer.CreateFillPaint(FUIColors.Primary.WithAlpha(100));
 
@@ -860,7 +860,7 @@ public class DeviceMapEditorForm : Form
 
                 if (isSelected || isHovered)
                 {
-                    using var hlPaint = FUIRenderer.CreateFillPaint(isSelected ? FUIColors.Active.WithAlpha(40) : FUIColors.Primary.WithAlpha(20));
+                    using var hlPaint = FUIRenderer.CreateFillPaint(isSelected ? FUIColors.SelectionBg : FUIColors.Primary.WithAlpha(20));
                     canvas.DrawRoundRect(itemBounds, 3, 3, hlPaint);
                 }
 

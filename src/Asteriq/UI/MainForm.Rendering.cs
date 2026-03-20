@@ -390,7 +390,7 @@ public partial class MainForm
         using var glowPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active.WithAlpha(30),
+            Color = FUIColors.ActiveLight,
             StrokeWidth = 3f,
             IsAntialias = true,
             ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
@@ -406,7 +406,7 @@ public partial class MainForm
         canvas.DrawRect(new SKRect(x + 2, y + 2, x + width - 2, y + height - 2), innerBgPaint);
 
         // L-corner frame (FUI style)
-        FUIRenderer.DrawLCornerFrame(canvas, _profileDropdownBounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
+        FUIRenderer.DrawLCornerFrame(canvas, _profileDropdownBounds, FUIColors.ActiveStrong, 20f, 6f, 1.5f, true);
 
         // Draw profile items
         float itemY = y + padding;
@@ -420,7 +420,7 @@ public partial class MainForm
             // Hover background with FUI glow
             if (isHovered)
             {
-                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+                using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
                 canvas.DrawRect(itemBounds, hoverPaint);
 
                 // Left accent bar on hover
@@ -431,7 +431,7 @@ public partial class MainForm
             // Active indicator (always show for active profile)
             if (isActive && !isHovered)
             {
-                using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(60));
+                using var activePaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(FUIColors.AlphaGlow));
                 canvas.DrawRect(new SKRect(x + 4, itemY + 2, x + 6, itemY + itemHeight - 2), activePaint);
             }
 
@@ -452,7 +452,7 @@ public partial class MainForm
         canvas.DrawLine(x + 12, sepY, x + width - 12, sepY, sepPaint);
 
         // Corner accents on separator
-        using var accentLinePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(120));
+        using var accentLinePaint = FUIRenderer.CreateStrokePaint(FUIColors.ActiveSubtle);
         canvas.DrawLine(x + 8, sepY, x + 12, sepY, accentLinePaint);
         canvas.DrawLine(x + width - 12, sepY, x + width - 8, sepY, accentLinePaint);
 

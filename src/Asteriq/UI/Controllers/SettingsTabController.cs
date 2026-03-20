@@ -330,7 +330,7 @@ public class SettingsTabController : ITabController, IDisposable
             _profileNameBounds = new SKRect(leftMargin, y, rightMargin, y + nameBoxHeight);
             bool nameHovered = _profileNameBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
-            FUIRenderer.DrawRoundedPanel(canvas, _profileNameBounds, FUIColors.Active.WithAlpha(30), FUIColors.Active, 4f);
+            FUIRenderer.DrawRoundedPanel(canvas, _profileNameBounds, FUIColors.ActiveLight, FUIColors.Active, 4f);
 
             float nameTextY = y + (nameBoxHeight - FUIRenderer.FontBody) / 2 + FUIRenderer.FontBody - 3;
             FUIRenderer.DrawText(canvas, profile.Name, new SKPoint(leftMargin + 10, nameTextY), FUIColors.TextBright, FUIRenderer.FontBody, true);
@@ -670,11 +670,11 @@ public class SettingsTabController : ITabController, IDisposable
                 {
                     int pct = _ctx.UpdateService.DownloadProgress;
                     // Progress bar fill as banner background
-                    using var bannerBg = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(15));
+                    using var bannerBg = FUIRenderer.CreateFillPaint(FUIColors.ActiveGhost);
                     canvas.DrawRoundRect(bannerRect, bannerRadius, bannerRadius, bannerBg);
                     float fillWidth = bannerRect.Width * (pct / 100f);
                     var fillRect = new SKRect(bannerRect.Left, bannerRect.Top, bannerRect.Left + fillWidth, bannerRect.Bottom);
-                    using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+                    using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
                     canvas.Save();
                     using var bannerClip = new SKRoundRect(bannerRect, bannerRadius);
                     canvas.ClipRoundRect(bannerClip);
@@ -1121,7 +1121,7 @@ public class SettingsTabController : ITabController, IDisposable
         FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "VISUAL");
         float indW = FUIRenderer.MeasureText("+", 13f);
         FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
-            hovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(180), 13f, true);
+            hovered ? FUIColors.TextBright : FUIColors.ActiveStrong, 13f, true);
     }
 
     private void DrawNetworkPanelCollapsed(SKCanvas canvas, SKRect bounds)
@@ -1133,7 +1133,7 @@ public class SettingsTabController : ITabController, IDisposable
         FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "NETWORK");
         float indW = FUIRenderer.MeasureText("+", 13f);
         FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
-            hovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(180), 13f, true);
+            hovered ? FUIColors.TextBright : FUIColors.ActiveStrong, 13f, true);
     }
 
     private void DrawHidHidePanelCollapsed(SKCanvas canvas, SKRect bounds)
@@ -1145,7 +1145,7 @@ public class SettingsTabController : ITabController, IDisposable
         FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "HIDHIDE");
         float indW = FUIRenderer.MeasureText("+", 13f);
         FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
-            hovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(180), 13f, true);
+            hovered ? FUIColors.TextBright : FUIColors.ActiveStrong, 13f, true);
     }
 
     private void DrawHidHideSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)

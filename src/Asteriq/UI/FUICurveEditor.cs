@@ -150,7 +150,7 @@ public class FUICurveEditor : UserControl
 
             bool isHovered = i == _hoveredPreset;
 
-            var bgColor = isActive ? FUIColors.Active.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
             var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.Primary : FUIColors.Frame);
             var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
@@ -179,7 +179,7 @@ public class FUICurveEditor : UserControl
         using var refPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Frame.WithAlpha(80),
+            Color = FUIColors.Frame.WithAlpha(FUIColors.AlphaHoverStrong),
             StrokeWidth = 1f,
             PathEffect = SKPathEffect.CreateDash(new[] { 4f, 4f }, 0)
         };
@@ -297,7 +297,7 @@ public class FUICurveEditor : UserControl
         using var glowPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active.WithAlpha(60),
+            Color = FUIColors.Active.WithAlpha(FUIColors.AlphaGlow),
             StrokeWidth = 4f,
             IsAntialias = true,
             ImageFilter = SKImageFilter.CreateBlur(4f, 4f)

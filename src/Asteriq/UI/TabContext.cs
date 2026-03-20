@@ -23,39 +23,65 @@ public class TabContext
     public IUpdateService UpdateService { get; }
     public DriverSetupManager DriverSetupManager { get; }
 
-    // Shared mutable state
+    // Shared mutable state — see SyncTabContext() / SyncFromTabContext() in MainForm.cs
+    // for the authoritative sync contract between MainForm and TabContext.
+
+    // OWNER: MainForm (SDL2 thread) — must remain local field for thread safety
     public List<PhysicalDeviceInfo> Devices { get; set; } = new();
+    // OWNER: MainForm — pushed via SyncTabContext
     public List<PhysicalDeviceInfo> DisconnectedDevices { get; set; } = new();
+    // OWNER: TabContext — synced back via SyncFromTabContext (also read on SDL2 thread)
     public int SelectedDevice { get; set; } = -1;
+    // OWNER: TabContext — synced back via SyncFromTabContext (also written on SDL2 thread)
     public DeviceInputState? CurrentInputState { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     public List<VJoyDeviceInfo> VJoyDevices { get; set; } = new();
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public int SelectedVJoyDeviceIndex { get; set; }
+    // OWNER: TabContext — synced back via SyncFromTabContext (also read on SDL2 thread)
     public DeviceMap? DeviceMap { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext (not synced back; see comment in SyncFromTabContext)
     public DeviceMap? MappingsPrimaryDeviceMap { get; set; }
     public ActiveInputTracker ActiveInputTracker { get; }
+    // OWNER: TabContext — synced back via SyncFromTabContext (also read on SDL2 thread)
     public bool IsForwarding { get; set; }
     public FUIBackground Background { get; }
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public bool BackgroundDirty { get; set; } = true;
+    // OWNER: MainForm — pushed via SyncTabContext
     public Point MousePosition { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     public float LeadLineProgress { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     public float PulsePhase { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     public float DashPhase { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     public SKSvg? JoystickSvg { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     public SKSvg? ThrottleSvg { get; set; }
     public Form OwnerForm { get; }
 
     // SVG interaction state (shared between Devices and Mappings tabs)
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public string? HoveredControlId { get; set; }
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public string? SelectedControlId { get; set; }
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public SKRect SilhouetteBounds { get; set; }
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public float SvgScale { get; set; } = 1f;
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public SKPoint SvgOffset { get; set; }
+    // OWNER: TabContext — synced back via SyncFromTabContext
     public bool SvgMirrored { get; set; }
     /// <summary>Source image width in viewBox units — used by ViewBoxToScreen for mirror math. Set by DrawSvgInBounds / DrawBitmapInBounds.</summary>
     public float SilhouetteSourceWidth { get; set; } = 2048f;
+    // OWNER: MainForm — pushed via SyncTabContext
     public Dictionary<string, SKRect> ControlBounds { get; set; } = new();
 
     // Profile UI state (shared, dropdown drawn in MainForm)
+    // OWNER: MainForm — pushed via SyncTabContext
     public List<ProfileInfo> Profiles { get; set; } = new();
 
     // Callbacks (core - set via constructor)
@@ -107,8 +133,10 @@ public class TabContext
     // Network forwarding (set after construction by MainForm)
     public INetworkDiscoveryService? NetworkDiscovery { get; set; }
     public INetworkInputService? NetworkInput { get; set; }
+    // OWNER: MainForm (SDL2 thread) — must remain local field for thread safety
     /// <summary>Current network forwarding mode — updated by MainForm on every sync.</summary>
     public NetworkInputMode NetworkMode { get; set; } = NetworkInputMode.Local;
+    // OWNER: MainForm — pushed via SyncTabContext
     /// <summary>True while a master-side connect handshake is in progress. CONNECT button is disabled.</summary>
     public bool IsNetworkConnecting { get; set; }
     /// <summary>
@@ -124,6 +152,7 @@ public class TabContext
     public Action? ClearForwardingSnapshots { get; set; }
     /// <summary>IP address of the RX peer currently connected as TX master. Null when not connected.</summary>
     public string? ConnectedPeerIp { get; set; }
+    // OWNER: MainForm — pushed via SyncTabContext
     /// <summary>True when this machine is in client mode (receiving vJoy from master). Tabs 0 and 1 are locked.</summary>
     public bool IsClientConnected { get; set; }
     public Action? StartNetworking { get; set; }

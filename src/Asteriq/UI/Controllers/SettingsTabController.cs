@@ -1791,7 +1791,13 @@ public class SettingsTabController : ITabController, IDisposable
                         {
                             Log.Debug("[UI] Peer toggle ON | peer={Ip} prevConnected={Prev}", peerIp, _ctx.ConnectedPeerIp ?? "none");
                             _connectingPeerIp = peerIp;
-                            _ = _ctx.ConnectToPeerAsync(peer);
+                            _ = _ctx.ConnectToPeerAsync(peer).ContinueWith(_ =>
+                            {
+                                // Clear connecting state on completion (success or failure)
+                                // so the toggle doesn't stick in the "connecting" position.
+                                _connectingPeerIp = null;
+                                _ctx.InvalidateCanvas();
+                            }, TaskScheduler.Default);
                         }
                         _ctx.InvalidateCanvas();
                         return;

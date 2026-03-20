@@ -438,4 +438,48 @@ public static class FUIColors
 
     /// <summary>Warning/conflict tint used as a cell background (very subtle).</summary>
     public static SKColor WarningTint => Warning.WithAlpha(AlphaHoverBg);
+
+    // ---------------------------------------------------------------------------
+    // Interactive state helpers — replace the 148+ inline hover ternaries.
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Returns Active when hovered, otherwise TextDim. Most common button/label pattern.</summary>
+    public static SKColor InteractiveColor(bool hovered) => hovered ? Active : TextDim;
+
+    /// <summary>Returns Active when hovered, otherwise TextPrimary. For content that is always visible.</summary>
+    public static SKColor ContentColor(bool hovered) => hovered ? Active : TextPrimary;
+
+    /// <summary>Returns TextBright when hovered, otherwise TextDim. For secondary interactive elements.</summary>
+    public static SKColor SecondaryColor(bool hovered) => hovered ? TextBright : TextDim;
+
+    /// <summary>Frame colour: brighter when hovered.</summary>
+    public static SKColor FrameColor(bool hovered) => hovered ? FrameBright : Frame;
+
+    // ---------------------------------------------------------------------------
+    // Additional semantic compounds — common alpha patterns extracted from render code.
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Active colour at ghost alpha — subtle tint for inactive indicators.</summary>
+    public static SKColor ActiveGhost => Active.WithAlpha(AlphaGhost);
+
+    /// <summary>Active colour at light tint — soft hover overlay.</summary>
+    public static SKColor ActiveLight => Active.WithAlpha(AlphaLightTint);
+
+    /// <summary>Active colour at panel subtle — collapsed panel indicators.</summary>
+    public static SKColor ActiveSubtle => Active.WithAlpha(AlphaPanelSubtle);
+
+    /// <summary>Active colour at strong — open/expanded indicators.</summary>
+    public static SKColor ActiveStrong => Active.WithAlpha(AlphaPanelStrong);
+
+    /// <summary>Frame at subtle alpha — light separators, column dividers.</summary>
+    public static SKColor FrameSubtle => Frame.WithAlpha(50);
+
+    /// <summary>Frame at hover-bg alpha — very subtle grid lines.</summary>
+    public static SKColor FrameGhost => Frame.WithAlpha(AlphaHoverBg);
+
+    /// <summary>Background2 at glow alpha — disabled control backgrounds.</summary>
+    public static SKColor DisabledBg => Background2.WithAlpha(AlphaGlow);
+
+    /// <summary>TextDim at panel-subtle alpha — disabled text.</summary>
+    public static SKColor TextDimSubtle => TextDim.WithAlpha(AlphaPanelSubtle);
 }

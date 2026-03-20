@@ -199,6 +199,16 @@ public static class FUIRenderer
     public const float BadgeHeightStandard = 20f;  // Standard badges (binding display)
     public const float DropdownItemHeight = 28f;   // Dropdown/list item row height
 
+    // Layout constants — shared sizing for panels, rows, and buttons
+    public const float RowHeight = 28f;            // Standard list/grid row height
+    public const float RowGap = 2f;                // Gap between adjacent rows
+    public const float CategoryHeaderHeight = 28f; // Category/section header row
+    public const float CollapsedPanelHeight = 52f; // Collapsed panel header-only height
+    public const float ButtonHeight = 32f;         // Standard action button
+    public const float ButtonHeightSmall = 24f;    // Compact inline button
+    public const float SelectorHeight = 32f;       // Dropdown selector control
+    public const float PanelHeaderHeight = 52f;    // Collapsible panel header click area
+
     // Line heights for proper text spacing
     public const float LineHeightCaption = 19f;
     public const float LineHeightBody = 23f;

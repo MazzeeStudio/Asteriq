@@ -26,7 +26,7 @@ public partial class SCBindingsTabController
         //   3. Column Actions or Cell Details (contextual, bottom-anchored, mutually exclusive)
         float verticalGap = 8f;
         float installationHeight = 90f;
-        const float CollapsedPanelH = 52f;
+
 
         var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
             rightBounds.Right, rightBounds.Top + installationHeight);
@@ -51,14 +51,14 @@ public partial class SCBindingsTabController
         {
             // Contextual panel expanded: Control Profiles = collapsed header at top, contextual fills the rest
             controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
-                rightBounds.Right, afterInstall + CollapsedPanelH);
+                rightBounds.Right, afterInstall + FUIRenderer.CollapsedPanelHeight);
             contextualBounds = new SKRect(rightBounds.Left, controlProfilesBounds.Bottom + verticalGap,
                 rightBounds.Right, bottomAreaBottom);
         }
         else if (hasContextualPanel && _cpPanel.IsExpanded)
         {
             // Control Profiles expanded: contextual = collapsed header at bottom, CP fills the rest
-            contextualBounds = new SKRect(rightBounds.Left, bottomAreaBottom - CollapsedPanelH,
+            contextualBounds = new SKRect(rightBounds.Left, bottomAreaBottom - FUIRenderer.CollapsedPanelHeight,
                 rightBounds.Right, bottomAreaBottom);
             controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
                 rightBounds.Right, contextualBounds.Top - verticalGap);
@@ -801,36 +801,35 @@ public partial class SCBindingsTabController
     private void DrawSCExportPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset,
         bool isExpanded = true, bool isCollapsible = false)
     {
-        float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
-        float y = m.Y;
-        float leftMargin = m.LeftMargin;
-        float rightMargin = m.RightMargin;
-        float buttonGap = 6f;
+        float y, leftMargin, rightMargin;
 
-        // Header bounds for click-to-expand handling
-        _cpPanel.HeaderBounds = isCollapsible
-            ? new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f)
-            : SKRect.Empty;
-        bool headerHovered = isCollapsible && !isExpanded
-            && _cpPanel.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "CONTROL PROFILES");
-
-        // Expand/collapse indicator (only shown when collapsible)
         if (isCollapsible)
         {
-            string indicator = isExpanded ? "-" : "+";
-            float indW = FUIRenderer.MeasureText(indicator, 13f);
-            FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
-                headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isExpanded ? (byte)100 : (byte)180),
-                13f, true);
+            bool headerHovered = !isExpanded
+                && new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + FUIRenderer.PanelHeaderHeight)
+                    .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "CONTROL PROFILES",
+                isExpanded, headerHovered, out var hdrBounds);
+            _cpPanel.HeaderBounds = hdrBounds;
+            if (!isExpanded) return;
+            y = m.Y;
+            leftMargin = m.LeftMargin;
+            rightMargin = m.RightMargin;
+        }
+        else
+        {
+            _cpPanel.HeaderBounds = SKRect.Empty;
+            var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+            y = m.Y;
+            leftMargin = m.LeftMargin;
+            rightMargin = m.RightMargin;
+            FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "CONTROL PROFILES");
         }
 
-        if (!isExpanded) return;
+        float buttonGap = 6f;
 
         // Control Profile dropdown (full width)
-        float dropdownHeight = 32f;
+        float dropdownHeight = FUIRenderer.SelectorHeight;
         _profileMgmt.DropdownBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
         bool dropdownHovered = _profileMgmt.DropdownBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName)
@@ -1427,26 +1426,16 @@ public partial class SCBindingsTabController
 
         var col = _grid.Columns[_colImport.HighlightedColumn];
 
-        float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        bool headerHovered = !isExpanded
+            && new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + FUIRenderer.PanelHeaderHeight)
+                .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "COLUMN ACTIONS",
+            isExpanded, headerHovered, out var hdrBounds);
+        _colImport.HeaderBounds = hdrBounds;
+        if (!isExpanded) return;
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
-
-        // Header bounds for click-to-collapse
-        _colImport.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
-
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "COLUMN ACTIONS");
-
-        // Expand/collapse indicator
-        string indicator = isExpanded ? "-" : "+";
-        float indW = FUIRenderer.MeasureText(indicator, 13f);
-        bool headerHovered = !isExpanded && _colImport.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
-            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isExpanded ? (byte)100 : (byte)180),
-            13f, true);
-
-        if (!isExpanded) return;
 
         y += 14f;
 
@@ -1596,26 +1585,16 @@ public partial class SCBindingsTabController
         if (_scFilteredActions is null || _cell.SelectedCell.actionIndex < 0 || _cell.SelectedCell.actionIndex >= _scFilteredActions.Count)
             return;
 
-        float cornerLen = isExpanded ? 30f : Math.Min(16f, bounds.Height * 0.35f);
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds, cornerLength: cornerLen);
+        bool headerHovered = !isExpanded
+            && new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + FUIRenderer.PanelHeaderHeight)
+                .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "BINDING DETAILS",
+            isExpanded, headerHovered, out var hdrBounds);
+        _cellDetails.HeaderBounds = hdrBounds;
+        if (!isExpanded) return;
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
-
-        // Header bounds for click-to-collapse
-        _cellDetails.HeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + 52f);
-
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "BINDING DETAILS");
-
-        // Expand/collapse indicator
-        string indicator = isExpanded ? "-" : "+";
-        float indW = FUIRenderer.MeasureText(indicator, 13f);
-        bool headerHovered = !isExpanded && _cellDetails.HeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawText(canvas, indicator, new SKPoint(rightMargin - indW, y - 18f),
-            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(isExpanded ? (byte)100 : (byte)180),
-            13f, true);
-
-        if (!isExpanded) return;
 
         y += 14f;
 

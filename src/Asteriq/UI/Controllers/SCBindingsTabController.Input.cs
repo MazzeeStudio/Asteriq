@@ -381,13 +381,13 @@ public partial class SCBindingsTabController
         }
         if (!_colImport.HeaderBounds.IsEmpty && _colImport.HeaderBounds.Contains(point) && showColumnActions)
         {
-            _cpPanel.IsExpanded = false; // Collapse Control Profiles, expand Column Actions
+            _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
             _ctx.MarkDirty();
             return;
         }
         if (!_cellDetails.HeaderBounds.IsEmpty && _cellDetails.HeaderBounds.Contains(point))
         {
-            _cpPanel.IsExpanded = false; // Collapse Control Profiles, expand Cell Details
+            _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
             _ctx.MarkDirty();
             return;
         }

@@ -7,8 +7,8 @@ using System.Drawing.Imaging;
 namespace Asteriq.UI;
 
 /// <summary>
-/// Manages the system tray icon with color-changing based on forwarding state.
-/// Colorizes the Asteriq logo based on forwarding state and current theme.
+/// Manages the system tray icon. Active colour (green) when forwarding,
+/// theme-aware colour (dark/light) when idle. Form icon always uses Active colour.
 /// </summary>
 public sealed class SystemTrayIcon : IDisposable
 {

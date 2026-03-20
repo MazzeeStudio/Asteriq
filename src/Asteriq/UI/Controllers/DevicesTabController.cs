@@ -309,6 +309,10 @@ public class DevicesTabController : ITabController
             _actions.HideFromViewHovered || _silhouette.RemoveVJoyHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
+        // "Include hidden" checkbox cursor
+        if (!_showHiddenCheckboxBounds.IsEmpty && _showHiddenCheckboxBounds.Contains(e.X, e.Y))
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+
         // Forwarding button hover detection
         _forwarding.StartHovered = !_forwarding.StartBounds.IsEmpty && _forwarding.StartBounds.Contains(e.X, e.Y);
         _forwarding.StopHovered = !_forwarding.StopBounds.IsEmpty && _forwarding.StopBounds.Contains(e.X, e.Y);

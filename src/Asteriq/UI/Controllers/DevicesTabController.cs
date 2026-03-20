@@ -1,4 +1,4 @@
-using Asteriq.Models;
+﻿using Asteriq.Models;
 using Asteriq.Services;
 using SkiaSharp;
 using Svg.Skia;
@@ -467,6 +467,23 @@ public class DevicesTabController : ITabController
         string categoryName = _devCat.Active == 0 ? "DEVICES" : "DEVICES";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
+        // Complete pending hide after delay
+        const float HideDelaySec = 0.5f;
+        if (_pendingHideGuid is not null)
+        {
+            float elapsed = (float)(DateTime.Now - _pendingHideTime).TotalSeconds;
+            if (elapsed >= HideDelaySec)
+            {
+                _ctx.AppSettings.SetDeviceHidden(_pendingHideGuid, true);
+                _pendingHideGuid = null;
+                EnsureVisibleDeviceSelected();
+            }
+            else
+            {
+                _ctx.MarkDirty(); // keep rendering until delay completes
+            }
+        }
+
         var filteredDevices = _devCat.Active == 0
             ? _ctx.Devices.Where(d => !d.IsVirtual &&
                 (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))).ToList()
@@ -819,7 +836,8 @@ public class DevicesTabController : ITabController
 
                 // Hide Device — Asteriq-level UI preference, bottom-anchored (separate from HidHide driver hiding)
                 {
-                    bool isHiddenFromView = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
+                    bool isHiddenFromView = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString())
+                        || _pendingHideGuid == device.InstanceGuid.ToString();
                     const float cbSize = 14f;
                     float rowCenterY = contentBounds.Bottom - pad - cbSize / 2f;
                     float cbX = contentBounds.Right - pad - cbSize;
@@ -1081,13 +1099,28 @@ public class DevicesTabController : ITabController
 
     #region vJoy Device Management
 
+    // Pending hide — guid of device waiting to be hidden after visual delay
+    private string? _pendingHideGuid;
+    private DateTime _pendingHideTime;
+
     private void ToggleHideFromView()
     {
         if (_ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count) return;
         var device = _ctx.Devices[_ctx.SelectedDevice];
-        bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
-        _ctx.AppSettings.SetDeviceHidden(device.InstanceGuid.ToString(), !currentlyHidden);
-        EnsureVisibleDeviceSelected();
+        string guid = device.InstanceGuid.ToString();
+        bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(guid);
+
+        if (currentlyHidden)
+        {
+            _ctx.AppSettings.SetDeviceHidden(guid, false);
+            _pendingHideGuid = null;
+        }
+        else
+        {
+            // Mark pending — device stays visible in both D1 and D3 until delay elapses
+            _pendingHideGuid = guid;
+            _pendingHideTime = DateTime.Now;
+        }
         _ctx.MarkDirty();
     }
 

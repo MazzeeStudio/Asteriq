@@ -34,12 +34,7 @@ public partial class SCBindingsTabController
         }
 
         // Column actions panel is only active when a vJoy (non-physical, non-readonly joystick) column is highlighted
-        bool showColumnActions = _colImport.HighlightedColumn >= 0
-            && _grid.Columns is not null
-            && _colImport.HighlightedColumn < _grid.Columns.Count
-            && _grid.Columns[_colImport.HighlightedColumn].IsJoystick
-            && !_grid.Columns[_colImport.HighlightedColumn].IsPhysical
-            && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
+        bool showColumnActions = IsColumnActionsVisible();
 
         // Column actions panel interactions — all guarded so stale bounds never intercept other panel clicks
         if (showColumnActions)
@@ -149,6 +144,7 @@ public partial class SCBindingsTabController
                 if (_colImport.HighlightedColumn == clickedCol)
                 {
                     DeselectColumn();
+                    _cpPanel.IsExpanded = true;
                 }
                 else
                 {
@@ -160,6 +156,7 @@ public partial class SCBindingsTabController
                     _colImport.SourceColumns.Clear();
                     _colImport.ProfileDropdownOpen = false;
                     _colImport.ColumnDropdownOpen = false;
+                    _cpPanel.IsExpanded = false; // Auto-expand Column Actions
                     _ctx.MarkDirty();
                 }
                 return;
@@ -328,82 +325,55 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Device Order panel — dropdown open/close
-        if (_deviceOrder.OpenRow >= 0)
+        // Panel header clicks — Control Profiles / contextual panel mutual-exclusive expand
+        if (!_cpPanel.HeaderBounds.IsEmpty && _cpPanel.HeaderBounds.Contains(point))
         {
-            if (!_deviceOrder.DropdownBounds.IsEmpty && _deviceOrder.DropdownBounds.Contains(point))
+            // Toggle Control Profiles expand — contextual panel stays visible but collapses
+            _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
+            _ctx.MarkDirty();
+            return;
+        }
+        if (!_colImport.HeaderBounds.IsEmpty && _colImport.HeaderBounds.Contains(point) && showColumnActions)
+        {
+            _cpPanel.IsExpanded = false; // Collapse Control Profiles, expand Column Actions
+            _ctx.MarkDirty();
+            return;
+        }
+        if (!_cellDetails.HeaderBounds.IsEmpty && _cellDetails.HeaderBounds.Contains(point))
+        {
+            _cpPanel.IsExpanded = false; // Collapse Control Profiles, expand Cell Details
+            _ctx.MarkDirty();
+            return;
+        }
+
+        // Activation mode segmented control clicks (Cell Details panel)
+        if (_cell.SelectedCell.actionIndex >= 0 && _cell.SelectedCell.colIndex >= 0
+            && _scFilteredActions is not null && _cell.SelectedCell.actionIndex < _scFilteredActions.Count
+            && !_cpPanel.IsExpanded)
+        {
+            var action = _scFilteredActions[_cell.SelectedCell.actionIndex];
+            if (_grid.Columns is not null && _cell.SelectedCell.colIndex < _grid.Columns.Count)
             {
-                // Click inside open dropdown: select a vJoy slot for this row's SC instance
-                float itemH = 28f;
-                int idx = (int)((point.Y - _deviceOrder.DropdownBounds.Top) / itemH);
-                var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
-                if (idx >= 0 && idx < existingSlots.Count)
-                    AssignDeviceOrderSlot(_deviceOrder.OpenRow + 1, existingSlots[idx].Id);
-                _deviceOrder.OpenRow = -1;
-                _deviceOrder.HoveredIndex = -1;
-                _ctx.MarkDirty();
-                return;
-            }
-            else
-            {
-                // Click outside dropdown — close it
-                _deviceOrder.OpenRow = -1;
-                _deviceOrder.HoveredIndex = -1;
-                _ctx.MarkDirty();
-                // If the click landed on a row selector, return now to prevent the
-                // row selector loop below from immediately re-opening the dropdown
-                for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
+                var col = _grid.Columns[_cell.SelectedCell.colIndex];
+                var binding = FindBindingForCell(action, col);
+                if (binding is not null)
                 {
-                    if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(point))
-                        return;
+                    for (int i = 0; i < _cellDetails.ActivationModeBounds.Length; i++)
+                    {
+                        if (!_cellDetails.ActivationModeBounds[i].IsEmpty && _cellDetails.ActivationModeBounds[i].Contains(point))
+                        {
+                            var newMode = (SCActivationMode)i;
+                            if (binding.ActivationMode != newMode)
+                            {
+                                binding.ActivationMode = newMode;
+                                if (!string.IsNullOrEmpty(_scExportProfile.ProfileName))
+                                    _scExportProfileService.SaveProfile(_scExportProfile);
+                                _ctx.MarkDirty();
+                            }
+                            return;
+                        }
+                    }
                 }
-                // Otherwise fall through so other panel clicks still work
-            }
-        }
-
-        // Panel header clicks — Device Order / Control Profiles mutual-exclusive expand
-        if (!_deviceOrder.HeaderBounds.IsEmpty && _deviceOrder.HeaderBounds.Contains(point))
-        {
-            if (!_deviceOrder.IsExpanded)
-            {
-                _deviceOrder.IsExpanded = true;
-                _deviceOrder.OpenRow = -1;
-                _ctx.MarkDirty();
-            }
-            return;
-        }
-        if (!_deviceOrder.ControlProfilesHeaderBounds.IsEmpty && _deviceOrder.ControlProfilesHeaderBounds.Contains(point))
-        {
-            if (_deviceOrder.IsExpanded)
-            {
-                _deviceOrder.IsExpanded = false;
-                _ctx.MarkDirty();
-            }
-            return;
-        }
-
-        // Device Order panel — auto-detect button (only when expanded)
-        if (_deviceOrder.IsExpanded && !_deviceOrder.AutoDetectBounds.IsEmpty && _deviceOrder.AutoDetectBounds.Contains(point)
-            && _directInputService is not null)
-        {
-            RunDeviceOrderAutoDetect();
-            return;
-        }
-
-        // Device Order panel — row selector clicks (only when expanded)
-        if (_deviceOrder.IsExpanded)
-        for (int row = 0; row < _deviceOrder.SelectorBounds.Length; row++)
-        {
-            if (!_deviceOrder.SelectorBounds[row].IsEmpty && _deviceOrder.SelectorBounds[row].Contains(point))
-            {
-                int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
-                if (vjoyCount > 1) // no point opening a single-item dropdown
-                {
-                    _deviceOrder.OpenRow = _deviceOrder.OpenRow == row ? -1 : row;
-                    _deviceOrder.HoveredIndex = -1;
-                    _ctx.MarkDirty();
-                }
-                return;
             }
         }
 
@@ -773,6 +743,8 @@ public partial class SCBindingsTabController
                         _scListening.IsListening = false;
                         _conflicts.ConflictLinks.Clear();
                         _conflicts.ConflictLinkBounds.Clear();
+                        if (_colImport.HighlightedColumn < 0)
+                            _cpPanel.IsExpanded = true;
                     }
                     return;
                 }
@@ -783,6 +755,8 @@ public partial class SCBindingsTabController
             // Click was in list area but not on a row - clear selection
             _cell.SelectedCell = (-1, -1);
             _scListening.IsListening = false;
+            if (_colImport.HighlightedColumn < 0)
+                _cpPanel.IsExpanded = true;
         }
     }
 
@@ -841,6 +815,7 @@ public partial class SCBindingsTabController
                     DeselectColumn();
                 _cell.SelectedCell = (actionIndex, colIndex);
                 _cell.LastCellClickTime = DateTime.Now;
+                _cpPanel.IsExpanded = false; // Auto-expand Cell Details
                 UpdateConflictLinks();
                 return;
             }
@@ -881,6 +856,7 @@ public partial class SCBindingsTabController
             _cell.SelectedCell = (actionIndex, colIndex);
             _cell.LastCellClickTime = DateTime.Now;
             _conflicts.HighlightActionIndex = -1;
+            _cpPanel.IsExpanded = false; // Auto-expand Cell Details
             UpdateConflictLinks();
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected cell ({actionIndex}, {colIndex}) - {col.Header}");
         }

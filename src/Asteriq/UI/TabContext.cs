@@ -98,6 +98,12 @@ public class TabContext
     public Action? OpenDriverSetup { get; set; }
     public Action? RefreshVJoyDevices { get; set; }
 
+    /// <summary>
+    /// Returns the active SC export profile from the Keybindings tab.
+    /// Used by the Mappings tab to read/write Device Order (VJoyToSCInstance).
+    /// </summary>
+    public Func<SCExportProfile?>? GetActiveSCExportProfile { get; set; }
+
     // Network forwarding (set after construction by MainForm)
     public INetworkDiscoveryService? NetworkDiscovery { get; set; }
     public INetworkInputService? NetworkInput { get; set; }

@@ -28,7 +28,8 @@ public partial class SCBindingsTabController : ITabController
     private readonly InputListeningState _scListening = new();
     private readonly ColumnImportState _colImport = new();
     private readonly ConflictState _conflicts = new();
-    private readonly DeviceOrderState _deviceOrder = new();
+    private readonly ControlProfilesPanelState _cpPanel = new();
+    private readonly CellDetailsState _cellDetails = new();
     private readonly ProfileMgmtState _profileMgmt = new();
     private readonly SearchFilterState _searchFilter = new();
     private readonly ScrollState _scroll = new();
@@ -120,6 +121,7 @@ public partial class SCBindingsTabController : ITabController
     public bool IsDraggingSearchSelection => _searchFilter.SearchDragging;
     public bool IsSearchBoxFocused => _searchFilter.SearchBoxFocused;
     public bool IsExportFilenameBoxFocused => _scExportFilenameBoxFocused;
+    public SCExportProfile ActiveSCExportProfile => _scExportProfile;
 
     public SCBindingsTabController(
         TabContext ctx,
@@ -398,53 +400,36 @@ public partial class SCBindingsTabController : ITabController
         }
 
         // Panel header hover (collapsed panel expand buttons)
-        bool overDevOrderHeader = !_deviceOrder.IsExpanded
-            && !_deviceOrder.HeaderBounds.IsEmpty
-            && _deviceOrder.HeaderBounds.Contains(e.X, e.Y);
-        bool overCPHeader = _deviceOrder.IsExpanded
-            && !_deviceOrder.ControlProfilesHeaderBounds.IsEmpty
-            && _deviceOrder.ControlProfilesHeaderBounds.Contains(e.X, e.Y);
-        if (overDevOrderHeader || overCPHeader)
+        bool overCPHeader = !_cpPanel.IsExpanded
+            && !_cpPanel.HeaderBounds.IsEmpty
+            && _cpPanel.HeaderBounds.Contains(e.X, e.Y);
+        bool overColActionsHeader = _cpPanel.IsExpanded
+            && !_colImport.HeaderBounds.IsEmpty
+            && _colImport.HeaderBounds.Contains(e.X, e.Y);
+        bool overCellDetailsHeader = _cpPanel.IsExpanded
+            && !_cellDetails.HeaderBounds.IsEmpty
+            && _cellDetails.HeaderBounds.Contains(e.X, e.Y);
+        if (overCPHeader || overColActionsHeader || overCellDetailsHeader)
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             _ctx.MarkDirty();
         }
 
-        // Device Order auto-detect button hover
-        _deviceOrder.AutoDetectHovered = !_deviceOrder.AutoDetectBounds.IsEmpty
-            && _deviceOrder.AutoDetectBounds.Contains(e.X, e.Y);
-        if (_deviceOrder.AutoDetectHovered)
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-
-        // Device Order row selector hover
-        for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
+        // Activation mode segment hover (Cell Details)
         {
-            if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(e.X, e.Y))
+            int prevHovered = _cellDetails.HoveredModeIndex;
+            _cellDetails.HoveredModeIndex = -1;
+            for (int i = 0; i < _cellDetails.ActivationModeBounds.Length; i++)
             {
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                break;
+                if (!_cellDetails.ActivationModeBounds[i].IsEmpty && _cellDetails.ActivationModeBounds[i].Contains(e.X, e.Y))
+                {
+                    _cellDetails.HoveredModeIndex = i;
+                    _ctx.OwnerForm.Cursor = Cursors.Hand;
+                    break;
+                }
             }
-        }
-
-        // Device Order open dropdown hover
-        if (_deviceOrder.OpenRow >= 0 && !_deviceOrder.DropdownBounds.IsEmpty
-            && _deviceOrder.DropdownBounds.Contains(e.X, e.Y))
-        {
-            float itemH = 28f;
-            int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
-            int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
-            int newHovered = idx >= 0 && idx < vjoyCount ? idx : -1;
-            if (newHovered != _deviceOrder.HoveredIndex)
-            {
-                _deviceOrder.HoveredIndex = newHovered;
+            if (_cellDetails.HoveredModeIndex != prevHovered)
                 _ctx.MarkDirty();
-            }
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
-        else if (_deviceOrder.OpenRow >= 0 && _deviceOrder.HoveredIndex >= 0)
-        {
-            _deviceOrder.HoveredIndex = -1;
-            _ctx.MarkDirty();
         }
 
         // Conflict link hover tracking
@@ -488,12 +473,7 @@ public partial class SCBindingsTabController : ITabController
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
-        bool showColumnActions = _colImport.HighlightedColumn >= 0
-            && _grid.Columns is not null
-            && _colImport.HighlightedColumn < _grid.Columns.Count
-            && _grid.Columns[_colImport.HighlightedColumn].IsJoystick
-            && !_grid.Columns[_colImport.HighlightedColumn].IsPhysical
-            && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
+        bool showColumnActions = IsColumnActionsVisible();
 
         // Import profile dropdown hover
         if (showColumnActions && _colImport.ProfileDropdownOpen
@@ -720,6 +700,7 @@ public partial class SCBindingsTabController : ITabController
     private sealed class ColumnImportState
     {
         public int HighlightedColumn = -1;
+        public SKRect HeaderBounds;
         public int ProfileIndex = -1;
         public bool ProfileDropdownOpen;
         public SKRect ProfileSelectorBounds;
@@ -751,17 +732,17 @@ public partial class SCBindingsTabController : ITabController
         public HashSet<string> NetworkConflictKeys = new();
     }
 
-    private sealed class DeviceOrderState
+    private sealed class ControlProfilesPanelState
     {
-        public int OpenRow = -1;
-        public SKRect[] SelectorBounds = Array.Empty<SKRect>();
-        public SKRect DropdownBounds = SKRect.Empty;
-        public int HoveredIndex = -1;
-        public SKRect AutoDetectBounds = SKRect.Empty;
-        public bool AutoDetectHovered;
-        public bool IsExpanded;
+        public bool IsExpanded = true;
         public SKRect HeaderBounds;
-        public SKRect ControlProfilesHeaderBounds;
+    }
+
+    private sealed class CellDetailsState
+    {
+        public SKRect HeaderBounds;
+        public SKRect[] ActivationModeBounds = new SKRect[5];
+        public int HoveredModeIndex = -1;
     }
 
     private sealed class ProfileMgmtState

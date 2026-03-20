@@ -1048,6 +1048,84 @@ internal static class FUIWidgets
         canvas.Restore();
     }
 
+    // ─── Segmented Control ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws a horizontal segmented control — a row of mutually exclusive segments
+    /// where exactly one can be selected. Returns the bounds of each segment for
+    /// hit-testing in the caller's input handler.
+    /// </summary>
+    /// <param name="selectedIndex">0-based index of the active segment, or -1 for none.</param>
+    /// <param name="hoveredIndex">0-based index of the hovered segment, or -1 for none.</param>
+    /// <param name="enabled">When false, all segments render dimmed and non-interactive.</param>
+    internal static SKRect[] DrawSegmentedControl(
+        SKCanvas canvas,
+        SKRect bounds,
+        string[] labels,
+        int selectedIndex,
+        int hoveredIndex,
+        bool enabled = true)
+    {
+        int count = labels.Length;
+        if (count == 0) return Array.Empty<SKRect>();
+
+        float segWidth = bounds.Width / count;
+        var segmentBounds = new SKRect[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            var seg = new SKRect(bounds.Left + i * segWidth, bounds.Top,
+                bounds.Left + (i + 1) * segWidth, bounds.Bottom);
+            segmentBounds[i] = seg;
+
+            bool isSelected = i == selectedIndex;
+            bool isHovered = enabled && i == hoveredIndex;
+
+            // Background
+            SKColor bgColor;
+            if (!enabled)
+                bgColor = FUIColors.Background1.WithAlpha(80);
+            else if (isSelected)
+                bgColor = FUIColors.Active.WithAlpha(60);
+            else if (isHovered)
+                bgColor = FUIColors.Background2.WithAlpha(200);
+            else
+                bgColor = FUIColors.Background1.WithAlpha(150);
+
+            using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
+            canvas.DrawRect(seg, bgPaint);
+
+            // Frame
+            SKColor frameColor;
+            if (!enabled)
+                frameColor = FUIColors.Frame.WithAlpha(60);
+            else if (isSelected)
+                frameColor = FUIColors.Active;
+            else if (isHovered)
+                frameColor = FUIColors.FrameBright;
+            else
+                frameColor = FUIColors.Frame;
+
+            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, isSelected ? 1.5f : 1f);
+            canvas.DrawRect(seg, framePaint);
+
+            // Text
+            SKColor textColor;
+            if (!enabled)
+                textColor = FUIColors.TextDim.WithAlpha(100);
+            else if (isSelected)
+                textColor = FUIColors.TextBright;
+            else if (isHovered)
+                textColor = FUIColors.TextPrimary;
+            else
+                textColor = FUIColors.TextDim;
+
+            FUIRenderer.DrawTextCentered(canvas, labels[i], seg, textColor, 11f, true);
+        }
+
+        return segmentBounds;
+    }
+
     // ─── Network Mode Indicator ───────────────────────────────────────────────
 
     /// <summary>

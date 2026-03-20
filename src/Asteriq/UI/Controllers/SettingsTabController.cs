@@ -749,15 +749,15 @@ public class SettingsTabController : ITabController, IDisposable
 
     private void DrawVisualSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        bool headerHovered = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH)
+            .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "VISUAL", true, headerHovered, out var hdrBounds);
+        _visualPanelHeaderBounds = hdrBounds;
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
         float contentWidth = m.ContentWidth;
         float sectionSpacing = 16f;
-
-        FUIRenderer.DrawText(canvas, "VISUAL", new SKPoint(leftMargin, y), FUIColors.TextBright, FUIRenderer.FontBody, true);
-        y += 32f;
 
         // Theme section
         float themeLabelWidth = 36f;
@@ -1032,7 +1032,6 @@ public class SettingsTabController : ITabController, IDisposable
             _networkPanelHeaderBounds = SKRect.Empty;
             _hidHidePanelHeaderBounds = SKRect.Empty;
             DrawVisualSettingsSubPanel(canvas, bounds, frameInset);
-            _visualPanelHeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH);
             return;
         }
 
@@ -1054,11 +1053,6 @@ public class SettingsTabController : ITabController, IDisposable
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, hidHideTop - gap);
                 var hidHideBounds = new SKRect(bounds.Left, hidHideTop, bounds.Right, bounds.Bottom);
                 DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
-                _visualPanelHeaderBounds = new SKRect(visualBounds.Left, visualBounds.Top, visualBounds.Right, visualBounds.Top + RightPanelCollapsedH);
-                bool visHov = _visualPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                float indW = FUIRenderer.MeasureText("-", 13f);
-                FUIRenderer.DrawText(canvas, "-", new SKPoint(visualBounds.Right - FUIRenderer.FrameInset - indW, visualBounds.Top + FUIRenderer.FrameInset + 18f),
-                    visHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
                 DrawHidHidePanelCollapsed(canvas, hidHideBounds);
             }
             return;
@@ -1082,11 +1076,6 @@ public class SettingsTabController : ITabController, IDisposable
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, netTop - gap);
                 var networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, bounds.Bottom);
                 DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
-                _visualPanelHeaderBounds = new SKRect(visualBounds.Left, visualBounds.Top, visualBounds.Right, visualBounds.Top + RightPanelCollapsedH);
-                bool visHov = _visualPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                float indW = FUIRenderer.MeasureText("-", 13f);
-                FUIRenderer.DrawText(canvas, "-", new SKPoint(visualBounds.Right - FUIRenderer.FrameInset - indW, visualBounds.Top + FUIRenderer.FrameInset + 18f),
-                    visHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
                 DrawNetworkPanelCollapsed(canvas, networkBounds);
             }
             return;
@@ -1122,11 +1111,6 @@ public class SettingsTabController : ITabController, IDisposable
             if (visExpanded)
             {
                 DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
-                _visualPanelHeaderBounds = new SKRect(visualBounds.Left, visualBounds.Top, visualBounds.Right, visualBounds.Top + RightPanelCollapsedH);
-                bool visHov = _visualPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                float indW = FUIRenderer.MeasureText("-", 13f);
-                FUIRenderer.DrawText(canvas, "-", new SKPoint(visualBounds.Right - FUIRenderer.FrameInset - indW, visualBounds.Top + FUIRenderer.FrameInset + 18f),
-                    visHov ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
             }
             else
                 DrawVisualPanelCollapsed(canvas, visualBounds);
@@ -1154,46 +1138,32 @@ public class SettingsTabController : ITabController, IDisposable
 
     private void DrawVisualPanelCollapsed(SKCanvas canvas, SKRect bounds)
     {
-        // Clear theme button bounds so stale rects don't receive clicks
         Array.Clear(_themeButtonBounds, 0, _themeButtonBounds.Length);
-
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
-        float y = m.Y;
         bool hovered = bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "VISUAL", false, hovered, out _);
         _visualPanelHeaderBounds = bounds;
-        FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "VISUAL");
-        float indW = FUIRenderer.MeasureText("+", 13f);
-        FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
-            hovered ? FUIColors.TextBright : FUIColors.ActiveStrong, 13f, true);
     }
 
     private void DrawNetworkPanelCollapsed(SKCanvas canvas, SKRect bounds)
     {
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
-        float y = m.Y;
         bool hovered = bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "NETWORK", false, hovered, out _);
         _networkPanelHeaderBounds = bounds;
-        FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "NETWORK");
-        float indW = FUIRenderer.MeasureText("+", 13f);
-        FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
-            hovered ? FUIColors.TextBright : FUIColors.ActiveStrong, 13f, true);
     }
 
     private void DrawHidHidePanelCollapsed(SKCanvas canvas, SKRect bounds)
     {
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
-        float y = m.Y;
         bool hovered = bounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "HIDHIDE", false, hovered, out _);
         _hidHidePanelHeaderBounds = bounds;
-        FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "HIDHIDE");
-        float indW = FUIRenderer.MeasureText("+", 13f);
-        FUIRenderer.DrawText(canvas, "+", new SKPoint(m.RightMargin - indW, y - 18f),
-            hovered ? FUIColors.TextBright : FUIColors.ActiveStrong, 13f, true);
     }
 
     private void DrawHidHideSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        bool headerHovered = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH)
+            .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "HIDHIDE", true, headerHovered, out var hdrBounds);
+        _hidHidePanelHeaderBounds = hdrBounds;
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
@@ -1203,13 +1173,6 @@ public class SettingsTabController : ITabController, IDisposable
 
         canvas.Save();
         canvas.ClipRect(bounds.Inset(2f, 2f));
-
-        _hidHidePanelHeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH);
-        bool headerHovered = _hidHidePanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "HIDHIDE");
-        float indW = FUIRenderer.MeasureText("-", 13f);
-        FUIRenderer.DrawText(canvas, "-", new SKPoint(rightMargin - indW, y - 18f),
-            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
 
         bool available = _ctx.HidHide?.IsAvailable() ?? false;
 
@@ -1420,26 +1383,21 @@ public class SettingsTabController : ITabController, IDisposable
 
     private void DrawNetworkSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
+        bool headerHovered = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH)
+            .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "NETWORK", true, headerHovered, out var hdrBounds);
+        _networkPanelHeaderBounds = hdrBounds;
         float y = m.Y;
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
         float contentWidth = m.ContentWidth;
-        const float rowH = 26f;      // info rows
-        const float btnH = 24f;      // action button height
+        const float rowH = 26f;
+        const float btnH = 24f;
         const float toggleW = 48f;
-        const float sectionGap = 8f; // gap between logical groups
+        const float sectionGap = 8f;
 
-        // Clip content to prevent overflow when panel is compressed
         canvas.Save();
         canvas.ClipRect(bounds.Inset(2f, 2f));
-
-        _networkPanelHeaderBounds = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH);
-        bool headerHovered = _networkPanelHeaderBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawPanelTitle(canvas, leftMargin, rightMargin, ref y, "NETWORK");
-        float indW = FUIRenderer.MeasureText("-", 13f);
-        FUIRenderer.DrawText(canvas, "-", new SKPoint(rightMargin - indW, y - 18f),
-            headerHovered ? FUIColors.TextBright : FUIColors.Active.WithAlpha(100), 13f, true);
 
         // Machine name + port
         string machineName = string.IsNullOrEmpty(_ctx.AppSettings.NetworkMachineName)

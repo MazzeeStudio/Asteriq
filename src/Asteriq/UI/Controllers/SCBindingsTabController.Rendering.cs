@@ -43,25 +43,25 @@ public partial class SCBindingsTabController
         float afterInstall = installationBounds.Bottom + verticalGap;
         float bottomAreaBottom = rightBounds.Bottom;
 
-        // Layout: one panel is expanded (fills space), the other is collapsed (52px header).
+        // Layout: panels share space with animated split. ExpandT lerps the split position.
+        // T=1: CP fills space, contextual = collapsed header at bottom.
+        // T=0: CP = collapsed header at top, contextual fills space.
         // When no contextual panel exists, Control Profiles fills everything.
         SKRect controlProfilesBounds;
         SKRect contextualBounds = SKRect.Empty;
-        if (hasContextualPanel && !_cpPanel.IsExpanded)
+        if (hasContextualPanel)
         {
-            // Contextual panel expanded: Control Profiles = collapsed header at top, contextual fills the rest
+            float t = _cpPanel.ExpandT;
+            float totalH = bottomAreaBottom - afterInstall;
+            float collapsedH = FUIRenderer.CollapsedPanelHeight;
+
+            // Interpolate CP height between collapsed and full
+            float cpFullH = totalH - collapsedH - verticalGap;
+            float cpH = collapsedH + (cpFullH - collapsedH) * t;
             controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
-                rightBounds.Right, afterInstall + FUIRenderer.CollapsedPanelHeight);
+                rightBounds.Right, afterInstall + cpH);
             contextualBounds = new SKRect(rightBounds.Left, controlProfilesBounds.Bottom + verticalGap,
                 rightBounds.Right, bottomAreaBottom);
-        }
-        else if (hasContextualPanel && _cpPanel.IsExpanded)
-        {
-            // Control Profiles expanded: contextual = collapsed header at bottom, CP fills the rest
-            contextualBounds = new SKRect(rightBounds.Left, bottomAreaBottom - FUIRenderer.CollapsedPanelHeight,
-                rightBounds.Right, bottomAreaBottom);
-            controlProfilesBounds = new SKRect(rightBounds.Left, afterInstall,
-                rightBounds.Right, contextualBounds.Top - verticalGap);
         }
         else
         {
@@ -76,13 +76,14 @@ public partial class SCBindingsTabController
         DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
 
         // RIGHT 2 — Control Profiles
-        bool cpExpanded = !hasContextualPanel || _cpPanel.IsExpanded;
+        // Show content when panel has enough height (threshold slightly above collapsed header)
+        bool cpExpanded = !hasContextualPanel || controlProfilesBounds.Height > FUIRenderer.CollapsedPanelHeight + 20;
         bool cpCollapsible = hasContextualPanel;
         DrawSCExportPanelCompact(canvas, controlProfilesBounds, frameInset,
             isExpanded: cpExpanded, isCollapsible: cpCollapsible);
 
         // RIGHT 3 — Contextual panel (Column Actions or Cell Details)
-        bool contextualExpanded = hasContextualPanel && !_cpPanel.IsExpanded;
+        bool contextualExpanded = hasContextualPanel && contextualBounds.Height > FUIRenderer.CollapsedPanelHeight + 20;
         if (showColumnActions)
             DrawColumnActionsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
         else if (showCellDetails)

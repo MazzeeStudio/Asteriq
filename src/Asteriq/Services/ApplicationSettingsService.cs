@@ -133,6 +133,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool DevicesIncludeHidden
+    {
+        get => _cachedSettings.DevicesIncludeHidden;
+        set
+        {
+            _cachedSettings.DevicesIncludeHidden = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public bool SCBindingsShowBoundOnly
     {
         get => _cachedSettings.SCBindingsShowBoundOnly;
@@ -383,6 +393,8 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public TrustedPeerConfig? TrustedMaster { get; set; }
         /// <summary>SDL instance GUIDs of devices the user has hidden from the Devices list (UI preference only).</summary>
         public List<string> HiddenDeviceGuids { get; set; } = new();
+        /// <summary>Whether the "Include hidden" checkbox in the Devices tab was last enabled.</summary>
+        public bool DevicesIncludeHidden { get; set; } = false;
     }
 
     /// <summary>

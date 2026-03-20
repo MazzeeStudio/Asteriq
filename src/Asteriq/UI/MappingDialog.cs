@@ -636,7 +636,7 @@ public class MappingDialog : FUIBaseDialog
         y += 24;
 
         var inputFrame = new SKRect(pad, y, bounds.Width - pad, y + 50);
-        using (var inputBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(30)))
+        using (var inputBgPaint = FUIRenderer.CreateFillPaint(FUIColors.ActiveLight))
         {
             canvas.DrawRect(inputFrame, inputBgPaint);
         }
@@ -777,7 +777,7 @@ public class MappingDialog : FUIBaseDialog
         buttons.Add(keyCaptureBtn);  // buttonOffset + 0
 
         // Draw the key capture field
-        using (var bgPaint = FUIRenderer.CreateFillPaint(_waitingForKeyCapture ? FUIColors.Active.WithAlpha(40) : FUIColors.Background2))
+        using (var bgPaint = FUIRenderer.CreateFillPaint(_waitingForKeyCapture ? FUIColors.SelectionBg : FUIColors.Background2))
         {
             canvas.DrawRect(keyCaptureBtn, bgPaint);
         }

@@ -108,7 +108,7 @@ public class BindingConflictDialog : FUIBaseDialog
 
         // Draw title bar background with warning tint
         var titleBarBounds = new SKRect(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Top + 40);
-        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+        using var titleBgPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
         canvas.DrawRect(titleBarBounds, titleBgPaint);
 
         // Draw title bar separator
@@ -217,10 +217,10 @@ public class BindingConflictDialog : FUIBaseDialog
     private static void DrawWarningButton(SKCanvas canvas, SKRect bounds, string text, bool hovered)
     {
         // Warning-colored button for "Apply Anyway"
-        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Active.WithAlpha(30));
+        using var bgPaint = FUIRenderer.CreateFillPaint(hovered ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : FUIColors.ActiveLight);
         canvas.DrawRect(bounds, bgPaint);
 
-        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(150));
+        using var borderPaint = FUIRenderer.CreateStrokePaint(hovered ? FUIColors.Active : FUIColors.SelectionBorder);
         canvas.DrawRect(bounds, borderPaint);
 
         // Text centered

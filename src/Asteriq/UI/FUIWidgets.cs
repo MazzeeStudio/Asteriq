@@ -22,7 +22,7 @@ internal static class FUIWidgets
         if (isSelected || isHovered)
         {
             var bgColor = isSelected
-                ? (isDisconnected ? FUIColors.Danger.WithAlpha(20) : FUIColors.Active.WithAlpha(30))
+                ? (isDisconnected ? FUIColors.Danger.WithAlpha(20) : FUIColors.ActiveLight)
                 : FUIColors.Primary.WithAlpha(15);
             FUIRenderer.FillFrame(canvas, itemBounds, bgColor, 6f);
         }
@@ -103,7 +103,7 @@ internal static class FUIWidgets
         float height = 22f;
         var bounds = new SKRect(x, y, x + width, y + height);
         var frameColor = isActive ? FUIColors.Active : FUIColors.FrameDim;
-        var fillColor = isActive ? FUIColors.Active.WithAlpha(40) : SKColors.Transparent;
+        var fillColor = isActive ? FUIColors.SelectionBg : SKColors.Transparent;
 
         FUIRenderer.FillFrame(canvas, bounds, fillColor, 4f);
         FUIRenderer.DrawFrame(canvas, bounds, frameColor, 4f, 1f, isActive);
@@ -334,7 +334,7 @@ internal static class FUIWidgets
         if (fillWidth > 0)
         {
             var fillRect = new SKRect(bounds.Left + 2, trackY + 1, bounds.Left + 2 + fillWidth, trackY + trackHeight - 1);
-            using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(180));
+            using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.ActiveStrong);
             canvas.DrawRoundRect(fillRect, 1, 1, fillPaint);
         }
 
@@ -378,7 +378,7 @@ internal static class FUIWidgets
         if (fillWidth > 2)
         {
             var fillBounds = new SKRect(bounds.Left + 1, bounds.Top + 1, bounds.Left + fillWidth - 1, bounds.Bottom - 1);
-            using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+            using var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBgStrong);
             canvas.DrawRoundRect(fillBounds, 3, 3, fillPaint);
         }
 
@@ -397,7 +397,7 @@ internal static class FUIWidgets
         bool isHovered = bounds.Contains(mousePosition.X, mousePosition.Y);
 
         var bgColor = isChecked
-            ? FUIColors.Active.WithAlpha(60)
+            ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
             : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
         var frameColor = isChecked
             ? FUIColors.Active
@@ -425,7 +425,7 @@ internal static class FUIWidgets
     internal static void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered, float fontSize = 14f, bool scaleFont = true)
     {
         var bgColor = active
-            ? FUIColors.Active.WithAlpha(60)
+            ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
             : (hovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
         var frameColor = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
         var textColor = active ? FUIColors.TextBright : FUIColors.TextDim;
@@ -459,7 +459,7 @@ internal static class FUIWidgets
     internal static void DrawSmallIconButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, bool isDanger = false)
     {
         var bgColor = hovered
-            ? (isDanger ? FUIColors.Warning.WithAlpha(60) : FUIColors.Active.WithAlpha(60))
+            ? (isDanger ? FUIColors.Warning.WithAlpha(60) : FUIColors.Active.WithAlpha(FUIColors.AlphaGlow))
             : FUIColors.Background2.WithAlpha(100);
         var textColor = hovered
             ? (isDanger ? FUIColors.Warning : FUIColors.Active)
@@ -477,7 +477,7 @@ internal static class FUIWidgets
     internal static void DrawActionButton(SKCanvas canvas, SKRect bounds, string text, bool hovered, bool isPrimary)
     {
         var bgColor = isPrimary
-            ? (hovered ? FUIColors.Active : FUIColors.Active.WithAlpha(180))
+            ? (hovered ? FUIColors.Active : FUIColors.ActiveStrong)
             : (hovered ? FUIColors.Primary.WithAlpha(60) : FUIColors.Background2);
         var textColor = isPrimary
             ? FUIColors.Background1
@@ -615,7 +615,7 @@ internal static class FUIWidgets
 
     internal static void DrawAddMappingButton(SKCanvas canvas, SKRect bounds, bool hovered)
     {
-        var bgColor = hovered ? FUIColors.Active.WithAlpha(60) : FUIColors.Primary.WithAlpha(30);
+        var bgColor = hovered ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : FUIColors.Primary.WithAlpha(30);
         var frameColor = hovered ? FUIColors.Active : FUIColors.Primary;
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
@@ -753,7 +753,7 @@ internal static class FUIWidgets
                 float selStartX = contentX + (sS > 0 ? FUIRenderer.MeasureText(text[..sS], textFontSize) : 0);
                 float selEndX = contentX + FUIRenderer.MeasureText(text[..sE], textFontSize);
                 var selRect = new SKRect(selStartX, bounds.Top + 4, selEndX, bounds.Bottom - 4);
-                using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+                using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBgStrong);
                 canvas.DrawRect(selRect, selPaint);
             }
 
@@ -803,7 +803,7 @@ internal static class FUIWidgets
 
     internal static void DrawSCCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, bool isHovered)
     {
-        var bgColor = isChecked ? FUIColors.Active.WithAlpha(60) : FUIColors.Background2.WithAlpha(100);
+        var bgColor = isChecked ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : FUIColors.Background2.WithAlpha(100);
         if (isHovered) bgColor = bgColor.WithAlpha((byte)Math.Min(255, bgColor.Alpha + 40));
         var borderColor = isChecked ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
         FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
@@ -820,7 +820,7 @@ internal static class FUIWidgets
 
     internal static void DrawProfileRefreshButton(SKCanvas canvas, SKRect bounds, bool hovered)
     {
-        var bgColor = hovered ? FUIColors.Active.WithAlpha(80) : FUIColors.Background2.WithAlpha(120);
+        var bgColor = hovered ? FUIColors.SelectionBgStrong : FUIColors.PanelBgDefault;
         var borderColor = hovered ? FUIColors.Active : FUIColors.Frame;
         FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
 
@@ -851,7 +851,7 @@ internal static class FUIWidgets
 
         if (isHovered && isEnabled)
         {
-            using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+            using var hoverPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
             canvas.DrawRect(itemBounds, hoverPaint);
 
             using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
@@ -886,7 +886,7 @@ internal static class FUIWidgets
             using var glowPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = FUIColors.Active.WithAlpha(60),
+                Color = FUIColors.Active.WithAlpha(FUIColors.AlphaGlow),
                 StrokeWidth = 8f,
                 IsAntialias = true,
                 MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 4f)
@@ -999,7 +999,7 @@ internal static class FUIWidgets
         using var glowPaint = new SKPaint
         {
             Style = SKPaintStyle.Stroke,
-            Color = FUIColors.Active.WithAlpha(30),
+            Color = FUIColors.ActiveLight,
             StrokeWidth = 3f,
             IsAntialias = true,
             ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
@@ -1013,7 +1013,7 @@ internal static class FUIWidgets
         canvas.DrawRect(bounds.Inset(2, 2), innerPaint);
 
         // L-corner frame
-        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.Active.WithAlpha(180), 20f, 6f, 1.5f, true);
+        FUIRenderer.DrawLCornerFrame(canvas, bounds, FUIColors.ActiveStrong, 20f, 6f, 1.5f, true);
 
         // Items (clipped for scroll)
         canvas.Save();
@@ -1029,14 +1029,14 @@ internal static class FUIWidgets
 
                 if (isHovered)
                 {
-                    using var hoverBg = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
+                    using var hoverBg = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
                     canvas.DrawRect(itemBounds, hoverBg);
                     using var accentBar = FUIRenderer.CreateFillPaint(FUIColors.Active);
                     canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
                 }
                 else if (isSelected)
                 {
-                    using var selAccent = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(60));
+                    using var selAccent = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(FUIColors.AlphaGlow));
                     canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), selAccent);
                 }
 
@@ -1086,7 +1086,7 @@ internal static class FUIWidgets
             if (!enabled)
                 bgColor = FUIColors.Background1.WithAlpha(80);
             else if (isSelected)
-                bgColor = FUIColors.Active.WithAlpha(60);
+                bgColor = FUIColors.Active.WithAlpha(FUIColors.AlphaGlow);
             else if (isHovered)
                 bgColor = FUIColors.Background2.WithAlpha(200);
             else

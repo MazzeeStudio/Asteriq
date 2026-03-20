@@ -225,13 +225,13 @@ internal static class SCBindingsRenderer
     {
         SKColor bgColor;
         if (disabled)
-            bgColor = FUIColors.Background2.WithAlpha(60);
+            bgColor = FUIColors.DisabledBg;
         else if (hovered)
-            bgColor = FUIColors.Active.WithAlpha(80);
+            bgColor = FUIColors.SelectionBgStrong;
         else
-            bgColor = FUIColors.Background2.WithAlpha(120);
+            bgColor = FUIColors.PanelBgDefault;
 
-        var borderColor = disabled ? FUIColors.Frame.WithAlpha(80) : (hovered ? FUIColors.Active : FUIColors.Frame);
+        var borderColor = disabled ? FUIColors.Frame.WithAlpha(FUIColors.AlphaHoverStrong) : (hovered ? FUIColors.Active : FUIColors.Frame);
         FUIRenderer.DrawRoundedPanel(canvas, bounds, bgColor, borderColor);
 
         var iconColor = disabled ? FUIColors.TextDim.WithAlpha(100) : (hovered ? FUIColors.TextBright : FUIColors.TextPrimary);
@@ -277,7 +277,7 @@ internal static class SCBindingsRenderer
 
         if (isHovered)
         {
-            using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Active.WithAlpha(150));
+            using var borderPaint = FUIRenderer.CreateStrokePaint(FUIColors.SelectionBorder);
             canvas.DrawRect(bounds, borderPaint);
         }
 

@@ -201,7 +201,7 @@ public class FUISelectionDialog : FUIBaseDialog
             // Draw selection/hover background
             if (i == _selectedItem)
             {
-                using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+                using var selPaint = FUIRenderer.CreateFillPaint(FUIColors.SelectionBgStrong);
                 canvas.DrawRect(itemBounds, selPaint);
             }
             else if (i == _hoveredItem)

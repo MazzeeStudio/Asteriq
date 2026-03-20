@@ -814,7 +814,7 @@ public class MappingDialog : FUIBaseDialog
     {
         var bgColor = isActive ? FUIColors.Primary.WithAlpha(60) : (isHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
         var frameColor = isActive ? FUIColors.Primary : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = isActive ? FUIColors.TextBright : FUIColors.TextDim;
+        var textColor = FUIColors.SecondaryColor(isActive);
 
         using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
         canvas.DrawRect(bounds, bgPaint);

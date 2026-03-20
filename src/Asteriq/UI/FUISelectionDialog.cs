@@ -211,7 +211,7 @@ public class FUISelectionDialog : FUIBaseDialog
             }
 
             // Draw item text
-            var textColor = item.IsAction ? FUIColors.Active : FUIColors.TextPrimary;
+            var textColor = FUIColors.ContentColor(item.IsAction);
             if (i == _selectedItem)
                 textColor = FUIColors.TextBright;
 

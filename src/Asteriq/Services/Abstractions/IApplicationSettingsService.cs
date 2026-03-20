@@ -65,6 +65,11 @@ public interface IApplicationSettingsService
     bool SCBindingsShowBoundOnly { get; set; }
 
     /// <summary>
+    /// Whether the "Include hidden" checkbox in the Devices tab is enabled.
+    /// </summary>
+    bool DevicesIncludeHidden { get; set; }
+
+    /// <summary>
     /// Get the last used SC export profile name for a specific SC environment (LIVE, TECH-PREVIEW, etc.)
     /// Returns null if no profile has been remembered for that environment.
     /// </summary>

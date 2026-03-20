@@ -12,7 +12,7 @@ public class DevicesTabController : ITabController
     // Device list hover/selection (local to this tab)
     private int _hoveredDevice = -1;
 
-    // Transient D1 filter state (not persisted)
+    // D1 filter state (persisted across sessions)
     private bool _showHiddenDevices;
     private SKRect _showHiddenCheckboxBounds;
 
@@ -42,10 +42,19 @@ public class DevicesTabController : ITabController
     public DevicesTabController(TabContext ctx)
     {
         _ctx = ctx;
+        _showHiddenDevices = ctx.AppSettings.DevicesIncludeHidden;
     }
 
     public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
     {
+        // Ensure selected device is not hidden (can happen on first load after prior session hid a device)
+        if (_devCat.Active == 0 && _ctx.SelectedDevice >= 0 && _ctx.SelectedDevice < _ctx.Devices.Count
+            && !_showHiddenDevices
+            && _ctx.AppSettings.IsDeviceHidden(_ctx.Devices[_ctx.SelectedDevice].InstanceGuid.ToString()))
+        {
+            EnsureVisibleDeviceSelected();
+        }
+
         // Calculate responsive panel widths (same logic as MainForm.DrawStructureLayer)
         float sideTabPad = FUIRenderer.SpaceSM;
         float pad = FUIRenderer.SpaceXL;
@@ -158,6 +167,7 @@ public class DevicesTabController : ITabController
         if (!_showHiddenCheckboxBounds.IsEmpty && _showHiddenCheckboxBounds.Contains(e.X, e.Y))
         {
             _showHiddenDevices = !_showHiddenDevices;
+            _ctx.AppSettings.DevicesIncludeHidden = _showHiddenDevices;
             EnsureVisibleDeviceSelected();
             _ctx.MarkDirty();
             return;
@@ -434,6 +444,9 @@ public class DevicesTabController : ITabController
     {
         if (_ctx.SelectedDevice < 0)
             _ctx.SelectFirstDeviceInCategory?.Invoke();
+        // Ensure the selected device is visible (not hidden) — fixes stale
+        // selection when a previously-selected device was hidden in a prior session.
+        EnsureVisibleDeviceSelected();
     }
 
     public void OnDeactivated() { }

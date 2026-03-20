@@ -7,71 +7,12 @@ namespace Asteriq.UI.Controllers;
 
 public partial class MappingsTabController
 {
-    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
+    private void ApplySvgTransform(FUIRenderer.SvgTransform t, bool mirror)
     {
-        if (svg.Picture is null) return;
-
-        var svgBounds = svg.Picture.CullRect;
-        if (svgBounds.Width <= 0 || svgBounds.Height <= 0) return;
-
-        float scaleX = bounds.Width / svgBounds.Width;
-        float scaleY = bounds.Height / svgBounds.Height;
-        float scale = Math.Min(scaleX, scaleY) * 0.95f;
-
-        float scaledWidth = svgBounds.Width * scale;
-        float scaledHeight = svgBounds.Height * scale;
-
-        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
-        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
-
-        _ctx.SvgScale = scale;
-        _ctx.SvgOffset = new SKPoint(offsetX, offsetY);
+        _ctx.SvgScale = t.Scale;
+        _ctx.SvgOffset = t.Offset;
         _ctx.SvgMirrored = mirror;
-        _ctx.SilhouetteSourceWidth = svgBounds.Width;
-
-        canvas.Save();
-        canvas.Translate(offsetX, offsetY);
-
-        if (mirror)
-        {
-            canvas.Translate(scaledWidth, 0);
-            canvas.Scale(-scale, scale);
-        }
-        else
-        {
-            canvas.Scale(scale);
-        }
-
-        canvas.DrawPicture(svg.Picture);
-        canvas.Restore();
-    }
-
-    private void DrawBitmapInBounds(SKCanvas canvas, SKBitmap bitmap, float viewBoxWidth, float viewBoxHeight, SKRect bounds, bool mirror = false)
-    {
-        if (viewBoxWidth <= 0 || viewBoxHeight <= 0) return;
-
-        float scaleX = bounds.Width / viewBoxWidth;
-        float scaleY = bounds.Height / viewBoxHeight;
-        float scale = Math.Min(scaleX, scaleY) * 0.95f;
-
-        float scaledWidth = viewBoxWidth * scale;
-        float scaledHeight = viewBoxHeight * scale;
-
-        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2;
-        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2;
-
-        _ctx.SvgScale = scale;
-        _ctx.SvgOffset = new SKPoint(offsetX, offsetY);
-        _ctx.SvgMirrored = mirror;
-        _ctx.SilhouetteSourceWidth = viewBoxWidth;
-
-        var destRect = new SKRect(offsetX, offsetY, offsetX + scaledWidth, offsetY + scaledHeight);
-
-        canvas.Save();
-        if (mirror)
-            canvas.Scale(-1, 1, offsetX + scaledWidth / 2, offsetY + scaledHeight / 2);
-        canvas.DrawBitmap(bitmap, destRect);
-        canvas.Restore();
+        _ctx.SilhouetteSourceWidth = t.SourceWidth;
     }
 
     private void DrawMappingsTabContent(SKCanvas canvas, SKRect bounds, float sideTabPad, float contentTop, float contentBottom)
@@ -679,7 +620,8 @@ public partial class MappingsTabController
         if (svg?.Picture is not null)
         {
             _ctx.SilhouetteBounds = constrainedBounds;
-            DrawSvgInBounds(canvas, svg, constrainedBounds, shouldMirror);
+            var t = FUIRenderer.DrawSvgInBounds(canvas, svg, constrainedBounds, shouldMirror);
+            ApplySvgTransform(t, shouldMirror);
             DrawMappingHighlightLeadLine(canvas, constrainedBounds);
         }
         else if (bitmap is not null)
@@ -687,7 +629,8 @@ public partial class MappingsTabController
             float vbW = _ctx.MappingsPrimaryDeviceMap?.ViewBox?.X ?? bitmap.Width;
             float vbH = _ctx.MappingsPrimaryDeviceMap?.ViewBox?.Y ?? bitmap.Height;
             _ctx.SilhouetteBounds = constrainedBounds;
-            DrawBitmapInBounds(canvas, bitmap, vbW, vbH, constrainedBounds, shouldMirror);
+            var t = FUIRenderer.DrawBitmapInBounds(canvas, bitmap, vbW, vbH, constrainedBounds, shouldMirror);
+            ApplySvgTransform(t, shouldMirror);
             DrawMappingHighlightLeadLine(canvas, constrainedBounds);
         }
         else
@@ -2772,7 +2715,7 @@ public partial class MappingsTabController
 
     /// <summary>
     /// Converts a device-map viewBox coordinate to canvas screen coordinates,
-    /// using the scale/offset set by the most recent DrawSvgInBounds call.
+    /// using the scale/offset set by the most recent FUIRenderer.DrawSvgInBounds call.
     /// </summary>
     private SKPoint ViewBoxToScreen(float viewBoxX, float viewBoxY)
     {

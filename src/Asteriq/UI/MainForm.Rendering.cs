@@ -481,47 +481,7 @@ public partial class MainForm
     private static void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
         => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
 
-    /// <summary>
-    /// Draw SVG in bounds with optional mirroring. Updates shared SVG transform state.
-    /// Used by Mappings tab (will move to MappingsTabController in future extraction).
-    /// </summary>
-    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds, bool mirror = false)
-    {
-        if (svg.Picture is null) return;
 
-        var svgBounds = svg.Picture.CullRect;
-        if (svgBounds.Width <= 0 || svgBounds.Height <= 0) return;
-
-        float scaleX = bounds.Width / svgBounds.Width;
-        float scaleY = bounds.Height / svgBounds.Height;
-        float scale = Math.Min(scaleX, scaleY) * 0.95f;
-
-        float scaledWidth = svgBounds.Width * scale;
-        float scaledHeight = svgBounds.Height * scale;
-
-        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
-        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
-
-        _svgScale = scale;
-        _svgOffset = new SKPoint(offsetX, offsetY);
-        _svgMirrored = mirror;
-
-        canvas.Save();
-        canvas.Translate(offsetX, offsetY);
-
-        if (mirror)
-        {
-            canvas.Translate(scaledWidth, 0);
-            canvas.Scale(-scale, scale);
-        }
-        else
-        {
-            canvas.Scale(scale);
-        }
-
-        canvas.DrawPicture(svg.Picture);
-        canvas.Restore();
-    }
 
     private void DrawStatusBar(SKCanvas canvas, SKRect bounds)
     {

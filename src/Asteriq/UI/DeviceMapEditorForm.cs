@@ -434,7 +434,8 @@ public class DeviceMapEditorForm : Form
         {
             var svgBounds = new SKRect(_svgPanelBounds.Left + 10, _svgPanelBounds.Top + 10,
                 _svgPanelBounds.Right - 10, _svgPanelBounds.Bottom - 10);
-            DrawSvgInBounds(canvas, _currentSvg, svgBounds);
+            var t = FUIRenderer.DrawSvgInBounds(canvas, _currentSvg, svgBounds, _deviceMap.Mirror);
+            ApplySvgTransform(t);
         }
         else
         {
@@ -445,39 +446,11 @@ public class DeviceMapEditorForm : Form
         DrawControlOverlays(canvas);
     }
 
-    private void DrawSvgInBounds(SKCanvas canvas, SKSvg svg, SKRect bounds)
+    private void ApplySvgTransform(FUIRenderer.SvgTransform t)
     {
-        var svgBounds = svg.Picture!.CullRect;
-
-        float scaleX = bounds.Width / svgBounds.Width;
-        float scaleY = bounds.Height / svgBounds.Height;
-        float scale = Math.Min(scaleX, scaleY) * 0.95f;
-
-        float scaledWidth = svgBounds.Width * scale;
-        float scaledHeight = svgBounds.Height * scale;
-        float offsetX = bounds.Left + (bounds.Width - scaledWidth) / 2 - svgBounds.Left * scale;
-        float offsetY = bounds.Top + (bounds.Height - scaledHeight) / 2 - svgBounds.Top * scale;
-
-        _svgScale = scale;
-        _svgOffset = new SKPoint(offsetX, offsetY);
-        _svgScaledWidth = scaledWidth;
-
-        canvas.Save();
-        canvas.Translate(offsetX, offsetY);
-
-        if (_deviceMap.Mirror)
-        {
-            // Flip horizontally: translate to right edge, then scale X by -1
-            canvas.Translate(scaledWidth, 0);
-            canvas.Scale(-scale, scale);
-        }
-        else
-        {
-            canvas.Scale(scale);
-        }
-
-        canvas.DrawPicture(svg.Picture);
-        canvas.Restore();
+        _svgScale = t.Scale;
+        _svgOffset = t.Offset;
+        _svgScaledWidth = t.ScaledWidth;
     }
 
     private void DrawControlOverlays(SKCanvas canvas)

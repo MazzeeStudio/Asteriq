@@ -30,6 +30,7 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
 
     private string _machineName = Environment.MachineName;
     private int _tcpPort = BroadcastPort;
+    private NetworkRole _role = NetworkRole.None;
 
     public event EventHandler? PeersChanged;
 
@@ -84,10 +85,11 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
     /// <summary>
     /// Update the advertised machine name and TCP port before calling StartAsync.
     /// </summary>
-    public void Configure(string machineName, int tcpPort)
+    public void Configure(string machineName, int tcpPort, NetworkRole role = NetworkRole.None)
     {
         _machineName = string.IsNullOrWhiteSpace(machineName) ? Environment.MachineName : machineName;
         _tcpPort = tcpPort;
+        _role = role;
     }
 
     private async Task RunBroadcastAsync(CancellationToken ct)
@@ -101,7 +103,7 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
         {
             try
             {
-                var msg = Encoding.UTF8.GetBytes($"{BroadcastPrefix}{_machineName}:{_tcpPort}");
+                var msg = Encoding.UTF8.GetBytes($"{BroadcastPrefix}{_machineName}:{_tcpPort}:{_role}");
                 await udp.SendAsync(msg, msg.Length, endpoint).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -136,15 +138,38 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
 
                 var parts = text[BroadcastPrefix.Length..].Split(':');
                 if (parts.Length < 2) continue;
+
+                // Format: name:port[:role]  — role is optional for backwards compatibility
+                var role = NetworkRole.None;
+                if (parts.Length >= 3 && Enum.TryParse<NetworkRole>(parts[^1], out var parsedRole))
+                {
+                    if (!int.TryParse(parts[^2], out int port2)) continue;
+                    var name2 = string.Join(":", parts[..^2]);
+                    var peer2 = _peers.AddOrUpdate(ip,
+                        _ => new NetworkPeer { MachineName = name2, IpAddress = ip, TcpPort = port2, Role = parsedRole, LastSeen = DateTime.UtcNow },
+                        (_, existing) =>
+                        {
+                            existing.MachineName = name2;
+                            existing.TcpPort = port2;
+                            existing.Role = parsedRole;
+                            existing.LastSeen = DateTime.UtcNow;
+                            return existing;
+                        });
+                    _logger.LogDebug("Peer discovered: {Machine} @ {Ip}:{Port} role={Role}", peer2.MachineName, ip, port2, parsedRole);
+                    PeersChanged?.Invoke(this, EventArgs.Empty);
+                    continue;
+                }
+
                 if (!int.TryParse(parts[^1], out int port)) continue;
                 var name = string.Join(":", parts[..^1]);
 
                 var peer = _peers.AddOrUpdate(ip,
-                    _ => new NetworkPeer { MachineName = name, IpAddress = ip, TcpPort = port, LastSeen = DateTime.UtcNow },
+                    _ => new NetworkPeer { MachineName = name, IpAddress = ip, TcpPort = port, Role = role, LastSeen = DateTime.UtcNow },
                     (_, existing) =>
                     {
                         existing.MachineName = name;
                         existing.TcpPort = port;
+                        existing.Role = role;
                         existing.LastSeen = DateTime.UtcNow;
                         return existing;
                     });

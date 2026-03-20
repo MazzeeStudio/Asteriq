@@ -2215,7 +2215,9 @@ public partial class MainForm : Form
         var forwardingItem = _trayIcon.ContextMenuStrip.Items["forwarding"] as ToolStripMenuItem;
         if (forwardingItem is null) return;
 
-        if (_isForwarding)
+        // Read from TabContext which is always up-to-date — _isForwarding may not
+        // have been synced yet when controllers invoke this via delegate.
+        if (_tabContext.IsForwarding)
         {
             forwardingItem.Text  = "Stop Forwarding";
             forwardingItem.Image = TrayMenuIcons.Stop(TrayIconSize, SkiaColorToGdi(FUIColors.Active));

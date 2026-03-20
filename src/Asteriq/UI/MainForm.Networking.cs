@@ -81,6 +81,7 @@ public partial class MainForm : Form
             if (!_vjoyService.IsInitialized) return;
             if (!_mappingEngine.Start()) return;
             _isForwarding = true;
+            _tabContext.IsForwarding = true;
             _trayIcon.SetActive(true);
         }
     }
@@ -93,6 +94,7 @@ public partial class MainForm : Form
         if (!_isForwarding) return;
         _mappingEngine.Stop();
         _isForwarding = false;
+        _tabContext.IsForwarding = false;
         _trayIcon.SetActive(false);
     }
 
@@ -125,6 +127,7 @@ public partial class MainForm : Form
                 if (_mappingEngine.Start())
                 {
                     _isForwarding = true;
+                    _tabContext.IsForwarding = true;
                     _trayIcon.SetActive(true);
                     BeginInvoke(UpdateTrayMenu);
                 }
@@ -193,6 +196,7 @@ public partial class MainForm : Form
                 if (_mappingEngine.Start())
                 {
                     _isForwarding = true;
+                    _tabContext.IsForwarding = true;
                     _trayIcon.SetActive(true);
                     BeginInvoke(UpdateTrayMenu);
                 }

@@ -132,8 +132,7 @@ public partial class SCBindingsTabController
             if (clickedCol >= 0
                 && _grid.Columns is not null
                 && _grid.Columns[clickedCol].IsJoystick
-                && !_grid.Columns[clickedCol].IsPhysical
-                && !_grid.Columns[clickedCol].IsReadOnly)
+                && !_grid.Columns[clickedCol].IsPhysical)
             {
                 // Clicking a column header always deselects any selected cell
                 _cell.SelectedCell = (-1, -1);
@@ -801,15 +800,24 @@ public partial class SCBindingsTabController
 
         var col = _grid.Columns[colIndex];
 
-        // Read-only columns display bindings but do not accept new assignments
-        if (col.IsReadOnly)
-            return;
-
         // If already listening, cancel
         if (_scListening.IsListening)
         {
             _scListening.IsListening = false;
             _cell.ListeningColumn = null;
+        }
+
+        // Read-only columns (no backing device): allow selection but block listening
+        if (col.IsReadOnly)
+        {
+            if (_colImport.HighlightedColumn >= 0)
+                DeselectColumn();
+            _cell.SelectedCell = (actionIndex, colIndex);
+            _cell.LastCellClickTime = DateTime.Now;
+            _cpPanel.IsExpanded = false; // Auto-expand Cell Details
+            UpdateConflictLinks();
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected read-only cell ({actionIndex}, {colIndex}) - {col.Header}");
+            return;
         }
 
         // Check for double-click on the same cell (within 400ms)

@@ -334,8 +334,8 @@ public partial class SCBindingsTabController
             {
                 var col = columns[c];
 
-                // Highlight background if this column is selected (read-only columns cannot be highlighted)
-                if (c == _colImport.HighlightedColumn && !col.IsReadOnly)
+                // Highlight background if this column is selected
+                if (c == _colImport.HighlightedColumn)
                 {
                     using var highlightPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(40));
                     canvas.DrawRect(new SKRect(colX, y, colX + colW, y + headerRowHeight), highlightPaint);
@@ -371,9 +371,9 @@ public partial class SCBindingsTabController
                     float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
                     FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.Active.WithAlpha(180), 10f);
                 }
-                else if (col.IsJoystick && _ctx.AppSettings.SCBindingsShowPhysicalHeaders)
+                else if (col.IsJoystick && !showJSRef)
                 {
-                    // Device mode: show physical device name only — no JS# (user can toggle to see that)
+                    // Device mode: show physical device name, or fall back to JS# if no device mapped
                     var headerColor = c == _colImport.HighlightedColumn ? FUIColors.Active : FUIColors.TextPrimary;
                     string? deviceName = GetPhysicalDeviceNameForVJoyColumn(col);
                     if (deviceName is not null)
@@ -384,9 +384,9 @@ public partial class SCBindingsTabController
                     }
                     else
                     {
-                        // No physical device mapped — dim dash
-                        float dashWidth = FUIRenderer.MeasureText("—", 12f);
-                        FUIRenderer.DrawText(canvas, "—", new SKPoint(colX + (colW - dashWidth) / 2, headerTextY), FUIColors.TextDim.WithAlpha(80), 12f);
+                        // No physical device mapped — show JS number so the header is never blank
+                        float jsW = FUIRenderer.MeasureText(col.Header, 12f);
+                        FUIRenderer.DrawText(canvas, col.Header, new SKPoint(colX + (colW - jsW) / 2, headerTextY), FUIColors.TextDim, 12f, true);
                     }
                 }
                 else
@@ -1696,13 +1696,17 @@ public partial class SCBindingsTabController
         _scAssignInputButtonBounds = new SKRect(leftMargin, btnY, leftMargin + btnWidth, btnY + btnHeight);
         _scAssignInputButtonHovered = _scAssignInputButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
 
+        bool isCellReadOnly = _cell.SelectedCell.colIndex >= 0 && _grid.Columns is not null
+            && _cell.SelectedCell.colIndex < _grid.Columns.Count
+            && _grid.Columns[_cell.SelectedCell.colIndex].IsReadOnly;
+
         if (_scListening.IsListening)
         {
             using var waitBgPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
             canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
             FUIRenderer.DrawTextCentered(canvas, "LISTENING...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
         }
-        else if (isCellShared)
+        else if (isCellShared || isCellReadOnly)
         {
             using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.Background2.WithAlpha(60));
             canvas.DrawRect(_scAssignInputButtonBounds, disabledPaint);

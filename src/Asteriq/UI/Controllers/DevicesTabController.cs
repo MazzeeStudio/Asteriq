@@ -16,6 +16,10 @@ public class DevicesTabController : ITabController
     private bool _showHiddenDevices;
     private SKRect _showHiddenCheckboxBounds;
 
+    // Hide-from-view fade animation
+    private string? _fadingDeviceGuid;
+    private DateTime _fadeStartTime;
+
     // State groups
     private readonly DeviceCategoryState _devCat = new();
     private readonly DeviceDragState _drag = new();
@@ -467,9 +471,27 @@ public class DevicesTabController : ITabController
         string categoryName = _devCat.Active == 0 ? "DEVICES" : "DEVICES";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
+        // Complete hide-from-view fade when the 2-second animation is done
+        const float FadeDurationSec = 2f;
+        if (_fadingDeviceGuid is not null)
+        {
+            float fadeElapsed = (float)(DateTime.Now - _fadeStartTime).TotalSeconds;
+            if (fadeElapsed >= FadeDurationSec)
+            {
+                _ctx.AppSettings.SetDeviceHidden(_fadingDeviceGuid, true);
+                _fadingDeviceGuid = null;
+                EnsureVisibleDeviceSelected();
+            }
+            else
+            {
+                _ctx.MarkDirty(); // keep animating
+            }
+        }
+
         var filteredDevices = _devCat.Active == 0
             ? _ctx.Devices.Where(d => !d.IsVirtual &&
-                (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString()))).ToList()
+                (_showHiddenDevices || !_ctx.AppSettings.IsDeviceHidden(d.InstanceGuid.ToString())
+                 || d.InstanceGuid.ToString() == _fadingDeviceGuid)).ToList()
             : _ctx.Devices.Where(d => d.IsVirtual).ToList();
 
         float itemY = contentBounds.Top + titleBarHeight + pad;
@@ -537,8 +559,24 @@ public class DevicesTabController : ITabController
                 string assignment = filteredDevices[i].IsVirtual
                     ? GetPrimaryDeviceForVJoyDevice(filteredDevices[i])
                     : GetVJoyAssignmentForDevice(filteredDevices[i]);
+
+                // Fade-out animation for hide-from-view
+                bool isFading = _fadingDeviceGuid is not null
+                    && filteredDevices[i].InstanceGuid.ToString() == _fadingDeviceGuid;
+                if (isFading)
+                {
+                    float fadeT = Math.Clamp((float)(DateTime.Now - _fadeStartTime).TotalSeconds / FadeDurationSec, 0f, 1f);
+                    byte alpha = (byte)(255 * (1f - fadeT));
+                    using var fadePaint = new SKPaint { Color = SKColors.White.WithAlpha(alpha) };
+                    canvas.SaveLayer(fadePaint);
+                }
+
                 FUIWidgets.DrawDeviceListItem(canvas, contentBounds.Left + pad - 10, itemY, contentBounds.Width - pad,
                     filteredDevices[i].Name, status, actualIndex == _ctx.SelectedDevice, actualIndex == _hoveredDevice, assignment);
+
+                if (isFading)
+                    canvas.Restore();
+
                 itemY += itemHeight + itemGap;
             }
 
@@ -1085,9 +1123,21 @@ public class DevicesTabController : ITabController
     {
         if (_ctx.SelectedDevice < 0 || _ctx.SelectedDevice >= _ctx.Devices.Count) return;
         var device = _ctx.Devices[_ctx.SelectedDevice];
-        bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(device.InstanceGuid.ToString());
-        _ctx.AppSettings.SetDeviceHidden(device.InstanceGuid.ToString(), !currentlyHidden);
-        EnsureVisibleDeviceSelected();
+        string guid = device.InstanceGuid.ToString();
+        bool currentlyHidden = _ctx.AppSettings.IsDeviceHidden(guid);
+
+        if (currentlyHidden)
+        {
+            // Unhide immediately (no fade needed)
+            _ctx.AppSettings.SetDeviceHidden(guid, false);
+            _fadingDeviceGuid = null;
+        }
+        else
+        {
+            // Start fade-out animation — device hides after fade completes
+            _fadingDeviceGuid = guid;
+            _fadeStartTime = DateTime.Now;
+        }
         _ctx.MarkDirty();
     }
 

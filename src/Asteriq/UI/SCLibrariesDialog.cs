@@ -29,7 +29,7 @@ public class SCLibrariesDialog : FUIBaseDialog
     private const float DescriptionHeight = 36f;
     private const float ItemHeight = 32f;
     private const float ButtonAreaHeight = 50f;
-    private const float ContentPadding = 16f;
+
     private const float RemoveButtonSize = 20f;
 
     private SKRect[] _itemBounds = Array.Empty<SKRect>();

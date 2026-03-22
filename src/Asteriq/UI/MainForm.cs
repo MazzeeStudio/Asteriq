@@ -593,10 +593,10 @@ public partial class MainForm : Form
         var profile = _profileManager.ActiveProfile;
         if (profile is null) return;
 
-        bool confirmed = FUIMessageBox.ShowQuestion(this,
+        int result = FUIMessageBox.Show(this,
             $"Delete profile '{profile.Name}'?\n\nThis cannot be undone.",
-            "Delete Profile");
-        if (!confirmed) return;
+            "Delete Profile", FUIMessageBox.MessageBoxType.Question, "Delete", "Cancel");
+        if (result != 0) return;
 
         var profileId = profile.Id;
         _profileManager.DeactivateProfile();

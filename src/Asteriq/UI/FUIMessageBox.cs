@@ -180,27 +180,33 @@ public class FUIMessageBox : FUIBaseDialog
             }
         }
 
-        // Draw buttons
+        // Draw buttons — single button right-aligned, two buttons left/right split
         float buttonWidth = 80f;
         float buttonHeight = 32f;
-        float buttonSpacing = 12f;
-        float totalButtonsWidth = _buttonLabels.Length * buttonWidth + (_buttonLabels.Length - 1) * buttonSpacing;
-        float buttonStartX = (bounds.Width - totalButtonsWidth) / 2;
         float buttonY = bounds.Bottom - 50;
 
-        for (int i = 0; i < _buttonLabels.Length; i++)
+        if (_buttonLabels.Length == 1)
         {
-            var btnBounds = new SKRect(
-                buttonStartX + i * (buttonWidth + buttonSpacing),
-                buttonY,
-                buttonStartX + i * (buttonWidth + buttonSpacing) + buttonWidth,
-                buttonY + buttonHeight
-            );
-            _buttonBounds[i] = btnBounds;
+            // Single button: right-aligned
+            var btnBounds = new SKRect(bounds.Right - ContentPadding - buttonWidth, buttonY,
+                bounds.Right - ContentPadding, buttonY + buttonHeight);
+            _buttonBounds[0] = btnBounds;
+            var state = _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[0].ToUpperInvariant(), state);
+        }
+        else
+        {
+            // Two buttons: cancel/secondary on left, primary/confirm on right
+            _buttonBounds[1] = new SKRect(ContentPadding, buttonY, ContentPadding + buttonWidth, buttonY + buttonHeight);
+            _buttonBounds[0] = new SKRect(bounds.Right - ContentPadding - buttonWidth, buttonY,
+                bounds.Right - ContentPadding, buttonY + buttonHeight);
 
-            var state = _hoveredButton == i ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state,
-                isDanger: i == 0 && _primaryButtonIsDanger);
+            for (int i = 0; i < _buttonLabels.Length; i++)
+            {
+                var state = _hoveredButton == i ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _buttonBounds[i], _buttonLabels[i].ToUpperInvariant(), state,
+                    isDanger: i == 0 && _primaryButtonIsDanger);
+            }
         }
 
         // Draw L-corner decorations

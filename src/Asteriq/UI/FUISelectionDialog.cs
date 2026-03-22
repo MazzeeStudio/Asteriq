@@ -35,7 +35,7 @@ public class FUISelectionDialog : FUIBaseDialog
     private const float DescriptionHeight = 50f;
     private const float ItemHeight = 28f;
     private const float ButtonAreaHeight = 50f;
-    private const float ContentPadding = 16f;
+
 
     public class SelectionItem
     {
@@ -272,27 +272,30 @@ public class FUISelectionDialog : FUIBaseDialog
             }
         }
 
-        // Draw buttons
+        // Draw buttons — primary (Select) on right, cancel on left
         float buttonWidth = 80f;
         float buttonHeight = 32f;
-        float buttonSpacing = 12f;
-        float totalButtonsWidth = _buttonLabels.Length * buttonWidth + (_buttonLabels.Length - 1) * buttonSpacing;
-        float buttonStartX = (bounds.Width - totalButtonsWidth) / 2;
         float buttonY = bounds.Bottom - 44;
 
         _buttonBounds = new SKRect[_buttonLabels.Length];
+        if (_buttonLabels.Length == 1)
+        {
+            _buttonBounds[0] = new SKRect(bounds.Right - ContentPadding - buttonWidth, buttonY,
+                bounds.Right - ContentPadding, buttonY + buttonHeight);
+        }
+        else
+        {
+            // button[0] = primary (Select) → right, button[1] = cancel → left
+            _buttonBounds[0] = new SKRect(bounds.Right - ContentPadding - buttonWidth, buttonY,
+                bounds.Right - ContentPadding, buttonY + buttonHeight);
+            _buttonBounds[1] = new SKRect(ContentPadding, buttonY,
+                ContentPadding + buttonWidth, buttonY + buttonHeight);
+        }
+
         for (int i = 0; i < _buttonLabels.Length; i++)
         {
-            var btnBounds = new SKRect(
-                buttonStartX + i * (buttonWidth + buttonSpacing),
-                buttonY,
-                buttonStartX + i * (buttonWidth + buttonSpacing) + buttonWidth,
-                buttonY + buttonHeight
-            );
-            _buttonBounds[i] = btnBounds;
-
             var state = _hoveredButton == i ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
-            FUIRenderer.DrawButton(canvas, btnBounds, _buttonLabels[i].ToUpperInvariant(), state);
+            FUIRenderer.DrawButton(canvas, _buttonBounds[i], _buttonLabels[i].ToUpperInvariant(), state);
         }
 
         // Draw L-corner decorations

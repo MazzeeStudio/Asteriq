@@ -551,12 +551,12 @@ public partial class SCBindingsTabController
         string oldProfileName = _scExportProfile.ProfileName;
         if (!string.IsNullOrEmpty(oldProfileName) && _scExportProfile.Bindings.Count > 0)
         {
-            var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
+            int replaceResult = FUIMessageBox.Show(_ctx.OwnerForm,
                 $"Profile '{oldProfileName}' has {_scExportProfile.Bindings.Count} existing binding(s).\n\n" +
                 "Import will replace all current bindings. Continue?",
-                "Replace Bindings");
+                "Replace Bindings", FUIMessageBox.MessageBoxType.Question, "Import", "Cancel");
 
-            if (!result)
+            if (replaceResult != 0)
                 return;
         }
 

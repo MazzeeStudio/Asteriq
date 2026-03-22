@@ -242,10 +242,10 @@ public partial class SCBindingsTabController
                     _profileMgmt.DropdownDeleteBounds.Contains(point))
                 {
                     var nameToDelete = _profileMgmt.DropdownDeleteProfileName;
-                    var confirmed = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
+                    int deleteResult = FUIMessageBox.Show(_ctx.OwnerForm,
                         $"Delete control profile '{nameToDelete}'?",
-                        "Delete Profile");
-                    if (confirmed)
+                        "Delete Profile", FUIMessageBox.MessageBoxType.Question, "Delete", "Cancel");
+                    if (deleteResult == 0)
                     {
                         _scExportProfileService?.DeleteProfile(nameToDelete);
                         // If the deleted profile was active, clear the active profile name

@@ -927,8 +927,17 @@ public class DevicesTabController : ITabController
                 FUIRenderer.DrawText(canvas, devName, new SKPoint(contentBounds.Left + pad, y),
                     primaryDevice.IsConnected ? FUIColors.TextPrimary : FUIColors.TextDim, 14f);
                 y += 20f;
-                FUIRenderer.DrawText(canvas, $"{primaryDevice.AxisCount} axes  {primaryDevice.ButtonCount} btns  {primaryDevice.HatCount} hats",
-                    new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
+                string primaryCapsText = $"{primaryDevice.AxisCount} axes  {primaryDevice.ButtonCount} btns  {primaryDevice.HatCount} hats";
+                var (pVid, pPid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(primaryDevice.InstanceGuid);
+                string primaryVidPid = pVid > 0 ? $"{pVid:X4}:{pPid:X4}" : "";
+
+                FUIRenderer.DrawText(canvas, primaryCapsText, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
+                if (!string.IsNullOrEmpty(primaryVidPid))
+                {
+                    float pVidPidWidth = FUIRenderer.MeasureText(primaryVidPid, 12f);
+                    FUIRenderer.DrawText(canvas, primaryVidPid,
+                        new SKPoint(contentBounds.Right - pad - pVidPidWidth, y), FUIColors.Active, 12f);
+                }
                 y += 20f;
             }
             else

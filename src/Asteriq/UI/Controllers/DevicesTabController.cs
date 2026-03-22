@@ -265,6 +265,7 @@ public class DevicesTabController : ITabController
     public void OnMouseMove(MouseEventArgs e)
     {
         if (UpdateDragState(e)) return;
+        _ctx.OwnerForm.Cursor = Cursors.Default;
         UpdateCategoryTabHover(e);
         UpdateDeviceListHover(e);
         UpdateActionButtonHover(e);

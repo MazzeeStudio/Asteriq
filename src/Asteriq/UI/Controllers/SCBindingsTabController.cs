@@ -308,6 +308,8 @@ public partial class SCBindingsTabController : ITabController
             return;
         }
 
+        _ctx.OwnerForm.Cursor = Cursors.Default;
+
         // Installation dropdown hover
         if (_scInstall.DropdownOpen && _scInstall.DropdownBounds.Contains(e.X, e.Y))
         {

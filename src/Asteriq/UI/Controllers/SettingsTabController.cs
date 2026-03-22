@@ -170,24 +170,20 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         var pt = new SKPoint(e.X, e.Y);
+        bool hasProfile = _ctx.ProfileManager.ActiveProfile is not null;
+        _ctx.OwnerForm.Cursor = Cursors.Default;
 
-        // Profile name box (rename on click)
-        if (_profileNameBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null)
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        // Profile name box
+        if (_profileNameBounds.Contains(pt) && hasProfile)
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Profile action buttons
         if (_newProfileButtonBounds.Contains(pt) ||
-            (_duplicateProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null) ||
+            (_duplicateProfileButtonBounds.Contains(pt) && hasProfile) ||
             _importProfileButtonBounds.Contains(pt) ||
-            (_exportProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null) ||
-            (_deleteProfileButtonBounds != default && _deleteProfileButtonBounds.Contains(pt) && _ctx.ProfileManager.ActiveProfile is not null))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+            (_exportProfileButtonBounds.Contains(pt) && hasProfile) ||
+            (_deleteProfileButtonBounds.HitTest(pt) && hasProfile))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Theme buttons
         foreach (var b in _themeButtonBounds)
@@ -195,73 +191,53 @@ public class SettingsTabController : ITabController, IDisposable
             if (b.HitTest(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
 
-
-
         // Toggles
-        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) || _clientOnlyToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) || _networkEnabledToggleBounds.Contains(pt))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) ||
+            _clientOnlyToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) ||
+            _networkEnabledToggleBounds.Contains(pt))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Background sliders
         if (_bgGridSliderBounds.Contains(pt) || _bgGlowSliderBounds.Contains(pt) ||
             _bgNoiseSliderBounds.Contains(pt) || _bgScanlineSliderBounds.Contains(pt) ||
             _bgVignetteSliderBounds.Contains(pt))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Support panel buttons
-        if (_bmacButtonBounds.Contains(pt) || _referralCopyButtonBounds.Contains(pt) || _referralLinkButtonBounds.Contains(pt))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        if (_bmacButtonBounds.Contains(pt) || _referralCopyButtonBounds.Contains(pt) ||
+            _referralLinkButtonBounds.Contains(pt))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Driver setup button
         if (_driverSetupButtonBounds.HitTest(pt))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Network buttons
         foreach (var b in _netRoleButtonBounds)
         {
             if (b.HitTest(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
-        if ((_netRegenerateBounds.HitTest(pt))
-            || (_netDisconnectBounds.HitTest(pt))
-            || (_netForgetBounds.HitTest(pt)))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        if (_netRegenerateBounds.HitTest(pt) || _netDisconnectBounds.HitTest(pt) || _netForgetBounds.HitTest(pt))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+
         foreach (var (toggleRect, _) in _peerActionBounds)
         {
-            if (toggleRect.Contains(pt))
-            {
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            if (toggleRect.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
+
+        // HidHide panel toggles
+        if (_hidHideCloakingToggleBounds.HitTest(pt) || _hidHideInverseToggleBounds.HitTest(pt) ||
+            _hidHideUpdateButtonBounds.HitTest(pt))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Update section buttons
-        if ((_checkButtonBounds.HitTest(pt))
-            || (_downloadButtonBounds.HitTest(pt))
-            || (_applyButtonBounds.HitTest(pt)))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
+        if (_checkButtonBounds.HitTest(pt) || _downloadButtonBounds.HitTest(pt) || _applyButtonBounds.HitTest(pt))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Right panel accordion headers
-        if ((_visualPanelHeaderBounds.HitTest(pt))
-            || (_networkPanelHeaderBounds.HitTest(pt)))
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
+        if (_visualPanelHeaderBounds.HitTest(pt) || _networkPanelHeaderBounds.HitTest(pt) ||
+            _hidHidePanelHeaderBounds.HitTest(pt))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
     }
 
     public void OnMouseUp(MouseEventArgs e)
@@ -279,56 +255,87 @@ public class SettingsTabController : ITabController, IDisposable
     public void OnMouseLeave() { }
     public void OnTick()
     {
-        _autoLoadT.Update(_ctx.AppSettings.AutoLoadLastProfile);
-        _closeToTrayT.Update(_ctx.AppSettings.CloseToTray);
-        _clientOnlyT.Update(_ctx.AppSettings.ClientOnlyMode);
-        _networkEnabledT.Update(_ctx.AppSettings.NetworkEnabled);
-        _checkUpdatesT.Update(_ctx.AppSettings.AutoCheckUpdates);
+        // Toggle animations
+        var settings = _ctx.AppSettings;
+        _autoLoadT.Update(settings.AutoLoadLastProfile);
+        _closeToTrayT.Update(settings.CloseToTray);
+        _clientOnlyT.Update(settings.ClientOnlyMode);
+        _networkEnabledT.Update(settings.NetworkEnabled);
+        _checkUpdatesT.Update(settings.AutoCheckUpdates);
         _cloakingT.Update(_hidHideCloaking);
         _inverseT.Update(_hidHideInverse);
 
-        // Per-peer connection toggles
-        bool netConnected  = _ctx.NetworkMode == NetworkInputMode.Remote;
-        bool netConnecting = _ctx.IsNetworkConnecting;
-        string? connectedIp  = _ctx.ConnectedPeerIp;
-        string? connectingIp = _connectingPeerIp;
-        var allDiscoveredPeers = _ctx.NetworkDiscovery?.KnownPeers.Values.ToList() ?? [];
-        var myRole = _ctx.AppSettings.NetworkRole;
-        var peers = myRole == NetworkRole.Master
-            ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Client || p.Role == NetworkRole.None).ToList()
-            : myRole == NetworkRole.Client
-                ? allDiscoveredPeers.Where(p => p.Role == NetworkRole.Master || p.Role == NetworkRole.None).ToList()
-                : allDiscoveredPeers;
-        var visibleIps = new HashSet<string>(peers.Select(p => p.IpAddress));
+        UpdatePeerToggleAnimations();
+        UpdateAccordionAnimations();
+    }
 
-        foreach (var p in peers)
+    private void UpdatePeerToggleAnimations()
+    {
+        var peersSource = _ctx.NetworkDiscovery?.KnownPeers.Values;
+        if (peersSource is null) return;
+
+        bool netConnected = _ctx.NetworkMode == NetworkInputMode.Remote;
+        bool netConnecting = _ctx.IsNetworkConnecting;
+        string? connectedIp = _ctx.ConnectedPeerIp;
+        string? connectingIp = _connectingPeerIp;
+        var myRole = _ctx.AppSettings.NetworkRole;
+
+        bool IsValidPeer(NetworkPeer p) => myRole switch
         {
-            float target = (netConnected  && connectedIp  == p.IpAddress) ? 1f
-                         : (netConnecting && connectingIp == p.IpAddress) ? 0.5f
-                         : 0f;
-            if (!_peerToggleT.TryGetValue(p.IpAddress, out float cur))
-                cur = target;  // snap on first appearance — no animation
-            float delta = target - cur;
-            _peerToggleT[p.IpAddress] = MathF.Abs(delta) < 0.002f ? target : cur + delta * ToggleLerpSpeed;
+            NetworkRole.Master => p.Role is NetworkRole.Client or NetworkRole.None,
+            NetworkRole.Client => p.Role is NetworkRole.Master or NetworkRole.None,
+            _ => true
+        };
+
+        var visibleIps = new HashSet<string>();
+
+        foreach (var p in peersSource)
+        {
+            if (!IsValidPeer(p)) continue;
+            visibleIps.Add(p.IpAddress);
+
+            float target = 0f;
+            if (netConnected && connectedIp == p.IpAddress)
+                target = 1f;
+            else if (netConnecting && connectingIp == p.IpAddress)
+                target = 0.5f;
+
+            if (!_peerToggleT.TryGetValue(p.IpAddress, out float current))
+                current = target;
+
+            _peerToggleT[p.IpAddress] = LerpSnap(current, target, ToggleLerpSpeed);
         }
 
         // Remove stale entries
-        foreach (var key in _peerToggleT.Keys.Where(k => !visibleIps.Contains(k)).ToList())
-            _peerToggleT.Remove(key);
+        foreach (var ip in _peerToggleT.Keys.ToList())
+        {
+            if (!visibleIps.Contains(ip))
+                _peerToggleT.Remove(ip);
+        }
+    }
 
-        // Animate settings right-panel accordion weights
-        const float panelLerp = 0.18f;
+    private void UpdateAccordionAnimations()
+    {
         float vTarget = _settingsRightPanelActive == "visual" ? 1f : 0f;
         float nTarget = _settingsRightPanelActive == "network" ? 1f : 0f;
         float hTarget = _settingsRightPanelActive == "hidhide" ? 1f : 0f;
-        _visualExpandW  += (vTarget - _visualExpandW) * panelLerp;
-        _networkExpandW += (nTarget - _networkExpandW) * panelLerp;
-        _hidHideExpandW += (hTarget - _hidHideExpandW) * panelLerp;
-        if (MathF.Abs(_visualExpandW - vTarget) < 0.001f) _visualExpandW = vTarget;
-        if (MathF.Abs(_networkExpandW - nTarget) < 0.001f) _networkExpandW = nTarget;
-        if (MathF.Abs(_hidHideExpandW - hTarget) < 0.001f) _hidHideExpandW = hTarget;
+
+        const float panelLerp = 0.18f;
+        _visualExpandW  = LerpSnap(_visualExpandW, vTarget, panelLerp);
+        _networkExpandW = LerpSnap(_networkExpandW, nTarget, panelLerp);
+        _hidHideExpandW = LerpSnap(_hidHideExpandW, hTarget, panelLerp);
+
         if (_visualExpandW != vTarget || _networkExpandW != nTarget || _hidHideExpandW != hTarget)
             _ctx.MarkDirty();
+    }
+
+    /// <summary>
+    /// Lerp towards target, snapping when close enough to avoid endless tiny deltas.
+    /// </summary>
+    private static float LerpSnap(float current, float target, float speed, float epsilon = 0.001f)
+    {
+        float delta = target - current;
+        return MathF.Abs(delta) < epsilon ? target : current + delta * speed;
     }
 
     public void OnActivated() { }

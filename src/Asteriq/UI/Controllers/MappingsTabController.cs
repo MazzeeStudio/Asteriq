@@ -552,6 +552,7 @@ public partial class MappingsTabController : ITabController
         ResetMoveHoverStates();
 
         if (UpdateMappingDragState(e)) return;
+        _ctx.OwnerForm.Cursor = Cursors.Default;
         if (UpdateRightPanelHover(e)) return;
         if (UpdateAxisEditorHover(e)) return;
         if (UpdateDeviceOrderHover(e)) return;

@@ -136,6 +136,21 @@ public interface IApplicationSettingsService
     TrustedPeerConfig? TrustedMaster { get; set; }
 
     /// <summary>
+    /// User-configured additional search paths for SC installations.
+    /// </summary>
+    List<string> CustomSCSearchPaths { get; set; }
+
+    /// <summary>
+    /// Add a custom SC search path if not already present.
+    /// </summary>
+    void AddCustomSCSearchPath(string path);
+
+    /// <summary>
+    /// Remove a custom SC search path.
+    /// </summary>
+    void RemoveCustomSCSearchPath(string path);
+
+    /// <summary>
     /// Returns true if the device with the given SDL instance GUID has been hidden from the Devices list.
     /// This is a UI-only preference and does not affect HidHide driver state.
     /// </summary>

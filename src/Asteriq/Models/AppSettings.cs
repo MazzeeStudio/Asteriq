@@ -53,6 +53,9 @@ public class AppSettings
     public int WindowX { get; set; } = int.MinValue; // MinValue = center on screen
     public int WindowY { get; set; } = int.MinValue; // MinValue = center on screen
 
+    // SC installation
+    public List<string> CustomSCSearchPaths { get; set; } = new();
+
     // System tray settings
     public bool CloseToTray { get; set; } = false; // Default: clicking X exits the app
 }

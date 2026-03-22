@@ -324,6 +324,7 @@ public partial class MainForm : Form
         _tabContext.HidHide = _hidHideService;
         _tabContext.DeviceMatching = _deviceMatching;
         _tabContext.SCInstallation = scInstallationService;
+        scInstallationService.CustomSearchPaths = _appSettings.CustomSCSearchPaths;
 
         // Network forwarding
         _tabContext.NetworkDiscovery = _networkDiscovery;

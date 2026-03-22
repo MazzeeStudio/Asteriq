@@ -432,6 +432,13 @@ public partial class SCBindingsTabController
             return;
         }
 
+        // Browse for SC install path
+        if (!_scInstall.BrowseBounds.IsEmpty && _scInstall.BrowseBounds.Contains(point))
+        {
+            BrowseForSCInstallPath();
+            return;
+        }
+
         // Action map filter selector click
         if (_searchFilter.FilterBounds.Contains(point) && _searchFilter.ActionMaps.Count > 0)
         {

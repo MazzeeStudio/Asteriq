@@ -8,9 +8,9 @@ namespace Asteriq.Services.Abstractions;
 public interface ISCInstallationService
 {
     /// <summary>
-    /// Optional custom installation path configured by user
+    /// Additional search paths configured by the user (e.g. custom game library locations)
     /// </summary>
-    string? CustomInstallPath { get; set; }
+    List<string> CustomSearchPaths { get; set; }
 
     /// <summary>
     /// Gets all detected SC installations (cached after first call)
@@ -31,4 +31,9 @@ public interface ISCInstallationService
     /// Gets installation by environment name
     /// </summary>
     SCInstallation? GetInstallation(string environment);
+
+    /// <summary>
+    /// Gets the auto-detected library paths where SC installations were found.
+    /// </summary>
+    List<string> GetAutoDetectedLibraryPaths();
 }

@@ -185,6 +185,14 @@ public class DevicesTabController : ITabController
             return;
         }
 
+        // Sync vJoy to physical device
+        if (_silhouette.SyncVJoyHovered && !_silhouette.SyncVJoyBounds.IsEmpty)
+        {
+            uint vjoyId = GetSelectedVJoyId();
+            if (vjoyId > 0) SyncVJoyToPhysical(vjoyId);
+            return;
+        }
+
         // Forwarding button clicks
         if (_forwarding.StartHovered && !_forwarding.StartBounds.IsEmpty)
         {
@@ -314,9 +322,10 @@ public class DevicesTabController : ITabController
         _actions.RemoveDeviceHovered = !_actions.RemoveDeviceBounds.IsEmpty && _actions.RemoveDeviceBounds.Contains(e.X, e.Y);
         _actions.HideFromViewHovered = !_actions.HideFromViewBounds.IsEmpty && _actions.HideFromViewBounds.Contains(e.X, e.Y);
         _silhouette.RemoveVJoyHovered = !_silhouette.RemoveVJoyBounds.IsEmpty && _silhouette.RemoveVJoyBounds.Contains(e.X, e.Y);
+        _silhouette.SyncVJoyHovered = !_silhouette.SyncVJoyBounds.IsEmpty && _silhouette.SyncVJoyBounds.Contains(e.X, e.Y);
 
         if (_actions.Map1to1Hovered || _actions.ClearMappingsHovered || _actions.RemoveDeviceHovered ||
-            _actions.HideFromViewHovered || _silhouette.RemoveVJoyHovered)
+            _actions.HideFromViewHovered || _silhouette.RemoveVJoyHovered || _silhouette.SyncVJoyHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         // "Include hidden" checkbox cursor
@@ -435,6 +444,7 @@ public class DevicesTabController : ITabController
         _silhouette.PrevHovered = false;
         _silhouette.NextHovered = false;
         _silhouette.RemoveVJoyHovered = false;
+        _silhouette.SyncVJoyHovered = false;
         _ctx.HoveredControlId = null;
     }
 
@@ -511,7 +521,7 @@ public class DevicesTabController : ITabController
                 ? "No physical devices detected"
                 : "No virtual devices detected";
             string helpMsg = _devCat.Active == 0
-                ? "Connect a joystick or gamepad"
+                ? "Connect a joystick, throttle, or other input device"
                 : "Install vJoy or start a virtual device";
             bool showClientHint = _devCat.Active == 0 && !_ctx.AppSettings.ClientOnlyMode;
 
@@ -806,8 +816,18 @@ public class DevicesTabController : ITabController
                 isDisconnected ? FUIColors.TextDim : FUIColors.TextPrimary, 14f);
             y += 20f;
 
-            FUIRenderer.DrawText(canvas, $"{device.AxisCount} axes  {device.ButtonCount} btns  {device.HatCount} hats",
-                new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
+            // Capabilities + VID:PID on same line
+            string capsText = $"{device.AxisCount} axes  {device.ButtonCount} btns  {device.HatCount} hats";
+            var (vid, pid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+            string vidPidText = vid > 0 ? $"{vid:X4}:{pid:X4}" : "";
+
+            FUIRenderer.DrawText(canvas, capsText, new SKPoint(contentBounds.Left + pad, y), FUIColors.TextDim, 12f);
+            if (!string.IsNullOrEmpty(vidPidText))
+            {
+                float vidPidWidth = FUIRenderer.MeasureText(vidPidText, 12f);
+                FUIRenderer.DrawText(canvas, vidPidText,
+                    new SKPoint(contentBounds.Right - pad - vidPidWidth, y), FUIColors.Active, 12f);
+            }
             y += 24f;
 
             float buttonWidth = contentBounds.Width - pad * 2;
@@ -939,6 +959,20 @@ public class DevicesTabController : ITabController
             FUIWidgets.DrawArrowButton(canvas, _silhouette.NextBounds, ">", _silhouette.NextHovered, hasNext);
             y += arrowButtonSize + buttonGap * 2;
 
+            // Sync to physical button — shown when a physical device is mapped
+            if (primaryDevice is not null)
+            {
+                float syncWidth = contentBounds.Width - pad * 2;
+                _silhouette.SyncVJoyBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + syncWidth, y + buttonHeight);
+                var syncState = _silhouette.SyncVJoyHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+                FUIRenderer.DrawButton(canvas, _silhouette.SyncVJoyBounds, "MATCH PHYSICAL", syncState);
+                y += buttonHeight + buttonGap;
+            }
+            else
+            {
+                _silhouette.SyncVJoyBounds = SKRect.Empty;
+            }
+
             // Remove vJoy device button
             float removeWidth = contentBounds.Width - pad * 2;
             _silhouette.RemoveVJoyBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + removeWidth, y + buttonHeight);
@@ -952,6 +986,7 @@ public class DevicesTabController : ITabController
             _actions.RemoveDeviceBounds = SKRect.Empty;
             _actions.HideFromViewBounds = SKRect.Empty;
             _silhouette.RemoveVJoyBounds = SKRect.Empty;
+            _silhouette.SyncVJoyBounds = SKRect.Empty;
             _silhouette.PrevBounds = SKRect.Empty;
             _silhouette.NextBounds = SKRect.Empty;
 
@@ -1396,6 +1431,95 @@ public class DevicesTabController : ITabController
         _ctx.MarkDirty();
     }
 
+    /// <summary>
+    /// Reconfigure a vJoy device to match its paired physical device's capabilities.
+    /// Deletes and recreates the vJoy slot via vJoyConfig.exe (requires UAC).
+    /// Preserves all existing mappings by keeping the same slot ID.
+    /// </summary>
+    private void SyncVJoyToPhysical(uint vjoyId)
+    {
+        var physical = GetPrimaryPhysicalDevice(vjoyId);
+        if (physical is null) return;
+
+        string? configPath = DriverSetupManager.GetVJoyConfigPath();
+        if (configPath is null)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "vJoyConfig.exe was not found in your vJoy installation.\n\n" +
+                "Please ensure vJoy is installed correctly.",
+                "vJoy Not Found");
+            return;
+        }
+
+        string[] axisNames = { "X", "Y", "Z", "RX", "RY", "RZ", "SL0", "SL1" };
+        int axisCount = Math.Min(physical.AxisCount, axisNames.Length);
+        int buttonCount = Math.Max(physical.ButtonCount, 1);
+        int povCount = physical.HatCount;
+
+        string message = $"Match vJoy Slot {vjoyId} to {physical.Name}?\n\n" +
+                         $"Axes: {axisCount}\n" +
+                         $"Buttons: {buttonCount}\n" +
+                         $"Hats: {povCount}\n\n" +
+                         "Existing mappings will be preserved.\nAn admin prompt will appear.";
+
+        bool confirmed = FUIMessageBox.ShowQuestion(_ctx.OwnerForm, message, "Match Physical Device");
+        if (!confirmed) return;
+
+        // Release the device before reconfiguring
+        _ctx.VJoyService.ReleaseDevice(vjoyId);
+
+        // Build vJoyConfig args: delete the slot then recreate with new capabilities
+        // vJoyConfig.exe supports applying a new config over an existing slot with -f (force)
+        string args = $"{vjoyId} -f";
+        if (axisCount > 0)
+            args += $" -a {string.Join(" ", axisNames.Take(axisCount))}";
+        if (buttonCount > 0)
+            args += $" -b {buttonCount}";
+        if (povCount > 0)
+            args += $" -p {povCount}";
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = configPath,
+                Arguments = args,
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            process?.WaitForExit(15000);
+
+            int exitCode = process?.ExitCode ?? -1;
+            if (exitCode != 0)
+            {
+                FUIMessageBox.ShowError(_ctx.OwnerForm,
+                    $"vJoyConfig.exe reported failure (exit code {exitCode}).\n\n" +
+                    "The device configuration may not have changed.",
+                    "Sync Failed");
+                return;
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            return; // User cancelled UAC
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                $"Failed to reconfigure vJoy device:\n{ex.Message}",
+                "Sync Failed");
+            return;
+        }
+
+        // Re-enumerate and refresh
+        _ctx.RefreshVJoyDevices?.Invoke();
+        _ctx.RefreshDevices?.Invoke();
+        _ctx.MarkDirty();
+    }
+
     #endregion
 
     #region Silhouette Picker
@@ -1598,6 +1722,8 @@ public class DevicesTabController : ITabController
         public bool NextHovered;
         public SKRect RemoveVJoyBounds;
         public bool RemoveVJoyHovered;
+        public SKRect SyncVJoyBounds;
+        public bool SyncVJoyHovered;
     }
 
     private sealed class SVGClickState

@@ -468,10 +468,13 @@ public partial class SCBindingsTabController : ITabController
             (!_colImport.ImportButtonBounds.IsEmpty && _colImport.ImportButtonBounds.Contains(e.X, e.Y)) ||
             (!_colImport.ClearColumnBounds.IsEmpty && _colImport.ClearColumnBounds.Contains(e.X, e.Y)) ||
             (!_colImport.ProfileSelectorBounds.IsEmpty && _colImport.ProfileSelectorBounds.Contains(e.X, e.Y)) ||
-            (!_colImport.ColumnSelectorBounds.IsEmpty && _colImport.ColumnSelectorBounds.Contains(e.X, e.Y)))
+            (!_colImport.ColumnSelectorBounds.IsEmpty && _colImport.ColumnSelectorBounds.Contains(e.X, e.Y)) ||
+            (!_scInstall.BrowseBounds.IsEmpty && _scInstall.BrowseBounds.Contains(e.X, e.Y)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
+
+        _scInstall.BrowseHovered = !_scInstall.BrowseBounds.IsEmpty && _scInstall.BrowseBounds.Contains(e.X, e.Y);
 
         bool showColumnActions = IsColumnActionsVisible();
 
@@ -620,6 +623,7 @@ public partial class SCBindingsTabController : ITabController
     public void OnMouseLeave()
     {
         _scInstall.HoveredInstallation = -1;
+        _scInstall.BrowseHovered = false;
         _scHoveredActionIndex = -1;
         _cell.HoveredCell = (-1, -1);
     }
@@ -649,6 +653,56 @@ public partial class SCBindingsTabController : ITabController
 
     public void OnDeactivated() { }
 
+    private void BrowseForSCInstallPath()
+    {
+        // When no installations exist, go straight to folder browse for quick setup
+        if (_scInstall.Installations.Count == 0)
+        {
+            using var folderDialog = new FolderBrowserDialog
+            {
+                Description = "Select Star Citizen library folder (e.g. Roberts Space Industries)",
+                ShowNewFolderButton = false,
+                UseDescriptionForTitle = true
+            };
+
+            if (folderDialog.ShowDialog(_ctx.OwnerForm) != DialogResult.OK)
+                return;
+
+            _ctx.AppSettings.AddCustomSCSearchPath(folderDialog.SelectedPath);
+            SyncCustomPathsAndRefresh();
+            return;
+        }
+
+        // When installations exist, show the libraries management dialog
+        var autoDetected = _scInstallationService.GetAutoDetectedLibraryPaths();
+        var custom = _ctx.AppSettings.CustomSCSearchPaths;
+
+        bool changed = SCLibrariesDialog.Show(_ctx.OwnerForm, autoDetected, custom,
+            out var addedPaths, out var removedPaths);
+
+        if (!changed)
+            return;
+
+        foreach (var path in addedPaths)
+            _ctx.AppSettings.AddCustomSCSearchPath(path);
+        foreach (var path in removedPaths)
+            _ctx.AppSettings.RemoveCustomSCSearchPath(path);
+
+        SyncCustomPathsAndRefresh();
+    }
+
+    private void SyncCustomPathsAndRefresh()
+    {
+        _scInstallationService.CustomSearchPaths = _ctx.AppSettings.CustomSCSearchPaths;
+        _scInstallationService.Refresh();
+        RefreshSCInstallations();
+
+        if (_scInstall.Installations.Count > 0 && _scInstall.SelectedInstallation < _scInstall.Installations.Count)
+            LoadSCSchema(_scInstall.Installations[_scInstall.SelectedInstallation], autoLoadProfileForEnvironment: true);
+
+        _ctx.MarkDirty();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // State classes — each groups logically-related fields for one sub-feature.
     // All fields are public so partial files can access them via the instance.
@@ -666,6 +720,8 @@ public partial class SCBindingsTabController : ITabController
         public bool DropdownOpen;
         public SKRect DropdownBounds;
         public int HoveredInstallation = -1;
+        public SKRect BrowseBounds;
+        public bool BrowseHovered;
     }
 
     private sealed class GridLayoutState

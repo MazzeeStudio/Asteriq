@@ -241,7 +241,7 @@ public partial class MappingsTabController : ITabController
         if (HandleAxisSettingsClick(e)) return;
         if (HandleDeviceOrderClick(e)) return;
         if (HandleNetSwitchClick(e)) return;
-        if (HandleVJoyNavigationClick()) return;
+        if (HandleVJoyNavigationClick(e)) return;
         HandleMappingRowClick();
     }
 
@@ -284,7 +284,7 @@ public partial class MappingsTabController : ITabController
         bool hasSelection = _selectedMappingRow >= 0 && _selectionIsExplicit;
 
         // Add input button — toggles listening
-        if (_addInputButtonHovered && hasSelection)
+        if (_addInputButtonBounds.Contains(e.X, e.Y) && hasSelection)
         {
             if (_inputDetection.IsListening) CancelInputListening();
             else StartInputListening(_selectedMappingRow);
@@ -292,20 +292,38 @@ public partial class MappingsTabController : ITabController
         }
 
         // Remove input source
-        if (_hoveredInputSourceRemove >= 0 && _selectionIsExplicit)
-        { RemoveInputSourceAtIndex(_hoveredInputSourceRemove); return true; }
+        if (_selectionIsExplicit)
+        {
+            for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
+            {
+                if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
+                { RemoveInputSourceAtIndex(i); return true; }
+            }
+        }
 
         // Merge operation (axis category, 2+ inputs)
-        if (_mappingCategory == 1 && hasSelection && _hoveredMergeOpButton >= 0)
-        { UpdateMergeOperationForSelected(_hoveredMergeOpButton); return true; }
+        if (_mappingCategory == 1 && hasSelection)
+        {
+            for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
+            {
+                if (_mergeOpButtonBounds[i].HitTest(e.X, e.Y))
+                { UpdateMergeOperationForSelected(i); return true; }
+            }
+        }
 
         // Button mode selection — blocked for modifier keys
         bool selectedIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
-        if (_mappingCategory == 0 && hasSelection && _buttonMode.HoveredMode >= 0 && !selectedIsModifier)
+        if (_mappingCategory == 0 && hasSelection && !selectedIsModifier)
         {
-            _buttonMode.SelectedMode = (ButtonMode)_buttonMode.HoveredMode;
-            UpdateButtonModeForSelected();
-            return true;
+            for (int i = 0; i < _buttonMode.ModeBounds.Length; i++)
+            {
+                if (_buttonMode.ModeBounds[i].Contains(e.X, e.Y))
+                {
+                    _buttonMode.SelectedMode = (ButtonMode)i;
+                    UpdateButtonModeForSelected();
+                    return true;
+                }
+            }
         }
 
         // Pulse duration slider
@@ -327,21 +345,31 @@ public partial class MappingsTabController : ITabController
         }
 
         // Output type selection
-        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.HoveredOutputType >= 0)
+        if (_mappingCategory == 0 && hasSelection)
         {
-            _keyboardOutput.IsKeyboard = (_keyboardOutput.HoveredOutputType == 1);
-            if (!_keyboardOutput.IsKeyboard)
+            if (_keyboardOutput.BtnBounds.Contains(e.X, e.Y))
+            {
+                _keyboardOutput.IsKeyboard = false;
                 _keyboardOutput.SelectedKeyName = "";
-            UpdateOutputTypeForSelected();
-            return true;
+                UpdateOutputTypeForSelected();
+                return true;
+            }
+            if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
+            {
+                _keyboardOutput.IsKeyboard = true;
+                UpdateOutputTypeForSelected();
+                return true;
+            }
         }
 
         // Key clear button
-        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard && _keyboardOutput.ClearHovered)
+        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard
+            && _keyboardOutput.ClearBounds.HitTest(e.X, e.Y))
         { ClearKeyboardBinding(); return true; }
 
         // Key capture field
-        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard && _keyboardOutput.CaptureHovered)
+        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard
+            && _keyboardOutput.CaptureBounds.Contains(e.X, e.Y))
         {
             _keyboardOutput.IsCapturing = true;
             _keyboardOutput.CaptureStartTicks = Environment.TickCount64;
@@ -349,7 +377,7 @@ public partial class MappingsTabController : ITabController
         }
 
         // Clear Mapping button
-        if (_mappingCategory == 0 && hasSelection && _clearAllButtonHovered)
+        if (_mappingCategory == 0 && hasSelection && _clearAllButtonBounds.Contains(e.X, e.Y))
         { ClearSelectedButtonMapping(); return true; }
 
         return false;
@@ -489,16 +517,16 @@ public partial class MappingsTabController : ITabController
         return false;
     }
 
-    private bool HandleVJoyNavigationClick()
+    private bool HandleVJoyNavigationClick(MouseEventArgs e)
     {
-        if (_vjoyPrevHovered && _ctx.SelectedVJoyDeviceIndex > 0)
+        if (_vjoyPrevButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex > 0)
         {
             _ctx.SelectedVJoyDeviceIndex--;
             ResetMappingSelectionState();
             return true;
         }
 
-        if (_vjoyNextHovered && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
+        if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
         {
             _ctx.SelectedVJoyDeviceIndex++;
             _selectionIsExplicit = false;

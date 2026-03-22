@@ -124,11 +124,11 @@ public class DevicesTabController : ITabController
         if (e.Button != MouseButtons.Left) return;
 
         if (HandleCategoryTabClick()) return;
-        if (HandleDeviceActionClick()) return;
+        if (HandleDeviceActionClick(e)) return;
         if (HandleHiddenCheckboxClick(e)) return;
-        if (HandleSilhouetteClick()) return;
-        if (HandleVJoyActionClick()) return;
-        if (HandleForwardingClick()) return;
+        if (HandleSilhouetteClick(e)) return;
+        if (HandleVJoyActionClick(e)) return;
+        if (HandleForwardingClick(e)) return;
         if (HandleDeviceListClick(e)) return;
         HandleSvgClick(e);
     }
@@ -143,18 +143,18 @@ public class DevicesTabController : ITabController
         return true;
     }
 
-    private bool HandleDeviceActionClick()
+    private bool HandleDeviceActionClick(MouseEventArgs e)
     {
-        if (_actions.Map1to1Hovered && !_actions.Map1to1Bounds.IsEmpty)
+        if (_actions.Map1to1Bounds.HitTest(e.X, e.Y))
         { _ctx.CreateOneToOneMappings?.Invoke(); return true; }
 
-        if (_actions.ClearMappingsHovered && !_actions.ClearMappingsBounds.IsEmpty)
+        if (_actions.ClearMappingsBounds.HitTest(e.X, e.Y))
         { _ctx.ClearDeviceMappings?.Invoke(); return true; }
 
-        if (_actions.RemoveDeviceHovered && !_actions.RemoveDeviceBounds.IsEmpty)
+        if (_actions.RemoveDeviceBounds.HitTest(e.X, e.Y))
         { _ctx.RemoveDisconnectedDevice?.Invoke(); return true; }
 
-        if (_actions.HideFromViewHovered && !_actions.HideFromViewBounds.IsEmpty)
+        if (_actions.HideFromViewBounds.HitTest(e.X, e.Y))
         { ToggleHideFromView(); return true; }
 
         return false;
@@ -171,23 +171,24 @@ public class DevicesTabController : ITabController
         return true;
     }
 
-    private bool HandleSilhouetteClick()
+    private bool HandleSilhouetteClick(MouseEventArgs e)
     {
-        if (_silhouette.PrevHovered) { StepSilhouette(-1); return true; }
-        if (_silhouette.NextHovered) { StepSilhouette(+1); return true; }
+        var (_, hasPrev, hasNext) = GetSilhouettePickerState();
+        if (_silhouette.PrevBounds.HitTest(e.X, e.Y) && hasPrev) { StepSilhouette(-1); return true; }
+        if (_silhouette.NextBounds.HitTest(e.X, e.Y) && hasNext) { StepSilhouette(+1); return true; }
         return false;
     }
 
-    private bool HandleVJoyActionClick()
+    private bool HandleVJoyActionClick(MouseEventArgs e)
     {
-        if (_silhouette.SyncVJoyHovered && !_silhouette.SyncVJoyBounds.IsEmpty)
+        if (_silhouette.SyncVJoyBounds.HitTest(e.X, e.Y))
         {
             uint vjoyId = GetSelectedVJoyId();
             if (vjoyId > 0) SyncVJoyToPhysical(vjoyId);
             return true;
         }
 
-        if (_silhouette.RemoveVJoyHovered && !_silhouette.RemoveVJoyBounds.IsEmpty)
+        if (_silhouette.RemoveVJoyBounds.HitTest(e.X, e.Y))
         {
             uint vjoyId = GetSelectedVJoyId();
             if (vjoyId > 0) RemoveVJoyDevice(vjoyId);
@@ -197,12 +198,12 @@ public class DevicesTabController : ITabController
         return false;
     }
 
-    private bool HandleForwardingClick()
+    private bool HandleForwardingClick(MouseEventArgs e)
     {
-        if (_forwarding.StartHovered && !_forwarding.StartBounds.IsEmpty)
+        if (_forwarding.StartBounds.HitTest(e.X, e.Y))
         { StartForwarding(); return true; }
 
-        if (_forwarding.StopHovered && !_forwarding.StopBounds.IsEmpty)
+        if (_forwarding.StopBounds.HitTest(e.X, e.Y))
         { StopForwarding(); return true; }
 
         return false;

@@ -307,6 +307,34 @@ public class ApplicationSettingsService : IApplicationSettingsService
         SaveSettings(_cachedSettings);
     }
 
+    public List<string> CustomSCSearchPaths
+    {
+        get => _cachedSettings.CustomSCSearchPaths;
+        set
+        {
+            _cachedSettings.CustomSCSearchPaths = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public void AddCustomSCSearchPath(string path)
+    {
+        if (!_cachedSettings.CustomSCSearchPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+        {
+            _cachedSettings.CustomSCSearchPaths.Add(path);
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public void RemoveCustomSCSearchPath(string path)
+    {
+        if (_cachedSettings.CustomSCSearchPaths.RemoveAll(p =>
+            p.Equals(path, StringComparison.OrdinalIgnoreCase)) > 0)
+        {
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public bool IsDeviceHidden(string instanceGuid) =>
         _cachedSettings.HiddenDeviceGuids.Contains(instanceGuid);
 
@@ -395,6 +423,8 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public List<string> HiddenDeviceGuids { get; set; } = new();
         /// <summary>Whether the "Include hidden" checkbox in the Devices tab was last enabled.</summary>
         public bool DevicesIncludeHidden { get; set; } = false;
+        /// <summary>User-configured additional search paths for SC installations.</summary>
+        public List<string> CustomSCSearchPaths { get; set; } = new();
     }
 
     /// <summary>

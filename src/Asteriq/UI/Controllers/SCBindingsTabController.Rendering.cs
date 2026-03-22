@@ -25,7 +25,7 @@ public partial class SCBindingsTabController
         //   2. Control Profiles (fills remaining, collapses when contextual panel is expanded)
         //   3. Column Actions or Cell Details (contextual, bottom-anchored, mutually exclusive)
         float verticalGap = 8f;
-        float installationHeight = 90f;
+        float installationHeight = 110f;
 
 
         var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
@@ -115,15 +115,80 @@ public partial class SCBindingsTabController
         float y = m.Y;
         FUIWidgets.DrawPanelTitle(canvas, m.LeftMargin, m.RightMargin, ref y, "GAME ENVIRONMENT");
 
+        bool hasInstallations = _scInstall.Installations.Count > 0;
         float selectorHeight = 32f;
-        _scInstall.SelectorBounds = new SKRect(m.LeftMargin, y, m.RightMargin, y + selectorHeight);
 
-        string installationText = _scInstall.Installations.Count > 0 && _scInstall.SelectedInstallation < _scInstall.Installations.Count
-            ? _scInstall.Installations[_scInstall.SelectedInstallation].DisplayName
-            : "No SC found";
+        if (hasInstallations)
+        {
+            _scInstall.SelectorBounds = new SKRect(m.LeftMargin, y, m.RightMargin, y + selectorHeight);
 
-        bool selectorHovered = _scInstall.SelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawSelector(canvas, _scInstall.SelectorBounds, installationText, selectorHovered || _scInstall.DropdownOpen, _scInstall.Installations.Count > 0);
+            string installationText = _scInstall.SelectedInstallation < _scInstall.Installations.Count
+                ? _scInstall.Installations[_scInstall.SelectedInstallation].DisplayName
+                : "No SC found";
+
+            bool selectorHovered = _scInstall.SelectorBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            FUIWidgets.DrawSelector(canvas, _scInstall.SelectorBounds, installationText, selectorHovered || _scInstall.DropdownOpen, true);
+            y += selectorHeight + 6f; // +2px extra spacing from selector
+
+            // Path + pencil "Manage" link on same line
+            var installation = _scInstall.SelectedInstallation < _scInstall.Installations.Count
+                ? _scInstall.Installations[_scInstall.SelectedInstallation]
+                : null;
+
+            const float detailFontSize = 12f;
+            float manageTextWidth = FUIRenderer.MeasureText("Manage", detailFontSize);
+            float pencilGap = 14f; // space for pencil icon
+            float manageTotalWidth = pencilGap + manageTextWidth;
+            float pathMaxWidth = m.RightMargin - m.LeftMargin - manageTotalWidth - 8f;
+
+            float detailLineY = y + 11f; // text baseline for path and "Manage"
+
+            if (installation is not null)
+            {
+                FUIRenderer.DrawTextTruncated(canvas, installation.InstallPath, new SKPoint(m.LeftMargin, detailLineY),
+                    pathMaxWidth, FUIColors.TextDim, detailFontSize);
+            }
+
+            // Manage link bounds (pencil icon + text)
+            float manageX = m.RightMargin - manageTotalWidth;
+            _scInstall.BrowseBounds = new SKRect(manageX - 4f, y, m.RightMargin + 4f, y + 20f);
+            _scInstall.BrowseHovered = _scInstall.BrowseBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            var manageColor = _scInstall.BrowseHovered ? FUIColors.TextBright : FUIColors.TextDim;
+
+            // Draw pencil icon — vertically centred on the text line
+            float pcx = manageX + 6f;
+            float pcy = detailLineY - 4f; // centre pencil on text midpoint
+            using (var penPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = manageColor,
+                StrokeWidth = 1.2f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            })
+            {
+                canvas.DrawLine(pcx - 4f, pcy + 4f, pcx + 3f, pcy - 3f, penPaint); // body
+                canvas.DrawLine(pcx - 4f, pcy + 4f, pcx - 5f, pcy + 5.5f, penPaint); // tip
+                canvas.DrawLine(pcx + 3f, pcy - 3f, pcx + 5f, pcy - 5f, penPaint); // top
+            }
+
+            // Draw "Manage" text
+            FUIRenderer.DrawText(canvas, "Manage", new SKPoint(manageX + pencilGap, detailLineY), manageColor, detailFontSize);
+        }
+        else
+        {
+            _scInstall.SelectorBounds = SKRect.Empty;
+
+            // Browse button + helper text
+            float browseHeight = 28f;
+            _scInstall.BrowseBounds = new SKRect(m.LeftMargin, y, m.RightMargin, y + browseHeight);
+            var browseState = _scInstall.BrowseHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
+            FUIRenderer.DrawButton(canvas, _scInstall.BrowseBounds, "SET STAR CITIZEN PATH", browseState);
+            y += browseHeight + 4f;
+
+            FUIRenderer.DrawText(canvas, "Star Citizen not found",
+                new SKPoint(m.LeftMargin, y + 10f), FUIColors.TextDim, 12f);
+        }
     }
 
     private void DrawSCInstallationDropdown(SKCanvas canvas)

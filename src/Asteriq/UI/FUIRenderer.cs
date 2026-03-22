@@ -1079,7 +1079,7 @@ public static class FUIRenderer
     public enum ButtonState { Normal, Hover, Active, Disabled }
 
     public static void DrawButton(SKCanvas canvas, SKRect bounds, string text,
-        ButtonState state, bool isDanger = false)
+        ButtonState state, bool isDanger = false, float fontSize = 14f)
     {
         var accent = isDanger ? FUIColors.Danger : FUIColors.Active;
 
@@ -1132,7 +1132,7 @@ public static class FUIRenderer
         using var framePaint = CreateStrokePaint(frameColor, LineWeight);
         canvas.DrawPath(bgPath, framePaint);
 
-        DrawTextCentered(canvas, text, bounds, textColor, 14f, withGlow && state == ButtonState.Active);
+        DrawTextCentered(canvas, text, bounds, textColor, fontSize, withGlow && state == ButtonState.Active);
     }
 
     public static void DrawTabButtonRow(SKCanvas canvas, float x, float y, int count, int activeIndex,

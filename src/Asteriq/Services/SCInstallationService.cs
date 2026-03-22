@@ -12,18 +12,17 @@ namespace Asteriq.Services;
 public class SCInstallationService : ISCInstallationService
 {
     private readonly List<SCInstallation> _installations = new();
-    private string? _customInstallPath;
+    private List<string> _customSearchPaths = new();
 
     /// <summary>
-    /// Optional custom installation path configured by user
+    /// Additional search paths configured by the user (e.g. custom game library locations)
     /// </summary>
-    public string? CustomInstallPath
+    public List<string> CustomSearchPaths
     {
-        get => _customInstallPath;
+        get => _customSearchPaths;
         set
         {
-            _customInstallPath = value;
-            // Clear cache when custom path changes
+            _customSearchPaths = value ?? new();
             _installations.Clear();
         }
     }
@@ -103,10 +102,13 @@ public class SCInstallationService : ISCInstallationService
     {
         _installations.Clear();
 
-        // First check custom path if configured
-        if (!string.IsNullOrEmpty(_customInstallPath) && Directory.Exists(_customInstallPath))
+        // First check custom paths if configured
+        foreach (var customPath in _customSearchPaths)
         {
-            CheckCustomPath(_customInstallPath);
+            if (!string.IsNullOrEmpty(customPath) && Directory.Exists(customPath))
+            {
+                CheckCustomPath(customPath);
+            }
         }
 
         // Then do auto-detection
@@ -284,6 +286,28 @@ public class SCInstallationService : ISCInstallationService
 
         // Default to modern path (will be created on export)
         return modernPath;
+    }
+
+    /// <summary>
+    /// Gets the auto-detected library paths where SC installations were found.
+    /// These are the parent directories containing Roberts Space Industries\StarCitizen.
+    /// </summary>
+    public List<string> GetAutoDetectedLibraryPaths()
+    {
+        var paths = new List<string>();
+        var searchRoots = GetSearchRoots();
+        foreach (var root in searchRoots)
+        {
+            var rsiPath = Path.Combine(root, "Roberts Space Industries", "StarCitizen");
+            if (Directory.Exists(rsiPath))
+            {
+                // Return the RSI parent (e.g. C:\Program Files\Roberts Space Industries)
+                var rsiParent = Path.Combine(root, "Roberts Space Industries");
+                if (!paths.Contains(rsiParent, StringComparer.OrdinalIgnoreCase))
+                    paths.Add(rsiParent);
+            }
+        }
+        return paths;
     }
 
     /// <summary>

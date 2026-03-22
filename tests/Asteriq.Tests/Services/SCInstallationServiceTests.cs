@@ -35,7 +35,7 @@ public class SCInstallationServiceTests : IDisposable
     {
         var service = new SCInstallationService();
         // Use a custom path that doesn't exist
-        service.CustomInstallPath = Path.Combine(_testDir, "nonexistent");
+        service.CustomSearchPaths = new List<string> { Path.Combine(_testDir, "nonexistent") };
 
         // Note: This test may find real SC installations on the system
         // We're primarily testing that the service doesn't crash
@@ -45,18 +45,18 @@ public class SCInstallationServiceTests : IDisposable
     }
 
     [Fact]
-    public void CustomInstallPath_ClearsCache()
+    public void CustomSearchPaths_ClearsCache()
     {
         var service = new SCInstallationService();
 
         // Access installations to populate cache
         _ = service.Installations;
 
-        // Change custom path should clear cache
-        service.CustomInstallPath = _testDir;
+        // Change custom paths should clear cache
+        service.CustomSearchPaths = new List<string> { _testDir };
 
         // Should not throw
-        Assert.Equal(_testDir, service.CustomInstallPath);
+        Assert.Contains(_testDir, service.CustomSearchPaths);
     }
 
     [Fact]

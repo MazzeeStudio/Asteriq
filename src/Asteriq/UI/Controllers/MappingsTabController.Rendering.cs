@@ -83,8 +83,7 @@ public partial class MappingsTabController
 
     private void DrawBindingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
-        // Vertical side tabs width
-        float sideTabWidth = 28f;
+        float sideTabWidth = FUIRenderer.SideTabWidth;
 
         // Panel shadow
         FUIRenderer.DrawPanelShadow(canvas, bounds, 3f, 3f, 10f);

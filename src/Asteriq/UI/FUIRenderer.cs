@@ -209,6 +209,7 @@ public static class FUIRenderer
     public const float ButtonHeightSmall = 24f;    // Compact inline button
     public const float SelectorHeight = 32f;       // Dropdown selector control
     public const float PanelHeaderHeight = 52f;    // Collapsible panel header click area
+    public const float SideTabWidth = 28f;         // Vertical side-tab strip width
 
     // Line heights for proper text spacing
     public const float LineHeightCaption = 19f;

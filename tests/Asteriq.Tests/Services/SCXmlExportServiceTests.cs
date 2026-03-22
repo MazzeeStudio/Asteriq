@@ -25,7 +25,7 @@ public class SCXmlExportServiceTests
     {
         var profile = CreateTestProfile();
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         Assert.NotNull(doc.Root);
         Assert.Equal("ActionMaps", doc.Root.Name.LocalName);
@@ -36,7 +36,7 @@ public class SCXmlExportServiceTests
     {
         var profile = CreateTestProfile();
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         Assert.Equal("1", doc.Root?.Attribute("version")?.Value);
         Assert.Equal("2", doc.Root?.Attribute("optionsVersion")?.Value);
@@ -49,7 +49,7 @@ public class SCXmlExportServiceTests
     {
         var profile = CreateTestProfile();
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var header = doc.Root?.Element("CustomisationUIHeader");
         Assert.NotNull(header);
@@ -63,7 +63,7 @@ public class SCXmlExportServiceTests
         profile.SetSCInstance(1, 1);
         profile.SetSCInstance(2, 2);
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var devices = doc.Root?.Element("CustomisationUIHeader")?.Element("devices");
         Assert.NotNull(devices);
@@ -79,7 +79,7 @@ public class SCXmlExportServiceTests
         profile.SetSCInstance(1, 1);
         profile.SetSCInstance(2, 2);
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var options = doc.Root?.Elements("options").ToList();
         Assert.Equal(2, options?.Count);
@@ -108,7 +108,7 @@ public class SCXmlExportServiceTests
             InputType = SCInputType.Button
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var actionMaps = doc.Root?.Elements("actionmap").ToList();
         Assert.Equal(2, actionMaps?.Count);
@@ -129,7 +129,7 @@ public class SCXmlExportServiceTests
             InputType = SCInputType.Axis
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("js1_y", rebind.Attribute("input")?.Value);
@@ -149,7 +149,7 @@ public class SCXmlExportServiceTests
             Inverted = true
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("1", rebind.Attribute("invert")?.Value);
@@ -169,7 +169,7 @@ public class SCXmlExportServiceTests
             Inverted = true // Should be ignored for buttons
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Null(rebind.Attribute("invert"));
@@ -189,7 +189,7 @@ public class SCXmlExportServiceTests
             ActivationMode = SCActivationMode.DoubleTap
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("double_tap", rebind.Attribute("activationMode")?.Value);
@@ -209,7 +209,7 @@ public class SCXmlExportServiceTests
             ActivationMode = SCActivationMode.Press
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Null(rebind.Attribute("activationMode"));
@@ -228,7 +228,7 @@ public class SCXmlExportServiceTests
             InputName = "y"
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("js3_y", rebind.Attribute("input")?.Value);
@@ -240,7 +240,7 @@ public class SCXmlExportServiceTests
         var profile = CreateTestProfile();
         // No bindings
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var actionMaps = doc.Root?.Elements("actionmap").ToList();
         Assert.Empty(actionMaps ?? new List<XElement>());
@@ -255,7 +255,7 @@ public class SCXmlExportServiceTests
     {
         var profile = new SCExportProfile { ProfileName = "" };
 
-        var result = _service.Validate(profile);
+        var result = SCXmlExportService.Validate(profile);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("name"));
@@ -267,7 +267,7 @@ public class SCXmlExportServiceTests
         var profile = CreateTestProfile();
         // No bindings
 
-        var result = _service.Validate(profile);
+        var result = SCXmlExportService.Validate(profile);
 
         Assert.True(result.IsValid);
         Assert.True(result.HasWarnings);
@@ -293,7 +293,7 @@ public class SCXmlExportServiceTests
             InputName = "button2"
         });
 
-        var result = _service.Validate(profile);
+        var result = SCXmlExportService.Validate(profile);
 
         Assert.True(result.HasWarnings);
         Assert.Contains(result.Warnings, w => w.Contains("Duplicate"));
@@ -312,7 +312,7 @@ public class SCXmlExportServiceTests
             InputName = "button1"
         });
 
-        var result = _service.Validate(profile);
+        var result = SCXmlExportService.Validate(profile);
 
         Assert.True(result.HasWarnings);
         Assert.Contains(result.Warnings, w => w.Contains("vJoy device 2"));
@@ -330,7 +330,7 @@ public class SCXmlExportServiceTests
             InputName = "button1"
         });
 
-        var result = _service.Validate(profile);
+        var result = SCXmlExportService.Validate(profile);
 
         Assert.True(result.IsValid);
     }
@@ -440,7 +440,7 @@ public class SCXmlExportServiceTests
             InputType = SCInputType.Button
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("kb1_w", rebind.Attribute("input")?.Value);
@@ -459,7 +459,7 @@ public class SCXmlExportServiceTests
             InputType = SCInputType.Button
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("mo1_mouse1", rebind.Attribute("input")?.Value);
@@ -485,7 +485,7 @@ public class SCXmlExportServiceTests
             InputName = "y"
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var action = doc.Descendants("action").First(a => a.Attribute("name")?.Value == "v_strafe_forward");
         var rebinds = action.Elements("rebind").ToList();
@@ -507,7 +507,7 @@ public class SCXmlExportServiceTests
             Modifiers = new List<string> { "lalt" }
         });
 
-        var doc = _service.Export(profile);
+        var doc = SCXmlExportService.Export(profile);
 
         var rebind = doc.Descendants("rebind").First();
         Assert.Equal("kb1_lalt+t", rebind.Attribute("input")?.Value);

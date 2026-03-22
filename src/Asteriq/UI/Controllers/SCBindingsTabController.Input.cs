@@ -26,7 +26,7 @@ public partial class SCBindingsTabController
         }
 
         // "Show JS ref" checkbox
-        if (!_searchFilter.ShowJSRefBounds.IsEmpty && _searchFilter.ShowJSRefBounds.Contains(point))
+        if (_searchFilter.ShowJSRefBounds.HitTest(point))
         {
             _ctx.AppSettings.SCBindingsShowPhysicalHeaders = !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
             _ctx.MarkDirty();
@@ -42,7 +42,7 @@ public partial class SCBindingsTabController
             // Profile dropdown — close on outside click
             if (_colImport.ProfileDropdownOpen)
             {
-                if (!_colImport.ProfileDropdownBounds.IsEmpty && _colImport.ProfileDropdownBounds.Contains(point))
+                if (_colImport.ProfileDropdownBounds.HitTest(point))
                 {
                     var (savedProfiles, xmlFiles) = GetColImportSources();
                     int totalSources = savedProfiles.Count + xmlFiles.Count;
@@ -68,7 +68,7 @@ public partial class SCBindingsTabController
             // Column dropdown — close on outside click
             if (_colImport.ColumnDropdownOpen)
             {
-                if (!_colImport.ColumnDropdownBounds.IsEmpty && _colImport.ColumnDropdownBounds.Contains(point))
+                if (_colImport.ColumnDropdownBounds.HitTest(point))
                 {
                     float itemH = 28f;
                     int idx = (int)((point.Y - _colImport.ColumnDropdownBounds.Top) / itemH);
@@ -86,19 +86,19 @@ public partial class SCBindingsTabController
                 }
             }
 
-            if (!_colImport.ClearColumnBounds.IsEmpty && _colImport.ClearColumnBounds.Contains(point))
+            if (_colImport.ClearColumnBounds.HitTest(point))
             {
                 ClearColumnBindings();
                 return;
             }
 
-            if (!_colImport.ImportButtonBounds.IsEmpty && _colImport.ImportButtonBounds.Contains(point))
+            if (_colImport.ImportButtonBounds.HitTest(point))
             {
                 ExecuteImportFromProfile();
                 return;
             }
 
-            if (!_colImport.ProfileSelectorBounds.IsEmpty && _colImport.ProfileSelectorBounds.Contains(point))
+            if (_colImport.ProfileSelectorBounds.HitTest(point))
             {
                 var (savedProfiles, xmlFiles) = GetColImportSources();
                 if (savedProfiles.Count + xmlFiles.Count > 0)
@@ -110,7 +110,7 @@ public partial class SCBindingsTabController
                 return;
             }
 
-            if (!_colImport.ColumnSelectorBounds.IsEmpty && _colImport.ColumnSelectorBounds.Contains(point))
+            if (_colImport.ColumnSelectorBounds.HitTest(point))
             {
                 if (_colImport.SourceColumns.Count > 0)
                 {
@@ -372,20 +372,20 @@ public partial class SCBindingsTabController
         }
 
         // Panel header clicks — Control Profiles / contextual panel mutual-exclusive expand
-        if (!_cpPanel.HeaderBounds.IsEmpty && _cpPanel.HeaderBounds.Contains(point))
+        if (_cpPanel.HeaderBounds.HitTest(point))
         {
             // Toggle Control Profiles expand — contextual panel stays visible but collapses
             _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
             _ctx.MarkDirty();
             return;
         }
-        if (!_colImport.HeaderBounds.IsEmpty && _colImport.HeaderBounds.Contains(point) && showColumnActions)
+        if (_colImport.HeaderBounds.HitTest(point) && showColumnActions)
         {
             _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
             _ctx.MarkDirty();
             return;
         }
-        if (!_cellDetails.HeaderBounds.IsEmpty && _cellDetails.HeaderBounds.Contains(point))
+        if (_cellDetails.HeaderBounds.HitTest(point))
         {
             _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
             _ctx.MarkDirty();
@@ -406,7 +406,7 @@ public partial class SCBindingsTabController
                 {
                     for (int i = 0; i < _cellDetails.ActivationModeBounds.Length; i++)
                     {
-                        if (!_cellDetails.ActivationModeBounds[i].IsEmpty && _cellDetails.ActivationModeBounds[i].Contains(point))
+                        if (_cellDetails.ActivationModeBounds[i].HitTest(point))
                         {
                             var newMode = (SCActivationMode)i;
                             if (binding.ActivationMode != newMode)
@@ -433,7 +433,7 @@ public partial class SCBindingsTabController
         }
 
         // Browse for SC install path
-        if (!_scInstall.BrowseBounds.IsEmpty && _scInstall.BrowseBounds.Contains(point))
+        if (_scInstall.BrowseBounds.HitTest(point))
         {
             BrowseForSCInstallPath();
             return;
@@ -488,8 +488,8 @@ public partial class SCBindingsTabController
                 _searchFilter.CaptureDeviceHidPath = null;
                 _searchFilter.SearchBoxFocused = true;
 
-                bool isDoubleClick = (DateTime.Now - _searchFilter.LastSearchClickTime).TotalMilliseconds < 400;
-                _searchFilter.LastSearchClickTime = DateTime.Now;
+                bool isDoubleClick = Environment.TickCount64 - _searchFilter.LastSearchClickTicks < SystemInformation.DoubleClickTime;
+                _searchFilter.LastSearchClickTicks = Environment.TickCount64;
 
                 if (isDoubleClick && !string.IsNullOrEmpty(_searchFilter.SearchText))
                 {
@@ -563,7 +563,7 @@ public partial class SCBindingsTabController
         // Conflict link clicks — navigate to the conflicting action
         for (int ci = 0; ci < _conflicts.ConflictLinkBounds.Count; ci++)
         {
-            if (!_conflicts.ConflictLinkBounds[ci].IsEmpty && _conflicts.ConflictLinkBounds[ci].Contains(point))
+            if (_conflicts.ConflictLinkBounds[ci].HitTest(point))
             {
                 if (_scFilteredActions is not null && ci < _conflicts.ConflictLinks.Count)
                 {
@@ -820,7 +820,7 @@ public partial class SCBindingsTabController
             if (_colImport.HighlightedColumn >= 0)
                 DeselectColumn();
             _cell.SelectedCell = (actionIndex, colIndex);
-            _cell.LastCellClickTime = DateTime.Now;
+            _cell.LastCellClickTicks = Environment.TickCount64;
             _cpPanel.IsExpanded = false; // Auto-expand Cell Details
             UpdateConflictLinks();
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected read-only cell ({actionIndex}, {colIndex}) - {col.Header}");
@@ -829,7 +829,7 @@ public partial class SCBindingsTabController
 
         // Check for double-click on the same cell (within 400ms)
         bool isDoubleClick = _cell.SelectedCell == (actionIndex, colIndex) &&
-                            (DateTime.Now - _cell.LastCellClickTime).TotalMilliseconds < 400;
+                            Environment.TickCount64 - _cell.LastCellClickTicks < SystemInformation.DoubleClickTime;
 
         // Shared cells: select normally but never enter listen mode — use CLEAR/right-click to unshare
         if (col.IsJoystick && !col.IsPhysical)
@@ -841,7 +841,7 @@ public partial class SCBindingsTabController
                 if (_colImport.HighlightedColumn >= 0)
                     DeselectColumn();
                 _cell.SelectedCell = (actionIndex, colIndex);
-                _cell.LastCellClickTime = DateTime.Now;
+                _cell.LastCellClickTicks = Environment.TickCount64;
                 _cpPanel.IsExpanded = false; // Auto-expand Cell Details
                 UpdateConflictLinks();
                 return;
@@ -881,7 +881,7 @@ public partial class SCBindingsTabController
 
             // Single click: just select the cell
             _cell.SelectedCell = (actionIndex, colIndex);
-            _cell.LastCellClickTime = DateTime.Now;
+            _cell.LastCellClickTicks = Environment.TickCount64;
             _conflicts.HighlightActionIndex = -1;
             _cpPanel.IsExpanded = false; // Auto-expand Cell Details
             UpdateConflictLinks();

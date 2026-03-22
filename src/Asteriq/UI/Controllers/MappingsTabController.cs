@@ -93,18 +93,7 @@ public partial class MappingsTabController : ITabController
         }
     }
 
-    // Windows API for detecting held keys
-    [DllImport("user32.dll")]
-    private static extern short GetAsyncKeyState(int vKey);
-
-    // Virtual key codes for left/right modifiers
-    private const int VK_RSHIFT = 0xA1;
-    private const int VK_LCONTROL = 0xA2;
-    private const int VK_RCONTROL = 0xA3;
-    private const int VK_LMENU = 0xA4;  // Left Alt
-    private const int VK_RMENU = 0xA5;  // Right Alt
-
-    private static bool IsKeyHeld(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+    // Keyboard interop delegated to KeyboardHelper
 
     /// <summary>True if a curve control point is being dragged.</summary>
     public bool IsDraggingCurve => _curve.DraggingPoint >= 0;
@@ -131,7 +120,7 @@ public partial class MappingsTabController : ITabController
     {
         var modifiers = new List<string>();
 
-        bool isAltGr = IsKeyHeld(VK_RMENU) && IsKeyHeld(VK_LCONTROL) && !IsKeyHeld(VK_RCONTROL);
+        bool isAltGr = KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RMENU) && KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_LCONTROL) && !KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RCONTROL);
 
         if (isAltGr)
         {
@@ -141,23 +130,23 @@ public partial class MappingsTabController : ITabController
         {
             if ((keys & Keys.Control) == Keys.Control)
             {
-                if (IsKeyHeld(VK_RCONTROL))
+                if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RCONTROL))
                     modifiers.Add("RCtrl");
-                else if (IsKeyHeld(VK_LCONTROL))
+                else if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_LCONTROL))
                     modifiers.Add("LCtrl");
             }
             if ((keys & Keys.Alt) == Keys.Alt)
             {
-                if (IsKeyHeld(VK_RMENU))
+                if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RMENU))
                     modifiers.Add("RAlt");
-                else if (IsKeyHeld(VK_LMENU))
+                else if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_LMENU))
                     modifiers.Add("LAlt");
             }
         }
 
         if ((keys & Keys.Shift) == Keys.Shift)
         {
-            if (IsKeyHeld(VK_RSHIFT))
+            if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RSHIFT))
                 modifiers.Add("RShift");
             else
                 modifiers.Add("LShift");
@@ -165,11 +154,7 @@ public partial class MappingsTabController : ITabController
 
         var baseKey = keys & ~Keys.Modifiers;
 
-        if (baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
-            baseKey == Keys.Menu || baseKey == Keys.LWin || baseKey == Keys.RWin ||
-            baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
-            baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
-            baseKey == Keys.LMenu || baseKey == Keys.RMenu)
+        if (IsModifierKey(baseKey))
             return (null, modifiers);
 
         var keyName = baseKey switch
@@ -216,34 +201,7 @@ public partial class MappingsTabController : ITabController
         return (keyName, modifiers);
     }
 
-    private static string GetModifierKeyName(Keys key)
-    {
-        if (key == Keys.ControlKey || key == Keys.Control)
-        {
-            if (IsKeyHeld(VK_RCONTROL)) return "RCtrl";
-            return "LCtrl";
-        }
-        if (key == Keys.LControlKey) return "LCtrl";
-        if (key == Keys.RControlKey) return "RCtrl";
-
-        if (key == Keys.ShiftKey || key == Keys.Shift)
-        {
-            if (IsKeyHeld(VK_RSHIFT)) return "RShift";
-            return "LShift";
-        }
-        if (key == Keys.LShiftKey) return "LShift";
-        if (key == Keys.RShiftKey) return "RShift";
-
-        if (key == Keys.Menu || key == Keys.Alt)
-        {
-            if (IsKeyHeld(VK_RMENU)) return "RAlt";
-            return "LAlt";
-        }
-        if (key == Keys.LMenu) return "LAlt";
-        if (key == Keys.RMenu) return "RAlt";
-
-        return key.ToString();
-    }
+    private static string GetModifierKeyName(Keys key) => KeyboardHelper.GetModifierKeyName(key);
 
     // Modifier key names as stored in OutputTarget.KeyName (case-insensitive).
     private static readonly HashSet<string> s_scModifierKeyNames =
@@ -252,6 +210,8 @@ public partial class MappingsTabController : ITabController
     /// <summary>Returns true when the given key name (as stored in OutputTarget.KeyName) is a modifier key.</summary>
     private static bool IsModifierKeyName(string? keyName) =>
         keyName is not null && s_scModifierKeyNames.Contains(keyName);
+
+    internal static bool IsModifierKey(Keys key) => KeyboardHelper.IsModifierKey(key);
 
     public MappingsTabController(
         TabContext ctx,
@@ -269,217 +229,202 @@ public partial class MappingsTabController : ITabController
 
     public void OnMouseDown(MouseEventArgs e)
     {
-        // Right-click handling
         if (e.Button == MouseButtons.Right)
         {
-            // Right-click on curve control points
-            if (_mappingCategory == 1 && _curve.SelectedType == CurveType.Custom)
-            {
-                var pt = new SKPoint(e.X, e.Y);
-                if (_curve.Bounds.Contains(pt))
-                {
-                    int pointIndex = FindCurvePointAt(pt, _curve.Bounds);
-                    if (pointIndex >= 0)
-                    {
-                        RemoveCurveControlPoint(pointIndex);
-                        return;
-                    }
-                }
-            }
+            HandleRightClick(e);
             return;
         }
 
-        // Left-click handling
+        if (HandleCategoryTabClick()) return;
+        if (HandleAutoScrollClick(e)) return;
+        if (HandleRightPanelClick(e)) return;
+        if (HandleAxisSettingsClick(e)) return;
+        if (HandleDeviceOrderClick(e)) return;
+        if (HandleNetSwitchClick(e)) return;
+        if (HandleVJoyNavigationClick()) return;
+        HandleMappingRowClick();
+    }
 
-        // Mapping category tab clicks (M1 Buttons / M2 Axes)
-        if (_hoveredMappingCategory >= 0)
-        {
-            _mappingCategory = _hoveredMappingCategory;
-            _selectedMappingRow = -1;
-            _selectionIsExplicit = false;
-            _listScroll.ScrollOffset = 0;
-            CancelInputListening();
-            SelectFirstRowIfUnselected();
-            return;
-        }
-
-        // Center panel: Auto-scroll checkbox toggle
-        if (_autoScroll.CheckboxBounds.Contains(e.X, e.Y))
-        {
-            _autoScroll.Enabled = !_autoScroll.Enabled;
-            _ctx.MarkDirty();
-            return;
-        }
-
-        // Right panel: Add input button - toggles listening
-        if (_addInputButtonHovered && _selectedMappingRow >= 0 && _selectionIsExplicit)
-        {
-            if (_inputDetection.IsListening)
-            {
-                CancelInputListening();
-            }
-            else
-            {
-                StartInputListening(_selectedMappingRow);
-            }
-            return;
-        }
-
-        // Right panel: Remove input source
-        if (_hoveredInputSourceRemove >= 0 && _selectionIsExplicit)
-        {
-            RemoveInputSourceAtIndex(_hoveredInputSourceRemove);
-            return;
-        }
-
-        // Right panel: Merge operation selection (axis category with 2+ inputs)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _selectionIsExplicit && _hoveredMergeOpButton >= 0)
-        {
-            UpdateMergeOperationForSelected(_hoveredMergeOpButton);
-            return;
-        }
-
-        // Right panel: Button mode selection (button category) — blocked for modifier keys
-        bool selectedIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _buttonMode.HoveredMode >= 0 && !selectedIsModifier)
-        {
-            _buttonMode.SelectedMode = (ButtonMode)_buttonMode.HoveredMode;
-            UpdateButtonModeForSelected();
-            return;
-        }
-
-        // Right panel: Pulse duration slider (button category, Pulse mode)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _buttonMode.SelectedMode == ButtonMode.Pulse)
+    private void HandleRightClick(MouseEventArgs e)
+    {
+        if (_mappingCategory == 1 && _curve.SelectedType == CurveType.Custom)
         {
             var pt = new SKPoint(e.X, e.Y);
-            if (_buttonMode.PulseSliderBounds.Contains(pt))
-            {
-                _buttonMode.DraggingPulse = true;
-                UpdatePulseDurationFromMouse(e.X);
-                return;
-            }
-        }
-
-        // Right panel: Hold duration slider (button category, HoldToActivate mode)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _buttonMode.SelectedMode == ButtonMode.HoldToActivate)
-        {
-            var pt = new SKPoint(e.X, e.Y);
-            if (_buttonMode.HoldSliderBounds.Contains(pt))
-            {
-                _buttonMode.DraggingHold = true;
-                UpdateHoldDurationFromMouse(e.X);
-                return;
-            }
-        }
-
-        // Right panel: Output type selection (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _keyboardOutput.HoveredOutputType >= 0)
-        {
-            _keyboardOutput.IsKeyboard = (_keyboardOutput.HoveredOutputType == 1);
-            if (!_keyboardOutput.IsKeyboard)
-            {
-                _keyboardOutput.SelectedKeyName = ""; // Clear key when switching to Button mode
-            }
-            UpdateOutputTypeForSelected();
-            return;
-        }
-
-        // Right panel: Key clear button (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _keyboardOutput.IsKeyboard && _keyboardOutput.ClearHovered)
-        {
-            ClearKeyboardBinding();
-            return;
-        }
-
-        // Right panel: Key capture field (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _keyboardOutput.IsKeyboard && _keyboardOutput.CaptureHovered)
-        {
-            _keyboardOutput.IsCapturing = true;
-            _keyboardOutput.CaptureStartTime = DateTime.Now;
-            return;
-        }
-
-        // Right panel: Clear Mapping button (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0 && _selectionIsExplicit && _clearAllButtonHovered)
-        {
-            ClearSelectedButtonMapping();
-            return;
-        }
-
-        // Right panel: Axis settings - curve type selection (axis category)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0 && _selectionIsExplicit)
-        {
-            // Check curve preset clicks
-            var pt = new SKPoint(e.X, e.Y);
-            if (HandleCurvePresetClick(pt))
-                return;
-
-            // Check for curve control point drag start
-            if (_curve.SelectedType == CurveType.Custom && _curve.Bounds.Contains(pt))
+            if (_curve.Bounds.Contains(pt))
             {
                 int pointIndex = FindCurvePointAt(pt, _curve.Bounds);
                 if (pointIndex >= 0)
-                {
-                    _curve.DraggingPoint = pointIndex;
-                    return;
-                }
-                else
-                {
-                    // Click in curve area but not on point - add new point
-                    var graphPt = CurveScreenToGraph(pt, _curve.Bounds);
-                    AddCurveControlPoint(graphPt);
-                    return;
-                }
-            }
-
-            // Check deadzone handle click - select and start drag
-            int dzHandle = FindDeadzoneHandleAt(pt);
-            if (dzHandle >= 0)
-            {
-                _deadzone.SelectedHandle = dzHandle;
-                _deadzone.DraggingHandle = dzHandle;
-                _ctx.MarkDirty();
-                return;
-            }
-
-            // Click on slider background (not on handle) - deselect
-            if (_deadzone.SliderBounds.Contains(pt))
-            {
-                _deadzone.SelectedHandle = -1;
-                _ctx.MarkDirty();
-                return;
+                    RemoveCurveControlPoint(pointIndex);
             }
         }
+    }
 
-        // Mapping Settings / Device Order accordion — header clicks toggle which is expanded
-        // When Device Order is expanded, clicking the Mapping Settings collapsed header collapses Device Order
-        // (Mapping Settings bounds are set by DrawMappingSettingsPanel — the collapsed header fills the full bounds)
-        if (_deviceOrder.IsExpanded)
+    private bool HandleCategoryTabClick()
+    {
+        if (_hoveredMappingCategory < 0) return false;
+        _mappingCategory = _hoveredMappingCategory;
+        _selectedMappingRow = -1;
+        _selectionIsExplicit = false;
+        _listScroll.ScrollOffset = 0;
+        CancelInputListening();
+        SelectFirstRowIfUnselected();
+        return true;
+    }
+
+    private bool HandleAutoScrollClick(MouseEventArgs e)
+    {
+        if (!_autoScroll.CheckboxBounds.Contains(e.X, e.Y)) return false;
+        _autoScroll.Enabled = !_autoScroll.Enabled;
+        _ctx.MarkDirty();
+        return true;
+    }
+
+    private bool HandleRightPanelClick(MouseEventArgs e)
+    {
+        bool hasSelection = _selectedMappingRow >= 0 && _selectionIsExplicit;
+
+        // Add input button — toggles listening
+        if (_addInputButtonHovered && hasSelection)
         {
-            // Check if the click is in the collapsed Mapping Settings header area (top 52px of right panel)
-            // We don't store separate bounds for this — check if click is above the Device Order header
-            if (!_deviceOrder.HeaderBounds.IsEmpty && e.Y < _deviceOrder.HeaderBounds.Top)
-            {
-                _deviceOrder.IsExpanded = false;
-                _deviceOrder.OpenRow = -1;
-                _ctx.MarkDirty();
-                return;
-            }
+            if (_inputDetection.IsListening) CancelInputListening();
+            else StartInputListening(_selectedMappingRow);
+            return true;
         }
 
-        // Device Order panel — header click to expand/collapse
-        if (!_deviceOrder.HeaderBounds.IsEmpty && _deviceOrder.HeaderBounds.Contains(e.X, e.Y))
+        // Remove input source
+        if (_hoveredInputSourceRemove >= 0 && _selectionIsExplicit)
+        { RemoveInputSourceAtIndex(_hoveredInputSourceRemove); return true; }
+
+        // Merge operation (axis category, 2+ inputs)
+        if (_mappingCategory == 1 && hasSelection && _hoveredMergeOpButton >= 0)
+        { UpdateMergeOperationForSelected(_hoveredMergeOpButton); return true; }
+
+        // Button mode selection — blocked for modifier keys
+        bool selectedIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
+        if (_mappingCategory == 0 && hasSelection && _buttonMode.HoveredMode >= 0 && !selectedIsModifier)
+        {
+            _buttonMode.SelectedMode = (ButtonMode)_buttonMode.HoveredMode;
+            UpdateButtonModeForSelected();
+            return true;
+        }
+
+        // Pulse duration slider
+        if (_mappingCategory == 0 && hasSelection && _buttonMode.SelectedMode == ButtonMode.Pulse
+            && _buttonMode.PulseSliderBounds.Contains(e.X, e.Y))
+        {
+            _buttonMode.DraggingPulse = true;
+            UpdatePulseDurationFromMouse(e.X);
+            return true;
+        }
+
+        // Hold duration slider
+        if (_mappingCategory == 0 && hasSelection && _buttonMode.SelectedMode == ButtonMode.HoldToActivate
+            && _buttonMode.HoldSliderBounds.Contains(e.X, e.Y))
+        {
+            _buttonMode.DraggingHold = true;
+            UpdateHoldDurationFromMouse(e.X);
+            return true;
+        }
+
+        // Output type selection
+        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.HoveredOutputType >= 0)
+        {
+            _keyboardOutput.IsKeyboard = (_keyboardOutput.HoveredOutputType == 1);
+            if (!_keyboardOutput.IsKeyboard)
+                _keyboardOutput.SelectedKeyName = "";
+            UpdateOutputTypeForSelected();
+            return true;
+        }
+
+        // Key clear button
+        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard && _keyboardOutput.ClearHovered)
+        { ClearKeyboardBinding(); return true; }
+
+        // Key capture field
+        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard && _keyboardOutput.CaptureHovered)
+        {
+            _keyboardOutput.IsCapturing = true;
+            _keyboardOutput.CaptureStartTime = DateTime.Now;
+            return true;
+        }
+
+        // Clear Mapping button
+        if (_mappingCategory == 0 && hasSelection && _clearAllButtonHovered)
+        { ClearSelectedButtonMapping(); return true; }
+
+        return false;
+    }
+
+    private bool HandleAxisSettingsClick(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0 || !_selectionIsExplicit)
+            return false;
+
+        var pt = new SKPoint(e.X, e.Y);
+
+        if (HandleCurvePresetClick(pt))
+            return true;
+
+        // Curve control point drag start
+        if (_curve.SelectedType == CurveType.Custom && _curve.Bounds.Contains(pt))
+        {
+            int pointIndex = FindCurvePointAt(pt, _curve.Bounds);
+            if (pointIndex >= 0)
+            {
+                _curve.DraggingPoint = pointIndex;
+                return true;
+            }
+
+            var graphPt = CurveScreenToGraph(pt, _curve.Bounds);
+            AddCurveControlPoint(graphPt);
+            return true;
+        }
+
+        // Deadzone handle click
+        int dzHandle = FindDeadzoneHandleAt(pt);
+        if (dzHandle >= 0)
+        {
+            _deadzone.SelectedHandle = dzHandle;
+            _deadzone.DraggingHandle = dzHandle;
+            _ctx.MarkDirty();
+            return true;
+        }
+
+        // Click on slider background — deselect
+        if (_deadzone.SliderBounds.Contains(pt))
+        {
+            _deadzone.SelectedHandle = -1;
+            _ctx.MarkDirty();
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HandleDeviceOrderClick(MouseEventArgs e)
+    {
+        // Accordion toggle: clicking collapsed Mapping Settings header when Device Order is expanded
+        if (_deviceOrder.IsExpanded && !_deviceOrder.HeaderBounds.IsEmpty && e.Y < _deviceOrder.HeaderBounds.Top)
+        {
+            _deviceOrder.IsExpanded = false;
+            _deviceOrder.OpenRow = -1;
+            _ctx.MarkDirty();
+            return true;
+        }
+
+        // Header click to expand/collapse
+        if (_deviceOrder.HeaderBounds.HitTest(e.X, e.Y))
         {
             _deviceOrder.IsExpanded = !_deviceOrder.IsExpanded;
             _deviceOrder.OpenRow = -1;
             _ctx.MarkDirty();
-            return;
+            return true;
         }
 
-        // Device Order panel — dropdown open/close
+        // Dropdown open/close
         if (_deviceOrder.OpenRow >= 0)
         {
-            if (!_deviceOrder.DropdownBounds.IsEmpty && _deviceOrder.DropdownBounds.Contains(e.X, e.Y))
+            if (_deviceOrder.DropdownBounds.HitTest(e.X, e.Y))
             {
                 float itemH = 28f;
                 int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
@@ -490,74 +435,69 @@ public partial class MappingsTabController : ITabController
                 _deviceOrder.OpenRow = -1;
                 _deviceOrder.HoveredIndex = -1;
                 _ctx.MarkDirty();
-                return;
+                return true;
             }
-            else
+
+            _deviceOrder.OpenRow = -1;
+            _deviceOrder.HoveredIndex = -1;
+            _ctx.MarkDirty();
+            for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
             {
-                _deviceOrder.OpenRow = -1;
-                _deviceOrder.HoveredIndex = -1;
-                _ctx.MarkDirty();
-                for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
-                {
-                    if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(e.X, e.Y))
-                        return;
-                }
+                if (_deviceOrder.SelectorBounds[i].HitTest(e.X, e.Y))
+                    return true;
             }
         }
 
-        // Device Order — auto-detect button (only when expanded)
-        if (_deviceOrder.IsExpanded && !_deviceOrder.AutoDetectBounds.IsEmpty && _deviceOrder.AutoDetectBounds.Contains(e.X, e.Y)
+        // Auto-detect button
+        if (_deviceOrder.IsExpanded && _deviceOrder.AutoDetectBounds.HitTest(e.X, e.Y)
             && _directInputService is not null)
         {
             RunDeviceOrderAutoDetect();
-            return;
+            return true;
         }
 
-        // Device Order — row selector clicks (only when expanded)
+        // Row selector clicks
         if (_deviceOrder.IsExpanded)
-        for (int row = 0; row < _deviceOrder.SelectorBounds.Length; row++)
         {
-            if (!_deviceOrder.SelectorBounds[row].IsEmpty && _deviceOrder.SelectorBounds[row].Contains(e.X, e.Y))
+            for (int row = 0; row < _deviceOrder.SelectorBounds.Length; row++)
             {
-                int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
-                if (vjoyCount > 1)
+                if (_deviceOrder.SelectorBounds[row].HitTest(e.X, e.Y))
                 {
-                    _deviceOrder.OpenRow = _deviceOrder.OpenRow == row ? -1 : row;
-                    _deviceOrder.HoveredIndex = -1;
-                    _ctx.MarkDirty();
+                    int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
+                    if (vjoyCount > 1)
+                    {
+                        _deviceOrder.OpenRow = _deviceOrder.OpenRow == row ? -1 : row;
+                        _deviceOrder.HoveredIndex = -1;
+                        _ctx.MarkDirty();
+                    }
+                    return true;
                 }
-                return;
             }
         }
 
-        // Left panel: NET SWITCH action button — assign switch button for selected row
-        if (!_netSwitch.ActionBounds.IsEmpty && _netSwitch.ActionBounds.Contains(e.X, e.Y))
-        {
-            AssignSwitchButtonForSelectedRow();
-            return;
-        }
+        return false;
+    }
 
-        // Left panel: NET SWITCH badge × — clear the switch button
-        if (!_netSwitch.BadgeXBounds.IsEmpty && _netSwitch.BadgeXBounds.Contains(e.X, e.Y))
-        {
-            ClearNetworkSwitchButton();
-            return;
-        }
+    private bool HandleNetSwitchClick(MouseEventArgs e)
+    {
+        if (_netSwitch.ActionBounds.HitTest(e.X, e.Y))
+        { AssignSwitchButtonForSelectedRow(); return true; }
 
-        // Left panel: vJoy device navigation
+        if (_netSwitch.BadgeXBounds.HitTest(e.X, e.Y))
+        { ClearNetworkSwitchButton(); return true; }
+
+        return false;
+    }
+
+    private bool HandleVJoyNavigationClick()
+    {
         if (_vjoyPrevHovered && _ctx.SelectedVJoyDeviceIndex > 0)
         {
             _ctx.SelectedVJoyDeviceIndex--;
-            _selectedMappingRow = -1;
-            _selectionIsExplicit = false;
-            _listScroll.ScrollOffset = 0;
-            _highlight.ControlDef = null;
-            CancelInputListening();
-            _ctx.UpdateMappingsPrimaryDeviceMap();
-            SelectFirstRowIfUnselected();
-            _ctx.MarkDirty();
-            return;
+            ResetMappingSelectionState();
+            return true;
         }
+
         if (_vjoyNextHovered && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
         {
             _ctx.SelectedVJoyDeviceIndex++;
@@ -568,36 +508,61 @@ public partial class MappingsTabController : ITabController
             _ctx.UpdateMappingsPrimaryDeviceMap();
             SelectFirstRowIfUnselected();
             _ctx.MarkDirty();
-            return;
+            return true;
         }
 
-        // Left panel: Output row clicked - select it
-        if (_hoveredMappingRow >= 0)
+        return false;
+    }
+
+    private void ResetMappingSelectionState()
+    {
+        _selectedMappingRow = -1;
+        _selectionIsExplicit = false;
+        _listScroll.ScrollOffset = 0;
+        _highlight.ControlDef = null;
+        CancelInputListening();
+        _ctx.UpdateMappingsPrimaryDeviceMap();
+        SelectFirstRowIfUnselected();
+        _ctx.MarkDirty();
+    }
+
+    private void HandleMappingRowClick()
+    {
+        if (_hoveredMappingRow < 0) return;
+
+        if (_hoveredMappingRow != _selectedMappingRow)
         {
-            if (_hoveredMappingRow != _selectedMappingRow)
-            {
-                // Selecting a different row - cancel listening
-                CancelInputListening();
-                _selectedMappingRow = _hoveredMappingRow;
-                // Load settings for the selected row
-                LoadOutputTypeStateForRow();  // For buttons
-                LoadAxisSettingsForRow();     // For axes
-            }
-            else
-            {
-                _selectedMappingRow = _hoveredMappingRow;
-            }
-            _selectionIsExplicit = true;
-            // Trigger silhouette highlight for the selected row
-            _highlight.ControlDef = GetControlForRow(_selectedMappingRow);
-            _highlight.ControlHighlightTime = DateTime.Now;
-            return;
+            CancelInputListening();
+            _selectedMappingRow = _hoveredMappingRow;
+            LoadOutputTypeStateForRow();
+            LoadAxisSettingsForRow();
         }
+        else
+        {
+            _selectedMappingRow = _hoveredMappingRow;
+        }
+
+        _selectionIsExplicit = true;
+        _highlight.ControlDef = GetControlForRow(_selectedMappingRow);
+        _highlight.ControlHighlightTime = DateTime.Now;
     }
 
     public void OnMouseMove(MouseEventArgs e)
     {
-        // Reset hover states
+        ResetMoveHoverStates();
+
+        if (UpdateMappingDragState(e)) return;
+        if (UpdateRightPanelHover(e)) return;
+        if (UpdateAxisEditorHover(e)) return;
+        if (UpdateDeviceOrderHover(e)) return;
+        if (UpdateNetSwitchHover(e)) return;
+        if (UpdateVJoyNavigationHover(e)) return;
+        if (UpdateMappingRowHover(e)) return;
+        UpdateCategoryTabHover(e);
+    }
+
+    private void ResetMoveHoverStates()
+    {
         _vjoyPrevHovered = false;
         _vjoyNextHovered = false;
         _hoveredMappingRow = -1;
@@ -613,251 +578,173 @@ public partial class MappingsTabController : ITabController
         _hoveredMergeOpButton = -1;
         _hoveredMappingCategory = -1;
         _autoScroll.CheckboxHovered = false;
+    }
 
-        // Center panel: Auto-scroll checkbox hover
+    private bool UpdateMappingDragState(MouseEventArgs e)
+    {
+        if (_buttonMode.DraggingPulse)
+        { UpdatePulseDurationFromMouse(e.X); _ctx.MarkDirty(); return true; }
+
+        if (_buttonMode.DraggingHold)
+        { UpdateHoldDurationFromMouse(e.X); _ctx.MarkDirty(); return true; }
+
+        return false;
+    }
+
+    private bool UpdateRightPanelHover(MouseEventArgs e)
+    {
         if (_autoScroll.CheckboxBounds.Contains(e.X, e.Y))
-        {
-            _autoScroll.CheckboxHovered = true;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        { _autoScroll.CheckboxHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
-        // Right panel: Add input button
         if (_addInputButtonBounds.Contains(e.X, e.Y))
-        {
-            _addInputButtonHovered = true;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        { _addInputButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
-        // Right panel: Input source remove buttons
         for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
         {
             if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
-            {
-                _hoveredInputSourceRemove = i;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            { _hoveredInputSourceRemove = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         }
 
-        // Right panel: Merge operation buttons (for axis category with 2+ inputs)
+        // Merge operation buttons (axis category)
         if (_mappingCategory == 1 && _selectedMappingRow >= 0)
         {
             for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
             {
-                if (!_mergeOpButtonBounds[i].IsEmpty && _mergeOpButtonBounds[i].Contains(e.X, e.Y))
-                {
-                    _hoveredMergeOpButton = i;
-                    _ctx.OwnerForm.Cursor = Cursors.Hand;
-                    return;
-                }
+                if (_mergeOpButtonBounds[i].HitTest(e.X, e.Y))
+                { _hoveredMergeOpButton = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
             }
         }
 
-        // Right panel: Button mode buttons (for button category)
+        // Button mode controls (button category)
         if (_mappingCategory == 0 && _selectedMappingRow >= 0)
         {
-            // Handle duration slider dragging
-            if (_buttonMode.DraggingPulse)
-            {
-                UpdatePulseDurationFromMouse(e.X);
-                _ctx.MarkDirty();
-                return;
-            }
-            if (_buttonMode.DraggingHold)
-            {
-                UpdateHoldDurationFromMouse(e.X);
-                _ctx.MarkDirty();
-                return;
-            }
-
             for (int i = 0; i < _buttonMode.ModeBounds.Length; i++)
             {
                 if (_buttonMode.ModeBounds[i].Contains(e.X, e.Y))
-                {
-                    _buttonMode.HoveredMode = i;
-                    _ctx.OwnerForm.Cursor = Cursors.Hand;
-                    return;
-                }
+                { _buttonMode.HoveredMode = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
             }
 
-            // Output type buttons
             if (_keyboardOutput.BtnBounds.Contains(e.X, e.Y))
-            {
-                _keyboardOutput.HoveredOutputType = 0;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            { _keyboardOutput.HoveredOutputType = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
             if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
-            {
-                _keyboardOutput.HoveredOutputType = 1;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            { _keyboardOutput.HoveredOutputType = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
-            // Key clear button (check before key capture field so it takes precedence)
-            if (_keyboardOutput.IsKeyboard && !_keyboardOutput.ClearBounds.IsEmpty && _keyboardOutput.ClearBounds.Contains(e.X, e.Y))
-            {
-                _keyboardOutput.ClearHovered = true;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
-
-            // Key capture field
+            if (_keyboardOutput.IsKeyboard && _keyboardOutput.ClearBounds.HitTest(e.X, e.Y))
+            { _keyboardOutput.ClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
             if (_keyboardOutput.IsKeyboard && _keyboardOutput.CaptureBounds.Contains(e.X, e.Y))
-            {
-                _keyboardOutput.CaptureHovered = true;
-                _ctx.OwnerForm.Cursor = Cursors.IBeam;
-                return;
-            }
+            { _keyboardOutput.CaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
 
-            // Clear Mapping button
             if (_clearAllButtonBounds.Contains(e.X, e.Y))
-            {
-                _clearAllButtonHovered = true;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            { _clearAllButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         }
 
-        // Right panel: Curve editor handling (for axis category)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0)
+        return false;
+    }
+
+    private bool UpdateAxisEditorHover(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0) return false;
+
+        var pt = new SKPoint(e.X, e.Y);
+
+        if (_curve.DraggingPoint >= 0)
+        { UpdateDraggedCurvePoint(pt); _ctx.MarkDirty(); return true; }
+
+        if (_deadzone.DraggingHandle >= 0)
+        { UpdateDraggedDeadzoneHandle(pt); _ctx.MarkDirty(); return true; }
+
+        if (_curve.SelectedType == CurveType.Custom && _curve.Bounds.Contains(pt))
         {
-            var pt = new SKPoint(e.X, e.Y);
-
-            // Handle dragging operations
-            if (_curve.DraggingPoint >= 0)
+            int newHovered = FindCurvePointAt(pt, _curve.Bounds);
+            if (newHovered != _curve.HoveredPoint)
             {
-                UpdateDraggedCurvePoint(pt);
-                _ctx.MarkDirty();
-                return;
-            }
-            if (_deadzone.DraggingHandle >= 0)
-            {
-                UpdateDraggedDeadzoneHandle(pt);
-                _ctx.MarkDirty();
-                return;
-            }
-            // Check curve point hover
-            if (_curve.SelectedType == CurveType.Custom && _curve.Bounds.Contains(pt))
-            {
-                int newHovered = FindCurvePointAt(pt, _curve.Bounds);
-                if (newHovered != _curve.HoveredPoint)
-                {
-                    _curve.HoveredPoint = newHovered;
-                    _ctx.OwnerForm.Cursor = newHovered >= 0 ? Cursors.Hand : Cursors.Cross;
-                    _ctx.MarkDirty();
-                }
-                return;
-            }
-            else if (_curve.HoveredPoint >= 0)
-            {
-                _curve.HoveredPoint = -1;
+                _curve.HoveredPoint = newHovered;
+                _ctx.OwnerForm.Cursor = newHovered >= 0 ? Cursors.Hand : Cursors.Cross;
                 _ctx.MarkDirty();
             }
+            return true;
         }
 
-        // Device Order: header hover
-        if (!_deviceOrder.HeaderBounds.IsEmpty && _deviceOrder.HeaderBounds.Contains(e.X, e.Y))
+        if (_curve.HoveredPoint >= 0)
         {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
+            _curve.HoveredPoint = -1;
+            _ctx.MarkDirty();
         }
 
-        // Device Order: auto-detect button hover
-        _deviceOrder.AutoDetectHovered = !_deviceOrder.AutoDetectBounds.IsEmpty
-            && _deviceOrder.AutoDetectBounds.Contains(e.X, e.Y);
+        return false;
+    }
+
+    private bool UpdateDeviceOrderHover(MouseEventArgs e)
+    {
+        if (_deviceOrder.HeaderBounds.HitTest(e.X, e.Y))
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        _deviceOrder.AutoDetectHovered = _deviceOrder.AutoDetectBounds.HitTest(e.X, e.Y);
         if (_deviceOrder.AutoDetectHovered)
-        {
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        { _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
-        // Device Order: row selector hover
         for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
         {
-            if (!_deviceOrder.SelectorBounds[i].IsEmpty && _deviceOrder.SelectorBounds[i].Contains(e.X, e.Y))
-            {
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            if (_deviceOrder.SelectorBounds[i].HitTest(e.X, e.Y))
+            { _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         }
 
-        // Device Order: open dropdown hover
-        if (_deviceOrder.OpenRow >= 0 && !_deviceOrder.DropdownBounds.IsEmpty
-            && _deviceOrder.DropdownBounds.Contains(e.X, e.Y))
+        if (_deviceOrder.OpenRow >= 0 && _deviceOrder.DropdownBounds.HitTest(e.X, e.Y))
         {
             float itemH = 28f;
             int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
             int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
             int newHovered = idx >= 0 && idx < vjoyCount ? idx : -1;
             if (newHovered != _deviceOrder.HoveredIndex)
-            {
-                _deviceOrder.HoveredIndex = newHovered;
-                _ctx.MarkDirty();
-            }
+            { _deviceOrder.HoveredIndex = newHovered; _ctx.MarkDirty(); }
             _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
-        else if (_deviceOrder.OpenRow >= 0 && _deviceOrder.HoveredIndex >= 0)
-        {
-            _deviceOrder.HoveredIndex = -1;
-            _ctx.MarkDirty();
+            return true;
         }
 
-        // Left panel: NET SWITCH action button
-        if (!_netSwitch.ActionBounds.IsEmpty && _netSwitch.ActionBounds.Contains(e.X, e.Y))
-        {
-            _netSwitch.ActionHovered = true;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        if (_deviceOrder.OpenRow >= 0 && _deviceOrder.HoveredIndex >= 0)
+        { _deviceOrder.HoveredIndex = -1; _ctx.MarkDirty(); }
 
-        // Left panel: NET SWITCH badge × button
-        if (!_netSwitch.BadgeXBounds.IsEmpty && _netSwitch.BadgeXBounds.Contains(e.X, e.Y))
-        {
-            _netSwitch.BadgeXHovered = true;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        return false;
+    }
 
-        // Left panel: vJoy device selector buttons
+    private bool UpdateNetSwitchHover(MouseEventArgs e)
+    {
+        if (_netSwitch.ActionBounds.HitTest(e.X, e.Y))
+        { _netSwitch.ActionHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        if (_netSwitch.BadgeXBounds.HitTest(e.X, e.Y))
+        { _netSwitch.BadgeXHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        return false;
+    }
+
+    private bool UpdateVJoyNavigationHover(MouseEventArgs e)
+    {
         if (_vjoyPrevButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex > 0)
-        {
-            _vjoyPrevHovered = true;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
-        if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
-        {
-            _vjoyNextHovered = true;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return;
-        }
+        { _vjoyPrevHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
-        // Left panel: Mapping row hover
+        if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
+        { _vjoyNextHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        return false;
+    }
+
+    private bool UpdateMappingRowHover(MouseEventArgs e)
+    {
         for (int i = 0; i < _mappingRowBounds.Count; i++)
         {
             if (_mappingRowBounds[i].Contains(e.X, e.Y))
-            {
-                _hoveredMappingRow = i;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return;
-            }
+            { _hoveredMappingRow = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         }
+        return false;
+    }
 
-        // Mapping category tabs hover detection
+    private void UpdateCategoryTabHover(MouseEventArgs e)
+    {
         if (_mappingCategoryButtonsBounds.Contains(e.X, e.Y))
-        {
-            _hoveredMappingCategory = 0;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
+        { _hoveredMappingCategory = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; }
         else if (_mappingCategoryAxesBounds.Contains(e.X, e.Y))
-        {
-            _hoveredMappingCategory = 1;
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-        }
+        { _hoveredMappingCategory = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; }
     }
 
     public void OnMouseUp(MouseEventArgs e)
@@ -900,12 +787,7 @@ public partial class MappingsTabController : ITabController
         {
             var baseKey = keyData & Keys.KeyCode;
 
-            bool isModifierOnly = baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
-                baseKey == Keys.Menu || baseKey == Keys.Control ||
-                baseKey == Keys.Shift || baseKey == Keys.Alt ||
-                baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
-                baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
-                baseKey == Keys.LMenu || baseKey == Keys.RMenu;
+            bool isModifierOnly = IsModifierKey(baseKey);
 
             if (isModifierOnly)
             {

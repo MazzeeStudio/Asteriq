@@ -150,7 +150,7 @@ public partial class MainForm
         // (Mapping category tab hover detection moved to MappingsTabController.OnMouseMove)
 
         // Profile selector cursor (when dropdown is closed)
-        if (!_profileDropdownOpen && !_profileSelectorBounds.IsEmpty && _profileSelectorBounds.Contains(se.X, se.Y))
+        if (!_profileDropdownOpen && _profileSelectorBounds.HitTest(se.X, se.Y))
             Cursor = Cursors.Hand;
 
         // Window controls hover - all coords in scaled canvas space

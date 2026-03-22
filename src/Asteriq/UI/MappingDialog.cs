@@ -67,17 +67,7 @@ public class MappingDialog : FUIBaseDialog
     private List<string> _capturedModifiers = new();  // Stores captured modifiers (LCtrl, RCtrl, LShift, RShift, LAlt, RAlt)
     private bool _waitingForKeyCapture = false;
 
-    // Windows API for detecting held keys
-    [DllImport("user32.dll")]
-    private static extern short GetAsyncKeyState(int vKey);
-
-    // Virtual key codes for left/right modifiers
-    private const int VK_LSHIFT = 0xA0;
-    private const int VK_RSHIFT = 0xA1;
-    private const int VK_LCONTROL = 0xA2;
-    private const int VK_RCONTROL = 0xA3;
-    private const int VK_LMENU = 0xA4;  // Left Alt
-    private const int VK_RMENU = 0xA5;  // Right Alt
+    // Keyboard interop delegated to KeyboardHelper
 
     // UI state
     private int _hoveredButton = -1;
@@ -316,27 +306,18 @@ public class MappingDialog : FUIBaseDialog
     }
 
     /// <summary>
-    /// Check if a key is currently held using GetAsyncKeyState
-    /// </summary>
-    private static bool IsKeyHeld(int vk)
-    {
-        return (GetAsyncKeyState(vk) & 0x8000) != 0;
-    }
-
-    /// <summary>
     /// Capture currently held modifier keys
     /// </summary>
     private static List<string> CaptureHeldModifiers()
     {
         var mods = new List<string>();
 
-        // Check left/right modifiers separately
-        if (IsKeyHeld(VK_LCONTROL)) mods.Add("LCtrl");
-        if (IsKeyHeld(VK_RCONTROL)) mods.Add("RCtrl");
-        if (IsKeyHeld(VK_LSHIFT)) mods.Add("LShift");
-        if (IsKeyHeld(VK_RSHIFT)) mods.Add("RShift");
-        if (IsKeyHeld(VK_LMENU)) mods.Add("LAlt");
-        if (IsKeyHeld(VK_RMENU)) mods.Add("RAlt");
+        if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_LCONTROL)) mods.Add("LCtrl");
+        if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RCONTROL)) mods.Add("RCtrl");
+        if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_LSHIFT)) mods.Add("LShift");
+        if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RSHIFT)) mods.Add("RShift");
+        if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_LMENU)) mods.Add("LAlt");
+        if (KeyboardHelper.IsKeyHeld(KeyboardHelper.VK_RMENU)) mods.Add("RAlt");
 
         return mods;
     }
@@ -871,12 +852,7 @@ public class MappingDialog : FUIBaseDialog
             var baseKey = keyData & Keys.KeyCode;
 
             // Check if this is a modifier-only key press
-            bool isModifierOnly = baseKey == Keys.ControlKey || baseKey == Keys.ShiftKey ||
-                baseKey == Keys.Menu || baseKey == Keys.Control ||
-                baseKey == Keys.Shift || baseKey == Keys.Alt ||
-                baseKey == Keys.LControlKey || baseKey == Keys.RControlKey ||
-                baseKey == Keys.LShiftKey || baseKey == Keys.RShiftKey ||
-                baseKey == Keys.LMenu || baseKey == Keys.RMenu;
+            bool isModifierOnly = Controllers.MappingsTabController.IsModifierKey(baseKey);
 
             if (isModifierOnly)
             {
@@ -914,35 +890,7 @@ public class MappingDialog : FUIBaseDialog
     /// <summary>
     /// Get the specific modifier key name (left/right variant)
     /// </summary>
-    private static string GetModifierKeyName(Keys key)
-    {
-        // Use GetAsyncKeyState to determine if it's left or right variant
-        if (key == Keys.ControlKey || key == Keys.Control)
-        {
-            if (IsKeyHeld(VK_RCONTROL)) return "RCtrl";
-            return "LCtrl";
-        }
-        if (key == Keys.LControlKey) return "LCtrl";
-        if (key == Keys.RControlKey) return "RCtrl";
-
-        if (key == Keys.ShiftKey || key == Keys.Shift)
-        {
-            if (IsKeyHeld(VK_RSHIFT)) return "RShift";
-            return "LShift";
-        }
-        if (key == Keys.LShiftKey) return "LShift";
-        if (key == Keys.RShiftKey) return "RShift";
-
-        if (key == Keys.Menu || key == Keys.Alt)
-        {
-            if (IsKeyHeld(VK_RMENU)) return "RAlt";
-            return "LAlt";
-        }
-        if (key == Keys.LMenu) return "LAlt";
-        if (key == Keys.RMenu) return "RAlt";
-
-        return key.ToString();
-    }
+    private static string GetModifierKeyName(Keys key) => KeyboardHelper.GetModifierKeyName(key);
 
     private static string KeyToString(Keys key)
     {

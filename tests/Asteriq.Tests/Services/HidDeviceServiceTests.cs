@@ -115,7 +115,7 @@ public class HidDeviceServiceTests
     {
         var service = new HidDeviceService();
 
-        var devices = service.EnumerateDevices();
+        var devices = HidDeviceService.EnumerateDevices();
 
         Assert.NotNull(devices);
         // We can't assert on count since it depends on hardware
@@ -126,7 +126,7 @@ public class HidDeviceServiceTests
     {
         var service = new HidDeviceService();
 
-        var result = service.FindMatchingDevice("NonExistent Device XYZ123");
+        var result = HidDeviceService.FindMatchingDevice("NonExistent Device XYZ123");
 
         Assert.Null(result);
     }
@@ -135,7 +135,7 @@ public class HidDeviceServiceTests
     public void HidDeviceService_FindMatchingDevice_RespectsExcludePaths()
     {
         var service = new HidDeviceService();
-        var devices = service.EnumerateDevices();
+        var devices = HidDeviceService.EnumerateDevices();
 
         if (devices.Count == 0)
         {
@@ -147,7 +147,7 @@ public class HidDeviceServiceTests
         var excludePaths = new HashSet<string> { firstDevice.DevicePath };
 
         // Try to find matching device with same name but excluding the path
-        var result = service.FindMatchingDevice(firstDevice.ProductName, excludePaths);
+        var result = HidDeviceService.FindMatchingDevice(firstDevice.ProductName, excludePaths);
 
         // If there's only one device with this name, result should be null
         // If there are multiple, result should have a different path

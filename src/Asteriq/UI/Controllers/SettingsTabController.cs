@@ -192,7 +192,7 @@ public class SettingsTabController : ITabController, IDisposable
         // Theme buttons
         foreach (var b in _themeButtonBounds)
         {
-            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+            if (b.HitTest(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
 
 
@@ -221,7 +221,7 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // Driver setup button
-        if (!_driverSetupButtonBounds.IsEmpty && _driverSetupButtonBounds.Contains(pt))
+        if (_driverSetupButtonBounds.HitTest(pt))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -230,11 +230,11 @@ public class SettingsTabController : ITabController, IDisposable
         // Network buttons
         foreach (var b in _netRoleButtonBounds)
         {
-            if (!b.IsEmpty && b.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+            if (b.HitTest(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
-        if ((!_netRegenerateBounds.IsEmpty  && _netRegenerateBounds.Contains(pt))
-            || (!_netDisconnectBounds.IsEmpty && _netDisconnectBounds.Contains(pt))
-            || (!_netForgetBounds.IsEmpty    && _netForgetBounds.Contains(pt)))
+        if ((_netRegenerateBounds.HitTest(pt))
+            || (_netDisconnectBounds.HitTest(pt))
+            || (_netForgetBounds.HitTest(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             return;
@@ -249,16 +249,16 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // Update section buttons
-        if ((!_checkButtonBounds.IsEmpty && _checkButtonBounds.Contains(pt))
-            || (!_downloadButtonBounds.IsEmpty && _downloadButtonBounds.Contains(pt))
-            || (!_applyButtonBounds.IsEmpty && _applyButtonBounds.Contains(pt)))
+        if ((_checkButtonBounds.HitTest(pt))
+            || (_downloadButtonBounds.HitTest(pt))
+            || (_applyButtonBounds.HitTest(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
         // Right panel accordion headers
-        if ((!_visualPanelHeaderBounds.IsEmpty && _visualPanelHeaderBounds.Contains(pt))
-            || (!_networkPanelHeaderBounds.IsEmpty && _networkPanelHeaderBounds.Contains(pt)))
+        if ((_visualPanelHeaderBounds.HitTest(pt))
+            || (_networkPanelHeaderBounds.HitTest(pt)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
@@ -1666,21 +1666,21 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // Right panel accordion header clicks
-        if (!_visualPanelHeaderBounds.IsEmpty && _visualPanelHeaderBounds.Contains(pt))
+        if (_visualPanelHeaderBounds.HitTest(pt))
         {
             _settingsRightPanelActive = "visual";
             _ctx.AppSettings.SettingsRightPanel = "visual";
             _ctx.InvalidateCanvas();
             return;
         }
-        if (!_networkPanelHeaderBounds.IsEmpty && _networkPanelHeaderBounds.Contains(pt))
+        if (_networkPanelHeaderBounds.HitTest(pt))
         {
             _settingsRightPanelActive = "network";
             _ctx.AppSettings.SettingsRightPanel = "network";
             _ctx.InvalidateCanvas();
             return;
         }
-        if (!_hidHidePanelHeaderBounds.IsEmpty && _hidHidePanelHeaderBounds.Contains(pt))
+        if (_hidHidePanelHeaderBounds.HitTest(pt))
         {
             _settingsRightPanelActive = "hidhide";
             _ctx.AppSettings.SettingsRightPanel = "hidhide";
@@ -1694,7 +1694,7 @@ public class SettingsTabController : ITabController, IDisposable
         // HidHide panel clicks
         if (_settingsRightPanelActive == "hidhide")
         {
-            if (!_hidHideUpdateButtonBounds.IsEmpty && _hidHideUpdateButtonBounds.Contains(pt)
+            if (_hidHideUpdateButtonBounds.HitTest(pt)
                 && _hidHideInstallPhase is HidHideInstallPhase.Idle or HidHideInstallPhase.Error)
             {
                 StartHidHideInstall();
@@ -1704,7 +1704,7 @@ public class SettingsTabController : ITabController, IDisposable
 
         if (_settingsRightPanelActive == "hidhide" && _ctx.HidHide?.IsAvailable() == true)
         {
-            if (!_hidHideCloakingToggleBounds.IsEmpty && _hidHideCloakingToggleBounds.Contains(pt))
+            if (_hidHideCloakingToggleBounds.HitTest(pt))
             {
                 _hidHideCloaking = !_hidHideCloaking;
                 if (_hidHideCloaking)
@@ -1714,7 +1714,7 @@ public class SettingsTabController : ITabController, IDisposable
                 _ctx.InvalidateCanvas();
                 return;
             }
-            if (!_hidHideInverseToggleBounds.IsEmpty && _hidHideInverseToggleBounds.Contains(pt))
+            if (_hidHideInverseToggleBounds.HitTest(pt))
             {
                 _hidHideInverse = !_hidHideInverse;
                 if (_hidHideInverse)
@@ -1858,14 +1858,14 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // Driver setup button click
-        if (!_driverSetupButtonBounds.IsEmpty && _driverSetupButtonBounds.Contains(pt))
+        if (_driverSetupButtonBounds.HitTest(pt))
         {
             _ctx.OpenDriverSetup?.Invoke();
             return;
         }
 
         // Check for updates button click
-        if (!_checkButtonBounds.IsEmpty && _checkButtonBounds.Contains(pt))
+        if (_checkButtonBounds.HitTest(pt))
         {
             var status = _ctx.UpdateService.Status;
             if (status is UpdateStatus.Unknown or UpdateStatus.UpToDate or UpdateStatus.Error)
@@ -1881,7 +1881,7 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // Download update button click (inside UpdateAvailable banner)
-        if (!_downloadButtonBounds.IsEmpty && _downloadButtonBounds.Contains(pt))
+        if (_downloadButtonBounds.HitTest(pt))
         {
             _ = _ctx.UpdateService.DownloadAsync().ContinueWith(
                 _ => _ctx.OwnerForm.Invoke(_ctx.InvalidateCanvas),
@@ -1893,7 +1893,7 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // Apply update button click (inside ReadyToApply banner)
-        if (!_applyButtonBounds.IsEmpty && _applyButtonBounds.Contains(pt))
+        if (_applyButtonBounds.HitTest(pt))
         {
             _ = _ctx.UpdateService.ApplyUpdateAsync();
             return;

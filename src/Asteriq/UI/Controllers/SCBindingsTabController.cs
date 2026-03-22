@@ -421,7 +421,7 @@ public partial class SCBindingsTabController : ITabController
             _cellDetails.HoveredModeIndex = -1;
             for (int i = 0; i < _cellDetails.ActivationModeBounds.Length; i++)
             {
-                if (!_cellDetails.ActivationModeBounds[i].IsEmpty && _cellDetails.ActivationModeBounds[i].Contains(e.X, e.Y))
+                if (_cellDetails.ActivationModeBounds[i].HitTest(e.X, e.Y))
                 {
                     _cellDetails.HoveredModeIndex = i;
                     _ctx.OwnerForm.Cursor = Cursors.Hand;
@@ -438,7 +438,7 @@ public partial class SCBindingsTabController : ITabController
             _conflicts.ConflictLinkHovered = -1;
             for (int ci = 0; ci < _conflicts.ConflictLinkBounds.Count; ci++)
             {
-                if (!_conflicts.ConflictLinkBounds[ci].IsEmpty && _conflicts.ConflictLinkBounds[ci].Contains(e.X, e.Y))
+                if (_conflicts.ConflictLinkBounds[ci].HitTest(e.X, e.Y))
                 {
                     _conflicts.ConflictLinkHovered = ci;
                     _ctx.OwnerForm.Cursor = Cursors.Hand;
@@ -462,19 +462,19 @@ public partial class SCBindingsTabController : ITabController
             _scClearAllButtonBounds.Contains(e.X, e.Y) ||
             _scResetDefaultsButtonBounds.Contains(e.X, e.Y) ||
             _searchFilter.ShowBoundOnlyBounds.Contains(e.X, e.Y) ||
-            (!_scroll.VScrollBounds.IsEmpty && _scroll.VScrollBounds.Contains(e.X, e.Y)) ||
-            (!_scroll.HScrollBounds.IsEmpty && _scroll.HScrollBounds.Contains(e.X, e.Y)) ||
-            (!_searchFilter.ShowJSRefBounds.IsEmpty && _searchFilter.ShowJSRefBounds.Contains(e.X, e.Y)) ||
-            (!_colImport.ImportButtonBounds.IsEmpty && _colImport.ImportButtonBounds.Contains(e.X, e.Y)) ||
-            (!_colImport.ClearColumnBounds.IsEmpty && _colImport.ClearColumnBounds.Contains(e.X, e.Y)) ||
-            (!_colImport.ProfileSelectorBounds.IsEmpty && _colImport.ProfileSelectorBounds.Contains(e.X, e.Y)) ||
-            (!_colImport.ColumnSelectorBounds.IsEmpty && _colImport.ColumnSelectorBounds.Contains(e.X, e.Y)) ||
-            (!_scInstall.BrowseBounds.IsEmpty && _scInstall.BrowseBounds.Contains(e.X, e.Y)))
+            (_scroll.VScrollBounds.HitTest(e.X, e.Y)) ||
+            (_scroll.HScrollBounds.HitTest(e.X, e.Y)) ||
+            (_searchFilter.ShowJSRefBounds.HitTest(e.X, e.Y)) ||
+            (_colImport.ImportButtonBounds.HitTest(e.X, e.Y)) ||
+            (_colImport.ClearColumnBounds.HitTest(e.X, e.Y)) ||
+            (_colImport.ProfileSelectorBounds.HitTest(e.X, e.Y)) ||
+            (_colImport.ColumnSelectorBounds.HitTest(e.X, e.Y)) ||
+            (_scInstall.BrowseBounds.HitTest(e.X, e.Y)))
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
         }
 
-        _scInstall.BrowseHovered = !_scInstall.BrowseBounds.IsEmpty && _scInstall.BrowseBounds.Contains(e.X, e.Y);
+        _scInstall.BrowseHovered = _scInstall.BrowseBounds.HitTest(e.X, e.Y);
 
         bool showColumnActions = IsColumnActionsVisible();
 
@@ -741,7 +741,7 @@ public partial class SCBindingsTabController : ITabController
     {
         public (int actionIndex, int colIndex) SelectedCell = (-1, -1);
         public (int actionIndex, int colIndex) HoveredCell = (-1, -1);
-        public DateTime LastCellClickTime;
+        public long LastCellClickTicks;
         public SCGridColumn? ListeningColumn;
     }
 
@@ -834,7 +834,7 @@ public partial class SCBindingsTabController : ITabController
         public int SelectionStart = -1; // -1 = no selection
         public int SelectionEnd = -1;
         public bool SearchDragging;
-        public DateTime LastSearchClickTime;
+        public long LastSearchClickTicks;
         public SKRect SearchBoxBounds;
         public bool SearchBoxFocused;
         public SKRect ShowBoundOnlyBounds;

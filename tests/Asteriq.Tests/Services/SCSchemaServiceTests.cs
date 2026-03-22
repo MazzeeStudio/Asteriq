@@ -22,7 +22,7 @@ public class SCSchemaServiceTests
     {
         var doc = CreateXmlDoc("<root></root>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Empty(actions);
     }
@@ -38,7 +38,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Equal(2, actions.Count);
         Assert.All(actions, a => Assert.Equal("spaceship_movement", a.ActionMap));
@@ -60,7 +60,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Equal(3, actions.Count);
         Assert.Single(actions, a => a.ActionMap == "spaceship_movement");
@@ -77,7 +77,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions);
         Assert.Equal("Flight Control", actions[0].Category); // Uses SCCategoryMapper for user-friendly names
@@ -96,7 +96,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Equal(4, actions.Count);
         Assert.Equal(SCInputType.Axis, actions.First(a => a.ActionName == "v_strafe_forward").InputType);
@@ -116,7 +116,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.All(actions, a => Assert.Equal(SCInputType.Button, a.InputType));
     }
@@ -131,7 +131,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions);
         Assert.Single(actions[0].DefaultBindings);
@@ -151,7 +151,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions);
         Assert.Single(actions[0].DefaultBindings);
@@ -171,7 +171,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions[0].DefaultBindings);
         Assert.True(actions[0].DefaultBindings[0].Inverted);
@@ -189,7 +189,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions[0].DefaultBindings);
         Assert.Equal(SCActivationMode.DoubleTap, actions[0].DefaultBindings[0].ActivationMode);
@@ -207,7 +207,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions[0].DefaultBindings);
         Assert.Equal("js1", actions[0].DefaultBindings[0].DevicePrefix);
@@ -224,7 +224,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions[0].DefaultBindings);
         Assert.Equal("w", actions[0].DefaultBindings[0].Input);
@@ -241,7 +241,7 @@ public class SCSchemaServiceTests
                 </actionmap>
             </profile>");
 
-        var actions = _service.ParseActions(doc);
+        var actions = SCSchemaService.ParseActions(doc);
 
         Assert.Single(actions);
         Assert.Equal("spaceship_movement.v_strafe_forward", actions[0].Key);
@@ -260,7 +260,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "test", ActionName = "action2" }
         };
 
-        var report = _service.CompareSchemas(actions, actions);
+        var report = SCSchemaService.CompareSchemas(actions, actions);
 
         Assert.False(report.HasChanges);
         Assert.Empty(report.AddedActions);
@@ -280,7 +280,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "test", ActionName = "action2" }
         };
 
-        var report = _service.CompareSchemas(oldActions, newActions);
+        var report = SCSchemaService.CompareSchemas(oldActions, newActions);
 
         Assert.True(report.HasChanges);
         Assert.Single(report.AddedActions);
@@ -301,7 +301,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "test", ActionName = "action1" }
         };
 
-        var report = _service.CompareSchemas(oldActions, newActions);
+        var report = SCSchemaService.CompareSchemas(oldActions, newActions);
 
         Assert.True(report.HasChanges);
         Assert.Empty(report.AddedActions);
@@ -321,7 +321,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "test", ActionName = "new_action" }
         };
 
-        var report = _service.CompareSchemas(oldActions, newActions);
+        var report = SCSchemaService.CompareSchemas(oldActions, newActions);
 
         Assert.True(report.HasChanges);
         Assert.Single(report.PossibleRenames);
@@ -342,7 +342,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "test", ActionName = "added2" }
         };
 
-        var report = _service.CompareSchemas(oldActions, newActions);
+        var report = SCSchemaService.CompareSchemas(oldActions, newActions);
 
         Assert.Contains("2 added", report.Summary);
         Assert.Contains("1 removed", report.Summary);
@@ -362,7 +362,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "map2", ActionName = "action3" }
         };
 
-        var grouped = _service.GroupByActionMap(actions);
+        var grouped = SCSchemaService.GroupByActionMap(actions);
 
         Assert.Equal(2, grouped.Count);
         Assert.Equal(2, grouped["map1"].Count);
@@ -379,7 +379,7 @@ public class SCSchemaServiceTests
             new() { ActionMap = "map3", ActionName = "action3", Category = "Category B" }
         };
 
-        var grouped = _service.GroupByCategory(actions);
+        var grouped = SCSchemaService.GroupByCategory(actions);
 
         Assert.Equal(2, grouped.Count);
         Assert.Equal(2, grouped["Category A"].Count);
@@ -428,7 +428,7 @@ public class SCSchemaServiceTests
             }
         };
 
-        var filtered = _service.FilterJoystickActions(actions);
+        var filtered = SCSchemaService.FilterJoystickActions(actions);
 
         // All actions should be included - users can bind any action to their joystick
         Assert.Equal(4, filtered.Count);

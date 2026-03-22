@@ -318,7 +318,7 @@ public partial class MappingsTabController
         }
 
         // Check symmetrical checkbox (only for Custom curve)
-        if (!_curve.CheckboxBounds.IsEmpty && _curve.CheckboxBounds.Contains(pt))
+        if (_curve.CheckboxBounds.HitTest(pt))
         {
             _curve.Symmetrical = !_curve.Symmetrical;
             if (_curve.Symmetrical)
@@ -365,7 +365,7 @@ public partial class MappingsTabController
 
             for (int i = 0; i < _deadzone.PresetBounds.Length; i++)
             {
-                if (!_deadzone.PresetBounds[i].IsEmpty && _deadzone.PresetBounds[i].Contains(pt))
+                if (_deadzone.PresetBounds[i].HitTest(pt))
                 {
                     float presetVal = presetValues[i];
 

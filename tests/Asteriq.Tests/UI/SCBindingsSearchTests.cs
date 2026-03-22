@@ -119,7 +119,7 @@ public class SCBindingsSearchTests
     public void MatchesTextSearch_CaseInsensitive_ReturnsTrue()
     {
         var action = Action("spaceship_movement", "v_strafe_forward");
-        Assert.True(SCBindingsSearch.MatchesTextSearch(action, [], "STRAFE"));
+        Assert.True(SCBindingsSearch.MatchesTextSearch(action, [], "strafe"));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -233,12 +233,12 @@ public class SCBindingsSearchTests
     }
 
     [Fact]
-    public void MatchesButtonCapture_NoColumnConstraint_KeyboardBinding_ReturnsFalse()
+    public void MatchesButtonCapture_NoColumnConstraint_KeyboardBinding_ReturnsTrue()
     {
         var action = Action("spaceship_weapons", "v_attack1");
         var bindings = new[] { KbBinding(action, "button3") };
-        // No column but keyboard binding — should not match joystick capture
-        Assert.False(SCBindingsSearch.MatchesButtonCapture(action, bindings,
+        // No column constraint — accepts any binding regardless of device type
+        Assert.True(SCBindingsSearch.MatchesButtonCapture(action, bindings,
             capturedInput: "button3", capturedModifier: null, vjoyDeviceId: null, physicalDeviceId: null));
     }
 

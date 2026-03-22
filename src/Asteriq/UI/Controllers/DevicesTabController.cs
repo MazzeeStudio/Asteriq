@@ -1462,8 +1462,9 @@ public class DevicesTabController : ITabController
                          $"Hats: {povCount}\n\n" +
                          "Existing mappings will be preserved.\nAn admin prompt will appear.";
 
-        bool confirmed = FUIMessageBox.ShowQuestion(_ctx.OwnerForm, message, "Match Physical Device");
-        if (!confirmed) return;
+        int result = FUIMessageBox.Show(_ctx.OwnerForm, message, "Match Physical Device",
+            FUIMessageBox.MessageBoxType.Question, "Match", "Cancel");
+        if (result != 0) return;
 
         // Release the device before reconfiguring
         _ctx.VJoyService.ReleaseDevice(vjoyId);

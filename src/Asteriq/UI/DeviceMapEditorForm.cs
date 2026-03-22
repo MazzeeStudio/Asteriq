@@ -279,8 +279,9 @@ public class DeviceMapEditorForm : Form
         {
             if (_hasUnsavedChanges)
             {
-                var result = FUIMessageBox.ShowQuestion(this, "You have unsaved changes. Discard and close?", "Unsaved Changes");
-                if (!result)
+                int result = FUIMessageBox.Show(this, "You have unsaved changes. Discard and close?", "Unsaved Changes",
+                    FUIMessageBox.MessageBoxType.Question, "Discard", "Cancel");
+                if (result != 0)
                     return true;
             }
             Close();

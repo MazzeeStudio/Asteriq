@@ -6,6 +6,8 @@ namespace Asteriq.UI;
 /// </summary>
 public class FUIBaseDialog : Form
 {
+    protected const float ContentPadding = 16f;
+
     protected override CreateParams CreateParams
     {
         get

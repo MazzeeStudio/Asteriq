@@ -111,21 +111,15 @@ public class FUIConfirmDialog : FUIBaseDialog
             messageY += lineHeight;
         }
 
-        // Buttons
+        // Buttons — cancel on left, confirm on right
         float buttonWidth = 100f;
         float buttonHeight = 32f;
-        float buttonGap = 20f;
         float buttonsY = bounds.Bottom - 55;
-        float totalButtonsWidth = buttonWidth * 2 + buttonGap;
-        float buttonsStartX = bounds.MidX - totalButtonsWidth / 2;
-
-        // Cancel button (left)
-        _cancelButtonBounds = new SKRect(buttonsStartX, buttonsY, buttonsStartX + buttonWidth, buttonsY + buttonHeight);
+        _cancelButtonBounds = new SKRect(ContentPadding, buttonsY, ContentPadding + buttonWidth, buttonsY + buttonHeight);
         FUIRenderer.DrawButton(canvas, _cancelButtonBounds, _cancelText, _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
-        // Confirm button (right)
-        _confirmButtonBounds = new SKRect(buttonsStartX + buttonWidth + buttonGap, buttonsY,
-            buttonsStartX + buttonWidth * 2 + buttonGap, buttonsY + buttonHeight);
+        _confirmButtonBounds = new SKRect(bounds.Right - ContentPadding - buttonWidth, buttonsY,
+            bounds.Right - ContentPadding, buttonsY + buttonHeight);
         FUIRenderer.DrawButton(canvas, _confirmButtonBounds, _confirmText, _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 

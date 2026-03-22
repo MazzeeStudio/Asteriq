@@ -605,9 +605,10 @@ public partial class MappingsTabController
                    $"  POV Hats: {physical.HatCount} (Continuous recommended)\n\n" +
                    "Would you like to open the vJoy Configuration utility?";
 
-        var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm, message, "vJoy Configuration Required");
+        int configResult = FUIMessageBox.Show(_ctx.OwnerForm, message, "vJoy Configuration Required",
+            FUIMessageBox.MessageBoxType.Question, "Open", "Cancel");
 
-        if (result)
+        if (configResult == 0)
         {
             LaunchVJoyConfigurator();
         }
@@ -725,14 +726,14 @@ public partial class MappingsTabController
                 buttons < physicalDevice.ButtonCount ||
                 povs < physicalDevice.HatCount)
             {
-                var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
+                int partialResult = FUIMessageBox.Show(_ctx.OwnerForm,
                     $"vJoy #{selectedVJoy.Id} doesn't have enough capacity.\n\n" +
                     $"Physical device: {physicalDevice.AxisCount} axes, {physicalDevice.ButtonCount} buttons, {physicalDevice.HatCount} hats\n" +
                     $"vJoy #{selectedVJoy.Id}: {axes} axes, {buttons} buttons, {povs} POVs\n\n" +
                     "Some controls will not be mapped. Continue?",
-                    "Partial Mapping");
+                    "Partial Mapping", FUIMessageBox.MessageBoxType.Question, "Continue", "Cancel");
 
-                if (!result)
+                if (partialResult != 0)
                     return null;
             }
 
@@ -762,11 +763,11 @@ public partial class MappingsTabController
         var physicalDevice = _ctx.Devices[_ctx.SelectedDevice];
         if (physicalDevice.IsVirtual) return;
 
-        var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
+        int clearResult = FUIMessageBox.Show(_ctx.OwnerForm,
             $"Remove all mappings for {physicalDevice.Name}?\n\nThis will remove axis, button, and hat mappings from all vJoy devices.",
-            "Clear Mappings");
+            "Clear Mappings", FUIMessageBox.MessageBoxType.Question, "Clear", "Cancel");
 
-        if (!result) return;
+        if (clearResult != 0) return;
 
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null) return;
@@ -799,15 +800,15 @@ public partial class MappingsTabController
         var device = _ctx.Devices[_ctx.SelectedDevice];
         if (device.IsConnected || device.IsVirtual) return; // Only works for disconnected physical devices
 
-        var result = FUIMessageBox.ShowQuestion(_ctx.OwnerForm,
+        int removeResult = FUIMessageBox.Show(_ctx.OwnerForm,
             $"Permanently remove {device.Name}?\n\n" +
             "This will:\n" +
-            "ÔÇó Clear all axis, button, and hat mappings\n" +
-            "ÔÇó Remove the device from the disconnected list\n\n" +
+            "• Clear all axis, button, and hat mappings\n" +
+            "• Remove the device from the disconnected list\n\n" +
             "This cannot be undone.",
-            "Remove Device");
+            "Remove Device", FUIMessageBox.MessageBoxType.Question, "Remove", "Cancel");
 
-        if (!result) return;
+        if (removeResult != 0) return;
 
         var profile = _ctx.ProfileManager.ActiveProfile;
         string deviceId = device.InstanceGuid.ToString();

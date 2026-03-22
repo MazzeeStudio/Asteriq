@@ -119,17 +119,14 @@ public class FUIInputDialog : FUIBaseDialog
         using var fieldBorderPaint = FUIRenderer.CreateStrokePaint(FUIColors.Frame);
         canvas.DrawRect(fieldBounds, fieldBorderPaint);
 
-        // Buttons
+        // Buttons — cancel on left, confirm on right
         float buttonWidth = 80f;
         float buttonHeight = 32f;
-        float buttonSpacing = 12f;
-        float totalWidth = buttonWidth * 2 + buttonSpacing;
-        float buttonStartX = (bounds.Width - totalWidth) / 2;
         float buttonY = bounds.Bottom - 48;
 
-        _cancelButtonBounds = new SKRect(buttonStartX, buttonY, buttonStartX + buttonWidth, buttonY + buttonHeight);
-        _confirmButtonBounds = new SKRect(buttonStartX + buttonWidth + buttonSpacing, buttonY,
-            buttonStartX + totalWidth, buttonY + buttonHeight);
+        _cancelButtonBounds = new SKRect(ContentPadding, buttonY, ContentPadding + buttonWidth, buttonY + buttonHeight);
+        _confirmButtonBounds = new SKRect(bounds.Right - ContentPadding - buttonWidth, buttonY,
+            bounds.Right - ContentPadding, buttonY + buttonHeight);
 
         FUIRenderer.DrawButton(canvas, _cancelButtonBounds, "CANCEL",
             _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);

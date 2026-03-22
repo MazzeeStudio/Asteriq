@@ -993,23 +993,52 @@ public class SettingsTabController : ITabController, IDisposable
         float referralGroupWidth = codeFieldWidth + FUIRenderer.SpaceSM + copyBtnWidth;
         float referralGroupX = leftMargin + (rightMargin - leftMargin - referralGroupWidth) / 2;
 
-        // "Copied" feedback — fade in 250ms, fade out 500ms
+
+        // "Copied" feedback — fade in, hold, fade out
         if (_referralCopiedTicks > 0)
         {
             long elapsedMs = Environment.TickCount64 - _referralCopiedTicks;
+
             const long fadeInMs = 250;
-            const long fadeOutMs = 2500;
-            const long totalMs = fadeInMs + fadeOutMs;
+            const long holdMs = 2000;
+            const long fadeOutMs = 500;
+
+            const long totalMs = fadeInMs + holdMs + fadeOutMs;
 
             if (elapsedMs < totalMs)
             {
-                float alpha = elapsedMs < fadeInMs
-                    ? elapsedMs / (float)fadeInMs
-                    : 1f - (elapsedMs - fadeInMs) / (float)fadeOutMs;
+                float alpha;
+
+                if (elapsedMs < fadeInMs)
+                {
+                    // Fade in
+                    alpha = elapsedMs / (float)fadeInMs;
+                }
+                else if (elapsedMs < fadeInMs + holdMs)
+                {
+                    // Fully visible
+                    alpha = 1f;
+                }
+                else
+                {
+                    // Fade out
+                    long fadeElapsed = elapsedMs - (fadeInMs + holdMs);
+                    alpha = 1f - fadeElapsed / (float)fadeOutMs;
+                }
+
                 var copiedColor = FUIColors.Active.WithAlpha((byte)(alpha * 255));
+
                 float copiedWidth = FUIRenderer.MeasureText("COPIED", 12f);
-                float copiedX = referralGroupX + (referralGroupWidth - copiedWidth) / 2;
-                FUIRenderer.DrawText(canvas, "COPIED", new SKPoint(copiedX, y - 8f), copiedColor, 12f);
+                float copiedX = referralGroupX + (codeFieldWidth - copiedWidth) / 2;
+
+                FUIRenderer.DrawText(
+                    canvas,
+                    "COPIED",
+                    new SKPoint(copiedX, y - 8f),
+                    copiedColor,
+                    12f
+                );
+
                 _ctx.MarkDirty();
             }
             else

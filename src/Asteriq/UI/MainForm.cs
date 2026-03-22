@@ -47,7 +47,6 @@ public partial class MainForm : Form
     private static extern bool ReleaseCapture();
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
-
     // SetWindowPos flags
     private const uint SWP_NOCOPYBITS = 0x0100;  // Discards entire window content (prevents ghost window)
     private const uint SWP_FRAMECHANGED = 0x0020;  // Recalculates frame
@@ -59,7 +58,11 @@ public partial class MainForm : Form
 
     private const int DWMWA_BORDER_COLOR = 34;  // Windows 11+ only
 
-    // Window sizing
+    // Window sizing — ResizeBorder is measured from the visible window edge inward.
+    // FramePadding accounts for the invisible frame that Windows adds around Sizable windows
+    // (WM_NCCALCSIZE returning 0 makes this invisible frame part of the client area).
+    private static readonly int FramePadding = SystemInformation.FrameBorderSize.Width
+                                             + SystemInformation.BorderSize.Width;
     private const int ResizeBorder = 6;
     private const int TitleBarHeight = 75;
 
@@ -1409,11 +1412,43 @@ public partial class MainForm : Form
 
     // (Key helper methods moved to MappingsTabController / SCBindingsTabController)
 
+    /// <summary>
+    /// SKControl that returns HTTRANSPARENT at window edges so the parent form
+    /// can handle resize hit-testing and cursor display.
+    /// </summary>
+    private sealed class BorderPassthroughSKControl : SKControl
+    {
+        private const int WM_NCHITTEST = 0x0084;
+        private const int HTTRANSPARENT = -1;
+
+        public Func<Point, bool>? IsInResizeBorder { get; set; }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_NCHITTEST && IsInResizeBorder != null)
+            {
+                var pt = Parent!.PointToClient(System.Windows.Forms.Cursor.Position);
+                if (IsInResizeBorder(pt))
+                {
+                    m.Result = (IntPtr)HTTRANSPARENT;
+                    return;
+                }
+            }
+            base.WndProc(ref m);
+        }
+    }
+
     private void InitializeCanvas()
     {
-        _canvas = new SKControl
+        _canvas = new BorderPassthroughSKControl
         {
-            Dock = DockStyle.Fill
+            Dock = DockStyle.Fill,
+            IsInResizeBorder = pt =>
+            {
+                int border = FramePadding + ResizeBorder;
+                return pt.X < border || pt.X >= ClientSize.Width - border ||
+                       pt.Y < border || pt.Y >= ClientSize.Height - border;
+            }
         };
         _canvas.PaintSurface += OnPaintSurface;
         _canvas.MouseMove += OnCanvasMouseMove;

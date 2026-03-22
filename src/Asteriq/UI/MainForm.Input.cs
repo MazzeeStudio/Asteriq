@@ -107,30 +107,6 @@ public partial class MainForm
             SyncFromTabContext();
         }
 
-        // Update cursor based on hit test (for resize feedback) - uses unscaled logical coords
-        int hitResult = HitTest(e.Location);
-        switch (hitResult)
-        {
-            case HTLEFT:
-            case HTRIGHT:
-                Cursor = Cursors.SizeWE;
-                break;
-            case HTTOP:
-            case HTBOTTOM:
-                Cursor = Cursors.SizeNS;
-                break;
-            case HTTOPLEFT:
-            case HTBOTTOMRIGHT:
-                Cursor = Cursors.SizeNWSE;
-                break;
-            case HTTOPRIGHT:
-            case HTBOTTOMLEFT:
-                Cursor = Cursors.SizeNESW;
-                break;
-            default:
-                break;
-        }
-
         // Devices tab hover handling (delegated to controller)
         if (_activeTab == 0)
         {

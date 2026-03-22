@@ -137,10 +137,13 @@ public partial class MainForm
 
     private int HitTest(Point clientPoint)
     {
-        bool left = clientPoint.X < ResizeBorder;
-        bool right = clientPoint.X >= ClientSize.Width - ResizeBorder;
-        bool top = clientPoint.Y < ResizeBorder;
-        bool bottom = clientPoint.Y >= ClientSize.Height - ResizeBorder;
+        // The effective resize border extends from the invisible frame edge inward
+        // past the visible window edge, so the user sees a resize zone at the visible border.
+        int border = FramePadding + ResizeBorder;
+        bool left = clientPoint.X < border;
+        bool right = clientPoint.X >= ClientSize.Width - border;
+        bool top = clientPoint.Y < border;
+        bool bottom = clientPoint.Y >= ClientSize.Height - border;
 
         if (top && left) return HTTOPLEFT;
         if (top && right) return HTTOPRIGHT;

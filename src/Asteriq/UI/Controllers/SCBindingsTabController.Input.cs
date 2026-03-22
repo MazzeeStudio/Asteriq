@@ -1131,11 +1131,44 @@ public partial class SCBindingsTabController
         _searchFilter.SelectionEnd = -1;
     }
 
+    private const int MaxSearchLength = 50;
+
+    private void ResetSearchCaptureState()
+    {
+        _searchFilter.ButtonCaptureTextActive = false;
+        _searchFilter.CaptureDeviceHidPath = null;
+    }
+
+    /// <summary>
+    /// Applies cursor movement with optional shift-selection. Returns the final cursor position.
+    /// When shift is held, extends selection. Without shift, collapses selection to the
+    /// appropriate edge (start for left movement, end for right movement).
+    /// </summary>
+    private int ApplySearchCursorMove(int cursor, int newPos, bool shift, bool collapseToStart)
+    {
+        if (shift)
+        {
+            if (_searchFilter.SelectionStart < 0)
+                _searchFilter.SelectionStart = cursor;
+            _searchFilter.SelectionEnd = newPos;
+        }
+        else
+        {
+            if (HasSearchSelection())
+            {
+                var (s, e) = GetOrderedSelection();
+                newPos = collapseToStart ? s : e;
+            }
+            ClearSearchSelection();
+        }
+        return newPos;
+    }
+
     private bool HandleSearchBoxKey(Keys keyData)
     {
         var key = keyData & Keys.KeyCode;
-        bool ctrl = (keyData & Keys.Control) == Keys.Control;
-        bool shift = (keyData & Keys.Shift) == Keys.Shift;
+        bool ctrl = keyData.HasFlag(Keys.Control);
+        bool shift = keyData.HasFlag(Keys.Shift);
         var text = _searchFilter.SearchText;
         int cursor = _searchFilter.CursorPos;
 
@@ -1150,83 +1183,41 @@ public partial class SCBindingsTabController
         if (key == Keys.Left)
         {
             int newPos = ctrl ? FindWordBoundaryLeft(text, cursor) : Math.Max(0, cursor - 1);
-            if (shift)
-            {
-                if (_searchFilter.SelectionStart < 0)
-                    _searchFilter.SelectionStart = cursor;
-                _searchFilter.SelectionEnd = newPos;
-            }
-            else
-            {
-                if (HasSearchSelection())
-                {
-                    var (s, _) = GetOrderedSelection();
-                    newPos = s;
-                }
-                ClearSearchSelection();
-            }
-            _searchFilter.CursorPos = newPos;
+            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, newPos, shift, collapseToStart: true);
             return true;
         }
 
         if (key == Keys.Right)
         {
             int newPos = ctrl ? FindWordBoundaryRight(text, cursor) : Math.Min(text.Length, cursor + 1);
-            if (shift)
-            {
-                if (_searchFilter.SelectionStart < 0)
-                    _searchFilter.SelectionStart = cursor;
-                _searchFilter.SelectionEnd = newPos;
-            }
-            else
-            {
-                if (HasSearchSelection())
-                {
-                    var (_, e) = GetOrderedSelection();
-                    newPos = e;
-                }
-                ClearSearchSelection();
-            }
-            _searchFilter.CursorPos = newPos;
+            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, newPos, shift, collapseToStart: false);
             return true;
         }
 
         if (key == Keys.Home)
         {
-            if (shift)
-            {
-                if (_searchFilter.SelectionStart < 0)
-                    _searchFilter.SelectionStart = cursor;
-                _searchFilter.SelectionEnd = 0;
-            }
-            else
-                ClearSearchSelection();
-            _searchFilter.CursorPos = 0;
+            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, 0, shift, collapseToStart: true);
             return true;
         }
 
         if (key == Keys.End)
         {
-            if (shift)
-            {
-                if (_searchFilter.SelectionStart < 0)
-                    _searchFilter.SelectionStart = cursor;
-                _searchFilter.SelectionEnd = text.Length;
-            }
-            else
-                ClearSearchSelection();
-            _searchFilter.CursorPos = text.Length;
+            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, text.Length, shift, collapseToStart: false);
             return true;
         }
 
         // Clipboard operations
         if (ctrl && key == Keys.C)
         {
-            string copyText = HasSearchSelection()
-                ? text[GetOrderedSelection().start..GetOrderedSelection().end]
-                : text;
-            if (!string.IsNullOrEmpty(copyText))
-                Clipboard.SetText(copyText);
+            if (HasSearchSelection())
+            {
+                var (s, e) = GetOrderedSelection();
+                Clipboard.SetText(text[s..e]);
+            }
+            else if (!string.IsNullOrEmpty(text))
+            {
+                Clipboard.SetText(text);
+            }
             return true;
         }
 
@@ -1237,7 +1228,6 @@ public partial class SCBindingsTabController
                 var (s, e) = GetOrderedSelection();
                 Clipboard.SetText(text[s..e]);
                 DeleteSearchSelection();
-                RefreshFilteredActions();
             }
             else if (!string.IsNullOrEmpty(text))
             {
@@ -1245,10 +1235,9 @@ public partial class SCBindingsTabController
                 _searchFilter.SearchText = "";
                 _searchFilter.CursorPos = 0;
                 ClearSearchSelection();
-                _searchFilter.ButtonCaptureTextActive = false;
-                _searchFilter.CaptureDeviceHidPath = null;
-                RefreshFilteredActions();
             }
+            ResetSearchCaptureState();
+            RefreshFilteredActions();
             return true;
         }
 
@@ -1256,17 +1245,15 @@ public partial class SCBindingsTabController
         {
             if (Clipboard.ContainsText())
             {
-                string pasted = Clipboard.GetText();
-                pasted = pasted.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ').Trim();
-                _searchFilter.ButtonCaptureTextActive = false;
-                _searchFilter.CaptureDeviceHidPath = null;
+                string pasted = Clipboard.GetText().ReplaceLineEndings(" ").Trim();
+                ResetSearchCaptureState();
 
                 if (HasSearchSelection())
                     DeleteSearchSelection();
 
                 text = _searchFilter.SearchText;
                 cursor = _searchFilter.CursorPos;
-                int remaining = 50 - text.Length;
+                int remaining = MaxSearchLength - text.Length;
                 if (remaining > 0)
                 {
                     string toInsert = pasted.Length > remaining ? pasted[..remaining] : pasted;
@@ -1289,55 +1276,51 @@ public partial class SCBindingsTabController
             return true;
         }
 
+        // Text-modifying keys — reset capture state once up front
+        bool modifiesText = key is Keys.Back or Keys.Delete || KeyToChar(key, shift) != '\0';
+        if (modifiesText)
+            ResetSearchCaptureState();
+
         if (key == Keys.Back)
         {
-            _searchFilter.ButtonCaptureTextActive = false;
-            _searchFilter.CaptureDeviceHidPath = null;
             if (HasSearchSelection())
             {
                 DeleteSearchSelection();
-                RefreshFilteredActions();
             }
             else if (cursor > 0)
             {
                 int deleteFrom = ctrl ? FindWordBoundaryLeft(text, cursor) : cursor - 1;
                 _searchFilter.SearchText = string.Concat(text.AsSpan(0, deleteFrom), text.AsSpan(cursor));
                 _searchFilter.CursorPos = deleteFrom;
-                RefreshFilteredActions();
             }
+            RefreshFilteredActions();
             return true;
         }
 
         if (key == Keys.Delete)
         {
-            _searchFilter.ButtonCaptureTextActive = false;
-            _searchFilter.CaptureDeviceHidPath = null;
             if (HasSearchSelection())
             {
                 DeleteSearchSelection();
-                RefreshFilteredActions();
             }
             else if (cursor < text.Length)
             {
                 int deleteTo = ctrl ? FindWordBoundaryRight(text, cursor) : cursor + 1;
                 _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), text.AsSpan(deleteTo));
-                RefreshFilteredActions();
             }
+            RefreshFilteredActions();
             return true;
         }
 
         char c = KeyToChar(key, shift);
         if (c != '\0')
         {
-            _searchFilter.ButtonCaptureTextActive = false;
-            _searchFilter.CaptureDeviceHidPath = null;
-
             if (HasSearchSelection())
                 DeleteSearchSelection();
 
             text = _searchFilter.SearchText;
             cursor = _searchFilter.CursorPos;
-            if (text.Length < 50)
+            if (text.Length < MaxSearchLength)
             {
                 _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), c.ToString(), text.AsSpan(cursor));
                 _searchFilter.CursorPos = cursor + 1;

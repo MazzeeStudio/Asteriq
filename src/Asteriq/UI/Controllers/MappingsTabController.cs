@@ -344,7 +344,7 @@ public partial class MappingsTabController : ITabController
         if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard && _keyboardOutput.CaptureHovered)
         {
             _keyboardOutput.IsCapturing = true;
-            _keyboardOutput.CaptureStartTime = DateTime.Now;
+            _keyboardOutput.CaptureStartTicks = Environment.TickCount64;
             return true;
         }
 
@@ -544,7 +544,7 @@ public partial class MappingsTabController : ITabController
 
         _selectionIsExplicit = true;
         _highlight.ControlDef = GetControlForRow(_selectedMappingRow);
-        _highlight.ControlHighlightTime = DateTime.Now;
+        _highlight.ControlHighlightTicks = Environment.TickCount64;
     }
 
     public void OnMouseMove(MouseEventArgs e)
@@ -843,7 +843,7 @@ public partial class MappingsTabController : ITabController
     {
         if (_highlight.ControlDef is not null)
         {
-            float elapsed = (float)(DateTime.Now - _highlight.ControlHighlightTime).TotalSeconds;
+            float elapsed = (Environment.TickCount64 - _highlight.ControlHighlightTicks) / 1000f;
             if (elapsed < 3f)
                 _ctx.MarkDirty();
             else
@@ -852,7 +852,7 @@ public partial class MappingsTabController : ITabController
 
         if (_highlight.FlashText is not null)
         {
-            float elapsed = (float)(DateTime.Now - _highlight.FlashTime).TotalSeconds;
+            float elapsed = (Environment.TickCount64 - _highlight.FlashTicks) / 1000f;
             if (elapsed < 2.5f)
                 _ctx.MarkDirty();
             else
@@ -977,7 +977,7 @@ public partial class MappingsTabController : ITabController
             string debounceKey = $"{state.DeviceName}:{i}";
             if (_highlight.Debounce.TryGetValue(debounceKey, out var lastTime))
             {
-                var elapsed = (DateTime.Now - lastTime).TotalMilliseconds;
+                var elapsed = Environment.TickCount64 - lastTime;
                 if (elapsed < HighlightDebounceCooldownMs)
                     continue; // Skip - too soon since last highlight for this button
             }
@@ -994,8 +994,8 @@ public partial class MappingsTabController : ITabController
                 // Found a mapping - highlight this row
                 _highlight.Row = mapping.Output.Index;
                 _highlight.VJoyDevice = mapping.Output.VJoyDevice;
-                _highlight.StartTime = DateTime.Now;
-                _highlight.Debounce[debounceKey] = DateTime.Now; // Record highlight time for debounce
+                _highlight.StartTicks = Environment.TickCount64;
+                _highlight.Debounce[debounceKey] = Environment.TickCount64; // Record highlight time for debounce
 
                 // Show lead line on the silhouette only if this mapping belongs to the currently viewed vJoy device
                 bool isCurrentVJoy = _ctx.VJoyDevices.Count > 0 &&
@@ -1009,7 +1009,7 @@ public partial class MappingsTabController : ITabController
                     if (control is not null)
                     {
                         _highlight.ControlDef = control;
-                        _highlight.ControlHighlightTime = DateTime.Now;
+                        _highlight.ControlHighlightTicks = Environment.TickCount64;
                     }
                 }
 
@@ -1036,8 +1036,8 @@ public partial class MappingsTabController : ITabController
             {
                 // Button pressed with no mapping - flash an indicator
                 _highlight.FlashText = $"BUTTON {i + 1} — NO MAPPING";
-                _highlight.FlashTime = DateTime.Now;
-                _highlight.Debounce[debounceKey] = DateTime.Now; // Debounce the no-mapping flash too
+                _highlight.FlashTicks = Environment.TickCount64;
+                _highlight.Debounce[debounceKey] = Environment.TickCount64; // Debounce the no-mapping flash too
             }
         }
 
@@ -1115,7 +1115,7 @@ public partial class MappingsTabController : ITabController
         public SKRect ClearBounds;
         public bool ClearHovered;
         public bool IsCapturing;
-        public DateTime CaptureStartTime = DateTime.MinValue;
+        public long CaptureStartTicks;
         public string? PendingKey;
         public List<string>? PendingModifiers;
         public int PendingOutputIndex = -1;
@@ -1127,7 +1127,7 @@ public partial class MappingsTabController : ITabController
         public bool IsListening;
         public SKRect FieldBounds;
         public DetectedInput? PendingInput;
-        public DateTime ListeningStartTime = DateTime.MinValue;
+        public long ListeningStartTicks;
         public bool ManualEntryMode;
         public SKRect ManualEntryBounds;
         public int SelectedSourceDevice;
@@ -1144,13 +1144,13 @@ public partial class MappingsTabController : ITabController
     {
         public int Row = -1;
         public uint VJoyDevice;
-        public DateTime StartTime = DateTime.MinValue;
+        public long StartTicks;
         public Dictionary<string, bool[]> PrevButtonState = new();
-        public Dictionary<string, DateTime> Debounce = new();
+        public Dictionary<string, long> Debounce = new();
         public ControlDefinition? ControlDef;
-        public DateTime ControlHighlightTime;
+        public long ControlHighlightTicks;
         public string? FlashText;
-        public DateTime FlashTime;
+        public long FlashTicks;
     }
 
     private sealed class AutoScrollState

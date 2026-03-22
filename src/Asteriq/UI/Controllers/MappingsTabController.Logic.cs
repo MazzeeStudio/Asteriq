@@ -133,7 +133,7 @@ public partial class MappingsTabController
         if (!_mappingEditorOpen) return;
 
         _inputDetection.IsListening = true;
-        _inputDetection.ListeningStartTime = DateTime.Now;
+        _inputDetection.ListeningStartTicks = Environment.TickCount64;
         _inputDetection.PendingInput = null;
 
         // Determine input type based on what we're editing
@@ -1075,7 +1075,7 @@ public partial class MappingsTabController
         if (rowIndex < 0) return;
 
         _inputDetection.IsListening = true;
-        _inputDetection.ListeningStartTime = DateTime.Now;
+        _inputDetection.ListeningStartTicks = Environment.TickCount64;
         _inputDetection.PendingInput = null;
 
         // Determine input type based on current mapping category tab
@@ -1144,7 +1144,7 @@ public partial class MappingsTabController
         if (_keyboardOutput.PendingKey is null) return;
 
         _inputDetection.IsListening = true;
-        _inputDetection.ListeningStartTime = DateTime.Now;
+        _inputDetection.ListeningStartTicks = Environment.TickCount64;
         _inputDetection.PendingInput = null;
 
         _inputDetectionService ??= new InputDetectionService(_ctx.InputService);
@@ -2068,7 +2068,7 @@ public partial class MappingsTabController
         if (inp is null)
         {
             _highlight.FlashText = "Assign a physical button first";
-            _highlight.FlashTime = DateTime.Now;
+            _highlight.FlashTicks = Environment.TickCount64;
             _ctx.MarkDirty();
             return;
         }

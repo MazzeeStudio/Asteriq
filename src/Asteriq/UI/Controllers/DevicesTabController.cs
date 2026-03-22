@@ -31,7 +31,7 @@ public class DevicesTabController : ITabController
     private readonly DeviceActionsState _actions = new();
     private readonly ForwardingButtonsState _forwarding = new();
     private readonly SilhouettePickerState _silhouette = new();
-    private readonly SVGClickState _svgClick = new();
+    private readonly SvgClickState _svgClick = new();
 
     /// <summary>
     /// The active device category (0 = physical, 1 = virtual/vJoy).
@@ -1771,7 +1771,7 @@ public class DevicesTabController : ITabController
         public bool SyncVJoyHovered;
     }
 
-    private sealed class SVGClickState
+    private sealed class SvgClickState
     {
         public long LastClickTicks;
         public string? LastControlId;

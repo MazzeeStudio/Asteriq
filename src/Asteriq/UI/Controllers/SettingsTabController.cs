@@ -71,7 +71,12 @@ public class SettingsTabController : ITabController, IDisposable
     private ToggleAnim _checkUpdatesT;
     private const float ToggleLerpSpeed = 0.14f;  // per 60Hz tick ≈ ~120 ms transition
 
-    // Settings right panel accordion state — "visual" | "network" | "hidhide"
+    // Settings right panel accordion state — PanelVisual | PanelNetwork | PanelHidHide
+    // Right panel accordion identifiers
+    private const string PanelVisual = "visual";
+    private const string PanelNetwork = "network";
+    private const string PanelHidHide = "hidhide";
+
     private string _settingsRightPanelActive;
     private SKRect _visualPanelHeaderBounds;
     private SKRect _networkPanelHeaderBounds;
@@ -123,8 +128,8 @@ public class SettingsTabController : ITabController, IDisposable
         _clientOnlyT    = new ToggleAnim { T = ctx.AppSettings.ClientOnlyMode ? 1f : 0f };
         _networkEnabledT = new ToggleAnim { T = ctx.AppSettings.NetworkEnabled ? 1f : 0f };
         _checkUpdatesT  = new ToggleAnim { T = ctx.AppSettings.AutoCheckUpdates ? 1f : 0f };
-        var savedPanel = ctx.AppSettings.SettingsRightPanel ?? "visual";
-        _settingsRightPanelActive = (savedPanel == "network" && !ctx.AppSettings.NetworkEnabled) ? "visual" : savedPanel;
+        var savedPanel = ctx.AppSettings.SettingsRightPanel ?? PanelVisual;
+        _settingsRightPanelActive = (savedPanel == PanelNetwork && !ctx.AppSettings.NetworkEnabled) ? PanelVisual : savedPanel;
     }
 
     public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
@@ -316,9 +321,9 @@ public class SettingsTabController : ITabController, IDisposable
 
     private void UpdateAccordionAnimations()
     {
-        float vTarget = _settingsRightPanelActive == "visual" ? 1f : 0f;
-        float nTarget = _settingsRightPanelActive == "network" ? 1f : 0f;
-        float hTarget = _settingsRightPanelActive == "hidhide" ? 1f : 0f;
+        float vTarget = _settingsRightPanelActive == PanelVisual ? 1f : 0f;
+        float nTarget = _settingsRightPanelActive == PanelNetwork ? 1f : 0f;
+        float hTarget = _settingsRightPanelActive == PanelHidHide ? 1f : 0f;
 
         const float panelLerp = 0.18f;
         _visualExpandW  = LerpSnap(_visualExpandW, vTarget, panelLerp);
@@ -476,7 +481,6 @@ public class SettingsTabController : ITabController, IDisposable
     {
         float gap = FUIRenderer.SpaceSM;
         float leftWidth = (bounds.Width - gap) * 0.52f;
-        float rightWidth = (bounds.Width - gap) * 0.48f;
 
         var leftBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + leftWidth, bounds.Bottom);
         var rightBounds = new SKRect(bounds.Left + leftWidth + gap, bounds.Top, bounds.Right, bounds.Bottom);
@@ -1017,14 +1021,14 @@ public class SettingsTabController : ITabController, IDisposable
         const float gap = 8f;
 
         // If HidHide was uninstalled while the panel was active, fall back to visual
-        if (!hidHideInstalled && _settingsRightPanelActive == "hidhide")
+        if (!hidHideInstalled && _settingsRightPanelActive == PanelHidHide)
         {
-            _settingsRightPanelActive = "visual";
+            _settingsRightPanelActive = PanelVisual;
             _hidHidePanelHeaderBounds = SKRect.Empty;
         }
 
         // Load HidHide state fresh when the panel first opens
-        if (_settingsRightPanelActive == "hidhide" && !_hidHideStateLoaded)
+        if (_settingsRightPanelActive == PanelHidHide && !_hidHideStateLoaded)
         {
             _hidHideCloaking = _ctx.HidHide!.IsCloakingEnabled();
             _hidHideInverse  = _ctx.HidHide!.IsInverseMode();
@@ -1046,7 +1050,7 @@ public class SettingsTabController : ITabController, IDisposable
         {
             // 2-panel accordion: VISUAL + HIDHIDE
             _networkPanelHeaderBounds = SKRect.Empty;
-            if (_settingsRightPanelActive == "hidhide")
+            if (_settingsRightPanelActive == PanelHidHide)
             {
                 float visBottom   = bounds.Top + RightPanelCollapsedH;
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
@@ -1069,7 +1073,7 @@ public class SettingsTabController : ITabController, IDisposable
         {
             // 2-panel accordion: VISUAL + NETWORK
             _hidHidePanelHeaderBounds = SKRect.Empty;
-            if (_settingsRightPanelActive == "network")
+            if (_settingsRightPanelActive == PanelNetwork)
             {
                 float visBottom   = bounds.Top + RightPanelCollapsedH;
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
@@ -1098,7 +1102,6 @@ public class SettingsTabController : ITabController, IDisposable
 
             float visH = RightPanelCollapsedH + expandableH * (_visualExpandW / wSum);
             float netH = RightPanelCollapsedH + expandableH * (_networkExpandW / wSum);
-            float hidH = RightPanelCollapsedH + expandableH * (_hidHideExpandW / wSum);
 
             float visTop = bounds.Top;
             float netTop = visTop + visH + gap;
@@ -1108,9 +1111,9 @@ public class SettingsTabController : ITabController, IDisposable
             var networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, netTop + netH);
             var hidHideBounds = new SKRect(bounds.Left, hidTop, bounds.Right, bounds.Bottom);
 
-            bool visExpanded = _settingsRightPanelActive == "visual";
-            bool netExpanded = _settingsRightPanelActive == "network";
-            bool hidExpanded = _settingsRightPanelActive == "hidhide";
+            bool visExpanded = _settingsRightPanelActive == PanelVisual;
+            bool netExpanded = _settingsRightPanelActive == PanelNetwork;
+            bool hidExpanded = _settingsRightPanelActive == PanelHidHide;
 
             // Visual panel
             canvas.Save();
@@ -1661,8 +1664,8 @@ public class SettingsTabController : ITabController, IDisposable
             {
                 _ctx.StartNetworking?.Invoke();
                 // Switch right panel to NETWORK so user can configure immediately
-                _settingsRightPanelActive = "network";
-                _ctx.AppSettings.SettingsRightPanel = "network";
+                _settingsRightPanelActive = PanelNetwork;
+                _ctx.AppSettings.SettingsRightPanel = PanelNetwork;
             }
             else
             {
@@ -1675,22 +1678,22 @@ public class SettingsTabController : ITabController, IDisposable
         // Right panel accordion header clicks
         if (_visualPanelHeaderBounds.HitTest(pt))
         {
-            _settingsRightPanelActive = "visual";
-            _ctx.AppSettings.SettingsRightPanel = "visual";
+            _settingsRightPanelActive = PanelVisual;
+            _ctx.AppSettings.SettingsRightPanel = PanelVisual;
             _ctx.InvalidateCanvas();
             return;
         }
         if (_networkPanelHeaderBounds.HitTest(pt))
         {
-            _settingsRightPanelActive = "network";
-            _ctx.AppSettings.SettingsRightPanel = "network";
+            _settingsRightPanelActive = PanelNetwork;
+            _ctx.AppSettings.SettingsRightPanel = PanelNetwork;
             _ctx.InvalidateCanvas();
             return;
         }
         if (_hidHidePanelHeaderBounds.HitTest(pt))
         {
-            _settingsRightPanelActive = "hidhide";
-            _ctx.AppSettings.SettingsRightPanel = "hidhide";
+            _settingsRightPanelActive = PanelHidHide;
+            _ctx.AppSettings.SettingsRightPanel = PanelHidHide;
             _hidHideStateLoaded = false;    // force toggle state reload
             _hidHideVersionChecked = false; // force version re-check
             _hidHideInstallPhase = HidHideInstallPhase.Idle;
@@ -1699,7 +1702,7 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // HidHide panel clicks
-        if (_settingsRightPanelActive == "hidhide")
+        if (_settingsRightPanelActive == PanelHidHide)
         {
             if (_hidHideUpdateButtonBounds.HitTest(pt)
                 && _hidHideInstallPhase is HidHideInstallPhase.Idle or HidHideInstallPhase.Error)
@@ -1709,7 +1712,7 @@ public class SettingsTabController : ITabController, IDisposable
             }
         }
 
-        if (_settingsRightPanelActive == "hidhide" && _ctx.HidHide?.IsAvailable() == true)
+        if (_settingsRightPanelActive == PanelHidHide && _ctx.HidHide?.IsAvailable() == true)
         {
             if (_hidHideCloakingToggleBounds.HitTest(pt))
             {

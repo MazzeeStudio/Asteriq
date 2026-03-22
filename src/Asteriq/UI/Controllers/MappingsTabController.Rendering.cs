@@ -388,7 +388,7 @@ public partial class MappingsTabController
 
             if (outputIndex == _highlight.Row && vjoyDevice.Id == _highlight.VJoyDevice)
             {
-                var elapsed = (DateTime.Now - _highlight.StartTime).TotalMilliseconds;
+                var elapsed = Environment.TickCount64 - _highlight.StartTicks;
                 if (elapsed < HighlightDurationMs)
                 {
                     hasAttentionHighlight = true;
@@ -634,7 +634,7 @@ public partial class MappingsTabController
         // "No mapping" flash indicator ÔÇö centered above the checkbox row, fades out
         if (_highlight.FlashText is not null)
         {
-            float elapsed = (float)(DateTime.Now - _highlight.FlashTime).TotalSeconds;
+            float elapsed = (Environment.TickCount64 - _highlight.FlashTicks) / 1000f;
             float opacity = elapsed < 1f ? 1f : Math.Max(0f, 1f - (elapsed - 1f) / 1.5f);
             if (opacity > 0.01f)
             {
@@ -788,7 +788,7 @@ public partial class MappingsTabController
         if (isListening)
         {
             // Check for timeout
-            var elapsed = (DateTime.Now - _inputDetection.ListeningStartTime).TotalMilliseconds;
+            var elapsed = Environment.TickCount64 - _inputDetection.ListeningStartTicks;
             if (elapsed >= InputListeningTimeoutMs)
             {
                 CancelInputListening(); // Timeout - cancel listening
@@ -1345,7 +1345,7 @@ public partial class MappingsTabController
             // Check for key capture timeout
             if (_keyboardOutput.IsCapturing)
             {
-                var elapsed = (DateTime.Now - _keyboardOutput.CaptureStartTime).TotalMilliseconds;
+                var elapsed = Environment.TickCount64 - _keyboardOutput.CaptureStartTicks;
                 if (elapsed >= KeyCaptureTimeoutMs)
                 {
                     _keyboardOutput.IsCapturing = false; // Timeout - cancel capture
@@ -1363,7 +1363,7 @@ public partial class MappingsTabController
             // Draw timeout progress bar when capturing
             if (_keyboardOutput.IsCapturing)
             {
-                var elapsed = (DateTime.Now - _keyboardOutput.CaptureStartTime).TotalMilliseconds;
+                var elapsed = Environment.TickCount64 - _keyboardOutput.CaptureStartTicks;
                 float progress = Math.Min(1f, (float)(elapsed / KeyCaptureTimeoutMs));
                 float remaining = 1f - progress;
 
@@ -2707,7 +2707,7 @@ public partial class MappingsTabController
     {
         if (_highlight.ControlDef?.Anchor is null) return;
 
-        float elapsed = (float)(DateTime.Now - _highlight.ControlHighlightTime).TotalSeconds;
+        float elapsed = (Environment.TickCount64 - _highlight.ControlHighlightTicks) / 1000f;
         float opacity = elapsed < 1f ? 1f : Math.Max(0f, 1f - (elapsed - 1f) / 2f);
         if (opacity < 0.01f) return;
 
@@ -2738,7 +2738,7 @@ public partial class MappingsTabController
             Value = 1f,
             IsAxis = false,
             Control = _highlight.ControlDef,
-            LastActivity = _highlight.ControlHighlightTime,
+            LastActivity = DateTime.Now, // approximate — uses current time since highlight ticks aren't DateTime
             AppearProgress = 1f
         };
 

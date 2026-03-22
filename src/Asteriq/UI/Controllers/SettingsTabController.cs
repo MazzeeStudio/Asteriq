@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
@@ -38,6 +38,7 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _bmacButtonBounds;
     private SKRect _referralCopyButtonBounds;
     private SKRect _referralLinkButtonBounds;
+    private long _referralCopiedTicks; // 0 = not showing
 
     // Profile name edit
     private SKRect _profileNameBounds;
@@ -992,6 +993,31 @@ public class SettingsTabController : ITabController, IDisposable
         float referralGroupWidth = codeFieldWidth + FUIRenderer.SpaceSM + copyBtnWidth;
         float referralGroupX = leftMargin + (rightMargin - leftMargin - referralGroupWidth) / 2;
 
+        // "Copied" feedback — fade in 250ms, fade out 500ms
+        if (_referralCopiedTicks > 0)
+        {
+            long elapsedMs = Environment.TickCount64 - _referralCopiedTicks;
+            const long fadeInMs = 250;
+            const long fadeOutMs = 2500;
+            const long totalMs = fadeInMs + fadeOutMs;
+
+            if (elapsedMs < totalMs)
+            {
+                float alpha = elapsedMs < fadeInMs
+                    ? elapsedMs / (float)fadeInMs
+                    : 1f - (elapsedMs - fadeInMs) / (float)fadeOutMs;
+                var copiedColor = FUIColors.Active.WithAlpha((byte)(alpha * 255));
+                float copiedWidth = FUIRenderer.MeasureText("COPIED", 12f);
+                float copiedX = referralGroupX + (referralGroupWidth - copiedWidth) / 2;
+                FUIRenderer.DrawText(canvas, "COPIED", new SKPoint(copiedX, y - 8f), copiedColor, 12f);
+                _ctx.MarkDirty();
+            }
+            else
+            {
+                _referralCopiedTicks = 0;
+            }
+        }
+
         var codeDisplayBounds = new SKRect(referralGroupX, y, referralGroupX + codeFieldWidth, y + btnHeight);
         FUIWidgets.DrawSettingsValueField(canvas, codeDisplayBounds, "STAR-RBDQ-Z4JG");
 
@@ -1855,6 +1881,8 @@ public class SettingsTabController : ITabController, IDisposable
         if (_referralCopyButtonBounds.Contains(pt))
         {
             Clipboard.SetText("STAR-RBDQ-Z4JG");
+            _referralCopiedTicks = Environment.TickCount64;
+            _ctx.MarkDirty();
             return;
         }
         if (_referralLinkButtonBounds.Contains(pt))

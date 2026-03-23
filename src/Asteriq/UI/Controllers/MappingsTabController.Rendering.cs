@@ -825,27 +825,33 @@ public partial class MappingsTabController
             }
         }
 
-        // Add input button [+]
-        var addBounds = new SKRect(leftMargin, y, rightMargin, y + 28);
-        _addInputButtonBounds = addBounds;
-        bool addHovered = _addInputButtonHovered;
+        // Add input button [+] — hidden in threshold mode when an input already exists
+        bool thresholdInputFull = _threshold.IsThresholdMode && inputs.Count >= 1 && !isListening;
+        _addInputButtonBounds = SKRect.Empty;
 
-        using var addBgPaint = FUIRenderer.CreateFillPaint(addHovered ? FUIColors.SelectionBg : FUIColors.Background2);
-        canvas.DrawRoundRect(addBounds, 3, 3, addBgPaint);
-
-        using var addFramePaint = new SKPaint
+        if (!thresholdInputFull)
         {
-            Style = SKPaintStyle.Stroke,
-            Color = addHovered ? FUIColors.Active : FUIColors.Frame,
-            StrokeWidth = addHovered ? 2f : 1f,
-            PathEffect = isListening ? null : SKPathEffect.CreateDash(new float[] { 4, 2 }, 0)
-        };
-        canvas.DrawRoundRect(addBounds, 3, 3, addFramePaint);
+            var addBounds = new SKRect(leftMargin, y, rightMargin, y + 28);
+            _addInputButtonBounds = addBounds;
+            bool addHovered = _addInputButtonHovered;
 
-        string addText = isListening ? "Cancel" : "+ Add Input";
-        FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
-            FUIColors.ContentColor(addHovered), 14f);
-        y += 28 + 4;  // Button height + minimal gap (section labels handle top margin)
+            using var addBgPaint = FUIRenderer.CreateFillPaint(addHovered ? FUIColors.SelectionBg : FUIColors.Background2);
+            canvas.DrawRoundRect(addBounds, 3, 3, addBgPaint);
+
+            using var addFramePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = addHovered ? FUIColors.Active : FUIColors.Frame,
+                StrokeWidth = addHovered ? 2f : 1f,
+                PathEffect = isListening ? null : SKPathEffect.CreateDash(new float[] { 4, 2 }, 0)
+            };
+            canvas.DrawRoundRect(addBounds, 3, 3, addFramePaint);
+
+            string addText = isListening ? "Cancel" : "+ Add Input";
+            FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
+                FUIColors.ContentColor(addHovered), 14f);
+            y += 28 + 4;
+        }
 
         // Merge operation selector (only for axes with 2+ inputs)
         bool isAxis = _mappingCategory == 1;
@@ -1046,12 +1052,20 @@ public partial class MappingsTabController
             canvas.DrawRoundRect(_threshold.AxisModeBounds, 3, 3, fr);
         FUIRenderer.DrawTextCentered(canvas, "Axis", _threshold.AxisModeBounds, axText, 13f);
 
-        // Threshold button
+        // Threshold button — disabled when merge mode (2+ inputs) to prevent data loss
         bool threshActive = _threshold.IsThresholdMode;
-        bool threshHovered = _threshold.HoveredOutputMode == 1;
-        var thBg = threshActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (threshHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-        var thFrame = threshActive ? FUIColors.Active : (threshHovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var thText = threshActive ? FUIColors.TextBright : (threshHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+        int inputCount = GetInputsForSelectedOutput().Count;
+        bool threshDisabled = !threshActive && inputCount >= 2;
+        bool threshHovered = !threshDisabled && _threshold.HoveredOutputMode == 1;
+        var thBg = threshDisabled ? FUIColors.Background2
+            : threshActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
+            : (threshHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+        var thFrame = threshDisabled ? FUIColors.Frame.WithAlpha(100)
+            : threshActive ? FUIColors.Active
+            : (threshHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var thText = threshDisabled ? FUIColors.TextDim.WithAlpha(100)
+            : threshActive ? FUIColors.TextBright
+            : (threshHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
         using (var bg = FUIRenderer.CreateFillPaint(thBg))
             canvas.DrawRoundRect(_threshold.ThresholdModeBounds, 3, 3, bg);

@@ -399,7 +399,7 @@ public partial class MappingsTabController : ITabController
         if (_mappingCategory != 1 || _selectedMappingRow < 0)
             return false;
 
-        // Output mode toggle — always active for axes
+        // Output mode toggle
         if (_threshold.AxisModeBounds.Contains(e.X, e.Y) && _threshold.IsThresholdMode)
         {
             SwitchToAxisMode();
@@ -407,6 +407,9 @@ public partial class MappingsTabController : ITabController
         }
         if (_threshold.ThresholdModeBounds.Contains(e.X, e.Y) && !_threshold.IsThresholdMode)
         {
+            // Block switch to threshold when merge mode (2+ inputs)
+            var inputs = GetInputsForSelectedOutput();
+            if (inputs.Count >= 2) return true;
             SwitchToThresholdMode();
             return true;
         }
@@ -796,7 +799,13 @@ public partial class MappingsTabController : ITabController
             if (_threshold.AxisModeBounds.Contains(e.X, e.Y))
             { _threshold.HoveredOutputMode = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
             if (_threshold.ThresholdModeBounds.Contains(e.X, e.Y))
-            { _threshold.HoveredOutputMode = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+            {
+                // Don't show hand cursor when disabled (merge mode)
+                bool mergeActive = !_threshold.IsThresholdMode && GetInputsForSelectedOutput().Count >= 2;
+                if (!mergeActive) _ctx.OwnerForm.Cursor = Cursors.Hand;
+                _threshold.HoveredOutputMode = 1;
+                return true;
+            }
 
             if (_threshold.IsThresholdMode)
             {

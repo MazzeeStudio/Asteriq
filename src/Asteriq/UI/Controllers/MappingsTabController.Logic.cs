@@ -1616,7 +1616,7 @@ public partial class MappingsTabController
         if (profile is null) return;
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
 
-        // Preserve inputs from existing AxisMapping
+        // Preserve input from existing AxisMapping
         var existingAxis = GetCurrentAxisMapping();
         var inputs = existingAxis?.Inputs ?? new List<InputSource>();
 

@@ -45,6 +45,7 @@ public partial class MappingsTabController : ITabController
     private InputDetectionService? _inputDetectionService;
 
     private const int KeyCaptureTimeoutMs = 10000; // 10 second timeout for key capture
+    private const int ModifierWaitMs = 300; // Wait for combo key after modifier press
 
     // Input listening timeout
     private const int InputListeningTimeoutMs = 15000; // 15 second timeout for input listening
@@ -1019,27 +1020,15 @@ public partial class MappingsTabController : ITabController
         // Handle key capture for keyboard output mapping
         if (_keyboardOutput.IsCapturing)
         {
-            var baseKey = keyData & Keys.KeyCode;
-
-            bool isModifierOnly = IsModifierKey(baseKey);
-
-            if (isModifierOnly)
+            if (HandleKeyCaptureEvent(keyData,
+                ref _keyboardOutput.PendingModifierName, ref _keyboardOutput.PendingModifierTicks,
+                out var kbKeyName, out var kbModifiers))
             {
-                _keyboardOutput.SelectedKeyName = GetModifierKeyName(baseKey);
-                _keyboardOutput.SelectedModifiers = null;
+                _keyboardOutput.SelectedKeyName = kbKeyName;
+                _keyboardOutput.SelectedModifiers = kbModifiers;
                 _keyboardOutput.IsKeyboard = true;
                 _keyboardOutput.IsCapturing = false;
-                UpdateKeyNameForSelected();
-                return true;
-            }
-
-            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
-            if (!string.IsNullOrEmpty(keyName))
-            {
-                _keyboardOutput.SelectedKeyName = keyName;
-                _keyboardOutput.SelectedModifiers = modifiers.Count > 0 ? modifiers : null;
-                _keyboardOutput.IsKeyboard = true;
-                _keyboardOutput.IsCapturing = false;
+                _keyboardOutput.PendingModifierName = null;
                 UpdateKeyNameForSelected();
             }
             return true;
@@ -1048,24 +1037,14 @@ public partial class MappingsTabController : ITabController
         // Handle key capture for threshold keyboard output (above)
         if (_threshold.AboveCapturing)
         {
-            var baseKey = keyData & Keys.KeyCode;
-            bool isModifierOnly = IsModifierKey(baseKey);
-
-            if (isModifierOnly)
+            if (HandleKeyCaptureEvent(keyData,
+                ref _threshold.AbovePendingModifier, ref _threshold.AbovePendingModifierTicks,
+                out var abKeyName, out var abModifiers))
             {
-                _threshold.AboveKeyName = GetModifierKeyName(baseKey);
-                _threshold.AboveModifiers = null;
+                _threshold.AboveKeyName = abKeyName;
+                _threshold.AboveModifiers = abModifiers;
                 _threshold.AboveCapturing = false;
-                SaveThresholdSettingsForRow();
-                return true;
-            }
-
-            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
-            if (!string.IsNullOrEmpty(keyName))
-            {
-                _threshold.AboveKeyName = keyName;
-                _threshold.AboveModifiers = modifiers.Count > 0 ? modifiers : null;
-                _threshold.AboveCapturing = false;
+                _threshold.AbovePendingModifier = null;
                 SaveThresholdSettingsForRow();
             }
             return true;
@@ -1074,24 +1053,14 @@ public partial class MappingsTabController : ITabController
         // Handle key capture for threshold keyboard output (below)
         if (_threshold.BelowCapturing)
         {
-            var baseKey = keyData & Keys.KeyCode;
-            bool isModifierOnly = IsModifierKey(baseKey);
-
-            if (isModifierOnly)
+            if (HandleKeyCaptureEvent(keyData,
+                ref _threshold.BelowPendingModifier, ref _threshold.BelowPendingModifierTicks,
+                out var blKeyName, out var blModifiers))
             {
-                _threshold.BelowKeyName = GetModifierKeyName(baseKey);
-                _threshold.BelowModifiers = null;
+                _threshold.BelowKeyName = blKeyName;
+                _threshold.BelowModifiers = blModifiers;
                 _threshold.BelowCapturing = false;
-                SaveThresholdSettingsForRow();
-                return true;
-            }
-
-            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
-            if (!string.IsNullOrEmpty(keyName))
-            {
-                _threshold.BelowKeyName = keyName;
-                _threshold.BelowModifiers = modifiers.Count > 0 ? modifiers : null;
-                _threshold.BelowCapturing = false;
+                _threshold.BelowPendingModifier = null;
                 SaveThresholdSettingsForRow();
             }
             return true;
@@ -1125,6 +1094,54 @@ public partial class MappingsTabController : ITabController
         return false;
     }
 
+    /// <summary>
+    /// Shared key capture logic. Modifier-only presses are saved as pending (returns false).
+    /// Non-modifier key presses finalize immediately with any held modifiers (returns true).
+    /// Pending modifiers finalize after ModifierWaitMs via CheckPendingModifierTimeout.
+    /// </summary>
+    private static bool HandleKeyCaptureEvent(Keys keyData,
+        ref string? pendingModifier, ref long pendingModifierTicks,
+        out string keyName, out List<string>? modifiers)
+    {
+        keyName = "";
+        modifiers = null;
+
+        var baseKey = keyData & Keys.KeyCode;
+        if (IsModifierKey(baseKey))
+        {
+            // Save as pending — don't finalize yet, wait for possible combo key
+            pendingModifier = GetModifierKeyName(baseKey);
+            pendingModifierTicks = Environment.TickCount64;
+            return false;
+        }
+
+        // Non-modifier key — finalize with any held modifiers
+        var (name, mods) = GetKeyNameAndModifiersFromKeys(keyData);
+        if (!string.IsNullOrEmpty(name))
+        {
+            keyName = name;
+            modifiers = mods.Count > 0 ? mods : null;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if a pending modifier has timed out (held alone without a combo key).
+    /// Called from the render loop. Returns true if a modifier-only capture should finalize.
+    /// </summary>
+    private static bool CheckPendingModifierTimeout(ref string? pendingModifier, ref long pendingModifierTicks,
+        out string keyName)
+    {
+        keyName = "";
+        if (pendingModifier is null) return false;
+        if (Environment.TickCount64 - pendingModifierTicks < ModifierWaitMs) return false;
+
+        keyName = pendingModifier;
+        pendingModifier = null;
+        return true;
+    }
+
     public void OnMouseLeave()
     {
         _curve.DraggingPoint = -1;
@@ -1154,6 +1171,35 @@ public partial class MappingsTabController : ITabController
                 _highlight.FlashText = null;
         }
 
+        // Finalize pending modifier-only captures after timeout
+        if (_keyboardOutput.IsCapturing &&
+            CheckPendingModifierTimeout(ref _keyboardOutput.PendingModifierName, ref _keyboardOutput.PendingModifierTicks, out var kbMod))
+        {
+            _keyboardOutput.SelectedKeyName = kbMod;
+            _keyboardOutput.SelectedModifiers = null;
+            _keyboardOutput.IsKeyboard = true;
+            _keyboardOutput.IsCapturing = false;
+            UpdateKeyNameForSelected();
+            _ctx.MarkDirty();
+        }
+        if (_threshold.AboveCapturing &&
+            CheckPendingModifierTimeout(ref _threshold.AbovePendingModifier, ref _threshold.AbovePendingModifierTicks, out var abMod))
+        {
+            _threshold.AboveKeyName = abMod;
+            _threshold.AboveModifiers = null;
+            _threshold.AboveCapturing = false;
+            SaveThresholdSettingsForRow();
+            _ctx.MarkDirty();
+        }
+        if (_threshold.BelowCapturing &&
+            CheckPendingModifierTimeout(ref _threshold.BelowPendingModifier, ref _threshold.BelowPendingModifierTicks, out var blMod))
+        {
+            _threshold.BelowKeyName = blMod;
+            _threshold.BelowModifiers = null;
+            _threshold.BelowCapturing = false;
+            SaveThresholdSettingsForRow();
+            _ctx.MarkDirty();
+        }
     }
 
     public void OnActivated()
@@ -1415,6 +1461,8 @@ public partial class MappingsTabController : ITabController
         public bool ClearHovered;
         public bool IsCapturing;
         public long CaptureStartTicks;
+        public string? PendingModifierName;
+        public long PendingModifierTicks;
         public string? PendingKey;
         public List<string>? PendingModifiers;
         public int PendingOutputIndex = -1;
@@ -1516,6 +1564,8 @@ public partial class MappingsTabController : ITabController
         public bool AboveClearHovered;
         public bool AboveCapturing;
         public long AboveCaptureStartTicks;
+        public string? AbovePendingModifier;
+        public long AbovePendingModifierTicks;
         public bool DraggingAboveThreshold;
         public bool DraggingAboveHysteresis;
 
@@ -1532,6 +1582,8 @@ public partial class MappingsTabController : ITabController
         public bool BelowClearHovered;
         public bool BelowCapturing;
         public long BelowCaptureStartTicks;
+        public string? BelowPendingModifier;
+        public long BelowPendingModifierTicks;
         public bool DraggingBelowThreshold;
         public bool DraggingBelowHysteresis;
     }

@@ -1213,10 +1213,7 @@ public partial class MappingsTabController
         }
         else if (hasKey)
         {
-            string display = modifiers is { Count: > 0 }
-                ? string.Join(" + ", modifiers) + " + " + keyName
-                : keyName;
-            FUIRenderer.DrawTextCentered(canvas, display, captureBounds, FUIColors.TextBright, 14f);
+            FUIWidgets.DrawKeycapsInBounds(canvas, captureBounds, keyName, modifiers);
 
             float clearSize = 20f;
             clearBounds = new SKRect(rightMargin - clearSize - 4, y + (capHeight - clearSize) / 2,

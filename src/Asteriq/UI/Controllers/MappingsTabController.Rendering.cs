@@ -1065,21 +1065,17 @@ public partial class MappingsTabController
             };
 
             bool isActive = _curve.SelectedType == presetType;
-            bool isHovered = presetBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            bool isHovered = _hoveredCurvePreset == i;
 
-            var bgColor = isActive
-                ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
-                : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
-            var frameColor = isActive
-                ? FUIColors.Active
-                : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-            var textColor = FUIColors.SecondaryColor(isActive);
+            var bgColor = isActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (isHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+            var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
+            var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
 
             using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-            canvas.DrawRect(presetBounds, bgPaint);
+            canvas.DrawRoundRect(presetBounds, 3, 3, bgPaint);
 
-            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor);
-            canvas.DrawRect(presetBounds, framePaint);
+            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, isActive ? 2f : 1f);
+            canvas.DrawRoundRect(presetBounds, 3, 3, framePaint);
 
             FUIRenderer.DrawTextCentered(canvas, presets[i], presetBounds, textColor, 12f);
         }
@@ -1120,22 +1116,24 @@ public partial class MappingsTabController
                     presetStartX + col * (presetBtnWidth + 3) + presetBtnWidth, y + 14);
                 _deadzone.PresetBounds[col] = btnBounds;
 
-                // Dim buttons if no handle selected
                 bool enabled = _deadzone.SelectedHandle >= 0;
-                bool isHovered = enabled && btnBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                bool isHovered = _hoveredDeadzonePreset == col;
 
                 var bgColor = enabled
-                    ? (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2)
+                    ? (isHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2)
                     : FUIColors.Background2;
                 var frameColor = enabled
                     ? (isHovered ? FUIColors.FrameBright : FUIColors.Frame)
                     : FUIColors.Frame.WithAlpha(100);
+                var textColor = enabled
+                    ? (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim)
+                    : FUIColors.TextDim.WithAlpha(100);
 
                 using var btnBg = FUIRenderer.CreateFillPaint(bgColor);
-                canvas.DrawRect(btnBounds, btnBg);
+                canvas.DrawRoundRect(btnBounds, 2, 2, btnBg);
                 using var btnFrame = FUIRenderer.CreateStrokePaint(frameColor);
-                canvas.DrawRect(btnBounds, btnFrame);
-                FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, enabled ? FUIColors.TextDim : FUIColors.TextDim.WithAlpha(100), 12f);
+                canvas.DrawRoundRect(btnBounds, 2, 2, btnFrame);
+                FUIRenderer.DrawTextCentered(canvas, presetLabels[col], btnBounds, textColor, 12f);
             }
 #pragma warning restore CA2000
 

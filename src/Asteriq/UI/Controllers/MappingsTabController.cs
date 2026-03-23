@@ -61,6 +61,10 @@ public partial class MappingsTabController : ITabController
     private SKRect[] _mergeOpButtonBounds = new SKRect[4]; // Average, Maximum, Minimum, Sum
     private int _hoveredMergeOpButton = -1;
 
+    // Curve and deadzone preset button hover
+    private int _hoveredCurvePreset = -1;
+    private int _hoveredDeadzonePreset = -1;
+
     // Mapping editor - action buttons
     private SKRect _saveButtonBounds;
     private SKRect _cancelButtonBounds;
@@ -529,13 +533,7 @@ public partial class MappingsTabController : ITabController
         if (_vjoyNextButtonBounds.Contains(e.X, e.Y) && _ctx.SelectedVJoyDeviceIndex < _ctx.VJoyDevices.Count - 1)
         {
             _ctx.SelectedVJoyDeviceIndex++;
-            _selectionIsExplicit = false;
-            _listScroll.ScrollOffset = 0;
-            _highlight.ControlDef = null;
-            CancelInputListening();
-            _ctx.UpdateMappingsPrimaryDeviceMap();
-            SelectFirstRowIfUnselected();
-            _ctx.MarkDirty();
+            ResetMappingSelectionState();
             return true;
         }
 
@@ -605,6 +603,8 @@ public partial class MappingsTabController : ITabController
         _clearAllButtonHovered = false;
         _hoveredInputSourceRemove = -1;
         _hoveredMergeOpButton = -1;
+        _hoveredCurvePreset = -1;
+        _hoveredDeadzonePreset = -1;
         _hoveredMappingCategory = -1;
         _autoScroll.CheckboxHovered = false;
     }
@@ -681,6 +681,23 @@ public partial class MappingsTabController : ITabController
 
         if (_deadzone.DraggingHandle >= 0)
         { UpdateDraggedDeadzoneHandle(pt); _ctx.MarkDirty(); return true; }
+
+        // Curve preset buttons (LINEAR, S-CURVE, EXPO, CUSTOM)
+        for (int i = 0; i < _curve.PresetBounds.Length; i++)
+        {
+            if (_curve.PresetBounds[i].Contains(pt))
+            { _hoveredCurvePreset = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        }
+
+        // Deadzone preset buttons (0%, 2%, 5%, 10%)
+        if (_deadzone.SelectedHandle >= 0)
+        {
+            for (int i = 0; i < _deadzone.PresetBounds.Length; i++)
+            {
+                if (_deadzone.PresetBounds[i].Contains(pt))
+                { _hoveredDeadzonePreset = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+            }
+        }
 
         if (_curve.SelectedType == CurveType.Custom && _curve.Bounds.Contains(pt))
         {

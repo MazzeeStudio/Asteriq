@@ -100,7 +100,7 @@ public partial class MappingsTabController
 
         // L-corner frame (adjusted for side tabs)
         var frameBounds = new SKRect(bounds.Left + sideTabWidth, bounds.Top, bounds.Right, bounds.Bottom);
-        FUIRenderer.DrawLCornerFrame(canvas, frameBounds, FUIColors.Frame, 40f, 10f);
+        FUIRenderer.DrawLCornerFrame(canvas, frameBounds, FUIColors.Frame, 30f, 8f);
 
         float y = contentBounds.Top + 10;
         float leftMargin = contentBounds.Left + 10;

@@ -646,11 +646,7 @@ public class DevicesTabController : ITabController
             float cbY = rowCenterY - checkboxH / 2f;
             _showHiddenCheckboxBounds = new SKRect(cbX, cbY, cbX + checkboxSize, cbY + checkboxH);
             bool cbHovered = _showHiddenCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            FUIWidgets.DrawSCCheckbox(canvas, _showHiddenCheckboxBounds, _showHiddenDevices, cbHovered);
-
-            float includeLabelX = cbX + checkboxSize + 5f;
-            FUIRenderer.DrawText(canvas, "Include hidden", new SKPoint(includeLabelX, rowCenterY + 4f),
-                FUIColors.InteractiveColor(_showHiddenDevices), 12f);
+            FUIWidgets.DrawCheckboxWithLabel(canvas, _showHiddenCheckboxBounds, _showHiddenDevices, cbHovered, "Include hidden", 12f);
         }
         else
         {
@@ -913,9 +909,7 @@ public class DevicesTabController : ITabController
                     float cbY = rowCenterY - cbSize / 2f;
                     _actions.HideFromViewBounds = new SKRect(cbX, cbY, cbX + cbSize, cbY + cbSize);
                     bool cbHovered = _actions.HideFromViewBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-                    FUIRenderer.DrawText(canvas, "Hide Device",
-                        new SKPoint(contentBounds.Left + pad, rowCenterY + 4f), FUIColors.TextDim, 12f);
-                    FUIWidgets.DrawSCCheckbox(canvas, _actions.HideFromViewBounds, isHiddenFromView, cbHovered);
+                    FUIWidgets.DrawCheckboxWithLabelLeft(canvas, _actions.HideFromViewBounds, isHiddenFromView, cbHovered, "Hide Device", 12f);
                 }
             }
         }

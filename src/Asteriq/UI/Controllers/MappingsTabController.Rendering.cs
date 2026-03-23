@@ -624,12 +624,8 @@ public partial class MappingsTabController
         float checkboxSize = 12f;
         float checkboxY = checkboxAreaTop + (checkboxRowHeight - checkboxSize) / 2f;
         _autoScroll.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _autoScroll.CheckboxBounds, _autoScroll.Enabled, _ctx.MousePosition);
-
-        var labelColor = FUIColors.SecondaryColor(_autoScroll.CheckboxHovered);
-        FUIRenderer.DrawText(canvas, "AUTO-SCROLL TO MAPPING",
-            new SKPoint(leftMargin + checkboxSize + 7, checkboxY + checkboxSize - 1),
-            labelColor, 13f);
+        FUIWidgets.DrawCheckboxWithLabel(canvas, _autoScroll.CheckboxBounds, _autoScroll.Enabled,
+            _autoScroll.CheckboxHovered, "AUTO-SCROLL TO MAPPING");
 
         // "No mapping" flash indicator ÔÇö centered above the checkbox row, fades out
         if (_highlight.FlashText is not null)
@@ -707,7 +703,12 @@ public partial class MappingsTabController
 
         if (isAxis)
         {
-            DrawAxisSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
+            y = DrawAxisOutputModeToggle(canvas, leftMargin, rightMargin, y);
+
+            if (_threshold.IsThresholdMode)
+                DrawThresholdSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
+            else
+                DrawAxisSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
         }
         else
         {
@@ -719,8 +720,7 @@ public partial class MappingsTabController
     {
         _inputSourceRemoveBounds.Clear();
 
-        FUIRenderer.DrawText(canvas, "INPUT SOURCES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += 18;
+        FUIWidgets.DrawSectionLabel(canvas, "INPUT SOURCES", leftMargin, ref y);
 
         // Get current mappings for selected output
         var inputs = GetInputsForSelectedOutput();
@@ -845,7 +845,7 @@ public partial class MappingsTabController
         string addText = isListening ? "Cancel" : "+ Add Input";
         FUIRenderer.DrawTextCentered(canvas, addText, addBounds,
             FUIColors.ContentColor(addHovered), 14f);
-        y += 28 + 8;  // Button height + small gap
+        y += 28 + 4;  // Button height + minimal gap (section labels handle top margin)
 
         // Merge operation selector (only for axes with 2+ inputs)
         bool isAxis = _mappingCategory == 1;
@@ -869,10 +869,7 @@ public partial class MappingsTabController
         var axisMapping = GetCurrentAxisMapping();
         if (axisMapping is null) return y;
 
-        // Section header with top margin
-        y += 12;  // Space before section
-        FUIRenderer.DrawText(canvas, "MERGE MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += 16;
+        FUIWidgets.DrawSectionLabel(canvas, "MERGE MODE", leftMargin, ref y);
 
         // Four merge operation buttons in a row
         string[] labels = { "AVG", "MAX", "MIN", "SUM" };
@@ -905,7 +902,7 @@ public partial class MappingsTabController
             FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 13f);
         }
 
-        y += buttonHeight + 16;  // Move well below buttons (4px aligned)
+        y += buttonHeight + 4;
 
         // Description of current merge mode
         string description = axisMapping.MergeOp switch
@@ -938,12 +935,24 @@ public partial class MappingsTabController
 
         if (isAxis)
         {
-            var mapping = profile.AxisMappings.FirstOrDefault(m =>
-                m.Output.Type == OutputType.VJoyAxis &&
-                m.Output.VJoyDevice == vjoyDevice.Id &&
-                m.Output.Index == outputIndex);
-            if (mapping is not null)
-                inputs.AddRange(mapping.Inputs);
+            // Check threshold mode first
+            if (_threshold.IsThresholdMode)
+            {
+                var a2bMappings = profile.AxisToButtonMappings.Where(m =>
+                    m.SourceVJoyDevice == vjoyDevice.Id &&
+                    m.SourceAxisIndex == outputIndex).ToList();
+                if (a2bMappings.Count > 0)
+                    inputs.AddRange(a2bMappings[0].Inputs);
+            }
+            else
+            {
+                var mapping = profile.AxisMappings.FirstOrDefault(m =>
+                    m.Output.Type == OutputType.VJoyAxis &&
+                    m.Output.VJoyDevice == vjoyDevice.Id &&
+                    m.Output.Index == outputIndex);
+                if (mapping is not null)
+                    inputs.AddRange(mapping.Inputs);
+            }
         }
         else
         {
@@ -997,14 +1006,270 @@ public partial class MappingsTabController
             m.Output.Index == outputIndex);
     }
 
+    private List<AxisToButtonMapping> GetCurrentAxisToButtonMappings()
+    {
+        if (_selectedMappingRow < 0 || _mappingCategory != 1) return new();
+        if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return new();
+
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return new();
+
+        var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+        int outputIndex = _selectedMappingRow;
+
+        return profile.AxisToButtonMappings.Where(m =>
+            m.SourceVJoyDevice == vjoyDevice.Id &&
+            m.SourceAxisIndex == outputIndex).ToList();
+    }
+
+    private float DrawAxisOutputModeToggle(SKCanvas canvas, float leftMargin, float rightMargin, float y)
+    {
+        FUIWidgets.DrawSectionLabel(canvas, "OUTPUT MODE", leftMargin, ref y);
+
+        float width = rightMargin - leftMargin;
+        float halfWidth = (width - 4) / 2;
+        float btnHeight = 28f;
+
+        _threshold.AxisModeBounds = new SKRect(leftMargin, y, leftMargin + halfWidth, y + btnHeight);
+        _threshold.ThresholdModeBounds = new SKRect(leftMargin + halfWidth + 4, y, rightMargin, y + btnHeight);
+
+        // Axis button
+        bool axisActive = !_threshold.IsThresholdMode;
+        bool axisHovered = _threshold.HoveredOutputMode == 0;
+        var axBg = axisActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (axisHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+        var axFrame = axisActive ? FUIColors.Active : (axisHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var axText = axisActive ? FUIColors.TextBright : (axisHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+        using (var bg = FUIRenderer.CreateFillPaint(axBg))
+            canvas.DrawRoundRect(_threshold.AxisModeBounds, 3, 3, bg);
+        using (var fr = FUIRenderer.CreateStrokePaint(axFrame, axisActive ? 2f : 1f))
+            canvas.DrawRoundRect(_threshold.AxisModeBounds, 3, 3, fr);
+        FUIRenderer.DrawTextCentered(canvas, "Axis", _threshold.AxisModeBounds, axText, 13f);
+
+        // Threshold button
+        bool threshActive = _threshold.IsThresholdMode;
+        bool threshHovered = _threshold.HoveredOutputMode == 1;
+        var thBg = threshActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (threshHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+        var thFrame = threshActive ? FUIColors.Active : (threshHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var thText = threshActive ? FUIColors.TextBright : (threshHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+        using (var bg = FUIRenderer.CreateFillPaint(thBg))
+            canvas.DrawRoundRect(_threshold.ThresholdModeBounds, 3, 3, bg);
+        using (var fr = FUIRenderer.CreateStrokePaint(thFrame, threshActive ? 2f : 1f))
+            canvas.DrawRoundRect(_threshold.ThresholdModeBounds, 3, 3, fr);
+        FUIRenderer.DrawTextCentered(canvas, "Threshold", _threshold.ThresholdModeBounds, thText, 13f);
+
+        y += btnHeight + 4;
+        return y;
+    }
+
+    private void DrawThresholdSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
+    {
+        float width = rightMargin - leftMargin;
+
+        float liveValue = GetLiveAxisValueForThreshold();
+        float checkboxSize = 12f;
+
+        // --- ABOVE section ---
+        y += 8;
+        _threshold.AboveBounds = new SKRect(leftMargin, y, leftMargin + checkboxSize, y + checkboxSize);
+        FUIWidgets.DrawCheckboxWithLabel(canvas, _threshold.AboveBounds, _threshold.AboveEnabled,
+            _threshold.HoveredDirection == 0, "ABOVE THRESHOLD");
+        y += checkboxSize + 14;
+
+        if (_threshold.AboveEnabled)
+        {
+            y = DrawThresholdSection(canvas, leftMargin, rightMargin, y, width, liveValue,
+                _threshold.AboveThreshold, _threshold.AboveHysteresis, true,
+                _threshold.AboveKeyName, _threshold.AboveModifiers,
+                ref _threshold.AboveSliderBounds, ref _threshold.AboveHystSliderBounds,
+                ref _threshold.AboveCaptureBounds, ref _threshold.AboveClearBounds,
+                ref _threshold.AboveCapturing, _threshold.AboveCaptureStartTicks,
+                _threshold.AboveCaptureHovered, _threshold.AboveClearHovered);
+        }
+
+        // --- BELOW section ---
+        y += 8;
+        _threshold.BelowBounds = new SKRect(leftMargin, y, leftMargin + checkboxSize, y + checkboxSize);
+        FUIWidgets.DrawCheckboxWithLabel(canvas, _threshold.BelowBounds, _threshold.BelowEnabled,
+            _threshold.HoveredDirection == 1, "BELOW THRESHOLD");
+        y += checkboxSize + 14;
+
+        if (_threshold.BelowEnabled)
+        {
+            y = DrawThresholdSection(canvas, leftMargin, rightMargin, y, width, liveValue,
+                _threshold.BelowThreshold, _threshold.BelowHysteresis, false,
+                _threshold.BelowKeyName, _threshold.BelowModifiers,
+                ref _threshold.BelowSliderBounds, ref _threshold.BelowHystSliderBounds,
+                ref _threshold.BelowCaptureBounds, ref _threshold.BelowClearBounds,
+                ref _threshold.BelowCapturing, _threshold.BelowCaptureStartTicks,
+                _threshold.BelowCaptureHovered, _threshold.BelowClearHovered);
+        }
+    }
+
+    private static float DrawThresholdSection(SKCanvas canvas, float leftMargin, float rightMargin, float y, float width,
+        float liveValue, float threshold, float hysteresis, bool isAbove,
+        string keyName, List<string>? modifiers,
+        ref SKRect sliderBounds, ref SKRect hystSliderBounds,
+        ref SKRect captureBounds, ref SKRect clearBounds,
+        ref bool isCapturing, long captureStartTicks,
+        bool captureHovered, bool clearHovered)
+    {
+        // Threshold slider
+        FUIWidgets.DrawSectionLabel(canvas, $"VALUE  {threshold:F2}", leftMargin, ref y, 12f);
+
+        float sliderHeight = 24f;
+        sliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
+
+        using (var trackBg = FUIRenderer.CreateFillPaint(FUIColors.Background1))
+            canvas.DrawRoundRect(sliderBounds, 3, 3, trackBg);
+        using (var trackFrame = FUIRenderer.CreateStrokePaint(FUIColors.Frame))
+            canvas.DrawRoundRect(sliderBounds, 3, 3, trackFrame);
+
+        // Active zone tint
+        float threshX = sliderBounds.Left + ((threshold + 1f) / 2f) * sliderBounds.Width;
+        var activeZone = isAbove
+            ? new SKRect(threshX, sliderBounds.Top, sliderBounds.Right, sliderBounds.Bottom)
+            : new SKRect(sliderBounds.Left, sliderBounds.Top, threshX, sliderBounds.Bottom);
+        using (var tint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(20)))
+            canvas.DrawRect(activeZone, tint);
+
+        // Hysteresis band
+        float hystPixels = (hysteresis / 2f) * sliderBounds.Width;
+        var hystBands = new SKRect(threshX - hystPixels, sliderBounds.Top, threshX + hystPixels, sliderBounds.Bottom);
+        using (var hystPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(30)))
+            canvas.DrawRect(hystBands, hystPaint);
+
+        // Threshold line
+        using (var threshLine = FUIRenderer.CreateStrokePaint(FUIColors.Primary, 2f))
+            canvas.DrawLine(threshX, sliderBounds.Top, threshX, sliderBounds.Bottom, threshLine);
+
+        // Live axis indicator
+        float liveX = Math.Clamp(sliderBounds.Left + ((liveValue + 1f) / 2f) * sliderBounds.Width, sliderBounds.Left, sliderBounds.Right);
+        using (var livePaint = FUIRenderer.CreateStrokePaint(FUIColors.Active, 2f))
+            canvas.DrawLine(liveX, sliderBounds.Top, liveX, sliderBounds.Bottom, livePaint);
+
+        // Tick labels
+        y += sliderHeight + 4;
+        FUIRenderer.DrawText(canvas, "-1.0", new SKPoint(leftMargin, y + 8), FUIColors.TextDim, 10f);
+        using var tickPaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, 10f);
+        float rightLabelWidth = tickPaint.MeasureText("1.0");
+        FUIRenderer.DrawText(canvas, "1.0", new SKPoint(rightMargin - rightLabelWidth, y + 8), FUIColors.TextDim, 10f);
+        y += 12;
+
+        // Hysteresis slider
+        FUIWidgets.DrawSectionLabel(canvas, $"HYSTERESIS  {hysteresis:F2}", leftMargin, ref y);
+
+        float hystSliderHeight = 16f;
+        hystSliderBounds = new SKRect(leftMargin, y, rightMargin, y + hystSliderHeight);
+
+        using (var trackBg2 = FUIRenderer.CreateFillPaint(FUIColors.Background1))
+            canvas.DrawRoundRect(hystSliderBounds, 3, 3, trackBg2);
+        using (var trackFrame2 = FUIRenderer.CreateStrokePaint(FUIColors.Frame))
+            canvas.DrawRoundRect(hystSliderBounds, 3, 3, trackFrame2);
+
+        float hystNorm = hysteresis / 0.25f;
+        float hystHandleX = Math.Clamp(hystSliderBounds.Left + hystNorm * hystSliderBounds.Width, hystSliderBounds.Left, hystSliderBounds.Right);
+
+        var hystFill = new SKRect(hystSliderBounds.Left, hystSliderBounds.Top, hystHandleX, hystSliderBounds.Bottom);
+        using (var fillPaint = FUIRenderer.CreateFillPaint(FUIColors.Warning.WithAlpha(40)))
+            canvas.DrawRoundRect(hystFill, 3, 3, fillPaint);
+        using (var handlePaint = FUIRenderer.CreateStrokePaint(FUIColors.Warning, 2f))
+            canvas.DrawLine(hystHandleX, hystSliderBounds.Top, hystHandleX, hystSliderBounds.Bottom, handlePaint);
+
+        y += hystSliderHeight + 4;
+
+        // Key capture
+        FUIWidgets.DrawSectionLabel(canvas, "KEY", leftMargin, ref y);
+
+        float capHeight = 32f;
+        captureBounds = new SKRect(leftMargin, y, rightMargin, y + capHeight);
+
+        // Timeout check
+        if (isCapturing)
+        {
+            var capElapsed = Environment.TickCount64 - captureStartTicks;
+            if (capElapsed >= KeyCaptureTimeoutMs)
+                isCapturing = false;
+        }
+
+        bool hasKey = !string.IsNullOrEmpty(keyName);
+        var capBg = isCapturing ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (captureHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background1);
+        var capFrame = isCapturing ? FUIColors.Active : (captureHovered ? FUIColors.FrameBright : FUIColors.Frame);
+
+        using (var bg = FUIRenderer.CreateFillPaint(capBg))
+            canvas.DrawRoundRect(captureBounds, 3, 3, bg);
+        using (var fr = FUIRenderer.CreateStrokePaint(capFrame))
+            canvas.DrawRoundRect(captureBounds, 3, 3, fr);
+
+        if (isCapturing)
+        {
+            FUIRenderer.DrawTextCentered(canvas, "Press key combo...", captureBounds, FUIColors.Active, 14f);
+            float elapsed = (Environment.TickCount64 - captureStartTicks) / (float)KeyCaptureTimeoutMs;
+            float progress = Math.Clamp(1f - elapsed, 0f, 1f);
+            var progressBounds = new SKRect(leftMargin + 2, y + capHeight - 3, leftMargin + 2 + (width - 4) * progress, y + capHeight - 1);
+            using var progressPaint = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(80));
+            canvas.DrawRect(progressBounds, progressPaint);
+        }
+        else if (hasKey)
+        {
+            string display = modifiers is { Count: > 0 }
+                ? string.Join(" + ", modifiers) + " + " + keyName
+                : keyName;
+            FUIRenderer.DrawTextCentered(canvas, display, captureBounds, FUIColors.TextBright, 14f);
+
+            float clearSize = 20f;
+            clearBounds = new SKRect(rightMargin - clearSize - 4, y + (capHeight - clearSize) / 2,
+                rightMargin - 4, y + (capHeight + clearSize) / 2);
+            FUIRenderer.DrawRoundedPanel(canvas, clearBounds,
+                clearHovered ? FUIColors.WarningTint : SKColors.Transparent,
+                clearHovered ? FUIColors.Warning : FUIColors.Frame);
+            FUIRenderer.DrawTextCentered(canvas, "X", clearBounds,
+                clearHovered ? FUIColors.Warning : FUIColors.TextDim, 12f);
+        }
+        else
+        {
+            FUIRenderer.DrawTextCentered(canvas, "Click to capture key", captureBounds, FUIColors.TextDim, 14f);
+        }
+
+        y += capHeight + 4;
+        return y;
+    }
+
+    private static void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
+    {
+        var bg = active ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
+        var frame = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
+        var textColor = active ? FUIColors.TextBright : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
+
+        using (var bgPaint = FUIRenderer.CreateFillPaint(bg))
+            canvas.DrawRoundRect(bounds, 3, 3, bgPaint);
+        using (var framePaint = FUIRenderer.CreateStrokePaint(frame, active ? 2f : 1f))
+            canvas.DrawRoundRect(bounds, 3, 3, framePaint);
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
+    }
+
+    private float GetLiveAxisValueForThreshold()
+    {
+        var mappings = GetCurrentAxisToButtonMappings();
+        if (mappings.Count == 0 || mappings[0].Inputs.Count == 0) return 0f;
+
+        var input = mappings[0].Inputs[0];
+        var device = _ctx.Devices.FirstOrDefault(d => d.InstanceGuid.ToString() == input.DeviceId);
+        if (device is null) return 0f;
+
+        var state = _ctx.InputService.GetDeviceState(device.DeviceIndex);
+        if (state is null || input.Index >= state.Axes.Length) return 0f;
+
+        return state.Axes[input.Index];
+    }
+
     private void DrawAxisSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
     {
         float width = rightMargin - leftMargin;
 
-        // Response Curve header (with top margin for section separation)
-        y += 8;  // Section separation
-        FUIRenderer.DrawText(canvas, "RESPONSE CURVE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += 16f;
+        // Response Curve header
+        FUIWidgets.DrawSectionLabel(canvas, "RESPONSE CURVE", leftMargin, ref y);
 
         // Symmetrical, Centre, and Invert checkboxes on their own row
         // Symmetrical on left, Centre and Invert on right
@@ -1015,30 +1280,23 @@ public partial class MappingsTabController
         float scaledFontSize = fontSize;
         float textY = y + (rowHeight / 2) + (scaledFontSize / 3); // Center text baseline
 
-        // Measure label widths for positioning
-        using var labelPaint = FUIRenderer.CreateTextPaint(FUIColors.TextDim, scaledFontSize);
-        float invertLabelWidth = labelPaint.MeasureText("Invert");
-        float centreLabelWidth = labelPaint.MeasureText("Centre");
-        float symmetricalLabelWidth = labelPaint.MeasureText("Symmetrical");
-        float labelGap = 4f;
-        float checkboxGap = 12f;
-
         // Symmetrical checkbox (leftmost) - checkbox then label
         _curve.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _curve.CheckboxBounds, _curve.Symmetrical, _ctx.MousePosition);
-        FUIRenderer.DrawText(canvas, "Symmetrical", new SKPoint(leftMargin + checkboxSize + labelGap, textY), FUIColors.TextDim, fontSize);
+        bool symHovered = _curve.CheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawCheckboxWithLabel(canvas, _curve.CheckboxBounds, _curve.Symmetrical, symHovered, "Symmetrical", fontSize);
 
         // Invert checkbox (rightmost) - label then checkbox
         float invertCheckX = rightMargin - checkboxSize;
         _deadzone.InvertToggleBounds = new SKRect(invertCheckX, checkboxY, invertCheckX + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _deadzone.InvertToggleBounds, _deadzone.AxisInverted, _ctx.MousePosition);
-        FUIRenderer.DrawText(canvas, "Invert", new SKPoint(invertCheckX - invertLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
+        bool invHovered = _deadzone.InvertToggleBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawCheckboxWithLabelLeft(canvas, _deadzone.InvertToggleBounds, _deadzone.AxisInverted, invHovered, "Invert", fontSize);
 
         // Centre checkbox (left of Invert) - label then checkbox
-        float centreCheckX = invertCheckX - invertLabelWidth - labelGap - checkboxGap - checkboxSize;
+        float invertLabelWidth = FUIRenderer.MeasureText("Invert", fontSize);
+        float centreCheckX = invertCheckX - invertLabelWidth - 7 - 12 - checkboxSize;
         _deadzone.CenterCheckboxBounds = new SKRect(centreCheckX, checkboxY, centreCheckX + checkboxSize, checkboxY + checkboxSize);
-        FUIWidgets.DrawCheckbox(canvas, _deadzone.CenterCheckboxBounds, _deadzone.CenterEnabled, _ctx.MousePosition);
-        FUIRenderer.DrawText(canvas, "Centre", new SKPoint(centreCheckX - centreLabelWidth - labelGap, textY), FUIColors.TextDim, fontSize);
+        bool ctrHovered = _deadzone.CenterCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        FUIWidgets.DrawCheckboxWithLabelLeft(canvas, _deadzone.CenterCheckboxBounds, _deadzone.CenterEnabled, ctrHovered, "Centre", fontSize);
 
         y += rowHeight + 6f;
 
@@ -1296,9 +1554,7 @@ public partial class MappingsTabController
     {
         float width = rightMargin - leftMargin;
 
-        // OUTPUT TYPE section - vJoy Button vs Keyboard
-        FUIRenderer.DrawText(canvas, "OUTPUT TYPE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += 20;
+        FUIWidgets.DrawSectionLabel(canvas, "OUTPUT TYPE", leftMargin, ref y);
 
         // Output type tabs
         string[] outputTypes = { "Button", "Keyboard" };
@@ -1329,13 +1585,12 @@ public partial class MappingsTabController
 
             FUIRenderer.DrawTextCentered(canvas, outputTypes[i], typeBounds, textColor, 14f);
         }
-        y += typeButtonHeight + 16;
+        y += typeButtonHeight + 4;
 
         // KEY COMBO section (only when Keyboard is selected)
         if (_keyboardOutput.IsKeyboard)
         {
-            FUIRenderer.DrawText(canvas, "KEY COMBO", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-            y += 20;
+            FUIWidgets.DrawSectionLabel(canvas, "KEY COMBO", leftMargin, ref y);
 
             float keyFieldHeight = 32f;
             _keyboardOutput.CaptureBounds = new SKRect(leftMargin, y, rightMargin, y + keyFieldHeight);
@@ -1401,16 +1656,14 @@ public partial class MappingsTabController
             {
                 FUIRenderer.DrawTextCentered(canvas, "Click to capture key", _keyboardOutput.CaptureBounds, FUIColors.TextDim, 14f);
             }
-            y += keyFieldHeight + 16;
+            y += keyFieldHeight + 4;
         }
 
         // Button Mode section
         // Modifier keys must stay in Normal mode ÔÇö the OS handles the modifier behaviour.
         bool isModifierKey = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
 
-        FUIRenderer.DrawText(canvas, "BUTTON MODE", new SKPoint(leftMargin, y),
-            isModifierKey ? FUIColors.TextDim.WithAlpha(60) : FUIColors.TextDim, 13f);
-        y += 20;
+        FUIWidgets.DrawSectionLabel(canvas, "BUTTON MODE", leftMargin, ref y);
 
         // Mode buttons - all on one row
         string[] modes = { "Normal", "Toggle", "Pulse", "Hold" };
@@ -1452,46 +1705,44 @@ public partial class MappingsTabController
                 _buttonMode.ModeBounds[i] = modeBounds;
             }
         }
-        y += buttonHeight + 12;
+        y += buttonHeight + 4;
 
         // Duration slider for Pulse mode
         if (_buttonMode.SelectedMode == ButtonMode.Pulse && y + 50 < bottom)
         {
-            FUIRenderer.DrawText(canvas, "PULSE DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-            y += 18;
+            FUIWidgets.DrawSectionLabel(canvas, "PULSE DURATION", leftMargin, ref y);
 
             float sliderHeight = 24f;
-            _buttonMode.PulseSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
+            _buttonMode.PulseSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
 
-            // Normalize value: 100-1000ms mapped to 0-1
             float normalizedPulse = (_buttonMode.PulseDurationMs - 100f) / 900f;
             FUIWidgets.DrawDurationSlider(canvas, _buttonMode.PulseSliderBounds, normalizedPulse, _buttonMode.DraggingPulse);
+            y += sliderHeight + 4;
 
-            // Value label
-            FUIRenderer.DrawText(canvas, $"{_buttonMode.PulseDurationMs}ms",
-                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 13f);
-
-            y += sliderHeight + 12;
+            string pulseLabel = $"{_buttonMode.PulseDurationMs}ms";
+            float pulseLabelW = FUIRenderer.MeasureText(pulseLabel, 12f);
+            FUIRenderer.DrawText(canvas, pulseLabel,
+                new SKPoint(rightMargin - pulseLabelW, y + 10), FUIColors.TextPrimary, 12f);
+            y += 14 + 8;
         }
 
         // Duration slider for Hold mode
         if (_buttonMode.SelectedMode == ButtonMode.HoldToActivate && y + 50 < bottom)
         {
-            FUIRenderer.DrawText(canvas, "HOLD DURATION", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-            y += 18;
+            FUIWidgets.DrawSectionLabel(canvas, "HOLD DURATION", leftMargin, ref y);
 
             float sliderHeight = 24f;
-            _buttonMode.HoldSliderBounds = new SKRect(leftMargin, y, rightMargin - 50, y + sliderHeight);
+            _buttonMode.HoldSliderBounds = new SKRect(leftMargin, y, rightMargin, y + sliderHeight);
 
-            // Normalize value: 200-2000ms mapped to 0-1
             float normalizedHold = (_buttonMode.HoldDurationMs - 200f) / 1800f;
             FUIWidgets.DrawDurationSlider(canvas, _buttonMode.HoldSliderBounds, normalizedHold, _buttonMode.DraggingHold);
+            y += sliderHeight + 4;
 
-            // Value label
-            FUIRenderer.DrawText(canvas, $"{_buttonMode.HoldDurationMs}ms",
-                new SKPoint(rightMargin - 45, y + sliderHeight / 2 + 4), FUIColors.TextPrimary, 13f);
-
-            y += sliderHeight + 12;
+            string holdLabel = $"{_buttonMode.HoldDurationMs}ms";
+            float holdLabelW = FUIRenderer.MeasureText(holdLabel, 12f);
+            FUIRenderer.DrawText(canvas, holdLabel,
+                new SKPoint(rightMargin - holdLabelW, y + 10), FUIColors.TextPrimary, 12f);
+            y += 14 + 8;
         }
 
         // Clear binding button
@@ -2501,10 +2752,29 @@ public partial class MappingsTabController
             m.Output.VJoyDevice == vjoyId &&
             m.Output.Index == axisIndex);
 
-        if (mapping is null || mapping.Inputs.Count == 0) return "ÔÇö";
+        if (mapping is not null && mapping.Inputs.Count > 0)
+        {
+            var input = mapping.Inputs[0];
+            return $"{input.DeviceName} - Axis {input.Index}";
+        }
 
-        var input = mapping.Inputs[0];
-        return $"{input.DeviceName} - Axis {input.Index}";
+        // Check AxisToButtonMappings (threshold mode)
+        var a2bs = profile.AxisToButtonMappings.Where(m =>
+            m.SourceVJoyDevice == vjoyId &&
+            m.SourceAxisIndex == axisIndex).ToList();
+
+        if (a2bs.Count > 0)
+        {
+            var parts = a2bs.Select(m =>
+            {
+                string dir = m.ActivateAbove ? "\u25b2" : "\u25bc";
+                string key = !string.IsNullOrEmpty(m.Output.KeyName) ? m.Output.KeyName : "?";
+                return $"{dir}{key}";
+            });
+            return $"Threshold {string.Join(" ", parts)}";
+        }
+
+        return "ÔÇö";
     }
 
     private static string GetButtonBindingText(MappingProfile? profile, uint vjoyId, int buttonIndex)

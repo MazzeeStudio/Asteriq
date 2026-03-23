@@ -289,26 +289,21 @@ public partial class SCBindingsTabController
         _searchFilter.ShowBoundOnlyBounds = new SKRect(checkboxX, y + (filterRowHeight - checkboxSize) / 2,
             checkboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
         _searchFilter.ShowBoundOnlyHovered = _searchFilter.ShowBoundOnlyBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIWidgets.DrawSCCheckbox(canvas, _searchFilter.ShowBoundOnlyBounds, showBoundOnly, _searchFilter.ShowBoundOnlyHovered);
-
-        float boundOnlyLabelX = checkboxX + checkboxSize + 6f;
-        FUIRenderer.DrawText(canvas, "Bound only", new SKPoint(boundOnlyLabelX, y + filterRowHeight / 2 + 4),
-            FUIColors.InteractiveColor(showBoundOnly), 13f);
+        FUIWidgets.DrawCheckboxWithLabel(canvas, _searchFilter.ShowBoundOnlyBounds, showBoundOnly,
+            _searchFilter.ShowBoundOnlyHovered, "Bound only");
 
         // "Show JS ref" checkbox — hidden in client mode (JS ref is always the header in that context)
-        float boundOnlyLabelW = FUIRenderer.MeasureText("Bound only", 13f);
+        float boundOnlyTotalW = checkboxSize + 7 + FUIRenderer.MeasureText("Bound only", 13f);
         bool isClientMode = _ctx.AppSettings.ClientOnlyMode;
         bool showJSRef = isClientMode || !_ctx.AppSettings.SCBindingsShowPhysicalHeaders;
         if (!isClientMode)
         {
-            float jsRefCheckboxX = boundOnlyLabelX + boundOnlyLabelW + 16f;
+            float jsRefCheckboxX = checkboxX + boundOnlyTotalW + 16f;
             _searchFilter.ShowJSRefBounds = new SKRect(jsRefCheckboxX, y + (filterRowHeight - checkboxSize) / 2,
                 jsRefCheckboxX + checkboxSize, y + (filterRowHeight + checkboxSize) / 2);
             _searchFilter.ShowJSRefHovered = _searchFilter.ShowJSRefBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            FUIWidgets.DrawSCCheckbox(canvas, _searchFilter.ShowJSRefBounds, showJSRef, _searchFilter.ShowJSRefHovered);
-            float jsRefLabelX = jsRefCheckboxX + checkboxSize + 6f;
-            FUIRenderer.DrawText(canvas, "Show JS ref", new SKPoint(jsRefLabelX, y + filterRowHeight / 2 + 4),
-                FUIColors.InteractiveColor(showJSRef), 13f);
+            FUIWidgets.DrawCheckboxWithLabel(canvas, _searchFilter.ShowJSRefBounds, showJSRef,
+                _searchFilter.ShowJSRefHovered, "Show JS ref");
         }
         else
         {

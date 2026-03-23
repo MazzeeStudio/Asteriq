@@ -913,9 +913,14 @@ public partial class MappingsTabController
                 m.Output.VJoyDevice == vjoyDevice.Id &&
                 m.Output.Index == outputIndex);
             if (existing is not null)
-            {
                 profile.AxisMappings.Remove(existing);
-            }
+
+            // Also remove any AxisToButtonMapping for this axis row
+            var existingA2B = profile.AxisToButtonMappings.FirstOrDefault(m =>
+                m.SourceVJoyDevice == vjoyDevice.Id &&
+                m.SourceAxisIndex == outputIndex);
+            if (existingA2B is not null)
+                profile.AxisToButtonMappings.Remove(existingA2B);
         }
         else
         {
@@ -1234,34 +1239,59 @@ public partial class MappingsTabController
 
         if (isAxis)
         {
-            // Find existing mapping or create new one
-            var existingMapping = profile.AxisMappings.FirstOrDefault(m =>
-                m.Output.Type == OutputType.VJoyAxis &&
-                m.Output.VJoyDevice == vjoyDevice.Id &&
-                m.Output.Index == outputIndex);
-
-            if (existingMapping is not null)
+            if (_threshold.IsThresholdMode)
             {
-                // Add input to existing mapping (support multiple inputs)
-                existingMapping.Inputs.Add(newInputSource);
-                existingMapping.Name = $"vJoy {vjoyDevice.Id} Axis {outputIndex} ({existingMapping.Inputs.Count} inputs)";
+                // Threshold mode: add input to AxisToButtonMapping
+                var existingA2B = profile.AxisToButtonMappings.FirstOrDefault(m =>
+                    m.SourceVJoyDevice == vjoyDevice.Id &&
+                    m.SourceAxisIndex == outputIndex);
+
+                if (existingA2B is not null)
+                {
+                    existingA2B.Inputs.Add(newInputSource);
+                }
+                else
+                {
+                    var mapping = new AxisToButtonMapping
+                    {
+                        Name = $"{input.DeviceName} Axis {input.Index} -> Threshold Key",
+                        Inputs = new List<InputSource> { newInputSource },
+                        Output = new OutputTarget { Type = OutputType.Keyboard },
+                        SourceVJoyDevice = vjoyDevice.Id,
+                        SourceAxisIndex = outputIndex,
+                    };
+                    profile.AxisToButtonMappings.Add(mapping);
+                }
             }
             else
             {
-                // Create new mapping
-                var mapping = new AxisMapping
+                // Normal axis mode
+                var existingMapping = profile.AxisMappings.FirstOrDefault(m =>
+                    m.Output.Type == OutputType.VJoyAxis &&
+                    m.Output.VJoyDevice == vjoyDevice.Id &&
+                    m.Output.Index == outputIndex);
+
+                if (existingMapping is not null)
                 {
-                    Name = $"{input.DeviceName} Axis {input.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
-                    Inputs = new List<InputSource> { newInputSource },
-                    Output = new OutputTarget
+                    existingMapping.Inputs.Add(newInputSource);
+                    existingMapping.Name = $"vJoy {vjoyDevice.Id} Axis {outputIndex} ({existingMapping.Inputs.Count} inputs)";
+                }
+                else
+                {
+                    var mapping = new AxisMapping
                     {
-                        Type = OutputType.VJoyAxis,
-                        VJoyDevice = vjoyDevice.Id,
-                        Index = outputIndex
-                    },
-                    Curve = new AxisCurve()
-                };
-                profile.AxisMappings.Add(mapping);
+                        Name = $"{input.DeviceName} Axis {input.Index} -> vJoy {vjoyDevice.Id} Axis {outputIndex}",
+                        Inputs = new List<InputSource> { newInputSource },
+                        Output = new OutputTarget
+                        {
+                            Type = OutputType.VJoyAxis,
+                            VJoyDevice = vjoyDevice.Id,
+                            Index = outputIndex
+                        },
+                        Curve = new AxisCurve()
+                    };
+                    profile.AxisMappings.Add(mapping);
+                }
             }
         }
         else
@@ -1413,10 +1443,53 @@ public partial class MappingsTabController
         _deadzone.Max = 1.0f;
         _deadzone.CenterEnabled = false;
         _deadzone.AxisInverted = false;
+        _threshold.IsThresholdMode = false;
+        _threshold.AboveEnabled = false;
+        _threshold.BelowEnabled = false;
+        _threshold.AboveThreshold = 0.5f;
+        _threshold.AboveHysteresis = 0.05f;
+        _threshold.AboveKeyName = "";
+        _threshold.AboveModifiers = null;
+        _threshold.AboveCapturing = false;
+        _threshold.BelowThreshold = -0.5f;
+        _threshold.BelowHysteresis = 0.05f;
+        _threshold.BelowKeyName = "";
+        _threshold.BelowModifiers = null;
+        _threshold.BelowCapturing = false;
 
         // Only for axis category
         if (_mappingCategory != 1) return;
         if (_selectedMappingRow < 0) return;
+
+        // Check for AxisToButtonMappings (threshold mode — can have above, below, or both)
+        var a2bMappings = GetCurrentAxisToButtonMappings();
+        if (a2bMappings.Count > 0)
+        {
+            _threshold.IsThresholdMode = true;
+            foreach (var m in a2bMappings)
+            {
+                if (m.ActivateAbove)
+                {
+                    _threshold.AboveEnabled = true;
+                    _threshold.AboveThreshold = m.Threshold;
+                    _threshold.AboveHysteresis = m.Hysteresis;
+                    _threshold.AboveKeyName = m.Output.KeyName ?? "";
+                    _threshold.AboveModifiers = m.Output.Modifiers;
+                }
+                else
+                {
+                    _threshold.BelowEnabled = true;
+                    _threshold.BelowThreshold = m.Threshold;
+                    _threshold.BelowHysteresis = m.Hysteresis;
+                    _threshold.BelowKeyName = m.Output.KeyName ?? "";
+                    _threshold.BelowModifiers = m.Output.Modifiers;
+                }
+            }
+            // If only one direction loaded, default the other to enabled for fresh setups
+            if (!_threshold.AboveEnabled && !_threshold.BelowEnabled)
+                _threshold.AboveEnabled = true;
+            return;
+        }
 
         var axisMapping = GetCurrentAxisMapping();
         if (axisMapping is null) return;
@@ -1486,6 +1559,125 @@ public partial class MappingsTabController
             profile.ModifiedAt = DateTime.UtcNow;
             _ctx.ProfileManager.SaveActiveProfile();
         }
+    }
+
+    private void SaveThresholdSettingsForRow()
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0) return;
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return;
+        var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+
+        // Get inputs from any existing mapping to preserve them
+        var existingMappings = GetCurrentAxisToButtonMappings();
+        var inputs = existingMappings.FirstOrDefault()?.Inputs ?? new List<InputSource>();
+
+        // Remove all existing threshold mappings for this axis row
+        profile.AxisToButtonMappings.RemoveAll(m =>
+            m.SourceVJoyDevice == vjoyDevice.Id &&
+            m.SourceAxisIndex == _selectedMappingRow);
+
+        // Re-create enabled mappings
+        if (_threshold.AboveEnabled)
+        {
+            profile.AxisToButtonMappings.Add(new AxisToButtonMapping
+            {
+                Inputs = inputs,
+                Output = new OutputTarget { Type = OutputType.Keyboard, KeyName = _threshold.AboveKeyName, Modifiers = _threshold.AboveModifiers },
+                Threshold = _threshold.AboveThreshold,
+                ActivateAbove = true,
+                Hysteresis = _threshold.AboveHysteresis,
+                SourceVJoyDevice = vjoyDevice.Id,
+                SourceAxisIndex = _selectedMappingRow,
+            });
+        }
+        if (_threshold.BelowEnabled)
+        {
+            profile.AxisToButtonMappings.Add(new AxisToButtonMapping
+            {
+                Inputs = inputs,
+                Output = new OutputTarget { Type = OutputType.Keyboard, KeyName = _threshold.BelowKeyName, Modifiers = _threshold.BelowModifiers },
+                Threshold = _threshold.BelowThreshold,
+                ActivateAbove = false,
+                Hysteresis = _threshold.BelowHysteresis,
+                SourceVJoyDevice = vjoyDevice.Id,
+                SourceAxisIndex = _selectedMappingRow,
+            });
+        }
+
+        profile.ModifiedAt = DateTime.UtcNow;
+        _ctx.ProfileManager.SaveActiveProfile();
+    }
+
+    private void SwitchToThresholdMode()
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0) return;
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return;
+        var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+
+        // Preserve inputs from existing AxisMapping
+        var existingAxis = GetCurrentAxisMapping();
+        var inputs = existingAxis?.Inputs ?? new List<InputSource>();
+
+        // Remove existing AxisMapping
+        if (existingAxis is not null)
+            profile.AxisMappings.Remove(existingAxis);
+
+        // Create AxisToButtonMapping (above enabled by default)
+        profile.AxisToButtonMappings.Add(new AxisToButtonMapping
+        {
+            Inputs = inputs,
+            Output = new OutputTarget { Type = OutputType.Keyboard },
+            Threshold = 0.5f,
+            ActivateAbove = true,
+            Hysteresis = 0.05f,
+            SourceVJoyDevice = vjoyDevice.Id,
+            SourceAxisIndex = _selectedMappingRow,
+        });
+
+        profile.ModifiedAt = DateTime.UtcNow;
+        _ctx.ProfileManager.SaveActiveProfile();
+        _ctx.OnMappingsChanged();
+        LoadAxisSettingsForRow();
+        _ctx.MarkDirty();
+    }
+
+    private void SwitchToAxisMode()
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0) return;
+        var profile = _ctx.ProfileManager.ActiveProfile;
+        if (profile is null) return;
+        var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+
+        // Preserve inputs from existing AxisToButtonMappings
+        var existingA2Bs = GetCurrentAxisToButtonMappings();
+        var inputs = existingA2Bs.FirstOrDefault()?.Inputs ?? new List<InputSource>();
+
+        // Remove all existing AxisToButtonMappings for this axis row
+        profile.AxisToButtonMappings.RemoveAll(m =>
+            m.SourceVJoyDevice == vjoyDevice.Id &&
+            m.SourceAxisIndex == _selectedMappingRow);
+
+        // Create AxisMapping with default curve
+        var mapping = new AxisMapping
+        {
+            Inputs = inputs,
+            Output = new OutputTarget
+            {
+                Type = OutputType.VJoyAxis,
+                VJoyDevice = vjoyDevice.Id,
+                Index = _selectedMappingRow,
+            },
+            Curve = new AxisCurve(),
+        };
+        profile.AxisMappings.Add(mapping);
+
+        profile.ModifiedAt = DateTime.UtcNow;
+        _ctx.ProfileManager.SaveActiveProfile();
+        _ctx.OnMappingsChanged();
+        LoadAxisSettingsForRow();
+        _ctx.MarkDirty();
     }
 
     private void LoadOutputTypeStateForRow()

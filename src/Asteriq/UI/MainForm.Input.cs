@@ -396,7 +396,7 @@ public partial class MainForm
 
         // Release mapping drag operations (delegated to Mappings controller)
         if (_mappingsController.IsDraggingCurve || _mappingsController.IsDraggingDeadzone ||
-            _mappingsController.IsDraggingDuration)
+            _mappingsController.IsDraggingDuration || _mappingsController.IsDraggingThreshold)
         {
             SyncTabContext();
             _mappingsController.OnMouseUp(se);

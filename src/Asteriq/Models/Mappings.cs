@@ -512,6 +512,12 @@ public class AxisToButtonMapping : Mapping
     /// <summary>Hysteresis to prevent flickering (0.0 to 0.5)</summary>
     public float Hysteresis { get; set; } = 0.05f;
 
+    /// <summary>Which vJoy device's axis list this was configured from (UI association)</summary>
+    public uint SourceVJoyDevice { get; set; }
+
+    /// <summary>Which axis row (0-7) in the Mappings tab this belongs to (UI association)</summary>
+    public int SourceAxisIndex { get; set; } = -1;
+
     /// <summary>Internal state tracking</summary>
     internal bool IsActivated { get; set; } = false;
 }

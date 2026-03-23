@@ -85,6 +85,7 @@ public partial class MappingsTabController : ITabController
     private readonly NetworkSwitchState _netSwitch = new();
     private readonly ListScrollState _listScroll = new();
     private readonly DeviceOrderState _deviceOrder = new();
+    private readonly ThresholdEditorState _threshold = new();
 
     // Legacy compatibility — computed alias kept for use in axis logic
     private float _axisDeadzone
@@ -108,8 +109,12 @@ public partial class MappingsTabController : ITabController
     /// <summary>True if a duration slider is being dragged.</summary>
     public bool IsDraggingDuration => _buttonMode.DraggingPulse || _buttonMode.DraggingHold;
 
+    /// <summary>True if a threshold or hysteresis slider is being dragged.</summary>
+    public bool IsDraggingThreshold => _threshold.DraggingAboveThreshold || _threshold.DraggingAboveHysteresis
+        || _threshold.DraggingBelowThreshold || _threshold.DraggingBelowHysteresis;
+
     /// <summary>True if the keyboard key capture mode is active.</summary>
-    public bool IsCapturingKey => _keyboardOutput.IsCapturing;
+    public bool IsCapturingKey => _keyboardOutput.IsCapturing || _threshold.AboveCapturing || _threshold.BelowCapturing;
 
     /// <summary>True if listening for physical input detection.</summary>
     public bool IsListeningForInput => _inputDetection.IsListening;
@@ -242,6 +247,7 @@ public partial class MappingsTabController : ITabController
         if (HandleCategoryTabClick()) return;
         if (HandleAutoScrollClick(e)) return;
         if (HandleRightPanelClick(e)) return;
+        if (HandleThresholdClick(e)) return;
         if (HandleAxisSettingsClick(e)) return;
         if (HandleDeviceOrderClick(e)) return;
         if (HandleNetSwitchClick(e)) return;
@@ -385,6 +391,130 @@ public partial class MappingsTabController : ITabController
         { ClearSelectedButtonMapping(); return true; }
 
         return false;
+    }
+
+    private bool HandleThresholdClick(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0)
+            return false;
+
+        // Output mode toggle — always active for axes
+        if (_threshold.AxisModeBounds.Contains(e.X, e.Y) && _threshold.IsThresholdMode)
+        {
+            SwitchToAxisMode();
+            return true;
+        }
+        if (_threshold.ThresholdModeBounds.Contains(e.X, e.Y) && !_threshold.IsThresholdMode)
+        {
+            SwitchToThresholdMode();
+            return true;
+        }
+
+        if (!_threshold.IsThresholdMode) return false;
+
+        // Direction checkboxes
+        if (_threshold.AboveBounds.Contains(e.X, e.Y))
+        {
+            _threshold.AboveEnabled = !_threshold.AboveEnabled;
+            if (!_threshold.AboveEnabled && !_threshold.BelowEnabled)
+                _threshold.BelowEnabled = true; // At least one must be active
+            SaveThresholdSettingsForRow();
+            _ctx.MarkDirty();
+            return true;
+        }
+        if (_threshold.BelowBounds.Contains(e.X, e.Y))
+        {
+            _threshold.BelowEnabled = !_threshold.BelowEnabled;
+            if (!_threshold.AboveEnabled && !_threshold.BelowEnabled)
+                _threshold.AboveEnabled = true; // At least one must be active
+            SaveThresholdSettingsForRow();
+            _ctx.MarkDirty();
+            return true;
+        }
+
+        // Above threshold controls (clear before capture — clear bounds are inside capture bounds)
+        if (_threshold.AboveEnabled)
+        {
+            if (_threshold.AboveSliderBounds.Contains(e.X, e.Y))
+            {
+                _threshold.DraggingAboveThreshold = true;
+                UpdateThresholdFromMouse(e.X, _threshold.AboveSliderBounds, out _threshold.AboveThreshold);
+                _ctx.MarkDirty();
+                return true;
+            }
+            if (_threshold.AboveHystSliderBounds.Contains(e.X, e.Y))
+            {
+                _threshold.DraggingAboveHysteresis = true;
+                UpdateHysteresisFromMouse(e.X, _threshold.AboveHystSliderBounds, out _threshold.AboveHysteresis);
+                _ctx.MarkDirty();
+                return true;
+            }
+            if (_threshold.AboveClearBounds.HitTest(e.X, e.Y) && !string.IsNullOrEmpty(_threshold.AboveKeyName))
+            {
+                _threshold.AboveKeyName = "";
+                _threshold.AboveModifiers = null;
+                SaveThresholdSettingsForRow();
+                _ctx.MarkDirty();
+                return true;
+            }
+            if (_threshold.AboveCaptureBounds.Contains(e.X, e.Y))
+            {
+                _threshold.AboveCapturing = true;
+                _threshold.AboveCaptureStartTicks = Environment.TickCount64;
+                _ctx.MarkDirty();
+                return true;
+            }
+        }
+
+        // Below threshold controls (clear before capture — clear bounds are inside capture bounds)
+        if (_threshold.BelowEnabled)
+        {
+            if (_threshold.BelowSliderBounds.Contains(e.X, e.Y))
+            {
+                _threshold.DraggingBelowThreshold = true;
+                UpdateThresholdFromMouse(e.X, _threshold.BelowSliderBounds, out _threshold.BelowThreshold);
+                _ctx.MarkDirty();
+                return true;
+            }
+            if (_threshold.BelowHystSliderBounds.Contains(e.X, e.Y))
+            {
+                _threshold.DraggingBelowHysteresis = true;
+                UpdateHysteresisFromMouse(e.X, _threshold.BelowHystSliderBounds, out _threshold.BelowHysteresis);
+                _ctx.MarkDirty();
+                return true;
+            }
+            if (_threshold.BelowClearBounds.HitTest(e.X, e.Y) && !string.IsNullOrEmpty(_threshold.BelowKeyName))
+            {
+                _threshold.BelowKeyName = "";
+                _threshold.BelowModifiers = null;
+                SaveThresholdSettingsForRow();
+                _ctx.MarkDirty();
+                return true;
+            }
+            if (_threshold.BelowCaptureBounds.Contains(e.X, e.Y))
+            {
+                _threshold.BelowCapturing = true;
+                _threshold.BelowCaptureStartTicks = Environment.TickCount64;
+                _ctx.MarkDirty();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void UpdateThresholdFromMouse(float mouseX, SKRect bounds, out float threshold)
+    {
+        if (bounds.Width <= 0) { threshold = 0; return; }
+        float norm = Math.Clamp((mouseX - bounds.Left) / bounds.Width, 0f, 1f);
+        threshold = (norm * 2f) - 1f; // Map 0..1 to -1..1
+    }
+
+    private static void UpdateHysteresisFromMouse(float mouseX, SKRect bounds, out float hysteresis)
+    {
+        if (bounds.Width <= 0) { hysteresis = 0.05f; return; }
+        float norm = Math.Clamp((mouseX - bounds.Left) / bounds.Width, 0f, 1f);
+        hysteresis = norm * 0.25f; // Map 0..1 to 0..0.25
     }
 
     private bool HandleAxisSettingsClick(MouseEventArgs e)
@@ -605,6 +735,12 @@ public partial class MappingsTabController : ITabController
         _hoveredMergeOpButton = -1;
         _hoveredCurvePreset = -1;
         _hoveredDeadzonePreset = -1;
+        _threshold.HoveredOutputMode = -1;
+        _threshold.HoveredDirection = -1;
+        _threshold.AboveCaptureHovered = false;
+        _threshold.AboveClearHovered = false;
+        _threshold.BelowCaptureHovered = false;
+        _threshold.BelowClearHovered = false;
         _hoveredMappingCategory = -1;
         _autoScroll.CheckboxHovered = false;
     }
@@ -616,6 +752,15 @@ public partial class MappingsTabController : ITabController
 
         if (_buttonMode.DraggingHold)
         { UpdateHoldDurationFromMouse(e.X); _ctx.MarkDirty(); return true; }
+
+        if (_threshold.DraggingAboveThreshold)
+        { UpdateThresholdFromMouse(e.X, _threshold.AboveSliderBounds, out _threshold.AboveThreshold); _ctx.MarkDirty(); return true; }
+        if (_threshold.DraggingBelowThreshold)
+        { UpdateThresholdFromMouse(e.X, _threshold.BelowSliderBounds, out _threshold.BelowThreshold); _ctx.MarkDirty(); return true; }
+        if (_threshold.DraggingAboveHysteresis)
+        { UpdateHysteresisFromMouse(e.X, _threshold.AboveHystSliderBounds, out _threshold.AboveHysteresis); _ctx.MarkDirty(); return true; }
+        if (_threshold.DraggingBelowHysteresis)
+        { UpdateHysteresisFromMouse(e.X, _threshold.BelowHystSliderBounds, out _threshold.BelowHysteresis); _ctx.MarkDirty(); return true; }
 
         return false;
     }
@@ -641,6 +786,38 @@ public partial class MappingsTabController : ITabController
             {
                 if (_mergeOpButtonBounds[i].HitTest(e.X, e.Y))
                 { _hoveredMergeOpButton = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+            }
+        }
+
+        // Axis output mode toggle and threshold controls (axis category)
+        if (_mappingCategory == 1 && _selectedMappingRow >= 0)
+        {
+            if (_threshold.AxisModeBounds.Contains(e.X, e.Y))
+            { _threshold.HoveredOutputMode = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+            if (_threshold.ThresholdModeBounds.Contains(e.X, e.Y))
+            { _threshold.HoveredOutputMode = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+            if (_threshold.IsThresholdMode)
+            {
+                if (_threshold.AboveBounds.Contains(e.X, e.Y))
+                { _threshold.HoveredDirection = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+                if (_threshold.BelowBounds.Contains(e.X, e.Y))
+                { _threshold.HoveredDirection = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+                if (_threshold.AboveEnabled)
+                {
+                    if (_threshold.AboveClearBounds.HitTest(e.X, e.Y))
+                    { _threshold.AboveClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+                    if (_threshold.AboveCaptureBounds.Contains(e.X, e.Y))
+                    { _threshold.AboveCaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
+                }
+                if (_threshold.BelowEnabled)
+                {
+                    if (_threshold.BelowClearBounds.HitTest(e.X, e.Y))
+                    { _threshold.BelowClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+                    if (_threshold.BelowCaptureBounds.Contains(e.X, e.Y))
+                    { _threshold.BelowCaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
+                }
             }
         }
 
@@ -811,6 +988,17 @@ public partial class MappingsTabController : ITabController
             UpdateDurationForSelectedMapping();
             _ctx.MarkDirty();
         }
+
+        // Release threshold/hysteresis slider dragging
+        if (IsDraggingThreshold)
+        {
+            _threshold.DraggingAboveThreshold = false;
+            _threshold.DraggingAboveHysteresis = false;
+            _threshold.DraggingBelowThreshold = false;
+            _threshold.DraggingBelowHysteresis = false;
+            SaveThresholdSettingsForRow();
+            _ctx.MarkDirty();
+        }
     }
 
     public void OnMouseWheel(MouseEventArgs e)
@@ -857,12 +1045,74 @@ public partial class MappingsTabController : ITabController
             return true;
         }
 
+        // Handle key capture for threshold keyboard output (above)
+        if (_threshold.AboveCapturing)
+        {
+            var baseKey = keyData & Keys.KeyCode;
+            bool isModifierOnly = IsModifierKey(baseKey);
+
+            if (isModifierOnly)
+            {
+                _threshold.AboveKeyName = GetModifierKeyName(baseKey);
+                _threshold.AboveModifiers = null;
+                _threshold.AboveCapturing = false;
+                SaveThresholdSettingsForRow();
+                return true;
+            }
+
+            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
+            if (!string.IsNullOrEmpty(keyName))
+            {
+                _threshold.AboveKeyName = keyName;
+                _threshold.AboveModifiers = modifiers.Count > 0 ? modifiers : null;
+                _threshold.AboveCapturing = false;
+                SaveThresholdSettingsForRow();
+            }
+            return true;
+        }
+
+        // Handle key capture for threshold keyboard output (below)
+        if (_threshold.BelowCapturing)
+        {
+            var baseKey = keyData & Keys.KeyCode;
+            bool isModifierOnly = IsModifierKey(baseKey);
+
+            if (isModifierOnly)
+            {
+                _threshold.BelowKeyName = GetModifierKeyName(baseKey);
+                _threshold.BelowModifiers = null;
+                _threshold.BelowCapturing = false;
+                SaveThresholdSettingsForRow();
+                return true;
+            }
+
+            var (keyName, modifiers) = GetKeyNameAndModifiersFromKeys(keyData);
+            if (!string.IsNullOrEmpty(keyName))
+            {
+                _threshold.BelowKeyName = keyName;
+                _threshold.BelowModifiers = modifiers.Count > 0 ? modifiers : null;
+                _threshold.BelowCapturing = false;
+                SaveThresholdSettingsForRow();
+            }
+            return true;
+        }
+
         // Cancel key capture / input listening with Escape
         if (keyData == Keys.Escape)
         {
             if (_keyboardOutput.IsCapturing)
             {
                 _keyboardOutput.IsCapturing = false;
+                return true;
+            }
+            if (_threshold.AboveCapturing)
+            {
+                _threshold.AboveCapturing = false;
+                return true;
+            }
+            if (_threshold.BelowCapturing)
+            {
+                _threshold.BelowCapturing = false;
                 return true;
             }
             if (_inputDetection.IsListening)
@@ -929,6 +1179,10 @@ public partial class MappingsTabController : ITabController
     {
         _buttonMode.DraggingPulse = false;
         _buttonMode.DraggingHold = false;
+        _threshold.DraggingAboveThreshold = false;
+        _threshold.DraggingAboveHysteresis = false;
+        _threshold.DraggingBelowThreshold = false;
+        _threshold.DraggingBelowHysteresis = false;
     }
 
     // ── Device Order Logic ────────────────────────────────────────────────────
@@ -1232,5 +1486,53 @@ public partial class MappingsTabController : ITabController
         public bool IsExpanded;
         public FUIWidgets.PanelSplitAnimator Anim = new() { T = 1f };
         public SKRect HeaderBounds;
+    }
+
+    private sealed class ThresholdEditorState
+    {
+        // Output mode toggle
+        public bool IsThresholdMode;
+        public SKRect AxisModeBounds;
+        public SKRect ThresholdModeBounds;
+        public int HoveredOutputMode = -1;
+
+        // Direction toggle (multi-select: both can be active)
+        public bool AboveEnabled;
+        public bool BelowEnabled;
+        public SKRect AboveBounds;
+        public SKRect BelowBounds;
+        public int HoveredDirection = -1;
+
+        // Above threshold config
+        public float AboveThreshold = 0.5f;
+        public float AboveHysteresis = 0.05f;
+        public string AboveKeyName = "";
+        public List<string>? AboveModifiers;
+        public SKRect AboveSliderBounds;
+        public SKRect AboveHystSliderBounds;
+        public SKRect AboveCaptureBounds;
+        public SKRect AboveClearBounds;
+        public bool AboveCaptureHovered;
+        public bool AboveClearHovered;
+        public bool AboveCapturing;
+        public long AboveCaptureStartTicks;
+        public bool DraggingAboveThreshold;
+        public bool DraggingAboveHysteresis;
+
+        // Below threshold config
+        public float BelowThreshold = -0.5f;
+        public float BelowHysteresis = 0.05f;
+        public string BelowKeyName = "";
+        public List<string>? BelowModifiers;
+        public SKRect BelowSliderBounds;
+        public SKRect BelowHystSliderBounds;
+        public SKRect BelowCaptureBounds;
+        public SKRect BelowClearBounds;
+        public bool BelowCaptureHovered;
+        public bool BelowClearHovered;
+        public bool BelowCapturing;
+        public long BelowCaptureStartTicks;
+        public bool DraggingBelowThreshold;
+        public bool DraggingBelowHysteresis;
     }
 }

@@ -391,6 +391,103 @@ internal static class FUIWidgets
         canvas.DrawCircle(handleX, bounds.MidY, handleRadius, handleStroke);
     }
 
+    /// <summary>
+    /// Draws a section label with enforced spacing: 16px top margin, label text, 8px bottom margin.
+    /// Returns updated y position (ready for the next element below).
+    /// </summary>
+    internal static float DrawSectionLabel(SKCanvas canvas, string text, float leftMargin, ref float y, float fontSize = 13f)
+    {
+        y += 16;
+        FUIRenderer.DrawText(canvas, text, new SKPoint(leftMargin, y + fontSize), FUIColors.TextDim, fontSize);
+        y += fontSize + 8;
+        return y;
+    }
+
+    /// <summary>
+    /// Draws a checkbox with label. This is the single-source-of-truth for all checkbox+label combos.
+    /// Label is positioned baseline-aligned with the checkbox bottom, 7px right of the checkbox.
+    /// Label color: TextBright on hover, TextDim otherwise (via SecondaryColor).
+    /// Returns the total width consumed (checkbox + gap + label).
+    /// </summary>
+    internal static float DrawCheckboxWithLabel(SKCanvas canvas, SKRect checkboxBounds, bool isChecked, bool isHovered,
+        string label, float fontSize = 13f)
+    {
+        // Draw the checkbox
+        var bgColor = isChecked
+            ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
+            : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+        var frameColor = isChecked
+            ? FUIColors.Active
+            : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        FUIRenderer.DrawRoundedPanel(canvas, checkboxBounds, bgColor, frameColor, 2f);
+
+        if (isChecked)
+        {
+            using var checkPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active,
+                StrokeWidth = 2f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            };
+            float cx = checkboxBounds.MidX;
+            float cy = checkboxBounds.MidY;
+            float s = checkboxBounds.Width * 0.3f;
+            canvas.DrawLine(cx - s, cy, cx - s * 0.3f, cy + s * 0.7f, checkPaint);
+            canvas.DrawLine(cx - s * 0.3f, cy + s * 0.7f, cx + s, cy - s * 0.5f, checkPaint);
+        }
+
+        // Draw the label (right of checkbox)
+        float labelX = checkboxBounds.Right + 7;
+        float labelY = checkboxBounds.Bottom - 1;
+        var labelColor = FUIColors.SecondaryColor(isHovered);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(labelX, labelY), labelColor, fontSize);
+
+        return checkboxBounds.Width + 7 + FUIRenderer.MeasureText(label, fontSize);
+    }
+
+    /// <summary>
+    /// Draws a checkbox with label positioned to the LEFT of the checkbox.
+    /// Same visual style as DrawCheckboxWithLabel but reversed layout.
+    /// </summary>
+    internal static void DrawCheckboxWithLabelLeft(SKCanvas canvas, SKRect checkboxBounds, bool isChecked, bool isHovered,
+        string label, float fontSize = 13f)
+    {
+        // Draw the checkbox (same as DrawCheckboxWithLabel)
+        var bgColor = isChecked
+            ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow)
+            : (isHovered ? FUIColors.Background2.WithAlpha(200) : FUIColors.Background2);
+        var frameColor = isChecked
+            ? FUIColors.Active
+            : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
+        FUIRenderer.DrawRoundedPanel(canvas, checkboxBounds, bgColor, frameColor, 2f);
+
+        if (isChecked)
+        {
+            using var checkPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = FUIColors.Active,
+                StrokeWidth = 2f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            };
+            float cx = checkboxBounds.MidX;
+            float cy = checkboxBounds.MidY;
+            float s = checkboxBounds.Width * 0.3f;
+            canvas.DrawLine(cx - s, cy, cx - s * 0.3f, cy + s * 0.7f, checkPaint);
+            canvas.DrawLine(cx - s * 0.3f, cy + s * 0.7f, cx + s, cy - s * 0.5f, checkPaint);
+        }
+
+        // Draw the label (left of checkbox)
+        float labelWidth = FUIRenderer.MeasureText(label, fontSize);
+        float labelX = checkboxBounds.Left - 7 - labelWidth;
+        float labelY = checkboxBounds.Bottom - 1;
+        var labelColor = FUIColors.SecondaryColor(isHovered);
+        FUIRenderer.DrawText(canvas, label, new SKPoint(labelX, labelY), labelColor, fontSize);
+    }
+
     /// <param name="mousePosition">Current mouse position for hover detection.</param>
     internal static void DrawCheckbox(SKCanvas canvas, SKRect bounds, bool isChecked, Point mousePosition)
     {

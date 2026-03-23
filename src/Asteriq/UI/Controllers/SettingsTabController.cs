@@ -534,11 +534,10 @@ public class SettingsTabController : ITabController, IDisposable
         float clientOnlyToggleY = y + (rowHeight - toggleHeight) / 2;
         _clientOnlyToggleBounds = new SKRect(rightMargin - toggleWidth, clientOnlyToggleY, rightMargin, clientOnlyToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _clientOnlyToggleBounds, _clientOnlyT.T, _ctx.MousePosition);
-        y += rowHeight + sectionSpacing;
+        y += rowHeight + 4;
 
         // DRIVERS section
-        FUIRenderer.DrawText(canvas, "DRIVERS", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += sectionSpacing;
+        FUIWidgets.DrawSectionLabel(canvas, "DRIVERS", leftMargin, ref y);
 
         var vjoyDevices = _ctx.VJoyService.EnumerateDevices();
         bool vjoyEnabled = vjoyDevices.Count > 0;
@@ -597,13 +596,12 @@ public class SettingsTabController : ITabController, IDisposable
                 new SKPoint(leftMargin, y + 12f), contentWidth, FUIColors.TextDim, 13f);
             y += rowHeight;
         }
-        y += sectionSpacing;
+        y += 4;
 
         // NETWORK enable toggle — only shown when vJoy is installed
         if (driverStatus.IsComplete)
         {
-            FUIRenderer.DrawText(canvas, "NETWORK", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-            y += sectionSpacing;
+            FUIWidgets.DrawSectionLabel(canvas, "NETWORK", leftMargin, ref y);
 
             float netLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
             float netLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
@@ -612,7 +610,7 @@ public class SettingsTabController : ITabController, IDisposable
             float netToggleY = y + (rowHeight - toggleHeight) / 2;
             _networkEnabledToggleBounds = new SKRect(rightMargin - toggleWidth, netToggleY, rightMargin, netToggleY + toggleHeight);
             FUIWidgets.DrawToggleSwitch(canvas, _networkEnabledToggleBounds, _networkEnabledT.T, _ctx.MousePosition);
-            y += rowHeight + sectionSpacing;
+            y += rowHeight + 4;
         }
         else
         {
@@ -620,8 +618,7 @@ public class SettingsTabController : ITabController, IDisposable
         }
 
         // VERSION & UPDATES section
-        FUIRenderer.DrawText(canvas, "VERSION & UPDATES", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += sectionSpacing;
+        FUIWidgets.DrawSectionLabel(canvas, "VERSION & UPDATES", leftMargin, ref y);
 
         // "Check for updates automatically" toggle — first in this section
         float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
@@ -833,11 +830,10 @@ public class SettingsTabController : ITabController, IDisposable
             StoreThemeButtonBounds(8 + i, themeBounds);
             FUIWidgets.DrawThemeButton(canvas, themeBounds, mfrNames2[i], mfrColors2[i], FUIColors.CurrentTheme == mfrThemes2[i], _ctx.MousePosition);
         }
-        y += themeBtnHeight + 20f;
+        y += themeBtnHeight + 4;
 
         // ── Colour Palette preview ─────────────────────────────────────────
-        FUIRenderer.DrawText(canvas, "PALETTE", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += 22f;
+        FUIWidgets.DrawSectionLabel(canvas, "PALETTE", leftMargin, ref y);
 
         float swatchGap = 5f;
         float swatchW   = (contentWidth - swatchGap * 3f) / 4f;
@@ -891,12 +887,10 @@ public class SettingsTabController : ITabController, IDisposable
                 new SKPoint(sx + swatchW / 2f - lblW / 2f, rect.Bottom - 2f),
                 new SKColor(0xFF, 0xFF, 0xFF, 200), 9f);
         }
-        y += swatchH + 20f;
-        // ── end palette ────────────────────────────────────────────────────
+        y += swatchH + 4;
 
         // Background effects section
-        FUIRenderer.DrawText(canvas, "BACKGROUND", new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        y += sectionSpacing + 8;
+        FUIWidgets.DrawSectionLabel(canvas, "BACKGROUND", leftMargin, ref y);
 
         string[] sliderLabels = { "Grid", "Glow", "Noise", "Scanlines", "Vignette" };
         float maxLabelWidth = 0;

@@ -1081,16 +1081,19 @@ public partial class MappingsTabController : ITabController
             if (_keyboardOutput.IsCapturing)
             {
                 _keyboardOutput.IsCapturing = false;
+                _keyboardOutput.PendingModifierName = null;
                 return true;
             }
             if (_threshold.AboveCapturing)
             {
                 _threshold.AboveCapturing = false;
+                _threshold.AbovePendingModifier = null;
                 return true;
             }
             if (_threshold.BelowCapturing)
             {
                 _threshold.BelowCapturing = false;
+                _threshold.BelowPendingModifier = null;
                 return true;
             }
             if (_inputDetection.IsListening)

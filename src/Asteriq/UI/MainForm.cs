@@ -1534,6 +1534,12 @@ public partial class MainForm : Form
             needsUpdate = true;
         }
 
+        // Mappings tab tick (pending modifier timeout, highlight animations)
+        if (_activeTab == 1)
+        {
+            _mappingsController.OnTick();
+        }
+
         // SC Bindings tab tick (input listening check)
         if (_activeTab == 2)
         {

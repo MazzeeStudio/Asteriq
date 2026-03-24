@@ -50,6 +50,7 @@ public sealed class NetworkVJoyService : IVJoyService
         return _inner.AcquireDevice(deviceId);
     }
     public void ReleaseDevice(uint deviceId)    => _inner.ReleaseDevice(deviceId);
+    public void ReleaseAllDevices()              => _inner.ReleaseAllDevices();
     public bool ResetDevice(uint deviceId)
     {
         // Clear snapshot so stale state is not transmitted after a reset

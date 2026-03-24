@@ -1092,6 +1092,7 @@ public partial class MainForm : Form
 
     /// <summary>
     /// Called when mappings are created or removed to update primary device detection
+    /// and hot-reload the mapping engine if forwarding is active.
     /// </summary>
     private void OnMappingsChanged()
     {
@@ -1104,12 +1105,20 @@ public partial class MainForm : Form
 
         // Refresh the visualization map for current vJoy device
         UpdateMappingsPrimaryDeviceMap();
+
+        // Hot-reload engine if forwarding is active so new/changed mappings take effect
+        if (_isForwarding && _mappingEngine.IsRunning)
+        {
+            _mappingEngine.Stop();
+            _mappingEngine.LoadProfile(profile);
+            _mappingEngine.Start();
+        }
     }
 
     /// <summary>
     /// Detect device type from device name using common keywords
     /// </summary>
-    private static string DetectDeviceType(string deviceName)
+    internal static string DetectDeviceType(string deviceName)
     {
         var name = deviceName.ToUpperInvariant();
 
@@ -1551,10 +1560,24 @@ public partial class MainForm : Form
 
     private void RefreshVJoyDevicesInternal()
     {
+        // vJoyConfig.exe reconfigures the driver, invalidating all kernel handles.
+        // Release stale acquisitions before re-enumerating so the engine can
+        // cleanly re-acquire devices when forwarding restarts.
+        bool wasForwarding = _isForwarding;
+        if (wasForwarding)
+            StopForwarding();
+
+        _vjoyService.ReleaseAllDevices();
         _vjoyDevices = _vjoyService.EnumerateDevices();
+
         // Immediately sync to context so callers can read the updated list before the next SyncTabContext()
         if (_tabContext is not null)
             _tabContext.VJoyDevices = _vjoyDevices;
+
+        // Restart forwarding if it was active — the engine will re-acquire devices
+        if (wasForwarding)
+            StartForwarding();
+
         // NOTE: callers that add a device should explicitly call RefreshDevices() afterwards
         // so the new SDL2 virtual joystick appears in the Devices tab.
         // Callers that remove a device should NOT call RefreshDevices() immediately,
@@ -2033,8 +2056,23 @@ public partial class MainForm : Form
                 mapping.Output.VJoyDevice = newId;
             }
         }
+        foreach (var mapping in profile.AxisToButtonMappings)
+        {
+            if (oldToNewVJoy.TryGetValue(mapping.Output.VJoyDevice, out uint newId))
+            {
+                mapping.Output.VJoyDevice = newId;
+            }
+        }
+        foreach (var mapping in profile.ButtonToAxisMappings)
+        {
+            if (oldToNewVJoy.TryGetValue(mapping.Output.VJoyDevice, out uint newId))
+            {
+                mapping.Output.VJoyDevice = newId;
+            }
+        }
 
         _profileManager.SaveActiveProfile();
+        OnMappingsChanged();
 
         Console.WriteLine($"Device order saved. vJoy assignments updated:");
         for (int i = 0; i < physicalDevices.Count; i++)

@@ -288,24 +288,31 @@ public partial class MappingsTabController
         // Build device ID for InputSource (using GUID)
         string deviceId = physicalDevice.InstanceGuid.ToString();
 
-        // Remove any existing mappings from this device to this vJoy device
+        // Remove ALL existing mappings from this device (any vJoy target).
+        // For merge mappings (multiple inputs), strip this device's input but keep the mapping.
         profile.AxisMappings.RemoveAll(m =>
-            m.Inputs.Any(i => i.DeviceId == deviceId) &&
-            m.Output.VJoyDevice == vjoyDevice.Id);
-        profile.ButtonMappings.RemoveAll(m =>
-            m.Inputs.Any(i => i.DeviceId == deviceId) &&
-            m.Output.VJoyDevice == vjoyDevice.Id);
-        profile.HatMappings.RemoveAll(m =>
-            m.Inputs.Any(i => i.DeviceId == deviceId) &&
-            m.Output.VJoyDevice == vjoyDevice.Id);
+            m.Inputs.Count == 1 && m.Inputs[0].DeviceId == deviceId);
+        foreach (var m in profile.AxisMappings)
+            m.Inputs.RemoveAll(i => i.DeviceId == deviceId);
+
+        profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        profile.AxisToButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        profile.ButtonToAxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
 
         // Create axis mappings using simple sequential mapping
         // Maps physical axis 0 -> vJoy axis 0, axis 1 -> vJoy axis 1, etc.
         // This is predictable and consistent with manual mapping behavior.
         var vjoyAxisIndices = GetVJoyAxisIndices(vjoyDevice);
 
+        // Throttles and pedals use end-only deadzone (0-100%), joysticks use centered (-100% to +100%)
+        string deviceType = MainForm.DetectDeviceType(physicalDevice.Name);
+        var deadzoneMode = deviceType is "Throttle" or "Pedals"
+            ? DeadzoneMode.EndOnly
+            : DeadzoneMode.Centered;
+
         LogMapping($"=== 1:1 Mapping for {physicalDevice.Name} ===");
-        LogMapping($"Device: {physicalDevice.Name}, AxisCount: {physicalDevice.AxisCount}");
+        LogMapping($"Device: {physicalDevice.Name}, AxisCount: {physicalDevice.AxisCount}, Type: {deviceType}");
 
         int axesToMap = Math.Min(physicalDevice.AxisCount, vjoyAxisIndices.Count);
         for (int i = 0; i < axesToMap; i++)
@@ -335,7 +342,7 @@ public partial class MappingsTabController
                     VJoyDevice = vjoyDevice.Id,
                     Index = vjoyAxisIndex
                 },
-                Curve = new AxisCurve { Type = CurveType.Linear }
+                Curve = new AxisCurve { Type = CurveType.Linear, DeadzoneMode = deadzoneMode }
             };
             profile.AxisMappings.Add(mapping);
         }
@@ -397,6 +404,23 @@ public partial class MappingsTabController
             };
             profile.HatMappings.Add(mapping);
         }
+
+        // Create/update device assignment so SaveDeviceOrder can track this device
+        profile.DeviceAssignments.RemoveAll(a =>
+            a.PhysicalDevice.Guid.Equals(deviceId, StringComparison.OrdinalIgnoreCase));
+
+        var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(physicalDevice.InstanceGuid);
+
+        profile.DeviceAssignments.Add(new DeviceAssignment
+        {
+            PhysicalDevice = new PhysicalDeviceRef
+            {
+                Name = physicalDevice.Name,
+                Guid = deviceId,
+                VidPid = vid > 0 ? $"{vid:X4}:{pid:X4}" : ""
+            },
+            VJoyDevice = vjoyDevice.Id
+        });
 
         // Save the profile
         _ctx.ProfileManager.SaveActiveProfile();

@@ -44,6 +44,11 @@ public interface IVJoyService : IDisposable
     void ReleaseDevice(uint deviceId);
 
     /// <summary>
+    /// Release all acquired vJoy devices (clears stale handles after driver reconfiguration)
+    /// </summary>
+    void ReleaseAllDevices();
+
+    /// <summary>
     /// Set axis value (normalized -1.0 to 1.0)
     /// </summary>
     bool SetAxis(uint deviceId, HID_USAGES axis, float value);

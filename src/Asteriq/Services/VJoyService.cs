@@ -224,6 +224,18 @@ public class VJoyService : IVJoyService
     }
 
     /// <summary>
+    /// Release all acquired vJoy devices. Called before driver reconfiguration
+    /// (add/remove device) to clear stale kernel handles.
+    /// </summary>
+    public void ReleaseAllDevices()
+    {
+        foreach (var deviceId in _acquiredDevices.Keys.ToList())
+        {
+            ReleaseDevice(deviceId);
+        }
+    }
+
+    /// <summary>
     /// Set axis value (normalized -1.0 to 1.0)
     /// </summary>
     public bool SetAxis(uint deviceId, HID_USAGES axis, float value)

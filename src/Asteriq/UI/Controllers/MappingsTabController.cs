@@ -1111,7 +1111,8 @@ public partial class MappingsTabController : ITabController
         if (_selectedMappingRow >= 0) return;
         if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return;
         _selectedMappingRow = 0;
-        _selectionIsExplicit = false; // auto-selected — user has not explicitly chosen this row
+        _selectionIsExplicit = true;
+        _highlight.ControlDef = GetControlForRow(_selectedMappingRow);
         LoadOutputTypeStateForRow();
         LoadAxisSettingsForRow();
     }

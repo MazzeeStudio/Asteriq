@@ -558,18 +558,22 @@ public partial class MappingsTabController
             return null;
         }
 
-        // Build axis list using DI axis types to match the physical device's actual axes
-        int buttonCount = Math.Max(physical.ButtonCount, 1);
-        int povCount = physical.HatCount;
-        var axisFlags = VJoyDirectInputOrderService.GetVJoyAxisFlagsForDevice(physical);
+        // Show configuration dialog pre-populated from the physical device's detected axes
+        var detectedFlags = VJoyDirectInputOrderService.GetVJoyAxisFlagsForDevice(physical);
+        int detectedButtons = Math.Max(physical.ButtonCount, 1);
+        int detectedPovs = physical.HatCount;
+
+        var config = VJoyConfigDialog.ShowConfig(_ctx.OwnerForm, physical.Name,
+            detectedFlags, detectedButtons, detectedPovs);
+        if (config is null) return null;
 
         string args = $"{newId} -f";
-        if (axisFlags.Count > 0)
-            args += $" -a {string.Join(" ", axisFlags)}";
-        if (buttonCount > 0)
-            args += $" -b {buttonCount}";
-        if (povCount > 0)
-            args += $" -p {povCount}";
+        if (config.AxisFlags.Count > 0)
+            args += $" -a {string.Join(" ", config.AxisFlags)}";
+        if (config.ButtonCount > 0)
+            args += $" -b {config.ButtonCount}";
+        if (config.PovCount > 0)
+            args += $" -p {config.PovCount}";
 
         try
         {

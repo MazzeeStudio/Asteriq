@@ -188,6 +188,13 @@ public class DevicesTabController : ITabController
             return true;
         }
 
+        if (_silhouette.ConfigVJoyBounds.HitTest(e.X, e.Y))
+        {
+            uint vjoyId = GetSelectedVJoyId();
+            if (vjoyId > 0) ConfigureVJoyDevice(vjoyId);
+            return true;
+        }
+
         if (_silhouette.RemoveVJoyBounds.HitTest(e.X, e.Y))
         {
             uint vjoyId = GetSelectedVJoyId();
@@ -349,9 +356,11 @@ public class DevicesTabController : ITabController
         _actions.HideFromViewHovered = _actions.HideFromViewBounds.HitTest(e.X, e.Y);
         _silhouette.RemoveVJoyHovered = _silhouette.RemoveVJoyBounds.HitTest(e.X, e.Y);
         _silhouette.SyncVJoyHovered = _silhouette.SyncVJoyBounds.HitTest(e.X, e.Y);
+        _silhouette.ConfigVJoyHovered = _silhouette.ConfigVJoyBounds.HitTest(e.X, e.Y);
 
         if (_actions.Map1to1Hovered || _actions.ClearMappingsHovered || _actions.RemoveDeviceHovered ||
-            _actions.HideFromViewHovered || _silhouette.RemoveVJoyHovered || _silhouette.SyncVJoyHovered)
+            _actions.HideFromViewHovered || _silhouette.RemoveVJoyHovered || _silhouette.SyncVJoyHovered ||
+            _silhouette.ConfigVJoyHovered)
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         if (_showHiddenCheckboxBounds.HitTest(e.X, e.Y))
@@ -1013,6 +1022,36 @@ public class DevicesTabController : ITabController
             _silhouette.RemoveVJoyBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + removeWidth, y + buttonHeight);
             var removeVJoyState = _silhouette.RemoveVJoyHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
             FUIRenderer.DrawButton(canvas, _silhouette.RemoveVJoyBounds, "REMOVE VJOY DEVICE", removeVJoyState, isDanger: true);
+            y += buttonHeight + 8f;
+
+            // "Manual configuration" pencil link
+            const float configFontSize = 12f;
+            const string configLabel = "Manual configuration";
+            float configTextW = FUIRenderer.MeasureText(configLabel, configFontSize);
+            float pencilGap = 14f;
+            float configTotalW = pencilGap + configTextW;
+            float configX = contentBounds.Right - pad - configTotalW;
+            _silhouette.ConfigVJoyBounds = new SKRect(configX - 4f, y, contentBounds.Right - pad + 4f, y + 18f);
+            _silhouette.ConfigVJoyHovered = _silhouette.ConfigVJoyBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+            var configColor = _silhouette.ConfigVJoyHovered ? FUIColors.TextBright : FUIColors.TextDim;
+
+            // Pencil icon
+            float pcx = configX + 6f;
+            float pcy = y + 7f;
+            using (var penPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = configColor,
+                StrokeWidth = 1.2f,
+                IsAntialias = true,
+                StrokeCap = SKStrokeCap.Round
+            })
+            {
+                canvas.DrawLine(pcx - 4f, pcy + 4f, pcx + 3f, pcy - 3f, penPaint);
+                canvas.DrawLine(pcx - 4f, pcy + 4f, pcx - 5f, pcy + 5.5f, penPaint);
+                canvas.DrawLine(pcx + 3f, pcy - 3f, pcx + 5f, pcy - 5f, penPaint);
+            }
+            FUIRenderer.DrawText(canvas, configLabel, new SKPoint(configX + pencilGap, y + 11f), configColor, configFontSize);
         }
         else
         {
@@ -1022,6 +1061,7 @@ public class DevicesTabController : ITabController
             _actions.HideFromViewBounds = SKRect.Empty;
             _silhouette.RemoveVJoyBounds = SKRect.Empty;
             _silhouette.SyncVJoyBounds = SKRect.Empty;
+            _silhouette.ConfigVJoyBounds = SKRect.Empty;
             _silhouette.PrevBounds = SKRect.Empty;
             _silhouette.NextBounds = SKRect.Empty;
 
@@ -1471,6 +1511,89 @@ public class DevicesTabController : ITabController
     /// Deletes and recreates the vJoy slot via vJoyConfig.exe (requires UAC).
     /// Preserves all existing mappings by keeping the same slot ID.
     /// </summary>
+    private void ConfigureVJoyDevice(uint vjoyId)
+    {
+        var vjoyDevice = _ctx.VJoyDevices.FirstOrDefault(v => v.Id == vjoyId);
+        if (vjoyDevice is null) return;
+
+        string? configPath = DriverSetupManager.GetVJoyConfigPath();
+        if (configPath is null)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "vJoyConfig.exe was not found in your vJoy installation.\n\n" +
+                "Please ensure vJoy is installed correctly.",
+                "vJoy Not Found");
+            return;
+        }
+
+        // Pre-populate from current vJoy device config
+        var currentFlags = new List<string>();
+        if (vjoyDevice.HasAxisX) currentFlags.Add("X");
+        if (vjoyDevice.HasAxisY) currentFlags.Add("Y");
+        if (vjoyDevice.HasAxisZ) currentFlags.Add("Z");
+        if (vjoyDevice.HasAxisRX) currentFlags.Add("RX");
+        if (vjoyDevice.HasAxisRY) currentFlags.Add("RY");
+        if (vjoyDevice.HasAxisRZ) currentFlags.Add("RZ");
+        if (vjoyDevice.HasSlider0) currentFlags.Add("SL0");
+
+        int currentPovs = vjoyDevice.ContPovCount + vjoyDevice.DiscPovCount;
+        bool currentContinuous = vjoyDevice.ContPovCount > 0;
+
+        var config = VJoyConfigDialog.ShowConfig(_ctx.OwnerForm,
+            $"vJoy Device {vjoyId}", currentFlags, vjoyDevice.ButtonCount, currentPovs, currentContinuous);
+        if (config is null) return;
+
+        _ctx.VJoyService.ReleaseDevice(vjoyId);
+
+        string args = $"{vjoyId} -f";
+        if (config.AxisFlags.Count > 0)
+            args += $" -a {string.Join(" ", config.AxisFlags)}";
+        if (config.ButtonCount > 0)
+            args += $" -b {config.ButtonCount}";
+        if (config.PovCount > 0)
+            args += $" -p {config.PovCount}";
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = configPath,
+                Arguments = args,
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            process?.WaitForExit(15000);
+
+            int exitCode = process?.ExitCode ?? -1;
+            if (exitCode != 0)
+            {
+                FUIMessageBox.ShowError(_ctx.OwnerForm,
+                    $"vJoyConfig.exe reported failure (exit code {exitCode}).\n\n" +
+                    "The device configuration may not have changed.",
+                    "Configuration Failed");
+                return;
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            return; // User cancelled UAC
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                $"Failed to reconfigure vJoy device:\n{ex.Message}",
+                "Configuration Failed");
+            return;
+        }
+
+        _ctx.RefreshVJoyDevices?.Invoke();
+        _ctx.RefreshDevices?.Invoke();
+        _ctx.InvalidateCanvas();
+    }
+
     private void SyncVJoyToPhysical(uint vjoyId)
     {
         var physical = GetPrimaryPhysicalDevice(vjoyId);
@@ -1503,8 +1626,7 @@ public class DevicesTabController : ITabController
         // Release the device before reconfiguring
         _ctx.VJoyService.ReleaseDevice(vjoyId);
 
-        // Build vJoyConfig args: delete the slot then recreate with new capabilities
-        // vJoyConfig.exe supports applying a new config over an existing slot with -f (force)
+        // Build vJoyConfig args
         string args = $"{vjoyId} -f";
         if (axisFlags.Count > 0)
             args += $" -a {string.Join(" ", axisFlags)}";
@@ -1776,6 +1898,8 @@ public class DevicesTabController : ITabController
         public bool RemoveVJoyHovered;
         public SKRect SyncVJoyBounds;
         public bool SyncVJoyHovered;
+        public SKRect ConfigVJoyBounds;
+        public bool ConfigVJoyHovered;
     }
 
     private sealed class SvgClickState

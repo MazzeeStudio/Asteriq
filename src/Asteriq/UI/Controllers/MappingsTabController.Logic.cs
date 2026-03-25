@@ -296,9 +296,11 @@ public partial class MappingsTabController
         RemoveMappingsForDevice(profile.AxisToButtonMappings, deviceId);
         RemoveMappingsForDevice(profile.ButtonToAxisMappings, deviceId);
 
-        // Create axis mappings using simple sequential mapping
-        // Maps physical axis 0 -> vJoy axis 0, axis 1 -> vJoy axis 1, etc.
-        // This is predictable and consistent with manual mapping behavior.
+        // Create axis mappings using sequential index mapping.
+        // SDL2 and DirectInput can enumerate axes in different orders, so we map
+        // by position: SDL2 axis 0 → vJoy's first enabled axis, axis 1 → second, etc.
+        // The vJoy device is configured with the correct axis TYPES via DI detection
+        // (done during device creation / Match Physical), so the types are already correct.
         var vjoyAxisIndices = GetVJoyAxisIndices(vjoyDevice);
 
         // Throttles and pedals use end-only deadzone (0-100%), joysticks use centered (-100% to +100%)
@@ -556,15 +558,14 @@ public partial class MappingsTabController
             return null;
         }
 
-        // Build axis list: up to 8 axes matching physical device count
-        string[] axisNames = { "X", "Y", "Z", "RX", "RY", "RZ", "SL0", "SL1" };
-        int axisCount = Math.Min(physical.AxisCount, axisNames.Length);
+        // Build axis list using DI axis types to match the physical device's actual axes
         int buttonCount = Math.Max(physical.ButtonCount, 1);
         int povCount = physical.HatCount;
+        var axisFlags = VJoyDirectInputOrderService.GetVJoyAxisFlagsForDevice(physical);
 
         string args = $"{newId} -f";
-        if (axisCount > 0)
-            args += $" -a {string.Join(" ", axisNames.Take(axisCount))}";
+        if (axisFlags.Count > 0)
+            args += $" -a {string.Join(" ", axisFlags)}";
         if (buttonCount > 0)
             args += $" -b {buttonCount}";
         if (povCount > 0)

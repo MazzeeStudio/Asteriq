@@ -97,4 +97,65 @@ public static class VJoyDirectInputOrderService
         // Data4 starts at byte index 8. Data4[0]=bytes[8], Data4[1]=bytes[9].
         return bytes[9];
     }
+
+    /// <summary>
+    /// Returns the vJoyConfig.exe axis flags (e.g., ["X","Y","RX","RY","SL0","Z"])
+    /// matching the physical device's actual axis types.
+    /// Tries HID data first (AxisInfos), falls back to isolated DI query, then sequential defaults.
+    /// </summary>
+    public static List<string> GetVJoyAxisFlagsForDevice(PhysicalDeviceInfo physical)
+    {
+        // 1. Try HID axis data (populated at startup by InputService.PopulateAxisTypes)
+        if (physical.AxisInfos.Count > 0)
+        {
+            var flags = AxisTypesToFlags(physical.AxisInfos.Select(a => a.Type));
+            if (flags.Count > 0) return flags;
+        }
+
+        // 2. Fallback: isolated DI query
+        var diAllAxes = DirectInput.DirectInputService.QueryAllAxisTypesIsolated();
+        if (diAllAxes.TryGetValue(physical.Name, out var diAxes) && diAxes.Count > 0)
+        {
+            var diTypes = diAxes.Select(a => a.Type switch
+            {
+                DirectInput.DirectInputAxisType.X => AxisType.X,
+                DirectInput.DirectInputAxisType.Y => AxisType.Y,
+                DirectInput.DirectInputAxisType.Z => AxisType.Z,
+                DirectInput.DirectInputAxisType.RX => AxisType.RX,
+                DirectInput.DirectInputAxisType.RY => AxisType.RY,
+                DirectInput.DirectInputAxisType.RZ => AxisType.RZ,
+                DirectInput.DirectInputAxisType.Slider => AxisType.Slider,
+                _ => AxisType.Unknown
+            });
+            var flags = AxisTypesToFlags(diTypes);
+            if (flags.Count > 0) return flags;
+        }
+
+        // 3. Fallback: sequential defaults
+        string[] defaultAxes = { "X", "Y", "Z", "RX", "RY", "RZ", "SL0", "SL1" };
+        int count = Math.Min(physical.AxisCount, defaultAxes.Length);
+        return defaultAxes.Take(count).ToList();
+    }
+
+    private static List<string> AxisTypesToFlags(IEnumerable<AxisType> types)
+    {
+        var flags = new List<string>();
+        foreach (var type in types)
+        {
+            string? flag = type switch
+            {
+                AxisType.X => "X",
+                AxisType.Y => "Y",
+                AxisType.Z => "Z",
+                AxisType.RX => "RX",
+                AxisType.RY => "RY",
+                AxisType.RZ => "RZ",
+                AxisType.Slider => "SL0",
+                _ => null
+            };
+            if (flag is not null && !flags.Contains(flag))
+                flags.Add(flag);
+        }
+        return flags;
+    }
 }

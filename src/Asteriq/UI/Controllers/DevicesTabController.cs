@@ -1486,13 +1486,12 @@ public class DevicesTabController : ITabController
             return;
         }
 
-        string[] axisNames = { "X", "Y", "Z", "RX", "RY", "RZ", "SL0", "SL1" };
-        int axisCount = Math.Min(physical.AxisCount, axisNames.Length);
         int buttonCount = Math.Max(physical.ButtonCount, 1);
         int povCount = physical.HatCount;
+        var axisFlags = VJoyDirectInputOrderService.GetVJoyAxisFlagsForDevice(physical);
 
         string message = $"Match vJoy Slot {vjoyId} to {physical.Name}?\n\n" +
-                         $"Axes: {axisCount}\n" +
+                         $"Axes: {string.Join(", ", axisFlags)}\n" +
                          $"Buttons: {buttonCount}\n" +
                          $"Hats: {povCount}\n\n" +
                          "Existing mappings will be preserved.\nAn admin prompt will appear.";
@@ -1507,8 +1506,8 @@ public class DevicesTabController : ITabController
         // Build vJoyConfig args: delete the slot then recreate with new capabilities
         // vJoyConfig.exe supports applying a new config over an existing slot with -f (force)
         string args = $"{vjoyId} -f";
-        if (axisCount > 0)
-            args += $" -a {string.Join(" ", axisNames.Take(axisCount))}";
+        if (axisFlags.Count > 0)
+            args += $" -a {string.Join(" ", axisFlags)}";
         if (buttonCount > 0)
             args += $" -b {buttonCount}";
         if (povCount > 0)

@@ -290,15 +290,11 @@ public partial class MappingsTabController
 
         // Remove ALL existing mappings from this device (any vJoy target).
         // For merge mappings (multiple inputs), strip this device's input but keep the mapping.
-        profile.AxisMappings.RemoveAll(m =>
-            m.Inputs.Count == 1 && m.Inputs[0].DeviceId == deviceId);
-        foreach (var m in profile.AxisMappings)
-            m.Inputs.RemoveAll(i => i.DeviceId == deviceId);
-
-        profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-        profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-        profile.AxisToButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-        profile.ButtonToAxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        RemoveMappingsForDevice(profile.AxisMappings, deviceId);
+        RemoveMappingsForDevice(profile.ButtonMappings, deviceId);
+        RemoveMappingsForDevice(profile.HatMappings, deviceId);
+        RemoveMappingsForDevice(profile.AxisToButtonMappings, deviceId);
+        RemoveMappingsForDevice(profile.ButtonToAxisMappings, deviceId);
 
         // Create axis mappings using simple sequential mapping
         // Maps physical axis 0 -> vJoy axis 0, axis 1 -> vJoy axis 1, etc.
@@ -798,10 +794,11 @@ public partial class MappingsTabController
 
         string deviceId = physicalDevice.InstanceGuid.ToString();
 
-        // Remove all mappings from this device
-        int axisRemoved = profile.AxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-        int buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-        int hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+        // Remove mappings from this device. For merge mappings (multiple inputs),
+        // only strip this device's input — don't destroy the whole mapping.
+        int axisRemoved = RemoveMappingsForDevice(profile.AxisMappings, deviceId);
+        int buttonRemoved = RemoveMappingsForDevice(profile.ButtonMappings, deviceId);
+        int hatRemoved = RemoveMappingsForDevice(profile.HatMappings, deviceId);
 
         _ctx.ProfileManager.SaveActiveProfile();
         _ctx.OnMappingsChanged();
@@ -811,6 +808,23 @@ public partial class MappingsTabController
             "Mappings Cleared");
 
         _ctx.InvalidateCanvas();
+    }
+
+    /// <summary>
+    /// Removes a device from a mapping list safely. For sole-input mappings, removes
+    /// the entire mapping. For merge mappings (multiple inputs), strips only this
+    /// device's input and keeps the mapping intact. Returns the count of fully removed mappings.
+    /// </summary>
+    private static int RemoveMappingsForDevice<T>(List<T> mappings, string deviceId) where T : Mapping
+    {
+        // First, strip device from merge mappings (multiple inputs)
+        foreach (var m in mappings.Where(m => m.Inputs.Count > 1))
+            m.Inputs.RemoveAll(i => i.DeviceId == deviceId);
+
+        // Then remove mappings where this was the sole input (now empty after strip, or was always sole)
+        return mappings.RemoveAll(m =>
+            m.Inputs.Count == 0 ||
+            (m.Inputs.Count == 1 && m.Inputs[0].DeviceId == deviceId));
     }
 
     /// <summary>
@@ -837,13 +851,13 @@ public partial class MappingsTabController
         var profile = _ctx.ProfileManager.ActiveProfile;
         string deviceId = device.InstanceGuid.ToString();
 
-        // Remove all mappings from this device
+        // Remove mappings from this device (preserving merge mappings for other devices)
         int axisRemoved = 0, buttonRemoved = 0, hatRemoved = 0;
         if (profile is not null)
         {
-            axisRemoved = profile.AxisMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-            buttonRemoved = profile.ButtonMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
-            hatRemoved = profile.HatMappings.RemoveAll(m => m.Inputs.Any(i => i.DeviceId == deviceId));
+            axisRemoved = RemoveMappingsForDevice(profile.AxisMappings, deviceId);
+            buttonRemoved = RemoveMappingsForDevice(profile.ButtonMappings, deviceId);
+            hatRemoved = RemoveMappingsForDevice(profile.HatMappings, deviceId);
             _ctx.ProfileManager.SaveActiveProfile();
             _ctx.OnMappingsChanged();
         }

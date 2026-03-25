@@ -134,8 +134,8 @@ public class DirectInputReader : IDisposable
         {
             InstanceGuid = deviceInstance.guidInstance,
             ProductGuid = deviceInstance.guidProduct,
-            InstanceName = deviceInstance.tszInstanceName ?? "",
-            ProductName = deviceInstance.tszProductName ?? ""
+            InstanceName = deviceInstance.InstanceName,
+            ProductName = deviceInstance.ProductName
         });
 
         return DIENUM_CONTINUE;

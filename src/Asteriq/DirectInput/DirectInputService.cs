@@ -71,6 +71,33 @@ public class DirectInputService : IDisposable
     }
 
     /// <summary>
+    /// Lightweight enumeration that collects only device identity info (GUIDs, names)
+    /// without creating/acquiring devices. Used for DI order detection.
+    /// </summary>
+    public List<DirectInputDeviceInfo> EnumerateDeviceIdentities()
+    {
+        var devices = new List<DirectInputDeviceInfo>();
+
+        EnumDevicesCallback callback = (ref DIDEVICEINSTANCEW deviceInstance, IntPtr pvRef) =>
+        {
+            devices.Add(new DirectInputDeviceInfo
+            {
+                InstanceGuid = deviceInstance.guidInstance,
+                ProductGuid = deviceInstance.guidProduct,
+                InstanceName = deviceInstance.InstanceName,
+                ProductName = deviceInstance.ProductName,
+            });
+            return DIENUM_CONTINUE;
+        };
+
+        var enumDevicesPtr = GetVTableMethod(_directInput, IDirectInput8_EnumDevices);
+        var enumDevices = Marshal.GetDelegateForFunctionPointer<EnumDevicesDelegate>(enumDevicesPtr);
+        enumDevices(_directInput, DI8DEVCLASS_GAMECTRL, callback, IntPtr.Zero, DIEDFL_ATTACHEDONLY);
+
+        return devices;
+    }
+
+    /// <summary>
     /// Get device info by instance GUID. Returns cached info if available.
     /// </summary>
     public DirectInputDeviceInfo? GetDeviceByGuid(Guid instanceGuid)
@@ -136,11 +163,12 @@ public class DirectInputService : IDisposable
                 if ((objInstance.dwType & DIDFT_AXIS) != 0 || (objInstance.dwType & DIDFT_ABSAXIS) != 0)
                 {
                     var axisType = GuidToAxisType(objInstance.guidType);
+                    string axisName = DIDEVICEINSTANCEW.ReadWideStringStatic(objInstance.tszNameBytes);
                     axes.Add(new DirectInputAxisInfo
                     {
                         Index = axisIndex++,
                         Type = axisType,
-                        Name = objInstance.tszName ?? $"Axis {axisIndex}",
+                        Name = axisName.Length > 0 ? axisName : $"Axis {axisIndex}",
                         TypeGuid = objInstance.guidType
                     });
                 }
@@ -155,8 +183,8 @@ public class DirectInputService : IDisposable
             {
                 InstanceGuid = instanceGuid,
                 ProductGuid = deviceInstance.guidProduct,
-                InstanceName = deviceInstance.tszInstanceName ?? "",
-                ProductName = deviceInstance.tszProductName ?? "",
+                InstanceName = deviceInstance.InstanceName,
+                ProductName = deviceInstance.ProductName,
                 Axes = axes,
                 ButtonCount = (int)caps.dwButtons,
                 PovCount = (int)caps.dwPOVs

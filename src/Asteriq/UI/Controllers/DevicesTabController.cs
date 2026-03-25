@@ -215,13 +215,9 @@ public class DevicesTabController : ITabController
 
         SelectDevice(_hoveredDevice);
 
-        // Initiate potential drag on physical devices only
-        if (_devCat.Active == 0)
-        {
-            _drag.DeviceIndex = _hoveredDevice;
-            _drag.StartPoint = new SKPoint(e.X, e.Y);
-            _drag.CurrentPoint = _drag.StartPoint;
-        }
+        // Drag/drop reordering disabled — reassigning vJoy IDs via drag
+        // can cause capability mismatches (e.g., 60-button device → 32-button vJoy).
+        // Use MAP 1:1 TO VJOY + Match Physical for safe device assignment.
 
         return true;
     }
@@ -1675,7 +1671,24 @@ public class DevicesTabController : ITabController
 
         if (vjoyIds.Count == 0) return "";
         if (vjoyIds.Count == 1) return $"VJOY:{vjoyIds.First()}";
-        return $"VJOY:{string.Join(",", vjoyIds.OrderBy(x => x))}";
+
+        // Find which vJoy slot considers this device its primary (most mappings)
+        uint primaryVJoy = 0;
+        foreach (var (vjoyId, guid) in profile.VJoyPrimaryDevices)
+        {
+            if (guid.Equals(deviceId, StringComparison.OrdinalIgnoreCase) && vjoyIds.Contains(vjoyId))
+            {
+                primaryVJoy = vjoyId;
+                break;
+            }
+        }
+
+        // Primary first, then remaining sorted
+        var ordered = primaryVJoy > 0
+            ? vjoyIds.Where(id => id == primaryVJoy)
+                .Concat(vjoyIds.Where(id => id != primaryVJoy).OrderBy(x => x))
+            : vjoyIds.OrderBy(x => x);
+        return $"VJOY:{string.Join(",", ordered)}";
     }
 
     private string GetPrimaryDeviceForVJoyDevice(PhysicalDeviceInfo vjoyDevice)

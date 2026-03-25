@@ -14,18 +14,21 @@ namespace Asteriq.Services;
 public static class VJoyDirectInputOrderService
 {
     /// <summary>
+    /// vJoy ProductGuid — all vJoy virtual devices share this GUID.
+    /// "BEAD1234-0000-0000-0000-504944564944"
+    /// </summary>
+    private static readonly Guid VJoyProductGuid = new("bead1234-0000-0000-0000-504944564944");
+
+    /// <summary>
     /// Detects the DirectInput enumeration order of vJoy devices and returns a mapping
     /// from vJoy slot ID to SC joystick instance number (1-based).
     ///
     /// Algorithm:
-    /// 1. Filters <paramref name="diDevices"/> to vJoy-named entries (ProductName contains
-    ///    "vjoy", case-insensitive), preserving DI enumeration order.
-    /// 2. Builds a capability fingerprint (ButtonCount, AxisCount, PovCount) for each
-    ///    DI vJoy device and each vJoy slot.
-    /// 3. Greedily matches each DI position (in order) to the first unmatched vJoy slot
-    ///    whose fingerprint matches.  If no fingerprint match is found, takes the first
-    ///    remaining unmatched slot (positional fallback).
-    /// 4. Any unmatched slots at the end receive identity mapping (slot N → instance N).
+    /// 1. Filters <paramref name="diDevices"/> to vJoy devices by ProductGuid,
+    ///    preserving DI enumeration order.
+    /// 2. Extracts the vJoy slot number from each DI device's InstanceGuid
+    ///    (encoded in Data4[1] — e.g., xxxxxxxx-xxxx-xxxx-8002-... = slot 2).
+    /// 3. Maps each slot to its 1-based DI position among vJoy devices.
     /// </summary>
     /// <param name="vjoySlots">vJoy device slots to include (Exists = true slots only).</param>
     /// <param name="diDevices">DirectInput game controllers in enumeration order.</param>
@@ -40,9 +43,11 @@ public static class VJoyDirectInputOrderService
         if (slots.Count == 0)
             return result;
 
-        // Filter to vJoy-named DI devices, preserving enumeration order
+        // Filter to vJoy DI devices by ProductGuid, preserving enumeration order.
+        // Fallback: also accept devices with "vjoy" in the name (in case ProductGuid varies).
         var vjoyDiDevices = diDevices
-            .Where(d => d.ProductName.Contains("vjoy", StringComparison.OrdinalIgnoreCase))
+            .Where(d => d.ProductGuid == VJoyProductGuid
+                || d.ProductName.Contains("vjoy", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (vjoyDiDevices.Count == 0)
@@ -53,65 +58,43 @@ public static class VJoyDirectInputOrderService
             return result;
         }
 
-        // Build fingerprints: (ButtonCount, AxisCount, PovCount)
-        // AxisCount for vJoy slots is derived from the Has* properties.
-        var slotFingerprints = slots
-            .Select(v => (ButtonCount: v.ButtonCount, AxisCount: CountAxes(v), PovCount: v.DiscPovCount + v.ContPovCount))
-            .ToList();
+        // Extract slot number from InstanceGuid and map to DI position.
+        // vJoy encodes the slot number in InstanceGuid Data4[1]:
+        //   xxxxxxxx-xxxx-xxxx-80NN-444553540000 where NN = slot number.
+        var slotIds = new HashSet<uint>(slots.Select(s => s.Id));
+        int scInstance = 0;
 
-        // unmatched = indices into slots[] still available for assignment
-        var unmatched = Enumerable.Range(0, slots.Count).ToList();
-
-        for (int diPos = 0; diPos < vjoyDiDevices.Count && unmatched.Count > 0; diPos++)
+        foreach (var diDev in vjoyDiDevices)
         {
-            var d = vjoyDiDevices[diPos];
-            var diFp = (ButtonCount: d.ButtonCount, AxisCount: d.Axes.Count, PovCount: d.PovCount);
+            scInstance++;
+            uint slotId = ExtractVJoySlotFromGuid(diDev.InstanceGuid);
 
-            // Find first unmatched slot whose fingerprint matches the DI device
-            int matchedListIdx = -1;
-            for (int i = 0; i < unmatched.Count; i++)
+            if (slotId > 0 && slotIds.Contains(slotId) && !result.ContainsKey(slotId))
             {
-                if (slotFingerprints[unmatched[i]] == diFp)
-                {
-                    matchedListIdx = i;
-                    break;
-                }
+                result[slotId] = scInstance;
             }
-
-            int slotIdx;
-            if (matchedListIdx >= 0)
-            {
-                slotIdx = unmatched[matchedListIdx];
-                unmatched.RemoveAt(matchedListIdx);
-            }
-            else
-            {
-                // No fingerprint match — positional fallback: take first remaining slot
-                slotIdx = unmatched[0];
-                unmatched.RemoveAt(0);
-            }
-
-            result[slots[slotIdx].Id] = diPos + 1; // 1-based SC instance
         }
 
-        // Any slots that exceeded the DI device count get identity mapping
-        foreach (int slotIdx in unmatched)
-            result[slots[slotIdx].Id] = (int)slots[slotIdx].Id;
+        // Any slots not found in DI get identity mapping
+        foreach (var slot in slots)
+        {
+            if (!result.ContainsKey(slot.Id))
+                result[slot.Id] = (int)slot.Id;
+        }
 
         return result;
     }
 
-    private static int CountAxes(VJoyDeviceInfo v)
+    /// <summary>
+    /// Extracts the vJoy slot number from a DirectInput InstanceGuid.
+    /// vJoy uses the format: xxxxxxxx-xxxx-xxxx-80NN-444553540000
+    /// where NN (Data4[1]) is the 1-based slot number.
+    /// Returns 0 if the GUID doesn't match the expected pattern.
+    /// </summary>
+    public static uint ExtractVJoySlotFromGuid(Guid instanceGuid)
     {
-        int count = 0;
-        if (v.HasAxisX) count++;
-        if (v.HasAxisY) count++;
-        if (v.HasAxisZ) count++;
-        if (v.HasAxisRX) count++;
-        if (v.HasAxisRY) count++;
-        if (v.HasAxisRZ) count++;
-        if (v.HasSlider0) count++;
-        if (v.HasSlider1) count++;
-        return count;
+        var bytes = instanceGuid.ToByteArray();
+        // Data4 starts at byte index 8. Data4[0]=bytes[8], Data4[1]=bytes[9].
+        return bytes[9];
     }
 }

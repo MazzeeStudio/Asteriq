@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Asteriq.DirectInput;
 using Asteriq.Models;
 using Asteriq.Services;
 using Asteriq.Services.Abstractions;
@@ -15,7 +14,6 @@ public partial class MappingsTabController : ITabController
 {
     private readonly TabContext _ctx;
     private readonly SCExportProfileService? _scExportProfileService;
-    private readonly DirectInputService? _directInputService;
 
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
     private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
@@ -85,7 +83,6 @@ public partial class MappingsTabController : ITabController
     private readonly AutoScrollState _autoScroll = new();
     private readonly NetworkSwitchState _netSwitch = new();
     private readonly ListScrollState _listScroll = new();
-    private readonly DeviceOrderState _deviceOrder = new();
     private readonly ThresholdEditorState _threshold = new();
 
     // Legacy compatibility — computed alias kept for use in axis logic
@@ -225,12 +222,10 @@ public partial class MappingsTabController : ITabController
 
     public MappingsTabController(
         TabContext ctx,
-        SCExportProfileService? scExportProfileService = null,
-        DirectInputService? directInputService = null)
+        SCExportProfileService? scExportProfileService = null)
     {
         _ctx = ctx;
         _scExportProfileService = scExportProfileService;
-        _directInputService = directInputService;
     }
     public void Draw(SKCanvas canvas, SKRect bounds, float padLeft, float contentTop, float contentBottom)
     {
@@ -250,7 +245,6 @@ public partial class MappingsTabController : ITabController
         if (HandleRightPanelClick(e)) return;
         if (HandleThresholdClick(e)) return;
         if (HandleAxisSettingsClick(e)) return;
-        if (HandleDeviceOrderClick(e)) return;
         if (HandleNetSwitchClick(e)) return;
         if (HandleVJoyNavigationClick(e)) return;
         HandleMappingRowClick();
@@ -567,83 +561,6 @@ public partial class MappingsTabController : ITabController
         return false;
     }
 
-    private bool HandleDeviceOrderClick(MouseEventArgs e)
-    {
-        // Accordion toggle: clicking collapsed Mapping Settings header when Device Order is expanded
-        if (_deviceOrder.IsExpanded && !_deviceOrder.HeaderBounds.IsEmpty && e.Y < _deviceOrder.HeaderBounds.Top)
-        {
-            _deviceOrder.IsExpanded = false;
-            _deviceOrder.OpenRow = -1;
-            _ctx.MarkDirty();
-            return true;
-        }
-
-        // Header click to expand/collapse
-        if (_deviceOrder.HeaderBounds.HitTest(e.X, e.Y))
-        {
-            _deviceOrder.IsExpanded = !_deviceOrder.IsExpanded;
-            _deviceOrder.OpenRow = -1;
-            _ctx.MarkDirty();
-            return true;
-        }
-
-        // Dropdown open/close
-        if (_deviceOrder.OpenRow >= 0)
-        {
-            if (_deviceOrder.DropdownBounds.HitTest(e.X, e.Y))
-            {
-                float itemH = 28f;
-                int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
-                var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).OrderBy(v => v.Id).ToList();
-                var profile = _ctx.GetActiveSCExportProfile?.Invoke();
-                if (idx >= 0 && idx < existingSlots.Count && profile is not null)
-                    AssignDeviceOrderSlot(profile, idx + 1, existingSlots[idx].Id);
-                _deviceOrder.OpenRow = -1;
-                _deviceOrder.HoveredIndex = -1;
-                _ctx.MarkDirty();
-                return true;
-            }
-
-            _deviceOrder.OpenRow = -1;
-            _deviceOrder.HoveredIndex = -1;
-            _ctx.MarkDirty();
-            for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
-            {
-                if (_deviceOrder.SelectorBounds[i].HitTest(e.X, e.Y))
-                    return true;
-            }
-        }
-
-        // Auto-detect button
-        if (_deviceOrder.IsExpanded && _deviceOrder.AutoDetectBounds.HitTest(e.X, e.Y)
-            && _directInputService is not null)
-        {
-            RunDeviceOrderAutoDetect();
-            return true;
-        }
-
-        // Row selector clicks
-        if (_deviceOrder.IsExpanded)
-        {
-            for (int row = 0; row < _deviceOrder.SelectorBounds.Length; row++)
-            {
-                if (_deviceOrder.SelectorBounds[row].HitTest(e.X, e.Y))
-                {
-                    int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
-                    if (vjoyCount > 1)
-                    {
-                        _deviceOrder.OpenRow = _deviceOrder.OpenRow == row ? -1 : row;
-                        _deviceOrder.HoveredIndex = -1;
-                        _ctx.MarkDirty();
-                    }
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     private bool HandleNetSwitchClick(MouseEventArgs e)
     {
         if (_netSwitch.ActionBounds.HitTest(e.X, e.Y))
@@ -715,7 +632,6 @@ public partial class MappingsTabController : ITabController
         _ctx.OwnerForm.Cursor = Cursors.Default;
         if (UpdateRightPanelHover(e)) return;
         if (UpdateAxisEditorHover(e)) return;
-        if (UpdateDeviceOrderHover(e)) return;
         if (UpdateNetSwitchHover(e)) return;
         if (UpdateVJoyNavigationHover(e)) return;
         if (UpdateMappingRowHover(e)) return;
@@ -903,39 +819,6 @@ public partial class MappingsTabController : ITabController
             _curve.HoveredPoint = -1;
             _ctx.MarkDirty();
         }
-
-        return false;
-    }
-
-    private bool UpdateDeviceOrderHover(MouseEventArgs e)
-    {
-        if (_deviceOrder.HeaderBounds.HitTest(e.X, e.Y))
-        { _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-
-        _deviceOrder.AutoDetectHovered = _deviceOrder.AutoDetectBounds.HitTest(e.X, e.Y);
-        if (_deviceOrder.AutoDetectHovered)
-        { _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-
-        for (int i = 0; i < _deviceOrder.SelectorBounds.Length; i++)
-        {
-            if (_deviceOrder.SelectorBounds[i].HitTest(e.X, e.Y))
-            { _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-        }
-
-        if (_deviceOrder.OpenRow >= 0 && _deviceOrder.DropdownBounds.HitTest(e.X, e.Y))
-        {
-            float itemH = 28f;
-            int idx = (int)((e.Y - _deviceOrder.DropdownBounds.Top) / itemH);
-            int vjoyCount = _ctx.VJoyDevices.Count(v => v.Exists);
-            int newHovered = idx >= 0 && idx < vjoyCount ? idx : -1;
-            if (newHovered != _deviceOrder.HoveredIndex)
-            { _deviceOrder.HoveredIndex = newHovered; _ctx.MarkDirty(); }
-            _ctx.OwnerForm.Cursor = Cursors.Hand;
-            return true;
-        }
-
-        if (_deviceOrder.OpenRow >= 0 && _deviceOrder.HoveredIndex >= 0)
-        { _deviceOrder.HoveredIndex = -1; _ctx.MarkDirty(); }
 
         return false;
     }
@@ -1243,60 +1126,6 @@ public partial class MappingsTabController : ITabController
         _threshold.DraggingBelowHysteresis = false;
     }
 
-    // ── Device Order Logic ────────────────────────────────────────────────────
-
-    private void AssignDeviceOrderSlot(SCExportProfile profile, int scInst, uint newVJoySlotId)
-    {
-        var existingSlots = _ctx.VJoyDevices.Where(v => v.Exists).ToList();
-        if (existingSlots.Count == 0) return;
-
-        uint? prevSlotId = null;
-        foreach (var slot in existingSlots)
-        {
-            if (profile.GetSCInstance(slot.Id) == scInst)
-            {
-                prevSlotId = slot.Id;
-                break;
-            }
-        }
-
-        if (prevSlotId == newVJoySlotId) return;
-
-        int newSlotCurrentInst = profile.GetSCInstance(newVJoySlotId);
-        profile.SetSCInstance(newVJoySlotId, scInst);
-        if (prevSlotId.HasValue)
-            profile.SetSCInstance(prevSlotId.Value, newSlotCurrentInst);
-
-        if (!string.IsNullOrEmpty(profile.ProfileName))
-            _scExportProfileService?.SaveProfile(profile);
-        _ctx.MarkDirty();
-    }
-
-    private void RunDeviceOrderAutoDetect()
-    {
-        if (_directInputService is null) return;
-        var profile = _ctx.GetActiveSCExportProfile?.Invoke();
-        if (profile is null) return;
-
-        try
-        {
-            var diDevices = _directInputService.EnumerateDevices();
-            var vjoySlots = _ctx.VJoyDevices.Where(v => v.Exists);
-            var mapping = VJoyDirectInputOrderService.DetectVJoyDiOrder(vjoySlots, diDevices);
-
-            foreach (var (vjoyId, scInstance) in mapping)
-                profile.SetSCInstance(vjoyId, scInstance);
-
-            if (!string.IsNullOrEmpty(profile.ProfileName))
-                _scExportProfileService?.SaveProfile(profile);
-            _ctx.MarkDirty();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
-        {
-            // Auto-detect failed — silently ignore (no status bar in Mappings tab)
-        }
-    }
-
     /// <summary>Public entry point for cross-tab callback.</summary>
     public void CreateOneToOneMappingsPublic() => CreateOneToOneMappings();
 
@@ -1533,19 +1362,6 @@ public partial class MappingsTabController : ITabController
         public float ScrollOffset;
         public float ContentHeight;
         public SKRect ListBounds;
-    }
-
-    private sealed class DeviceOrderState
-    {
-        public int OpenRow = -1;
-        public SKRect[] SelectorBounds = Array.Empty<SKRect>();
-        public SKRect DropdownBounds = SKRect.Empty;
-        public int HoveredIndex = -1;
-        public SKRect AutoDetectBounds = SKRect.Empty;
-        public bool AutoDetectHovered;
-        public bool IsExpanded;
-        public FUIWidgets.PanelSplitAnimator Anim = new() { T = 1f };
-        public SKRect HeaderBounds;
     }
 
     private sealed class ThresholdEditorState

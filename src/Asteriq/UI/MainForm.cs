@@ -339,7 +339,7 @@ public partial class MainForm : Form
 
         _settingsController = new SettingsTabController(_tabContext);
         _devicesController = new DevicesTabController(_tabContext);
-        _mappingsController = new MappingsTabController(_tabContext, scExportProfileService, directInputService);
+        _mappingsController = new MappingsTabController(_tabContext, scExportProfileService);
         _scBindingsController = new SCBindingsTabController(
             _tabContext, scInstallationService, scProfileCacheService,
             scSchemaService, scExportService, scExportProfileService,

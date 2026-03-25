@@ -90,13 +90,31 @@ internal static class DirectInputInterop
         public Guid guidInstance;
         public Guid guidProduct;
         public uint dwDevType;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string tszInstanceName;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string tszProductName;
+        // Strings are WCHAR[260] but we marshal as byte arrays to avoid
+        // CharSet issues — decoded via ReadWideString() in DirectInputService.
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 520)]
+        public byte[] tszInstanceNameBytes;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 520)]
+        public byte[] tszProductNameBytes;
         public Guid guidFFDriver;
         public ushort wUsagePage;
         public ushort wUsage;
+
+        public string InstanceName => ReadWideStringStatic(tszInstanceNameBytes);
+        public string ProductName => ReadWideStringStatic(tszProductNameBytes);
+
+        public static string ReadWideStringStatic(byte[]? bytes)
+        {
+            if (bytes is null) return "";
+            // Find null terminator (two consecutive zero bytes on even boundary)
+            int len = 0;
+            for (int i = 0; i < bytes.Length - 1; i += 2)
+            {
+                if (bytes[i] == 0 && bytes[i + 1] == 0) break;
+                len += 2;
+            }
+            return System.Text.Encoding.Unicode.GetString(bytes, 0, len);
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -107,8 +125,8 @@ internal static class DirectInputInterop
         public uint dwOfs;
         public uint dwType;
         public uint dwFlags;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string tszName;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 520)]
+        public byte[] tszNameBytes;
         public uint dwFFMaxForce;
         public uint dwFFForceResolution;
         public ushort wCollectionNumber;

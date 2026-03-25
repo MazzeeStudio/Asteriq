@@ -241,6 +241,113 @@ public class DirectInputService : IDisposable
         Dispose();
     }
 
+    /// <summary>
+    /// Queries axis types for all game controllers using an isolated DirectInput instance.
+    /// Creates its own DI8 interface, enumerates all devices, queries each one's axes,
+    /// then releases everything — no interference with the live SDL2/DI input path.
+    /// Uses the correct vtable indices (3=GetCapabilities, 4=EnumObjects).
+    /// Returns a dictionary keyed by product name → list of axis types in order.
+    /// </summary>
+    public static Dictionary<string, List<DirectInputAxisInfo>> QueryAllAxisTypesIsolated()
+    {
+        var result = new Dictionary<string, List<DirectInputAxisInfo>>();
+        IntPtr di = IntPtr.Zero;
+
+        try
+        {
+            // Create a fresh DI8 instance
+            var iid = IID_IDirectInput8W;
+            int hr = DirectInput8Create(
+                GetModuleHandle(IntPtr.Zero),
+                DIRECTINPUT_VERSION,
+                ref iid,
+                out di,
+                IntPtr.Zero);
+            if (hr != DI_OK || di == IntPtr.Zero)
+                return result;
+
+            // Collect device GUIDs and names via enumeration
+            var deviceList = new List<(Guid InstanceGuid, string Name)>();
+            EnumDevicesCallback enumCallback = (ref DIDEVICEINSTANCEW devInst, IntPtr pvRef) =>
+            {
+                deviceList.Add((devInst.guidInstance, devInst.InstanceName));
+                return DIENUM_CONTINUE;
+            };
+
+            var enumDevicesPtr = GetVTableMethod(di, IDirectInput8_EnumDevices);
+            var enumDevices = Marshal.GetDelegateForFunctionPointer<EnumDevicesDelegate>(enumDevicesPtr);
+            enumDevices(di, DI8DEVCLASS_GAMECTRL, enumCallback, IntPtr.Zero, DIEDFL_ATTACHEDONLY);
+
+            // Query axis types for each device
+            const int VT_GetCapabilities = 3;
+            const int VT_EnumObjects = 4;
+            var createDevicePtr = GetVTableMethod(di, IDirectInput8_CreateDevice);
+            var createDevice = Marshal.GetDelegateForFunctionPointer<CreateDeviceDelegate>(createDevicePtr);
+
+            foreach (var (guid, name) in deviceList)
+            {
+                IntPtr device = IntPtr.Zero;
+                try
+                {
+                    var instanceGuid = guid;
+                    hr = createDevice(di, ref instanceGuid, out device, IntPtr.Zero);
+                    if (hr != DI_OK || device == IntPtr.Zero)
+                        continue;
+
+                    var axes = new List<DirectInputAxisInfo>();
+                    int axisIndex = 0;
+                    EnumObjectsCallback axisCallback = (ref DIDEVICEOBJECTINSTANCEW objInstance, IntPtr pvRef) =>
+                    {
+                        if ((objInstance.dwType & DIDFT_AXIS) != 0 || (objInstance.dwType & DIDFT_ABSAXIS) != 0)
+                        {
+                            var axisType = GuidToAxisType(objInstance.guidType);
+                            string axisName = DIDEVICEINSTANCEW.ReadWideStringStatic(objInstance.tszNameBytes);
+                            axes.Add(new DirectInputAxisInfo
+                            {
+                                Index = axisIndex++,
+                                Type = axisType,
+                                Name = axisName.Length > 0 ? axisName : $"Axis {axisIndex}",
+                                TypeGuid = objInstance.guidType
+                            });
+                        }
+                        return DIENUM_CONTINUE;
+                    };
+
+                    var enumObjectsPtr = GetVTableMethod(device, VT_EnumObjects);
+                    var enumObjects = Marshal.GetDelegateForFunctionPointer<EnumObjectsDelegate>(enumObjectsPtr);
+                    enumObjects(device, axisCallback, IntPtr.Zero, DIDFT_AXIS);
+
+                    if (axes.Count > 0 && !result.ContainsKey(name))
+                        result[name] = axes;
+                }
+                finally
+                {
+                    if (device != IntPtr.Zero)
+                    {
+                        var releasePtr = GetVTableMethod(device, 2);
+                        var release = Marshal.GetDelegateForFunctionPointer<ReleaseDelegate>(releasePtr);
+                        release(device);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Isolation failure — return whatever we have
+        }
+        finally
+        {
+            if (di != IntPtr.Zero)
+            {
+                var releasePtr = GetVTableMethod(di, 2);
+                var release = Marshal.GetDelegateForFunctionPointer<ReleaseDelegate>(releasePtr);
+                release(di);
+            }
+        }
+
+        return result;
+    }
+
     // Delegate types for COM vtable calls
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int EnumDevicesDelegate(IntPtr self, uint dwDevType, EnumDevicesCallback lpCallback, IntPtr pvRef, uint dwFlags);

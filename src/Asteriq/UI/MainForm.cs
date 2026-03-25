@@ -1485,6 +1485,7 @@ public partial class MainForm : Form
         // With no devices, 10 Hz is enough for hot-plug detection and avoids timeBeginPeriod(1).
         int physicalCount = _devices.Count(d => !d.IsVirtual && d.IsConnected);
         _inputService.StartPolling(physicalCount > 0 ? 500 : 10);
+
     }
 
     private void InitializeRenderLoop()

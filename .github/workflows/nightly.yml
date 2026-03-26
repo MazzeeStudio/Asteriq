@@ -1,4 +1,5 @@
 name: Nightly Build
+# Builds on every push to dev, creates/updates a rolling "nightly" prerelease.
 
 on:
   push:

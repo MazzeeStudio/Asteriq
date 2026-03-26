@@ -52,7 +52,7 @@ public sealed class UpdateService : IUpdateService
                 return;
             }
 
-            string latestTag = release.TagName.TrimStart('v');
+            string latestTag = ExtractVersion(release);
             string current = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                 ?.InformationalVersion ?? "0.0.0";
@@ -251,7 +251,7 @@ public sealed class UpdateService : IUpdateService
             if (release is null) return null;
 
             // Update version info in case a newer release is available
-            LatestVersion = release.TagName.TrimStart('v');
+            LatestVersion = ExtractVersion(release);
 
             return release.Assets
                 ?.FirstOrDefault(a => a.Name.Equals(AssetName, StringComparison.OrdinalIgnoreCase))
@@ -290,9 +290,35 @@ public sealed class UpdateService : IUpdateService
         return l > c;
     }
 
+    /// <summary>
+    /// Extracts a parseable version string from a release.
+    /// For stable releases, tag_name is "v0.8.572". For nightly, tag_name is "nightly"
+    /// but the release name is "Nightly v0.8.573" — extract version from whichever works.
+    /// </summary>
+    private static string ExtractVersion(GitHubRelease release)
+    {
+        // Try tag first (works for stable releases like "v0.8.572")
+        string tag = release.TagName.TrimStart('v');
+        if (Version.TryParse(tag, out _)) return tag;
+
+        // Fall back to release name (works for nightly like "Nightly v0.8.573")
+        if (release.Name is not null)
+        {
+            int vIdx = release.Name.IndexOf('v');
+            if (vIdx >= 0)
+            {
+                string fromV = release.Name[(vIdx + 1)..];
+                if (Version.TryParse(fromV, out _)) return fromV;
+            }
+        }
+
+        return tag; // return as-is; IsNewer will handle parse failure
+    }
+
     // Minimal GitHub API response shapes
     private sealed record GitHubRelease(
         [property: System.Text.Json.Serialization.JsonPropertyName("tag_name")] string TagName,
+        [property: System.Text.Json.Serialization.JsonPropertyName("name")] string? Name,
         [property: System.Text.Json.Serialization.JsonPropertyName("assets")] List<GitHubAsset>? Assets);
 
     private sealed record GitHubAsset(

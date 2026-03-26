@@ -49,11 +49,16 @@ public sealed class NetworkDiscoveryService : INetworkDiscoveryService, IDisposa
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
-        _broadcastTask = RunBroadcastAsync(ct);
+        // Only Client (RX) machines broadcast their availability.
+        // Master (TX) machines only listen — they don't need to advertise.
+        if (_role == NetworkRole.Client)
+            _broadcastTask = RunBroadcastAsync(ct);
+
         _listenTask = RunListenAsync(ct);
         _pruneTimer = new System.Threading.Timer(_ => PruneStale(), null, PruneIntervalMs, PruneIntervalMs);
 
-        _logger.LogInformation("NetworkDiscovery started (machine={Machine}, port={Port})", _machineName, _tcpPort);
+        _logger.LogInformation("NetworkDiscovery started (machine={Machine}, port={Port}, role={Role}, broadcasting={Broadcast})",
+            _machineName, _tcpPort, _role, _role == NetworkRole.Client);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)

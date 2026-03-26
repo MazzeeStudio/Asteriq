@@ -58,22 +58,34 @@ public partial class SCBindingsTabController
         if (existingVJoyIds.Count > 0)
             return columns;
 
+        // Track VID:PID counts for disambiguating multiple identical devices
+        var vidPidCounts = new Dictionary<string, int>();
+
         foreach (var device in _ctx.Devices)
         {
             if (device.IsVirtual || !device.IsConnected) continue;
-            if (string.IsNullOrEmpty(device.HidDevicePath)) continue;
+
+            // Use VID:PID as the stable device key (survives unplug/replug).
+            // HidDevicePath is preferred when available but not all devices have it.
+            string baseKey = GetPhysicalDeviceKey(device);
+            if (string.IsNullOrEmpty(baseKey)) continue;
+
+            // Disambiguate duplicate VID:PID devices (e.g. two Alpha Primes)
+            vidPidCounts.TryGetValue(baseKey, out int count);
+            vidPidCounts[baseKey] = count + 1;
+            string deviceKey = count == 0 ? baseKey : $"{baseKey}#{count + 1}";
 
             // Check if this device already has a persisted SC instance
-            int scInstance = _scExportProfile.GetSCInstanceForPhysical(device.HidDevicePath);
+            int scInstance = _scExportProfile.GetSCInstanceForPhysical(deviceKey);
             if (scInstance == 0)
             {
                 // Assign next available SC instance
                 scInstance = usedSCInstances.Count > 0 ? usedSCInstances.Max() + 1 : 1;
-                _scExportProfile.SetSCInstanceForPhysical(device.HidDevicePath, scInstance);
+                _scExportProfile.SetSCInstanceForPhysical(deviceKey, scInstance);
                 // Persist the DirectInput GUID for XML export
                 if (device.DirectInputGuid != Guid.Empty)
                 {
-                    _scExportProfile.PhysicalDeviceDirectInputGuids[device.HidDevicePath] = device.DirectInputGuid;
+                    _scExportProfile.PhysicalDeviceDirectInputGuids[deviceKey] = device.DirectInputGuid;
                 }
                 _scExportProfileService?.SaveProfile(_scExportProfile);
             }
@@ -85,16 +97,34 @@ public partial class SCBindingsTabController
 
             columns.Add(new SCGridColumn
             {
-                Id = $"phys:{device.HidDevicePath}",
+                Id = $"phys:{deviceKey}",
                 Header = shortName,
                 DevicePrefix = $"js{scInstance}",
                 SCInstance = scInstance,
                 IsJoystick = true,
-                PhysicalDevice = device
+                PhysicalDevice = device,
+                PhysicalDeviceKey = deviceKey
             });
         }
 
         return columns;
+    }
+
+    /// <summary>
+    /// Get a stable key for a physical device. Uses VID:PID from the SDL GUID which
+    /// survives unplug/replug. Falls back to HidDevicePath if VID:PID is unavailable.
+    /// </summary>
+    private static string GetPhysicalDeviceKey(PhysicalDeviceInfo device)
+    {
+        var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
+        if (vid > 0 && pid > 0)
+            return $"{vid:X4}:{pid:X4}";
+
+        // Fall back to HID device path if available
+        if (!string.IsNullOrEmpty(device.HidDevicePath))
+            return device.HidDevicePath;
+
+        return string.Empty;
     }
 
     private static string TruncateDeviceName(string name)
@@ -216,7 +246,7 @@ public partial class SCBindingsTabController
                     : null;
 
                 uint? vjoyId = (col.IsJoystick && !col.IsPhysical) ? col.VJoyDeviceId : null;
-                string? physId = col.IsPhysical ? col.PhysicalDevice?.HidDevicePath : null;
+                string? physId = col.IsPhysical ? col.PhysicalDeviceKey : null;
                 SCDeviceType? capDevType = col.IsKeyboard ? SCDeviceType.Keyboard
                     : col.IsMouse ? SCDeviceType.Mouse
                     : null;
@@ -519,7 +549,7 @@ public partial class SCBindingsTabController
         if (col.IsPhysical)
         {
             conflicts = _scExportProfile.GetConflictingBindings(
-                col.PhysicalDevice!.HidDevicePath,
+                col.PhysicalDeviceKey,
                 inputName,
                 action.ActionMap,
                 action.ActionName,
@@ -626,7 +656,7 @@ public partial class SCBindingsTabController
                     b.ActionName == action.ActionName &&
                     b.DeviceType == SCDeviceType.Joystick &&
                     b.PhysicalDeviceId is not null &&
-                    b.PhysicalDeviceId != col.PhysicalDevice!.HidDevicePath);
+                    b.PhysicalDeviceId != col.PhysicalDeviceKey);
 
             if (existingOnOtherPhysical is not null)
             {
@@ -665,7 +695,7 @@ public partial class SCBindingsTabController
                 ActionMap = action.ActionMap,
                 ActionName = action.ActionName,
                 DeviceType = SCDeviceType.Joystick,
-                PhysicalDeviceId = col.PhysicalDevice!.HidDevicePath,
+                PhysicalDeviceId = col.PhysicalDeviceKey,
                 InputName = inputName,
                 InputType = inputType,
                 Modifiers = modifierList
@@ -1118,7 +1148,7 @@ public partial class SCBindingsTabController
         SCActionBinding? selectedBinding = col.IsPhysical
             ? _scExportProfile.Bindings.FirstOrDefault(b =>
                 b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
-                b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath)
+                b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId == col.PhysicalDeviceKey)
             : col.IsJoystick
                 ? _scExportProfile.Bindings.FirstOrDefault(b =>
                     b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
@@ -1151,7 +1181,7 @@ public partial class SCBindingsTabController
         List<SCActionBinding> conflicts;
         if (col.IsPhysical)
         {
-            conflicts = _scExportProfile.GetConflictingBindings(col.PhysicalDevice!.HidDevicePath,
+            conflicts = _scExportProfile.GetConflictingBindings(col.PhysicalDeviceKey,
                 selectedBinding.InputName, selectedAction.ActionMap, selectedAction.ActionName, selectedBinding.Modifiers);
         }
         else if (col.IsKeyboard || col.IsMouse)

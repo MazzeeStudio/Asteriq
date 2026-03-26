@@ -694,7 +694,7 @@ public partial class SCBindingsTabController
                                 binding = _scExportProfile.Bindings.FirstOrDefault(b =>
                                     b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
                                     b.DeviceType == SCDeviceType.Joystick &&
-                                    b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath);
+                                    b.PhysicalDeviceId == col.PhysicalDeviceKey);
                             }
                             else if (col.IsJoystick)
                             {
@@ -1770,7 +1770,7 @@ public partial class SCBindingsTabController
             return _scExportProfile.Bindings.FirstOrDefault(b =>
                 b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
                 b.DeviceType == SCDeviceType.Joystick &&
-                b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath);
+                b.PhysicalDeviceId == col.PhysicalDeviceKey);
         }
         if (col.IsJoystick)
         {

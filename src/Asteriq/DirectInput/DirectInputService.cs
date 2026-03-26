@@ -279,7 +279,6 @@ public class DirectInputService : IDisposable
             enumDevices(di, DI8DEVCLASS_GAMECTRL, enumCallback, IntPtr.Zero, DIEDFL_ATTACHEDONLY);
 
             // Query axis types for each device
-            const int VT_GetCapabilities = 3;
             const int VT_EnumObjects = 4;
             var createDevicePtr = GetVTableMethod(di, IDirectInput8_CreateDevice);
             var createDevice = Marshal.GetDelegateForFunctionPointer<CreateDeviceDelegate>(createDevicePtr);
@@ -331,7 +330,7 @@ public class DirectInputService : IDisposable
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException or AccessViolationException)
         {
             // Isolation failure — return whatever we have
         }

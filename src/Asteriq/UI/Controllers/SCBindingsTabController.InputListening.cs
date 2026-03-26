@@ -235,7 +235,7 @@ public partial class SCBindingsTabController
                 if (device.IsVirtual || !device.IsConnected) continue;
 
                 // For physical columns, only baseline the matching device
-                if (col.IsPhysical && device.HidDevicePath != col.PhysicalDevice!.HidDevicePath) continue;
+                if (col.IsPhysical && GetPhysicalDeviceKey(device) != col.PhysicalDeviceKey) continue;
 
                 var state = _ctx.InputService.GetDeviceState(idx);
                 if (state is not null)
@@ -263,7 +263,7 @@ public partial class SCBindingsTabController
             if (device.IsVirtual || !device.IsConnected) continue;
 
             // For physical columns, only listen to the matching device
-            if (col.IsPhysical && device.HidDevicePath != col.PhysicalDevice!.HidDevicePath) continue;
+            if (col.IsPhysical && GetPhysicalDeviceKey(device) != col.PhysicalDeviceKey) continue;
 
             var state = _ctx.InputService.GetDeviceState(idx);
             if (state is null) continue;
@@ -352,13 +352,13 @@ public partial class SCBindingsTabController
     /// </summary>
     private void StartButtonCapture()
     {
-        // Build GUID → HID path map on UI thread (safe here; background handler is read-only).
+        // Build GUID → device key map on UI thread (safe here; background handler is read-only).
         _captureGuidToHidPath = new Dictionary<Guid, string>();
         for (int i = 0; i < _ctx.Devices.Count; i++)
         {
             var dev = _ctx.Devices[i];
             if (!dev.IsVirtual && dev.IsConnected)
-                _captureGuidToHidPath[dev.InstanceGuid] = dev.HidDevicePath;
+                _captureGuidToHidPath[dev.InstanceGuid] = GetPhysicalDeviceKey(dev);
         }
 
         // Reset all detection state before subscribing.
@@ -678,12 +678,12 @@ public partial class SCBindingsTabController
             }
             else if (hidPath is not null)
             {
-                // Joystick: find by HID path
+                // Joystick: find by device key
                 // Case 1: physical column (no-vJoy setup)
                 for (int c = 0; c < _grid.Columns.Count; c++)
                 {
                     var col = _grid.Columns[c];
-                    if (col.IsPhysical && col.PhysicalDevice!.HidDevicePath == hidPath)
+                    if (col.IsPhysical && col.PhysicalDeviceKey == hidPath)
                     {
                         foundCol = c;
                         break;
@@ -693,7 +693,7 @@ public partial class SCBindingsTabController
                 // Case 2: vJoy column — find via VJoyPrimaryDevices in the active Mappings profile
                 if (foundCol < 0)
                 {
-                    var physDevice = _ctx.Devices.FirstOrDefault(d => !d.IsVirtual && d.HidDevicePath == hidPath);
+                    var physDevice = _ctx.Devices.FirstOrDefault(d => !d.IsVirtual && GetPhysicalDeviceKey(d) == hidPath);
                     var activeProfile = _ctx.ProfileManager.ActiveProfile;
                     if (physDevice is not null && activeProfile is not null)
                     {
@@ -763,11 +763,11 @@ public partial class SCBindingsTabController
         if (hidPath is null || inputName is null)
             return;
 
-        // Find device by HID path
+        // Find device by device key
         int devIdx = -1;
         for (int i = 0; i < _ctx.Devices.Count; i++)
         {
-            if (!_ctx.Devices[i].IsVirtual && _ctx.Devices[i].HidDevicePath == hidPath)
+            if (!_ctx.Devices[i].IsVirtual && GetPhysicalDeviceKey(_ctx.Devices[i]) == hidPath)
             {
                 devIdx = i;
                 break;

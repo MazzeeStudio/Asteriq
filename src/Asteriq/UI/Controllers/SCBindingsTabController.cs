@@ -177,6 +177,11 @@ public partial class SCBindingsTabController : ITabController
         /// </summary>
         public PhysicalDeviceInfo? PhysicalDevice { get; set; }
         /// <summary>
+        /// Stable key for physical device (VID:PID or HID path). Used to persist bindings
+        /// across sessions. Empty for vJoy/KB/Mouse columns.
+        /// </summary>
+        public string PhysicalDeviceKey { get; set; } = "";
+        /// <summary>
         /// True when this column represents a connected physical device (not vJoy).
         /// </summary>
         public bool IsPhysical => PhysicalDevice is not null;

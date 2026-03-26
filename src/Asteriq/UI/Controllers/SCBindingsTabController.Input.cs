@@ -649,7 +649,7 @@ public partial class SCBindingsTabController
                     var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
                         b.ActionMap == selectedAction.ActionMap && b.ActionName == selectedAction.ActionName &&
                         b.DeviceType == SCDeviceType.Joystick &&
-                        b.PhysicalDeviceId == selCol.PhysicalDevice!.HidDevicePath);
+                        b.PhysicalDeviceId == selCol.PhysicalDeviceKey);
                     if (binding is not null)
                         _scExportProfile.RemoveBinding(binding);
                 }
@@ -979,7 +979,7 @@ public partial class SCBindingsTabController
             var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
                 b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
                 b.DeviceType == SCDeviceType.Joystick &&
-                b.PhysicalDeviceId == col.PhysicalDevice!.HidDevicePath);
+                b.PhysicalDeviceId == col.PhysicalDeviceKey);
             if (binding is not null)
             {
                 _scExportProfile.RemoveBinding(binding);

@@ -76,6 +76,12 @@ public interface INetworkInputService : IDisposable
     void SendProfileList(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles);
 
     /// <summary>
+    /// Send a vJoy device configuration to the connected client so it can match
+    /// the master's vJoy setup. No-op when Mode != Remote or not connected.
+    /// </summary>
+    void SendVJoyConfig(VJoyDeviceInfo deviceInfo);
+
+    /// <summary>
     /// Accept the pending trust request (called after the user approves in the trust dialog).
     /// </summary>
     void AcceptPairing();
@@ -90,6 +96,12 @@ public interface INetworkInputService : IDisposable
     /// Caller must marshal to the UI thread before touching UI state.
     /// </summary>
     event EventHandler<ProfileListReceivedEventArgs>? ProfileListReceived;
+
+    /// <summary>
+    /// Fired on the client when the master sends a vJoy device configuration.
+    /// The client should apply it via vJoyConfig.exe (requires UAC elevation).
+    /// </summary>
+    event EventHandler<VJoyConfigReceivedEventArgs>? VJoyConfigReceived;
 
     /// <summary>
     /// Fired on the background receive thread when the TCP connection is lost unexpectedly.
@@ -144,5 +156,26 @@ public sealed class ProfileListReceivedEventArgs : EventArgs
     public ProfileListReceivedEventArgs(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles)
     {
         Profiles = profiles;
+    }
+}
+
+/// <summary>
+/// Event args for a vJoy device configuration received from the master.
+/// </summary>
+public sealed class VJoyConfigReceivedEventArgs : EventArgs
+{
+    public uint DeviceId { get; }
+    public List<string> AxisFlags { get; }
+    public int ButtonCount { get; }
+    public int PovCount { get; }
+    public bool PovContinuous { get; }
+
+    public VJoyConfigReceivedEventArgs(uint deviceId, List<string> axisFlags, int buttonCount, int povCount, bool povContinuous)
+    {
+        DeviceId = deviceId;
+        AxisFlags = axisFlags;
+        ButtonCount = buttonCount;
+        PovCount = povCount;
+        PovContinuous = povContinuous;
     }
 }

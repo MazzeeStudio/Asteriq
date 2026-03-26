@@ -179,6 +179,8 @@ public class TabContext
     public List<(string Name, byte[] XmlBytes)> RemoteControlProfiles { get; set; } = new();
     /// <summary>Machine name of the TX master that sent RemoteControlProfiles.</summary>
     public string RemoteControlProfilesMasterName { get; set; } = "";
+    /// <summary>vJoy device configs received from the master for mismatch detection.</summary>
+    public Dictionary<uint, VJoyConfigReceivedEventArgs> MasterVJoyConfigs { get; set; } = new();
     /// <summary>
     /// Called when the NET SWITCH button assignment changes.
     /// SCBindingsTabController sets this to its CheckNetworkSwitchConflicts method.

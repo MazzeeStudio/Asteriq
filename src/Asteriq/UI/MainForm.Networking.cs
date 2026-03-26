@@ -47,6 +47,7 @@ public partial class MainForm : Form
         _networkInput.ClientConnected     += OnClientConnected;
         _networkInput.TrustRequested      += OnTrustRequested;
         _networkInput.ProfileListReceived += OnProfileListReceived;
+        _networkInput.VJoyConfigReceived  += OnVJoyConfigReceived;
 
         _ = _networkDiscovery.StartAsync();
         _ = _networkInput.StartListenerAsync(port);
@@ -60,6 +61,7 @@ public partial class MainForm : Form
         _networkInput.ClientConnected     -= OnClientConnected;
         _networkInput.TrustRequested      -= OnTrustRequested;
         _networkInput.ProfileListReceived -= OnProfileListReceived;
+        _networkInput.VJoyConfigReceived  -= OnVJoyConfigReceived;
 
         _ = _networkDiscovery.StopAsync();
         _ = _networkInput.DisconnectAsync();
@@ -151,6 +153,10 @@ public partial class MainForm : Form
             PreInitializeAllNetworkSnapshots();
             StartNetworkHeartbeat();
             _tabContext.SendProfileListToClient?.Invoke();
+
+            // Send vJoy device configs so the client can detect mismatches
+            foreach (var vjoy in _vjoyDevices.Where(v => v.Exists))
+                _networkInput.SendVJoyConfig(vjoy);
             BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq", $"Connected to {peer.MachineName}"));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -243,6 +249,7 @@ public partial class MainForm : Form
         _tabContext.ConnectedPeerIp = null;
         _tabContext.RemoteControlProfiles = new();
         _tabContext.RemoteControlProfilesMasterName = "";
+        _tabContext.MasterVJoyConfigs.Clear();
         _logger.LogInformation("[Disconnect] Disconnected — mode=Local");
         BeginInvoke(MarkDirty);
     }
@@ -315,6 +322,7 @@ public partial class MainForm : Form
             _tabContext.ConnectedPeerIp = null;
             _tabContext.RemoteControlProfiles = new();
             _tabContext.RemoteControlProfilesMasterName = "";
+            _tabContext.MasterVJoyConfigs.Clear();
             MarkDirty();
         });
     }
@@ -371,6 +379,23 @@ public partial class MainForm : Form
             _logger.LogInformation("Received {Count} control profile(s) from {Master}",
                 e.Profiles.Count, _connectedMasterName);
             MarkDirty();
+        });
+    }
+
+    private void OnVJoyConfigReceived(object? sender, VJoyConfigReceivedEventArgs e)
+    {
+        // Arrives on background receive thread — marshal to UI.
+        // Store the master's config so the client can compare and warn the user.
+        BeginInvoke(() =>
+        {
+            _logger.LogInformation("Received vJoy config from master: device {Id}, axes [{Axes}], buttons {Buttons}, POVs {Povs}",
+                e.DeviceId, string.Join(",", e.AxisFlags), e.ButtonCount, e.PovCount);
+
+            if (_tabContext is not null)
+            {
+                _tabContext.MasterVJoyConfigs[e.DeviceId] = e;
+                _canvas.Invalidate();
+            }
         });
     }
 

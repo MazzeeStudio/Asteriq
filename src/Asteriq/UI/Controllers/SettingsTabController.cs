@@ -54,6 +54,8 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _netRegenerateBounds;
     private SKRect _netDisconnectBounds;   // RX (client) role only
     private SKRect _netForgetBounds;
+    private SKRect _netMatchMasterBounds; // RX (client) role only — match master's vJoy config
+    private bool _matchingMasterInProgress;
     // Per-peer toggle bounds (TX role) — rebuilt every frame; one entry per discovered peer
     private readonly List<(SKRect Toggle, string IpAddress)> _peerActionBounds = [];
     private readonly Dictionary<string, float> _peerToggleT = new();  // per-peer knob animation (0=off, 0.5=connecting, 1=on)
@@ -227,7 +229,8 @@ public class SettingsTabController : ITabController, IDisposable
         {
             if (b.HitTest(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
         }
-        if (_netRegenerateBounds.HitTest(pt) || _netDisconnectBounds.HitTest(pt) || _netForgetBounds.HitTest(pt))
+        if (_netRegenerateBounds.HitTest(pt) || _netDisconnectBounds.HitTest(pt) || _netForgetBounds.HitTest(pt) ||
+            _netMatchMasterBounds.HitTest(pt))
         { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         foreach (var (toggleRect, _) in _peerActionBounds)
@@ -339,6 +342,104 @@ public class SettingsTabController : ITabController, IDisposable
     /// <summary>
     /// Lerp towards target, snapping when close enough to avoid endless tiny deltas.
     /// </summary>
+    private void ApplyMasterVJoyConfig()
+    {
+        if (_matchingMasterInProgress) return;
+
+        string? configPath = Services.DriverSetupManager.GetVJoyConfigPath();
+        if (configPath is null)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "vJoyConfig.exe was not found.\nPlease ensure vJoy is installed correctly.",
+                "vJoy Not Found");
+            return;
+        }
+
+        // Collect all commands that need to run, releasing devices up front
+        var commands = new List<string>();
+        foreach (var (deviceId, masterCfg) in _ctx.MasterVJoyConfigs)
+        {
+            var local = _ctx.VJoyDevices.FirstOrDefault(v => v.Id == deviceId);
+            if (local is not null && VJoyConfigMatches(local, masterCfg))
+                continue; // already matches
+
+            _ctx.VJoyService.ReleaseDevice(deviceId);
+
+            string args = $"{deviceId} -f";
+            if (masterCfg.AxisFlags.Count > 0)
+                args += $" -a {string.Join(" ", masterCfg.AxisFlags)}";
+            if (masterCfg.ButtonCount > 0)
+                args += $" -b {masterCfg.ButtonCount}";
+            if (masterCfg.PovCount > 0)
+                args += $" -p {masterCfg.PovCount}";
+
+            commands.Add($"\"{configPath}\" {args}");
+        }
+
+        if (commands.Count == 0) return; // everything already matches
+
+        _matchingMasterInProgress = true;
+        _ctx.MarkDirty();
+
+        // Write a temp batch script so all devices are configured under one UAC prompt
+        string batPath = Path.Combine(Path.GetTempPath(), $"asteriq_vjoy_sync_{Environment.ProcessId}.bat");
+        File.WriteAllText(batPath, string.Join(Environment.NewLine, commands) + Environment.NewLine);
+
+        Task.Run(() =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{batPath}\"",
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                };
+
+                using var process = System.Diagnostics.Process.Start(psi);
+                process?.WaitForExit(30000);
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                // User cancelled UAC — no error needed
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+            {
+                _ctx.OwnerForm.BeginInvoke(() =>
+                    FUIMessageBox.ShowError(_ctx.OwnerForm,
+                        $"Failed to reconfigure vJoy devices:\n{ex.Message}",
+                        "Configuration Failed"));
+            }
+            finally
+            {
+                try { File.Delete(batPath); } catch { /* best effort cleanup */ }
+                _ctx.OwnerForm.BeginInvoke(() =>
+                {
+                    _matchingMasterInProgress = false;
+                    _ctx.RefreshVJoyDevices?.Invoke();
+                    _ctx.InvalidateCanvas();
+                });
+            }
+        });
+    }
+
+    private static bool VJoyConfigMatches(VJoyDeviceInfo local, VJoyConfigReceivedEventArgs master)
+    {
+        if (local.ButtonCount != master.ButtonCount) return false;
+        if ((local.DiscPovCount + local.ContPovCount) != master.PovCount) return false;
+        if (local.HasAxisX != master.AxisFlags.Contains("X")) return false;
+        if (local.HasAxisY != master.AxisFlags.Contains("Y")) return false;
+        if (local.HasAxisZ != master.AxisFlags.Contains("Z")) return false;
+        if (local.HasAxisRX != master.AxisFlags.Contains("RX")) return false;
+        if (local.HasAxisRY != master.AxisFlags.Contains("RY")) return false;
+        if (local.HasAxisRZ != master.AxisFlags.Contains("RZ")) return false;
+        if (local.HasSlider0 != master.AxisFlags.Contains("SL0")) return false;
+        if (local.HasSlider1 != master.AxisFlags.Contains("SL1")) return false;
+        return true;
+    }
+
     private static float LerpSnap(float current, float target, float speed, float epsilon = 0.001f)
     {
         float delta = target - current;
@@ -1567,6 +1668,7 @@ public class SettingsTabController : ITabController, IDisposable
             y += sectionGap;
             FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
                 new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, statusColor, 13f);
+
         }
         // ── Client-specific UI ─────────────────────────────────────────
         else if (currentRole == NetworkRole.Client)
@@ -1603,6 +1705,47 @@ public class SettingsTabController : ITabController, IDisposable
             var statusColor2 = FUIColors.InteractiveColor(isReceiving);
             FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText2}",
                 new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, statusColor2, 13f);
+            y += rowH;
+
+            // vJoy mismatch warning — show when master has sent config and local doesn't match
+            _netMatchMasterBounds = SKRect.Empty;
+            if (_ctx.MasterVJoyConfigs.Count > 0)
+            {
+                bool hasMismatch = false;
+                foreach (var (masterId, masterCfg) in _ctx.MasterVJoyConfigs)
+                {
+                    var local = _ctx.VJoyDevices.FirstOrDefault(v => v.Id == masterId);
+                    if (local is null || !VJoyConfigMatches(local, masterCfg))
+                    {
+                        hasMismatch = true;
+                        break;
+                    }
+                }
+
+                if (hasMismatch)
+                {
+                    y += 4f;
+                    if (_matchingMasterInProgress)
+                    {
+                        // Animated dots: cycle 1–5 dots based on time
+                        int dotCount = (int)(Environment.TickCount64 / 400 % 5) + 1;
+                        string dots = new string('.', dotCount);
+                        FUIRenderer.DrawTextTruncated(canvas, $"Syncing vJoy config{dots}",
+                            new SKPoint(leftMargin, y + btnH / 2f + 4f), contentWidth, FUIColors.TextDim, 13f);
+                        _ctx.MarkDirty(); // keep animating
+                    }
+                    else
+                    {
+                        FUIRenderer.DrawTextTruncated(canvas, "vJoy config does not match master",
+                            new SKPoint(leftMargin, y + btnH / 2f + 4f), contentWidth - 140f, FUIColors.Warning, 13f);
+                        float matchBtnW = 130f;
+                        _netMatchMasterBounds = new SKRect(rightMargin - matchBtnW, y, rightMargin, y + btnH);
+                        bool matchHov = _netMatchMasterBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                        FUIRenderer.DrawButton(canvas, _netMatchMasterBounds, "MATCH MASTER",
+                            matchHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+                    }
+                }
+            }
         }
         else
         {
@@ -1889,6 +2032,7 @@ public class SettingsTabController : ITabController, IDisposable
                         return;
                     }
                 }
+
             }
             // Client-specific buttons
             else if (_ctx.AppSettings.NetworkRole == NetworkRole.Client)
@@ -1906,6 +2050,13 @@ public class SettingsTabController : ITabController, IDisposable
                     // Route through MainForm.SwitchToLocalAsync — clears client state
                     _ = _ctx.NetworkDisconnectAsync?.Invoke();
                     _ctx.InvalidateCanvas();
+                    return;
+                }
+
+                // Match Master — apply master's vJoy config locally using proven vJoyConfig.exe flow
+                if (_netMatchMasterBounds.Contains(pt))
+                {
+                    ApplyMasterVJoyConfig();
                     return;
                 }
             }

@@ -33,6 +33,7 @@ public sealed class NetworkInputService : INetworkInputService
         public const byte HelloAccept = 6; // client→master: empty
         public const byte HelloReject = 7; // client→master: empty
         public const byte ProfileList  = 8; // master→client: [count:4][nameLen:2][name][xmlLen:4][xml] × count
+        public const byte VJoyConfig   = 9; // master→client: vJoy device config (axes, buttons, POVs)
     }
 
     // ── Services ─────────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ public sealed class NetworkInputService : INetworkInputService
     public event EventHandler<string>? ClientConnected;
     public event EventHandler<TrustRequestEventArgs>? TrustRequested;
     public event EventHandler<ProfileListReceivedEventArgs>? ProfileListReceived;
+    public event EventHandler<VJoyConfigReceivedEventArgs>? VJoyConfigReceived;
 
     private int _packetsReceived;
 
@@ -315,6 +317,23 @@ public sealed class NetworkInputService : INetworkInputService
         }
     }
 
+    public void SendVJoyConfig(VJoyDeviceInfo deviceInfo)
+    {
+        if (_mode != NetworkInputMode.Remote || _stream is null) return;
+
+        var payload = EncodeVJoyConfig(deviceInfo);
+        lock (_sendLock)
+        {
+            try   { WritePacketSync(_stream, MsgType.VJoyConfig, payload); }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "SendVJoyConfig failed — connection lost");
+                _mode = NetworkInputMode.Local;
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
     public void SendProfileList(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles)
     {
         if (_mode != NetworkInputMode.Remote || _stream is null) return;
@@ -393,6 +412,14 @@ public sealed class NetworkInputService : INetworkInputService
                         var profileList = DecodeProfileList(payload);
                         if (profileList.Count > 0)
                             ProfileListReceived?.Invoke(this, new ProfileListReceivedEventArgs(profileList));
+                        break;
+
+                    case MsgType.VJoyConfig:
+                        var config = DecodeVJoyConfig(payload);
+                        _logger.LogInformation("Received vJoy config from master: device={Id} axes={Axes} buttons={Buttons} povs={Povs}",
+                            config.DeviceId, string.Join(",", config.AxisFlags), config.ButtonCount, config.PovCount);
+                        VJoyConfigReceived?.Invoke(this, new VJoyConfigReceivedEventArgs(
+                            config.DeviceId, config.AxisFlags, config.ButtonCount, config.PovCount, config.PovContinuous));
                         break;
                 }
             }
@@ -599,6 +626,64 @@ public sealed class NetworkInputService : INetworkInputService
         int codeLen  = r.ReadByte();
         var code     = System.Text.Encoding.UTF8.GetString(r.ReadBytes(codeLen));
         return (name, port, code);
+    }
+
+    /// <summary>
+    /// Encode a vJoy device configuration for transmission to the client.
+    /// Format: [deviceId:4][axisFlags:1][buttonCount:2][discPovCount:1][contPovCount:1]
+    /// axisFlags is a bitmask: bit0=X, bit1=Y, bit2=Z, bit3=RX, bit4=RY, bit5=RZ, bit6=SL0, bit7=SL1
+    /// </summary>
+    public static byte[] EncodeVJoyConfig(VJoyDeviceInfo info)
+    {
+        byte axisFlags = 0;
+        if (info.HasAxisX)  axisFlags |= 0x01;
+        if (info.HasAxisY)  axisFlags |= 0x02;
+        if (info.HasAxisZ)  axisFlags |= 0x04;
+        if (info.HasAxisRX) axisFlags |= 0x08;
+        if (info.HasAxisRY) axisFlags |= 0x10;
+        if (info.HasAxisRZ) axisFlags |= 0x20;
+        if (info.HasSlider0) axisFlags |= 0x40;
+        if (info.HasSlider1) axisFlags |= 0x80;
+
+        using var ms = new System.IO.MemoryStream(9);
+        using var w  = new System.IO.BinaryWriter(ms);
+        w.Write(info.Id);
+        w.Write(axisFlags);
+        w.Write((ushort)info.ButtonCount);
+        w.Write((byte)info.DiscPovCount);
+        w.Write((byte)info.ContPovCount);
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Decode a vJoy device configuration received from the master.
+    /// Returns (deviceId, axisFlags as string list for vJoyConfig.exe, buttonCount, povCount, continuous).
+    /// </summary>
+    public static (uint DeviceId, List<string> AxisFlags, int ButtonCount, int PovCount, bool PovContinuous) DecodeVJoyConfig(byte[] payload)
+    {
+        using var ms = new System.IO.MemoryStream(payload);
+        using var r  = new System.IO.BinaryReader(ms);
+
+        uint deviceId = r.ReadUInt32();
+        byte axisFlags = r.ReadByte();
+        int buttonCount = r.ReadUInt16();
+        int discPovCount = r.ReadByte();
+        int contPovCount = r.ReadByte();
+
+        var flags = new List<string>();
+        if ((axisFlags & 0x01) != 0) flags.Add("X");
+        if ((axisFlags & 0x02) != 0) flags.Add("Y");
+        if ((axisFlags & 0x04) != 0) flags.Add("Z");
+        if ((axisFlags & 0x08) != 0) flags.Add("RX");
+        if ((axisFlags & 0x10) != 0) flags.Add("RY");
+        if ((axisFlags & 0x20) != 0) flags.Add("RZ");
+        if ((axisFlags & 0x40) != 0) flags.Add("SL0");
+        if ((axisFlags & 0x80) != 0) flags.Add("SL1");
+
+        bool continuous = contPovCount > 0;
+        int povCount = continuous ? contPovCount : discPovCount;
+
+        return (deviceId, flags, buttonCount, povCount, continuous);
     }
 
     private void ApplySnapshot(VJoyOutputSnapshot snapshot, uint deviceId)

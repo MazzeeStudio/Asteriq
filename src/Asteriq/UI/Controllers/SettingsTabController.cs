@@ -64,6 +64,10 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _downloadButtonBounds;
     private SKRect _applyButtonBounds;
 
+    // Update channel segmented control
+    private SKRect[] _updateChannelSegBounds = Array.Empty<SKRect>();
+    private static readonly string[] UpdateChannelLabels = ["STABLE", "NIGHTLY"];
+
     // Toggle knob animation positions (0 = off, 1 = on); initialized from current settings
     private ToggleAnim _autoLoadT;
     private ToggleAnim _closeToTrayT;
@@ -235,6 +239,12 @@ public class SettingsTabController : ITabController, IDisposable
         if (_hidHideCloakingToggleBounds.HitTest(pt) || _hidHideInverseToggleBounds.HitTest(pt) ||
             _hidHideUpdateButtonBounds.HitTest(pt))
         { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+
+        // Update channel segments
+        foreach (var seg in _updateChannelSegBounds)
+        {
+            if (seg.Contains(pt)) { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
+        }
 
         // Update section buttons
         if (_checkButtonBounds.HitTest(pt) || _downloadButtonBounds.HitTest(pt) || _applyButtonBounds.HitTest(pt))
@@ -628,6 +638,26 @@ public class SettingsTabController : ITabController, IDisposable
         float autoCheckToggleY = y + (rowHeight - toggleHeight) / 2;
         _checkUpdatesToggleBounds = new SKRect(rightMargin - toggleWidth, autoCheckToggleY, rightMargin, autoCheckToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _checkUpdatesToggleBounds, _checkUpdatesT.T, _ctx.MousePosition);
+        y += rowHeight + 8;
+
+        // Update channel selector: Stable / Nightly
+        float channelLabelMaxWidth = contentWidth - 160f - minControlGap;
+        float channelLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Update channel", new SKPoint(leftMargin, channelLabelY),
+            channelLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float segWidth = 160f;
+        float segHeight = 22f;
+        float segY = y + (rowHeight - segHeight) / 2;
+        var segBounds = new SKRect(rightMargin - segWidth, segY, rightMargin, segY + segHeight);
+        int channelIndex = _ctx.AppSettings.UpdateChannel == UpdateChannel.Nightly ? 1 : 0;
+        int channelHovered = -1;
+        if (segBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y))
+        {
+            float segEach = segBounds.Width / UpdateChannelLabels.Length;
+            channelHovered = (int)((_ctx.MousePosition.X - segBounds.Left) / segEach);
+        }
+        _updateChannelSegBounds = FUIWidgets.DrawSegmentedControl(canvas, segBounds, UpdateChannelLabels,
+            channelIndex, channelHovered);
         y += rowHeight + sectionSpacing;
 
         // Version row: "v0.8.289" left, [Check for updates] button right
@@ -1703,6 +1733,21 @@ public class SettingsTabController : ITabController, IDisposable
             _ctx.AppSettings.AutoCheckUpdates = !_ctx.AppSettings.AutoCheckUpdates;
             _ctx.InvalidateCanvas();
             return;
+        }
+
+        // Update channel segmented control
+        for (int i = 0; i < _updateChannelSegBounds.Length; i++)
+        {
+            if (_updateChannelSegBounds[i].Contains(pt))
+            {
+                var channel = i == 1 ? UpdateChannel.Nightly : UpdateChannel.Stable;
+                if (_ctx.AppSettings.UpdateChannel != channel)
+                {
+                    _ctx.AppSettings.UpdateChannel = channel;
+                    _ctx.InvalidateCanvas();
+                }
+                return;
+            }
         }
 
         // Network forwarding toggle

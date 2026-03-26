@@ -71,6 +71,16 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public UpdateChannel UpdateChannel
+    {
+        get => _cachedSettings.UpdateChannel;
+        set
+        {
+            _cachedSettings.UpdateChannel = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
     public float FontSize
     {
         get => _cachedSettings.FontSize;
@@ -389,6 +399,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;
         public bool AutoCheckUpdates { get; set; } = true;
+        public UpdateChannel UpdateChannel { get; set; } = UpdateChannel.Stable;
 
         [JsonConverter(typeof(FontScaleConverter))]
         public float FontSize { get; set; } = 1.0f;

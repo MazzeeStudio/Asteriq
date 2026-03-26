@@ -24,6 +24,12 @@ public interface IApplicationSettingsService
     bool AutoCheckUpdates { get; set; }
 
     /// <summary>
+    /// Which update channel to follow: Stable (default) checks only full releases;
+    /// Nightly also checks pre-releases tagged "nightly".
+    /// </summary>
+    UpdateChannel UpdateChannel { get; set; }
+
+    /// <summary>
     /// Interface scale factor (0.8 – 1.5, default 1.0)
     /// </summary>
     float FontSize { get; set; }

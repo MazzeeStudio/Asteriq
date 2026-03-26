@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Reflection;
+using Asteriq.Models;
 using Asteriq.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -10,7 +11,8 @@ public sealed class UpdateService : IUpdateService
     private const string Owner = "MazzeeStudio";
     private const string Repo = "Asteriq";
     private const string AssetName = "Asteriq.zip";
-    private const string ApiUrl = $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
+    private const string StableApiUrl = $"https://api.github.com/repos/{Owner}/{Repo}/releases/latest";
+    private const string NightlyApiUrl = $"https://api.github.com/repos/{Owner}/{Repo}/releases/tags/nightly";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IApplicationSettingsService _appSettings;
@@ -40,7 +42,8 @@ public sealed class UpdateService : IUpdateService
         try
         {
             var client = _httpClientFactory.CreateClient("Asteriq");
-            var release = await client.GetFromJsonAsync<GitHubRelease>(ApiUrl, ct);
+            string apiUrl = _appSettings.UpdateChannel == UpdateChannel.Nightly ? NightlyApiUrl : StableApiUrl;
+            var release = await client.GetFromJsonAsync<GitHubRelease>(apiUrl, ct);
 
             if (release is null || string.IsNullOrWhiteSpace(release.TagName))
             {
@@ -71,6 +74,13 @@ public sealed class UpdateService : IUpdateService
                 _logger.LogDebug("Up to date: {Current}", current);
             }
 
+            _appSettings.LastUpdateCheck = DateTime.Now;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // No release exists for this channel yet (e.g. nightly tag not created)
+            _logger.LogDebug("No release found for channel {Channel}", _appSettings.UpdateChannel);
+            Status = UpdateStatus.UpToDate;
             _appSettings.LastUpdateCheck = DateTime.Now;
         }
         catch (HttpRequestException ex)
@@ -236,7 +246,8 @@ public sealed class UpdateService : IUpdateService
         try
         {
             var client = _httpClientFactory.CreateClient("Asteriq");
-            var release = await client.GetFromJsonAsync<GitHubRelease>(ApiUrl, ct);
+            string apiUrl = _appSettings.UpdateChannel == UpdateChannel.Nightly ? NightlyApiUrl : StableApiUrl;
+            var release = await client.GetFromJsonAsync<GitHubRelease>(apiUrl, ct);
             if (release is null) return null;
 
             // Update version info in case a newer release is available

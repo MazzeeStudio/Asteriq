@@ -1,0 +1,73 @@
+name: Nightly Build
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for git rev-list --count
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content src\Asteriq\Asteriq.csproj
+          $major = ($proj.Project.PropertyGroup.MajorVersion | Where-Object { $_ } | Select-Object -First 1)
+          $minor = ($proj.Project.PropertyGroup.MinorVersion | Where-Object { $_ } | Select-Object -First 1)
+          $build = git rev-list --count HEAD
+          $version = "$major.$minor.$build"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish src\Asteriq\Asteriq.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=none `
+            -o publish-release
+
+          Get-ChildItem publish-release -Filter "*.pdb" | Remove-Item -Force
+
+          if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
+          Compress-Archive -Path "publish-release\*" -DestinationPath "dist\Asteriq.zip" -Force
+
+      - name: Create or update nightly release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          DATE=$(date -u +%Y-%m-%d)
+
+          # Delete existing nightly release if present (force-moves the tag)
+          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+
+          # Create fresh pre-release with the nightly tag
+          gh release create nightly \
+            dist/Asteriq.zip \
+            --target "$COMMIT_SHA" \
+            --prerelease \
+            --title "Nightly v${VERSION}" \
+            --notes "Automated nightly build from \`dev\` branch.
+
+          **Version:** v${VERSION}
+          **Commit:** ${SHORT_SHA}
+          **Date:** ${DATE}
+
+          > This is an unstable pre-release for testing. Use **Settings > Update channel > Nightly** in Asteriq to receive these builds automatically."

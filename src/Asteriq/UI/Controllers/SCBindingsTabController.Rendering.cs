@@ -417,14 +417,21 @@ public partial class SCBindingsTabController
                 }
                 else if (col.IsPhysical)
                 {
-                    // Physical device column: device name on top, "JS{N}" sub-label below
                     var headerColor = FUIColors.ContentColor(c == _colImport.HighlightedColumn);
-                    float headerTextWidth = FUIRenderer.MeasureText(col.Header, 10f);
-                    float centeredX = colX + (colW - headerTextWidth) / 2;
-                    FUIRenderer.DrawText(canvas, col.Header, new SKPoint(centeredX, headerTextY - 5f), headerColor, 10f, true);
-                    string jsLabel = $"JS{col.SCInstance}";
-                    float subLabelWidth = FUIRenderer.MeasureText(jsLabel, 10f);
-                    FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - subLabelWidth) / 2, headerTextY + 5f), FUIColors.ActiveStrong, 10f);
+                    if (showJSRef)
+                    {
+                        // JS ref mode: show "JS{N}" only
+                        string jsLabel = $"JS{col.SCInstance}";
+                        float jsLabelWidth = FUIRenderer.MeasureText(jsLabel, 12f);
+                        FUIRenderer.DrawText(canvas, jsLabel, new SKPoint(colX + (colW - jsLabelWidth) / 2, headerTextY), headerColor, 12f, true);
+                    }
+                    else
+                    {
+                        // Device name mode: truncated name only
+                        string shortName = FUIWidgets.TruncateTextToWidth(col.Header, colW - 4f, 11f);
+                        float nameWidth = FUIRenderer.MeasureText(shortName, 11f);
+                        FUIRenderer.DrawText(canvas, shortName, new SKPoint(colX + (colW - nameWidth) / 2, headerTextY), headerColor, 11f, true);
+                    }
                 }
                 else if (col.IsJoystick && !showJSRef)
                 {

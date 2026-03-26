@@ -32,28 +32,37 @@ public class DriverSetupManager
     /// </summary>
     public bool IsVJoyInstalled()
     {
+        // Primary check: actually talk to the driver via vJoyInterface.dll.
+        // Registry keys can linger after uninstall, so they're unreliable alone.
         try
         {
-            // Check registry for vJoy service
+            bool enabled = VJoy.VJoyInterop.vJoyEnabled();
+            if (enabled)
+            {
+                _logger.LogInformation("vJoy detected: driver is enabled (vJoyEnabled() returned true)");
+                return true;
+            }
+            _logger.LogInformation("vJoy driver not enabled (vJoyEnabled() returned false)");
+            return false;
+        }
+        catch (DllNotFoundException)
+        {
+            _logger.LogInformation("vJoy not detected: vJoyInterface.dll not found");
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "vJoy detection failed, falling back to registry check");
+        }
+
+        // Fallback: registry check (covers edge cases where DLL exists but P/Invoke fails)
+        try
+        {
             using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\vjoy");
             if (key is not null)
             {
-                _logger.LogInformation("vJoy detected: service key found at HKLM\\SYSTEM\\CurrentControlSet\\Services\\vjoy");
+                _logger.LogInformation("vJoy detected via registry: service key found");
                 return true;
-            }
-
-            // Alternative: Check if vJoy device exists
-            using var devKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum\ROOT\HIDCLASS");
-            if (devKey is not null)
-            {
-                foreach (var subKeyName in devKey.GetSubKeyNames())
-                {
-                    if (subKeyName.Contains("VID_1234&PID_BEAD", StringComparison.OrdinalIgnoreCase))
-                    {
-                        _logger.LogInformation("vJoy detected: device found in HIDCLASS registry: {DeviceKey}", subKeyName);
-                        return true;
-                    }
-                }
             }
 
             _logger.LogInformation("vJoy not detected in registry");

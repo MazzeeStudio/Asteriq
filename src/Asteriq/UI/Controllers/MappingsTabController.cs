@@ -26,6 +26,10 @@ public partial class MappingsTabController : ITabController
     private bool _selectionIsExplicit = false; // true only when user explicitly clicked a row
     private int _hoveredMappingRow = -1;
 
+    // Maps visual axis row index → actual vJoy axis index (0-7).
+    // Only contains indices for axes the vJoy device actually has configured.
+    private List<int> _visibleAxisIndices = new();
+
     private SKRect _vjoyPrevButtonBounds;
     private SKRect _vjoyNextButtonBounds;
     private bool _vjoyPrevHovered;

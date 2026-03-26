@@ -1581,6 +1581,9 @@ public partial class MainForm : Form
         if (_tabContext is not null)
             _tabContext.VJoyDevices = _vjoyDevices;
 
+        // Clean up mappings that reference axes no longer present on vJoy devices
+        CleanupStaleMappings();
+
         // Restart forwarding if it was active — the engine will re-acquire devices
         if (wasForwarding)
             StartForwarding();
@@ -1590,6 +1593,41 @@ public partial class MainForm : Form
         // Callers that remove a device should NOT call RefreshDevices() immediately,
         // because SDL2 still reports the device until the OS sends a device-removed notification.
         _canvas.Invalidate();
+    }
+
+    private void CleanupStaleMappings()
+    {
+        var profile = _profileManager.ActiveProfile;
+        if (profile is null) return;
+
+        bool changed = false;
+        foreach (var vjoy in _vjoyDevices)
+        {
+            var validAxes = new HashSet<int>();
+            if (vjoy.HasAxisX) validAxes.Add(0);
+            if (vjoy.HasAxisY) validAxes.Add(1);
+            if (vjoy.HasAxisZ) validAxes.Add(2);
+            if (vjoy.HasAxisRX) validAxes.Add(3);
+            if (vjoy.HasAxisRY) validAxes.Add(4);
+            if (vjoy.HasAxisRZ) validAxes.Add(5);
+            if (vjoy.HasSlider0) validAxes.Add(6);
+            if (vjoy.HasSlider1) validAxes.Add(7);
+
+            changed |= profile.AxisMappings.RemoveAll(m =>
+                m.Output.Type == OutputType.VJoyAxis &&
+                m.Output.VJoyDevice == vjoy.Id &&
+                !validAxes.Contains(m.Output.Index)) > 0;
+
+            changed |= profile.AxisToButtonMappings.RemoveAll(m =>
+                m.SourceVJoyDevice == vjoy.Id &&
+                !validAxes.Contains(m.SourceAxisIndex)) > 0;
+        }
+
+        if (changed)
+        {
+            profile.ModifiedAt = DateTime.UtcNow;
+            _profileManager.SaveActiveProfile();
+        }
     }
 
     private void RefreshDevices()

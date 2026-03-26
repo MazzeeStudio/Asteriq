@@ -467,6 +467,13 @@ public partial class MappingsTabController
     }
 
     /// <summary>
+    /// Converts a visual row index (in the axis list) to the actual vJoy axis index (0-7).
+    /// Returns -1 if the row is out of range.
+    /// </summary>
+    private int AxisIndexForRow(int row) =>
+        row >= 0 && row < _visibleAxisIndices.Count ? _visibleAxisIndices[row] : -1;
+
+    /// <summary>
     /// Get a human-readable name for a vJoy axis index.
     /// </summary>
     private static string GetVJoyAxisName(int index)
@@ -894,8 +901,9 @@ public partial class MappingsTabController
         // Use current mapping category to determine axis vs button
         // Category 0 = Buttons, Category 1 = Axes
         bool isAxis = _mappingCategory == 1;
-        // rowIndex is already the correct index within the current category
-        int outputIndex = rowIndex;
+        // For axes, translate visual row to actual vJoy axis index
+        int outputIndex = isAxis ? AxisIndexForRow(rowIndex) : rowIndex;
+        if (outputIndex < 0) return;
 
         // Remove existing binding for this output
         RemoveBindingAtRow(rowIndex, save: false);
@@ -946,8 +954,9 @@ public partial class MappingsTabController
         // Use current mapping category to determine axis vs button
         // Category 0 = Buttons, Category 1 = Axes
         bool isAxis = _mappingCategory == 1;
-        // rowIndex is already the correct index within the current category
-        int outputIndex = rowIndex;
+        // For axes, translate visual row to actual vJoy axis index
+        int outputIndex = isAxis ? AxisIndexForRow(rowIndex) : rowIndex;
+        if (outputIndex < 0) return;
 
         if (isAxis)
         {
@@ -1157,7 +1166,7 @@ public partial class MappingsTabController
                     var existingMapping = FindExistingMappingForInput(profile, inputSource);
                     if (existingMapping is not null)
                     {
-                        string newTarget = isAxis ? $"vJoy Axis {targetRowIndex}" : $"vJoy Button {targetRowIndex + 1}";
+                        string newTarget = isAxis ? $"vJoy Axis {GetVJoyAxisName(AxisIndexForRow(targetRowIndex))}" : $"vJoy Button {targetRowIndex + 1}";
                         if (!ConfirmDuplicateMapping(existingMapping, newTarget))
                         {
                             // User cancelled, don't create the mapping
@@ -1276,8 +1285,9 @@ public partial class MappingsTabController
         if (_ctx.VJoyDevices.Count == 0 || _ctx.SelectedVJoyDeviceIndex >= _ctx.VJoyDevices.Count) return;
 
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
-        // rowIndex is already the correct index within the current category (axes or buttons)
-        int outputIndex = rowIndex;
+        // For axes, translate visual row to actual vJoy axis index
+        int outputIndex = isAxis ? AxisIndexForRow(rowIndex) : rowIndex;
+        if (outputIndex < 0) return;
         var newInputSource = input.ToInputSource();
 
         if (isAxis)
@@ -1413,7 +1423,8 @@ public partial class MappingsTabController
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
         // Category 0 = Buttons, Category 1 = Axes
         bool isAxis = _mappingCategory == 1;
-        int outputIndex = _selectedMappingRow;
+        int outputIndex = isAxis ? AxisIndexForRow(_selectedMappingRow) : _selectedMappingRow;
+        if (outputIndex < 0) return;
 
         if (isAxis)
         {
@@ -1616,9 +1627,12 @@ public partial class MappingsTabController
         var inputs = existingMappings.FirstOrDefault()?.Inputs ?? new List<InputSource>();
 
         // Remove all existing threshold mappings for this axis row
+        int axisIdx = AxisIndexForRow(_selectedMappingRow);
+        if (axisIdx < 0) return;
+
         profile.AxisToButtonMappings.RemoveAll(m =>
             m.SourceVJoyDevice == vjoyDevice.Id &&
-            m.SourceAxisIndex == _selectedMappingRow);
+            m.SourceAxisIndex == axisIdx);
 
         // Re-create enabled mappings
         if (_threshold.AboveEnabled)
@@ -1631,7 +1645,7 @@ public partial class MappingsTabController
                 ActivateAbove = true,
                 Hysteresis = _threshold.AboveHysteresis,
                 SourceVJoyDevice = vjoyDevice.Id,
-                SourceAxisIndex = _selectedMappingRow,
+                SourceAxisIndex = axisIdx,
             });
         }
         if (_threshold.BelowEnabled)
@@ -1644,7 +1658,7 @@ public partial class MappingsTabController
                 ActivateAbove = false,
                 Hysteresis = _threshold.BelowHysteresis,
                 SourceVJoyDevice = vjoyDevice.Id,
-                SourceAxisIndex = _selectedMappingRow,
+                SourceAxisIndex = axisIdx,
             });
         }
 
@@ -1658,6 +1672,8 @@ public partial class MappingsTabController
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null) return;
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+        int axisIdx = AxisIndexForRow(_selectedMappingRow);
+        if (axisIdx < 0) return;
 
         // Preserve input from existing AxisMapping
         var existingAxis = GetCurrentAxisMapping();
@@ -1676,7 +1692,7 @@ public partial class MappingsTabController
             ActivateAbove = true,
             Hysteresis = 0.05f,
             SourceVJoyDevice = vjoyDevice.Id,
-            SourceAxisIndex = _selectedMappingRow,
+            SourceAxisIndex = axisIdx,
         });
 
         profile.ModifiedAt = DateTime.UtcNow;
@@ -1692,6 +1708,8 @@ public partial class MappingsTabController
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is null) return;
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+        int axisIdx = AxisIndexForRow(_selectedMappingRow);
+        if (axisIdx < 0) return;
 
         // Preserve inputs from existing AxisToButtonMappings
         var existingA2Bs = GetCurrentAxisToButtonMappings();
@@ -1700,7 +1718,7 @@ public partial class MappingsTabController
         // Remove all existing AxisToButtonMappings for this axis row
         profile.AxisToButtonMappings.RemoveAll(m =>
             m.SourceVJoyDevice == vjoyDevice.Id &&
-            m.SourceAxisIndex == _selectedMappingRow);
+            m.SourceAxisIndex == axisIdx);
 
         // Create AxisMapping with default curve
         var mapping = new AxisMapping
@@ -1710,7 +1728,7 @@ public partial class MappingsTabController
             {
                 Type = OutputType.VJoyAxis,
                 VJoyDevice = vjoyDevice.Id,
-                Index = _selectedMappingRow,
+                Index = axisIdx,
             },
             Curve = new AxisCurve(),
         };

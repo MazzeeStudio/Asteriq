@@ -139,7 +139,8 @@ public partial class MappingsTabController
 
         // Get counts based on current category
         string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
-        int axisCount = hasVJoy ? Math.Min(axisNames.Length, 8) : 0;
+        _visibleAxisIndices = hasVJoy ? GetVJoyAxisIndices(vjoyDevice!) : new List<int>();
+        int axisCount = _visibleAxisIndices.Count;
         int buttonCount = vjoyDevice?.ButtonCount ?? 0;
 
         // Calculate content height based on selected category (no section headers when filtered)
@@ -199,8 +200,9 @@ public partial class MappingsTabController
         // Show AXES when category is 1
         if (_mappingCategory == 1 && hasVJoy && axisCount > 0)
         {
-            for (int i = 0; i < axisCount; i++)
+            for (int vi = 0; vi < axisCount; vi++)
             {
+                int axisIdx = _visibleAxisIndices[vi];
                 float rowTop = y;
                 float rowBottom = y + rowHeight;
 
@@ -208,11 +210,11 @@ public partial class MappingsTabController
                 if (rowBottom > bounds.Top && rowTop < bounds.Bottom)
                 {
                     var rowBounds = new SKRect(bounds.Left, rowTop, bounds.Right, rowBottom);
-                    string binding = GetAxisBindingText(profile, vjoyDevice!.Id, i);
+                    string binding = GetAxisBindingText(profile, vjoyDevice!.Id, axisIdx);
                     bool isSelected = rowIndex == _selectedMappingRow;
                     bool isHovered = rowIndex == _hoveredMappingRow;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[i], binding, isSelected, isHovered, rowIndex);
+                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered, rowIndex);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -904,7 +906,8 @@ public partial class MappingsTabController
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
         // Category 0 = Buttons, Category 1 = Axes
         bool isAxis = _mappingCategory == 1;
-        int outputIndex = _selectedMappingRow;
+        int outputIndex = isAxis ? AxisIndexForRow(_selectedMappingRow) : _selectedMappingRow;
+        if (outputIndex < 0) return inputs;
 
         if (isAxis)
         {
@@ -948,9 +951,10 @@ public partial class MappingsTabController
         // Category 0 = Buttons, Category 1 = Axes
         if (_mappingCategory == 1)
         {
-            // Axes
+            // Axes — translate visual row to actual axis index
             string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
-            return _selectedMappingRow < axisNames.Length ? axisNames[_selectedMappingRow] : $"Axis {_selectedMappingRow}";
+            int axisIdx = AxisIndexForRow(_selectedMappingRow);
+            return axisIdx >= 0 && axisIdx < axisNames.Length ? axisNames[axisIdx] : $"Axis {_selectedMappingRow}";
         }
         else
         {
@@ -971,7 +975,8 @@ public partial class MappingsTabController
         if (profile is null) return null;
 
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
-        int outputIndex = _selectedMappingRow;
+        int outputIndex = AxisIndexForRow(_selectedMappingRow);
+        if (outputIndex < 0) return null;
 
         return profile.AxisMappings.FirstOrDefault(m =>
             m.Output.Type == OutputType.VJoyAxis &&
@@ -988,7 +993,8 @@ public partial class MappingsTabController
         if (profile is null) return new();
 
         var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
-        int outputIndex = _selectedMappingRow;
+        int outputIndex = AxisIndexForRow(_selectedMappingRow);
+        if (outputIndex < 0) return new();
 
         return profile.AxisToButtonMappings.Where(m =>
             m.SourceVJoyDevice == vjoyDevice.Id &&
@@ -2341,13 +2347,12 @@ public partial class MappingsTabController
         if (_isEditingAxis)
         {
             string[] axisNames = { "X Axis", "Y Axis", "Z Axis", "RX Axis", "RY Axis", "RZ Axis", "Slider 1", "Slider 2" };
-            int axisIndex = _editingRowIndex;
-            return axisIndex < axisNames.Length ? axisNames[axisIndex] : $"Axis {axisIndex}";
+            int axisIndex = AxisIndexForRow(_editingRowIndex);
+            return axisIndex >= 0 && axisIndex < axisNames.Length ? axisNames[axisIndex] : $"Axis {_editingRowIndex}";
         }
         else
         {
-            int buttonIndex = _editingRowIndex - 8;
-            return $"Button {buttonIndex + 1}";
+            return $"Button {_editingRowIndex + 1}";
         }
     }
 
@@ -2915,9 +2920,11 @@ public partial class MappingsTabController
         string? binding;
         if (_mappingCategory == 1)
         {
-            // Axes category: row i = axis output index i
+            // Axes category: translate visual row to actual axis index
+            int axisIdx = AxisIndexForRow(rowIndex);
+            if (axisIdx < 0) return null;
             var mapping = profile.AxisMappings.FirstOrDefault(m =>
-                m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == rowIndex);
+                m.Output.VJoyDevice == vjoyDevice.Id && m.Output.Index == axisIdx);
             binding = mapping?.Inputs.Count > 0 ? GetAxisBindingName(mapping.Inputs[0].Index) : null;
         }
         else

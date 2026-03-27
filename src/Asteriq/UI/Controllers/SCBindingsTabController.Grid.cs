@@ -301,6 +301,129 @@ public partial class SCBindingsTabController
     }
 
     /// <summary>
+    /// Reverts all shared binding reroutes from the current SCExportProfile, restoring
+    /// the mapping profile's button outputs to their original values.
+    /// Must be called BEFORE switching to a new SCExportProfile.
+    /// </summary>
+    private void RevertSharedBindingReroutes()
+    {
+        var mappingProfile = _ctx.ProfileManager.ActiveProfile;
+        if (mappingProfile is null) return;
+
+        bool changed = false;
+        foreach (var binding in _scExportProfile.Bindings)
+        {
+            foreach (var shared in binding.SharedWith)
+            {
+                int secondaryButton = ParseButtonIndex(shared.InputName);
+                if (secondaryButton < 0) continue;
+
+                foreach (var mappingId in shared.ReroutedMappingIds)
+                {
+                    var mapping = mappingProfile.ButtonMappings.FirstOrDefault(m => m.Id == mappingId);
+                    if (mapping is not null)
+                    {
+                        mapping.Output.VJoyDevice = shared.VJoySlot;
+                        mapping.Output.Index = secondaryButton;
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        if (changed)
+        {
+            _ctx.OnMappingsChanged();
+        }
+    }
+
+    /// <summary>
+    /// Re-applies shared binding reroutes from the active SCExportProfile to the active
+    /// MappingProfile. Called after switching control profiles or Asteriq configurations
+    /// so that shares are profile-independent.
+    /// </summary>
+    /// <param name="notifyEngine">If true, calls OnMappingsChanged to hot-reload the engine.
+    /// Pass false during initialization when the engine isn't running yet.</param>
+    private void ReapplySharedBindingReroutes(bool notifyEngine = true)
+    {
+        var mappingProfile = _ctx.ProfileManager.ActiveProfile;
+        if (mappingProfile is null) return;
+
+        // Collect unique reroute specs: (fromVJoy, fromButton) → (toVJoy, toButton)
+        var reroutes = new Dictionary<(uint fromVJoy, int fromButton), (uint toVJoy, int toButton)>();
+        foreach (var binding in _scExportProfile.Bindings)
+        {
+            int primaryButton = ParseButtonIndex(binding.InputName);
+            if (primaryButton < 0) continue;
+
+            foreach (var shared in binding.SharedWith)
+            {
+                int secondaryButton = ParseButtonIndex(shared.InputName);
+                if (secondaryButton < 0) continue;
+                reroutes[(shared.VJoySlot, secondaryButton)] = (binding.VJoyDevice, primaryButton);
+            }
+        }
+
+        if (reroutes.Count == 0) return;
+
+        bool changed = false;
+        foreach (var binding in _scExportProfile.Bindings)
+        {
+            foreach (var shared in binding.SharedWith)
+            {
+                int secondaryButton = ParseButtonIndex(shared.InputName);
+                if (secondaryButton < 0) continue;
+
+                var newIds = new List<Guid>();
+                foreach (var bm in mappingProfile.ButtonMappings)
+                {
+                    if (bm.Output.Type == OutputType.VJoyButton &&
+                        bm.Output.VJoyDevice == shared.VJoySlot &&
+                        bm.Output.Index == secondaryButton)
+                    {
+                        int primaryButton = ParseButtonIndex(binding.InputName);
+                        if (primaryButton < 0) continue;
+                        bm.Output.VJoyDevice = binding.VJoyDevice;
+                        bm.Output.Index = primaryButton;
+                        newIds.Add(bm.Id);
+                        changed = true;
+                    }
+                }
+
+                // Skip if this reroute was already applied by a previous SharedWith entry
+                // on the same binding (PerformShare only reroutes once, other entries share the IDs).
+                if (newIds.Count == 0 && reroutes.ContainsKey((shared.VJoySlot, ParseButtonIndex(shared.InputName))))
+                {
+                    // Another SharedWith entry for the same button already applied the reroute.
+                    // Copy the IDs from the reroute spec so RevertSharedBindingReroutes can find them.
+                    var key = (shared.VJoySlot, ParseButtonIndex(shared.InputName));
+                    var target = reroutes[key];
+                    foreach (var bm in mappingProfile.ButtonMappings)
+                    {
+                        if (bm.Output.Type == OutputType.VJoyButton &&
+                            bm.Output.VJoyDevice == target.toVJoy &&
+                            bm.Output.Index == target.toButton)
+                        {
+                            // This mapping is already rerouted to the primary
+                            if (shared.ReroutedMappingIds.Count == 0 || shared.ReroutedMappingIds.Contains(bm.Id))
+                                newIds.Add(bm.Id);
+                        }
+                    }
+                }
+
+                if (newIds.Count > 0)
+                    shared.ReroutedMappingIds = newIds;
+            }
+        }
+
+        if (changed)
+        {
+            if (notifyEngine)
+                _ctx.OnMappingsChanged();
+        }
+    }
+
+    /// <summary>
     /// Parses a vJoy button index (0-based) from an SC input name like "button33".
     /// Returns -1 if the input is not a button or cannot be parsed.
     /// </summary>
@@ -787,7 +910,8 @@ public partial class SCBindingsTabController
 
             if (reroutedIds.Count > 0)
             {
-                _ctx.ProfileManager.SaveActiveProfile();
+                // Do NOT save mapping profile — reroutes are runtime-only and re-applied
+                // from SCExportProfile SharedWith data on every startup/profile switch.
                 _ctx.OnMappingsChanged();
                 System.Diagnostics.Debug.WriteLine(
                     $"[SCBindings] Rerouted {reroutedIds.Count} mapping(s) from vJoy{secondaryVJoySlot}/{secondaryInputName} → vJoy{primaryBinding.VJoyDevice}/{primaryBinding.InputName}");
@@ -905,7 +1029,6 @@ public partial class SCBindingsTabController
                     mapping.Output.Index = secondaryButtonIndex;
                 }
             }
-            _ctx.ProfileManager.SaveActiveProfile();
             _ctx.OnMappingsChanged();
             System.Diagnostics.Debug.WriteLine(
                 $"[SCBindings] Restored {sharedEntry.ReroutedMappingIds.Count} mapping(s) back to vJoy{sharedEntry.VJoySlot}/{sharedEntry.InputName}");

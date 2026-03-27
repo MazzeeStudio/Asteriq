@@ -77,6 +77,7 @@ public partial class SCBindingsTabController
             // Initial conflict detection
             UpdateConflictingBindings();
             UpdateSharedCells();
+            ReapplySharedBindingReroutes(notifyEngine: false);
 
             System.Diagnostics.Debug.WriteLine($"[MainForm] SC bindings initialized, {_scInstall.Installations.Count} installations found");
         }
@@ -258,6 +259,8 @@ public partial class SCBindingsTabController
         if (!string.IsNullOrEmpty(lastProfileName))
             profile = _scExportProfileService?.LoadProfile(lastProfileName);
 
+        RevertSharedBindingReroutes();
+
         // No fallback to global profiles — each environment gets its own remembered profile
         // or starts blank. Never bleed a profile from another installation.
         if (profile is not null)
@@ -276,6 +279,7 @@ public partial class SCBindingsTabController
 
         UpdateConflictingBindings();
         UpdateSharedCells();
+        ReapplySharedBindingReroutes();
     }
 
     private void ReportProgress(int version, string message)
@@ -473,6 +477,7 @@ public partial class SCBindingsTabController
         if (confirmDialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
         {
             var deletedName = _scExportProfile.ProfileName;
+            RevertSharedBindingReroutes();
             _scExportProfileService.DeleteProfile(deletedName);
             RefreshSCExportProfiles();
 
@@ -503,6 +508,9 @@ public partial class SCBindingsTabController
                 }
             }
 
+            UpdateConflictingBindings();
+            UpdateSharedCells();
+            ReapplySharedBindingReroutes();
             SetStatus($"Deleted profile '{deletedName}'");
         }
     }
@@ -514,14 +522,16 @@ public partial class SCBindingsTabController
         var profile = _scExportProfileService.LoadProfile(profileName);
         if (profile is not null)
         {
+            RevertSharedBindingReroutes();
             _scExportProfile = profile;
-    
+
             if (CurrentEnvironment is not null)
                 _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, profileName);
             _ctx.AppSettings.LastSCExportProfile = profileName;
             _profileMgmt.DropdownOpen = false;
             UpdateConflictingBindings();
             UpdateSharedCells();
+            ReapplySharedBindingReroutes();
             SetStatus($"Loaded profile '{profileName}'");
         }
     }
@@ -542,6 +552,8 @@ public partial class SCBindingsTabController
             if (replaceResult != 0)
                 return;
         }
+
+        RevertSharedBindingReroutes();
 
         // Always adopt the SC file's name so the dropdown reflects what was imported
         _scExportProfile.ProfileName = mappingFile.DisplayName;
@@ -592,6 +604,7 @@ public partial class SCBindingsTabController
         // Update conflicts
         UpdateConflictingBindings();
         UpdateSharedCells();
+        ReapplySharedBindingReroutes();
 
         // Log final profile stats
         var finalKb = _scExportProfile.Bindings.Count(b => b.DeviceType == SCDeviceType.Keyboard);

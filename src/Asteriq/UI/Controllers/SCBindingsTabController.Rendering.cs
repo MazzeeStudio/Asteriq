@@ -878,7 +878,7 @@ public partial class SCBindingsTabController
         bool dropdownHovered = _profileMgmt.DropdownBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         string dropdownLabel = string.IsNullOrEmpty(_scExportProfile.ProfileName)
             ? "— No Profile Selected —"
-            : _scProfileDirty ? $"{_scExportProfile.ProfileName}*" : _scExportProfile.ProfileName;
+            : _scExportProfile.ProfileName;
         SCBindingsRenderer.DrawSCProfileDropdown(canvas, _profileMgmt.DropdownBounds, dropdownLabel, dropdownHovered, _profileMgmt.DropdownOpen);
 
         // Pencil edit icon inside dropdown box (left of arrow), visible on hover when a profile is loaded
@@ -918,21 +918,14 @@ public partial class SCBindingsTabController
 
         y += dropdownHeight + 6f;
 
-        // Buttons row: [Import]  [+ New]  [Save] — all text-width sized, right-aligned
+        // Buttons row: [Import]  [+ New] — all text-width sized, right-aligned
         const float textBtnPad = 16f;
         float textBtnHeight = FUIRenderer.TouchTargetMinHeight;  // 24px minimum
-        float saveBtnWidth = FUIRenderer.MeasureText("Save", 14f) + textBtnPad;
         float newBtnWidth = FUIRenderer.MeasureText("+ New", 14f) + textBtnPad;
         float importBtnWidth = FUIRenderer.MeasureText("Import", 14f) + textBtnPad;
 
-        // Save button (rightmost)
-        _profileMgmt.SaveProfileBounds = new SKRect(rightMargin - saveBtnWidth, y, rightMargin, y + textBtnHeight);
-        _profileMgmt.SaveProfileHovered = _profileMgmt.SaveProfileBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        FUIRenderer.DrawButton(canvas, _profileMgmt.SaveProfileBounds, "Save",
-            _profileMgmt.SaveProfileHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
-
-        // New button (left of Save)
-        float newBtnX = rightMargin - saveBtnWidth - buttonGap - newBtnWidth;
+        // New button (rightmost)
+        float newBtnX = rightMargin - newBtnWidth;
         _profileMgmt.NewProfileBounds = new SKRect(newBtnX, y, newBtnX + newBtnWidth, y + textBtnHeight);
         _profileMgmt.NewProfileHovered = _profileMgmt.NewProfileBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
         FUIRenderer.DrawButton(canvas, _profileMgmt.NewProfileBounds, "+ New",

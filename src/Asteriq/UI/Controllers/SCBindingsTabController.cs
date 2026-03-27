@@ -42,9 +42,6 @@ public partial class SCBindingsTabController : ITabController
 
     private enum SCStatusKind { Info, Success, Warning, Error }
 
-    // Dirty tracking: true when the profile name has been edited but not yet saved
-    private bool _scProfileDirty = false;
-
     // In-memory schema cache: avoids re-parsing XML when switching back to an already-loaded environment
     private static readonly Dictionary<string, List<SCAction>> s_schemaCache = new();
 
@@ -462,7 +459,6 @@ public partial class SCBindingsTabController : ITabController
             _profileMgmt.DropdownBounds.Contains(e.X, e.Y) ||
             (_profileMgmt.ProfileEditBounds != SKRect.Empty && _profileMgmt.ProfileEditBounds.Contains(e.X, e.Y)) ||
             _profileMgmt.NewProfileBounds.Contains(e.X, e.Y) ||
-            _profileMgmt.SaveProfileBounds.Contains(e.X, e.Y) ||
             _searchFilter.FilterBounds.Contains(e.X, e.Y) ||
             _scAssignInputButtonBounds.Contains(e.X, e.Y) ||
             _scClearBindingButtonBounds.Contains(e.X, e.Y) ||
@@ -824,8 +820,6 @@ public partial class SCBindingsTabController : ITabController
         public int HoveredProfileIndex = -1;
         public SKRect NewProfileBounds;
         public bool NewProfileHovered;
-        public SKRect SaveProfileBounds;
-        public bool SaveProfileHovered;
         public SKRect ImportProfileBounds;
         public bool ImportProfileHovered;
         public SKRect ProfileEditBounds;

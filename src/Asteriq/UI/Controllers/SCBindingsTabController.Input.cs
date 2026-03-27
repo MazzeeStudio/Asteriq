@@ -171,21 +171,7 @@ public partial class SCBindingsTabController
                 if (_scInstall.HoveredInstallation >= 0 && _scInstall.HoveredInstallation < _scInstall.Installations.Count
                     && _scInstall.HoveredInstallation != _scInstall.SelectedInstallation)
                 {
-                    if (_scProfileDirty)
-                    {
-                        using var dialog = new FUIConfirmDialog(
-                            "Unsaved Changes",
-                            $"Profile '{_scExportProfile.ProfileName}' has an unsaved name change.\n\nSwitch installation and discard changes?",
-                            "Discard & Switch", "Cancel");
-                        if (dialog.ShowDialog(_ctx.OwnerForm) != DialogResult.Yes)
-                        {
-                            _scInstall.DropdownOpen = false;
-                            return;
-                        }
-                    }
-
                     _scInstall.SelectedInstallation = _scInstall.HoveredInstallation;
-                    _scProfileDirty = false;
                     LoadSCSchema(_scInstall.Installations[_scInstall.SelectedInstallation], autoLoadProfileForEnvironment: true);
                     _ctx.AppSettings.PreferredSCEnvironment = _scInstall.Installations[_scInstall.SelectedInstallation].Environment;
                 }
@@ -352,12 +338,6 @@ public partial class SCBindingsTabController
             }
 
             // SC Export profile management buttons
-            if (_profileMgmt.SaveProfileBounds.Contains(point))
-            {
-                SaveSCExportProfile();
-                return;
-            }
-
             if (_profileMgmt.NewProfileBounds.Contains(point))
             {
                 CreateNewSCExportProfile();

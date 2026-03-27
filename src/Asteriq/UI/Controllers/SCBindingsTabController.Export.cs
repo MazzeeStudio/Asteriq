@@ -273,7 +273,7 @@ public partial class SCBindingsTabController
             System.Diagnostics.Debug.WriteLine($"[SCBindings] No remembered profile for {environment} — started blank");
         }
 
-        _scProfileDirty = false;
+
         UpdateConflictingBindings();
         UpdateSharedCells();
     }
@@ -420,27 +420,6 @@ public partial class SCBindingsTabController
         }
     }
 
-    private void SaveSCExportProfile()
-    {
-        if (_scExportProfileService is null) return;
-
-        // If there's no name yet, prompt the user (same as Create New)
-        if (string.IsNullOrEmpty(_scExportProfile.ProfileName))
-        {
-            CreateNewSCExportProfile();
-            return;
-        }
-
-        _scExportProfileService.SaveProfile(_scExportProfile);
-        _scProfileDirty = false;
-        if (CurrentEnvironment is not null)
-            _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, _scExportProfile.ProfileName);
-        _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
-        RefreshSCExportProfiles();
-
-        SetStatus($"Profile '{_scExportProfile.ProfileName}' saved", SCStatusKind.Success);
-    }
-
     private void CreateNewSCExportProfile()
     {
         var newName = FUIInputDialog.Show(_ctx.OwnerForm, "New Profile", "Profile Name:",
@@ -473,7 +452,11 @@ public partial class SCBindingsTabController
                 _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
             }
 
-            SaveSCExportProfile();
+            _scExportProfileService?.SaveProfile(_scExportProfile);
+            if (CurrentEnvironment is not null)
+                _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, _scExportProfile.ProfileName);
+            _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
+            RefreshSCExportProfiles();
             SetStatus($"Created profile '{newName}'", SCStatusKind.Success);
         }
     }
@@ -500,7 +483,7 @@ public partial class SCBindingsTabController
                 if (nextProfile is not null)
                 {
                     _scExportProfile = nextProfile;
-                    _scProfileDirty = false;
+            
                     if (CurrentEnvironment is not null)
                         _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, nextProfile.ProfileName);
                     _ctx.AppSettings.LastSCExportProfile = nextProfile.ProfileName;
@@ -512,7 +495,7 @@ public partial class SCBindingsTabController
                 if (CurrentEnvironment is not null)
                     _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, null);
                 _ctx.AppSettings.LastSCExportProfile = null;
-                _scProfileDirty = false;
+        
                 _scExportProfile = new SCExportProfile();
                 foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 {
@@ -532,7 +515,7 @@ public partial class SCBindingsTabController
         if (profile is not null)
         {
             _scExportProfile = profile;
-            _scProfileDirty = false;
+    
             if (CurrentEnvironment is not null)
                 _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, profileName);
             _ctx.AppSettings.LastSCExportProfile = profileName;
@@ -600,7 +583,7 @@ public partial class SCBindingsTabController
         // Do NOT delete the previously active profile — import creates/overwrites a profile,
         // it should not silently remove the one the user was working on.
         _scExportProfileService?.SaveProfile(_scExportProfile);
-        _scProfileDirty = false;
+
         if (CurrentEnvironment is not null)
             _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, _scExportProfile.ProfileName);
         _ctx.AppSettings.LastSCExportProfile = _scExportProfile.ProfileName;
@@ -666,7 +649,7 @@ public partial class SCBindingsTabController
         }
 
         _scExportProfile.ProfileName = name;
-        _scProfileDirty = false;
+
         _scExportProfileService?.SaveProfile(_scExportProfile);
         _ctx.InvalidateCanvas();
     }

@@ -414,7 +414,7 @@ public class SettingsTabController : ITabController, IDisposable
             }
             finally
             {
-                try { File.Delete(batPath); } catch { /* best effort cleanup */ }
+                try { File.Delete(batPath); } catch (IOException) { /* best effort cleanup */ }
                 _ctx.OwnerForm.BeginInvoke(() =>
                 {
                     _matchingMasterInProgress = false;

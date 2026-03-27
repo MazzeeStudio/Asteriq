@@ -295,7 +295,7 @@ public class DevicesTabController : ITabController
         if (_devCat.Active != 0 || _drag.DeviceIndex < 0) return false;
 
         var currentPoint = new SKPoint(e.X, e.Y);
-        float dragDistance = SKPoint.Distance(currentPoint, _drag.StartPoint);
+        float dragDistance = SKPoint.Distance(currentPoint, SKPoint.Empty);
 
         if (!_drag.IsDragging && dragDistance > 5)
         {
@@ -647,7 +647,7 @@ public class DevicesTabController : ITabController
                     : GetVJoyAssignmentForDevice(draggedDevice);
 
                 canvas.Save();
-                canvas.Translate(_drag.CurrentPoint.X - _drag.StartPoint.X, _drag.CurrentPoint.Y - _drag.StartPoint.Y);
+                canvas.Translate(_drag.CurrentPoint.X, _drag.CurrentPoint.Y);
                 using var ghostPaint = new SKPaint { Color = SKColors.White.WithAlpha(180) };
                 FUIWidgets.DrawDeviceListItem(canvas, contentBounds.Left + pad - 10,
                     _drag.ItemBounds.Count > 0 ? _drag.ItemBounds[0].Top + (_drag.DeviceIndex * (itemHeight + itemGap)) : contentBounds.Top + 50,
@@ -1980,7 +1980,6 @@ public class DevicesTabController : ITabController
         public bool IsDragging;
         public int DeviceIndex = -1;
         public int DropTargetIndex = -1;
-        public SKPoint StartPoint;
         public SKPoint CurrentPoint;
         public List<SKRect> ItemBounds = new();
     }

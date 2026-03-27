@@ -596,10 +596,10 @@ public partial class SCBindingsTabController
             _scExportProfile.SetSCInstance(instance, (int)instance);
         }
 
-        // Save the profile under the new name; delete old file if the name changed
+        // Save the imported profile under its own name.
+        // Do NOT delete the previously active profile — import creates/overwrites a profile,
+        // it should not silently remove the one the user was working on.
         _scExportProfileService?.SaveProfile(_scExportProfile);
-        if (!string.IsNullOrEmpty(oldProfileName) && oldProfileName != _scExportProfile.ProfileName)
-            _scExportProfileService?.DeleteProfile(oldProfileName);
         _scProfileDirty = false;
         if (CurrentEnvironment is not null)
             _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, _scExportProfile.ProfileName);

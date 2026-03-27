@@ -20,6 +20,9 @@ public class DevicesTabController : ITabController
     private bool _showHiddenDevices;
     private SKRect _showHiddenCheckboxBounds;
 
+    // D2 "Add vJoy device" link-button
+    private SKRect _addVjoyBounds;
+
     // Layout state cached from Draw — reused by mouse handlers to avoid duplicating layout math
     private float _cachedContentTop;
     private float _cachedLeftPanelWidth;
@@ -126,6 +129,7 @@ public class DevicesTabController : ITabController
         if (HandleCategoryTabClick()) return;
         if (HandleDeviceActionClick(e)) return;
         if (HandleHiddenCheckboxClick(e)) return;
+        if (HandleAddVjoyClick(e)) return;
         if (HandleSilhouetteClick(e)) return;
         if (HandleVJoyActionClick(e)) return;
         if (HandleForwardingClick(e)) return;
@@ -168,6 +172,14 @@ public class DevicesTabController : ITabController
         _ctx.AppSettings.DevicesIncludeHidden = _showHiddenDevices;
         EnsureVisibleDeviceSelected();
         _ctx.MarkDirty();
+        return true;
+    }
+
+    private bool HandleAddVjoyClick(MouseEventArgs e)
+    {
+        if (_addVjoyBounds.IsEmpty || !_addVjoyBounds.Contains(e.X, e.Y))
+            return false;
+        AddVJoyDevice();
         return true;
     }
 
@@ -364,6 +376,9 @@ public class DevicesTabController : ITabController
             _ctx.OwnerForm.Cursor = Cursors.Hand;
 
         if (_showHiddenCheckboxBounds.HitTest(e.X, e.Y))
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+
+        if (_addVjoyBounds.HitTest(e.X, e.Y))
             _ctx.OwnerForm.Cursor = Cursors.Hand;
     }
 
@@ -641,7 +656,7 @@ public class DevicesTabController : ITabController
             }
         }
 
-        // Bottom row: "Include hidden" checkbox (only when on physical devices tab)
+        // Bottom row: "Include hidden" checkbox (D1) or "+ Add vJoy device" link (D2)
         if (_devCat.Active == 0)
         {
             const float checkboxSize = 14f;
@@ -652,10 +667,28 @@ public class DevicesTabController : ITabController
             _showHiddenCheckboxBounds = new SKRect(cbX, cbY, cbX + checkboxSize, cbY + checkboxH);
             bool cbHovered = _showHiddenCheckboxBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
             FUIWidgets.DrawCheckboxWithLabel(canvas, _showHiddenCheckboxBounds, _showHiddenDevices, cbHovered, "Include hidden", 12f);
+            _addVjoyBounds = SKRect.Empty;
         }
         else
         {
             _showHiddenCheckboxBounds = SKRect.Empty;
+
+            if (_ctx.VJoyService.IsInitialized)
+            {
+                const float fontSize = 12f;
+                const string label = "+ Add vJoy device";
+                float textW = FUIRenderer.MeasureText(label, fontSize);
+                float lx = contentBounds.Left + pad;
+                float ly = bounds.Bottom - pad - 10f;
+                _addVjoyBounds = new SKRect(lx, ly - 8f, lx + textW, ly + 8f);
+                bool hovered = _addVjoyBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                var color = hovered ? FUIColors.TextBright : FUIColors.TextDim;
+                FUIRenderer.DrawText(canvas, label, new SKPoint(lx, ly + 3f), color, fontSize);
+            }
+            else
+            {
+                _addVjoyBounds = SKRect.Empty;
+            }
         }
     }
 
@@ -1586,6 +1619,90 @@ public class DevicesTabController : ITabController
             FUIMessageBox.ShowError(_ctx.OwnerForm,
                 $"Failed to reconfigure vJoy device:\n{ex.Message}",
                 "Configuration Failed");
+            return;
+        }
+
+        _ctx.RefreshVJoyDevices?.Invoke();
+        _ctx.RefreshDevices?.Invoke();
+        _ctx.InvalidateCanvas();
+    }
+
+    private void AddVJoyDevice()
+    {
+        string? configPath = DriverSetupManager.GetVJoyConfigPath();
+        if (configPath is null)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "vJoyConfig.exe was not found in your vJoy installation.\n\n" +
+                "Please ensure vJoy is installed correctly.",
+                "vJoy Not Found");
+            return;
+        }
+
+        // Find the next available vJoy slot (1-16)
+        var existingIds = _ctx.VJoyDevices.Select(v => v.Id).ToHashSet();
+        uint newId = 0;
+        for (uint id = 1; id <= 16; id++)
+        {
+            if (!existingIds.Contains(id))
+            {
+                newId = id;
+                break;
+            }
+        }
+
+        if (newId == 0)
+        {
+            FUIMessageBox.ShowWarning(_ctx.OwnerForm,
+                "All 16 vJoy device slots are in use.",
+                "No Slots Available");
+            return;
+        }
+
+        var config = VJoyConfigDialog.ShowConfig(_ctx.OwnerForm, $"vJoy Device {newId}");
+        if (config is null) return;
+
+        string args = $"{newId} -f";
+        if (config.AxisFlags.Count > 0)
+            args += $" -a {string.Join(" ", config.AxisFlags)}";
+        if (config.ButtonCount > 0)
+            args += $" -b {config.ButtonCount}";
+        if (config.PovCount > 0)
+            args += $" -p {config.PovCount}";
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = configPath,
+                Arguments = args,
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            process?.WaitForExit(15000);
+
+            int exitCode = process?.ExitCode ?? -1;
+            if (exitCode != 0)
+            {
+                FUIMessageBox.ShowError(_ctx.OwnerForm,
+                    $"vJoyConfig.exe reported failure (exit code {exitCode}).\n\n" +
+                    "The device may not have been created.",
+                    "Creation Failed");
+                return;
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            return; // User cancelled UAC
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            FUIMessageBox.ShowError(_ctx.OwnerForm,
+                $"Failed to create vJoy device:\n{ex.Message}",
+                "Creation Failed");
             return;
         }
 

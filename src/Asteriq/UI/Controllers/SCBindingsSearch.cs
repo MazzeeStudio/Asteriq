@@ -109,10 +109,12 @@ public static class SCBindingsSearch
             }
             else if (vjoyDeviceId.HasValue)
             {
-                // vJoy column: must match this specific vJoy slot (not a physical binding)
-                if (b.DeviceType != SCDeviceType.Joystick
-                    || b.PhysicalDeviceId is not null
-                    || b.VJoyDevice != vjoyDeviceId.Value)
+                // vJoy column: must match this specific vJoy slot (not a physical binding),
+                // either as the primary binding or via a SharedWith entry.
+                if (b.DeviceType != SCDeviceType.Joystick || b.PhysicalDeviceId is not null)
+                    continue;
+                if (b.VJoyDevice != vjoyDeviceId.Value
+                    && !b.SharedWith.Any(s => s.VJoySlot == vjoyDeviceId.Value))
                     continue;
             }
             else if (physicalDeviceId is not null)
@@ -125,10 +127,6 @@ public static class SCBindingsSearch
             {
                 // No column constraint — accept any binding
             }
-
-            // ── Exact input name match ──────────────────────────────────────
-            if (!b.InputName.Equals(capturedInput, StringComparison.OrdinalIgnoreCase))
-                continue;
 
             // ── Exact modifier match ────────────────────────────────────────
             if (capturedModifier is null)
@@ -144,7 +142,22 @@ public static class SCBindingsSearch
                     continue;
             }
 
-            return true;
+            // ── Exact input name match (primary) ────────────────────────────
+            if (b.InputName.Equals(capturedInput, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // ── Shared binding match ────────────────────────────────────────
+            // The primary binding lives on a different vJoy slot, but a SharedWith
+            // entry may reference the captured column + input.
+            if (vjoyDeviceId.HasValue)
+            {
+                foreach (var shared in b.SharedWith)
+                {
+                    if (shared.VJoySlot == vjoyDeviceId.Value
+                        && shared.InputName.Equals(capturedInput, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
         }
 
         return false;

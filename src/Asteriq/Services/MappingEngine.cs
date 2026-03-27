@@ -16,6 +16,14 @@ public class MappingEngine : IMappingEngine
     private readonly Dictionary<string, bool[]> _deviceButtonValues = new();
     private readonly Dictionary<string, int[]> _deviceHatValues = new();
     private readonly Dictionary<Guid, float> _mergeAxisCache = new();
+
+    // Tracks which mappings currently assert "pressed" for each vJoy button.
+    // When multiple mappings target the same button (e.g. shared bindings),
+    // the output is true if ANY mapping asserts pressed — even across separate
+    // device polling cycles. This prevents two mappings from fighting.
+    private readonly Dictionary<(uint vjoyDevice, int buttonIndex), HashSet<Guid>> _buttonPressedBy = new();
+    private readonly HashSet<(uint vjoyDevice, int buttonIndex)> _dirtyButtonOutputs = new();
+    private readonly Dictionary<(uint vjoyDevice, int buttonIndex), bool> _lastButtonState = new();
     private readonly object _lock = new();
 
     private MappingProfile? _activeProfile;
@@ -52,6 +60,9 @@ public class MappingEngine : IMappingEngine
         {
             _activeProfile = profile;
             _mergeAxisCache.Clear();
+            _buttonPressedBy.Clear();
+            _dirtyButtonOutputs.Clear();
+            _lastButtonState.Clear();
 
             // Initialize merge cache for axis mappings with multiple inputs
             foreach (var mapping in profile.AxisMappings.Where(m => m.Inputs.Count > 1))
@@ -140,16 +151,13 @@ public class MappingEngine : IMappingEngine
                     if (input.DeviceName == state.DeviceName && input.Index < state.Buttons.Length)
                     {
                         bool pressed = state.Buttons[input.Index];
-
-                        // Handle inversion
                         if (mapping.Invert)
                             pressed = !pressed;
-
-                        // Output to vJoy (button indices are 1-based in vJoy)
-                        _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index + 1, pressed);
+                        CollectButtonOutput(mapping.Output.VJoyDevice, mapping.Output.Index, pressed, mapping.Id);
                     }
                 }
             }
+            FlushButtonOutputs();
 
             // Process all hat mappings for this device
             foreach (var mapping in _activeProfile.HatMappings)
@@ -221,22 +229,23 @@ public class MappingEngine : IMappingEngine
                 ProcessAxisMapping(mapping, deviceId, state);
             }
 
-            // Process button mappings (filtered by active layer)
+            // Process button mappings — outputs are tracked per-mapping persistently.
+            // When multiple mappings target the same vJoy button (e.g. shared bindings),
+            // the output is true if ANY mapping asserts pressed, even across device polls.
             foreach (var mapping in _activeProfile.ButtonMappings.Where(m => m.Enabled && IsMappingActive(m)))
             {
                 ProcessButtonMapping(mapping, deviceId, state);
             }
+            foreach (var mapping in _activeProfile.AxisToButtonMappings.Where(m => m.Enabled && IsMappingActive(m)))
+            {
+                ProcessAxisToButtonMapping(mapping, deviceId, state);
+            }
+            FlushButtonOutputs();
 
             // Process hat mappings (filtered by active layer)
             foreach (var mapping in _activeProfile.HatMappings.Where(m => m.Enabled && IsMappingActive(m)))
             {
                 ProcessHatMapping(mapping, deviceId, state);
-            }
-
-            // Process axis-to-button mappings (filtered by active layer)
-            foreach (var mapping in _activeProfile.AxisToButtonMappings.Where(m => m.Enabled && IsMappingActive(m)))
-            {
-                ProcessAxisToButtonMapping(mapping, deviceId, state);
             }
 
             // Process button-to-axis mappings (filtered by active layer)
@@ -390,10 +399,10 @@ public class MappingEngine : IMappingEngine
         if (mapping.Invert)
             outputPressed = !outputPressed;
 
-        // Output
+        // Output — vJoy buttons are collected and flushed with OR dedup
         if (mapping.Output.Type == OutputType.VJoyButton)
         {
-            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index + 1, outputPressed); // vJoy buttons are 1-indexed
+            CollectButtonOutput(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed, mapping.Id);
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
@@ -529,10 +538,10 @@ public class MappingEngine : IMappingEngine
         // Apply inversion
         bool outputPressed = mapping.Invert ? !shouldActivate : shouldActivate;
 
-        // Output
+        // Output — vJoy buttons are collected and flushed with OR dedup
         if (mapping.Output.Type == OutputType.VJoyButton)
         {
-            _vjoy.SetButton(mapping.Output.VJoyDevice, mapping.Output.Index + 1, outputPressed); // vJoy buttons are 1-indexed
+            CollectButtonOutput(mapping.Output.VJoyDevice, mapping.Output.Index, outputPressed, mapping.Id);
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
@@ -660,6 +669,40 @@ public class MappingEngine : IMappingEngine
             default:
                 return inputPressed;
         }
+    }
+
+    private void CollectButtonOutput(uint vjoyDevice, int buttonIndex, bool pressed, Guid mappingId)
+    {
+        var key = (vjoyDevice, buttonIndex);
+        if (!_buttonPressedBy.TryGetValue(key, out var sources))
+        {
+            sources = new HashSet<Guid>();
+            _buttonPressedBy[key] = sources;
+        }
+
+        if (pressed)
+            sources.Add(mappingId);
+        else
+            sources.Remove(mappingId);
+
+        _dirtyButtonOutputs.Add(key);
+    }
+
+    private void FlushButtonOutputs()
+    {
+        foreach (var key in _dirtyButtonOutputs)
+        {
+            bool anyPressed = _buttonPressedBy.TryGetValue(key, out var sources) && sources.Count > 0;
+
+            // Only write to vJoy when the state actually changes — avoids sending
+            // redundant HID reports that can reset hold-detection timers in games.
+            if (!_lastButtonState.TryGetValue(key, out var lastState) || lastState != anyPressed)
+            {
+                _vjoy.SetButton(key.vjoyDevice, key.buttonIndex + 1, anyPressed); // vJoy buttons are 1-indexed
+                _lastButtonState[key] = anyPressed;
+            }
+        }
+        _dirtyButtonOutputs.Clear();
     }
 
     private static float ApplyMerge(List<float> values, MergeOperation op)

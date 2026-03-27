@@ -255,15 +255,6 @@ public class SCXmlExportService
             }
 
             actionElement.Add(rebindElement);
-
-            // Write shared inputs as sibling elements so they round-trip across export/import.
-            // SC ignores unknown child elements, so these are safe to include.
-            foreach (var shared in binding.SharedWith)
-            {
-                int sharedScInstance = profile.GetSCInstance(shared.VJoySlot);
-                actionElement.Add(new XElement("asteriq_shared",
-                    new XAttribute("input", $"js{sharedScInstance}_{shared.InputName}")));
-            }
         }
 
         return actionElement;
@@ -436,28 +427,9 @@ public class SCXmlExportService
                         }
                     }
 
-                    // Parse <asteriq_shared> siblings and attach to the primary JS binding.
-                    // VJoySlot is stored as SC instance number (same convention as VJoyDevice during import).
-                    var primaryJsBinding = actionBindings.FirstOrDefault(b => b.DeviceType == SCDeviceType.Joystick);
-                    if (primaryJsBinding is not null)
-                    {
-                        foreach (var sharedEl in action.Elements("asteriq_shared"))
-                        {
-                            var sharedInput = sharedEl.Attribute("input")?.Value;
-                            if (string.IsNullOrEmpty(sharedInput)) continue;
-
-                            var underscoreIdx = sharedInput.IndexOf('_');
-                            if (underscoreIdx > 2 && sharedInput.StartsWith("js") &&
-                                uint.TryParse(sharedInput[2..underscoreIdx], out var slot))
-                            {
-                                primaryJsBinding.SharedWith.Add(new SCSharedInput
-                                {
-                                    VJoySlot = slot,
-                                    InputName = sharedInput[(underscoreIdx + 1)..]
-                                });
-                            }
-                        }
-                    }
+                    // Note: SharedWith data is preserved in the Asteriq JSON profile,
+                    // not in the SC XML export. Legacy <asteriq_shared> elements in
+                    // imported files are ignored — they broke SC's action parsing.
                 }
             }
 

@@ -25,6 +25,7 @@ public class SCSharedBindingDialog : FUIBaseDialog
     private readonly string _primaryInputDisplay;
     private readonly string _secondaryDeviceLabel;
     private readonly string _secondaryInputDisplay;
+    private readonly List<string> _affectedActionNames;
     // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
 #pragma warning disable CA2213
     private SKControl _canvas = null!;
@@ -46,13 +47,15 @@ public class SCSharedBindingDialog : FUIBaseDialog
         string primaryDeviceLabel,
         string primaryInputDisplay,
         string secondaryDeviceLabel,
-        string secondaryInputDisplay)
+        string secondaryInputDisplay,
+        List<string>? affectedActionNames = null)
     {
         _actionDisplayName = actionDisplayName;
         _primaryDeviceLabel = primaryDeviceLabel;
         _primaryInputDisplay = primaryInputDisplay;
         _secondaryDeviceLabel = secondaryDeviceLabel;
         _secondaryInputDisplay = secondaryInputDisplay;
+        _affectedActionNames = affectedActionNames ?? new();
 
         InitializeComponent();
     }
@@ -67,7 +70,8 @@ public class SCSharedBindingDialog : FUIBaseDialog
         KeyPreview = true;
 
         float s = FUIRenderer.CanvasScaleFactor;
-        ClientSize = new Size((int)(480 * s), (int)(230 * s));
+        int extraHeight = _affectedActionNames.Count > 0 ? Math.Min(_affectedActionNames.Count, 8) * 16 + 28 : 0;
+        ClientSize = new Size((int)(480 * s), (int)((230 + extraHeight) * s));
 
         _canvas = new SKControl { Dock = DockStyle.Fill };
         _canvas.PaintSurface += OnPaintSurface;
@@ -123,8 +127,26 @@ public class SCSharedBindingDialog : FUIBaseDialog
         FUIRenderer.DrawText(canvas, desc2, new SKPoint(20, y), FUIColors.TextDim, 13f);
         y += 28;
 
+        // Affected actions list
+        if (_affectedActionNames.Count > 0)
+        {
+            FUIRenderer.DrawText(canvas, "Sharing will also affect these bindings on " + _primaryInputDisplay + ":",
+                new SKPoint(20, y), FUIColors.Warning, 11f, true);
+            y += 16;
+            int shown = 0;
+            foreach (var name in _affectedActionNames)
+            {
+                if (shown >= 8) { FUIRenderer.DrawText(canvas, $"  + {_affectedActionNames.Count - 8} more...", new SKPoint(20, y), FUIColors.TextDim, 11f); y += 16; break; }
+                FUIRenderer.DrawText(canvas, $"  • {name}", new SKPoint(20, y), FUIColors.TextPrimary, 11f);
+                y += 16;
+                shown++;
+            }
+            y += 12;
+        }
+
         // Share option explanation
-        FUIRenderer.DrawText(canvas, "SHARE — reroute the physical button on " + _secondaryDeviceLabel +
+        string shareLabel = _affectedActionNames.Count > 0 ? "SHARE ALL" : "SHARE";
+        FUIRenderer.DrawText(canvas, shareLabel + " — reroute the physical button on " + _secondaryDeviceLabel +
             " so both inputs trigger the same action.",
             new SKPoint(20, y), FUIColors.TextDim, 11f);
         y += 18;
@@ -146,8 +168,9 @@ public class SCSharedBindingDialog : FUIBaseDialog
         FUIRenderer.DrawButton(canvas, _cancelButtonBounds, "CANCEL", _hoveredButton == 0 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Share (middle) — primary-colored
-        _shareButtonBounds = new SKRect(160, buttonY, 280, buttonY + buttonHeight);
-        FUIRenderer.DrawButton(canvas, _shareButtonBounds, "SHARE", _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+        string shareBtnLabel = _affectedActionNames.Count > 0 ? "SHARE ALL" : "SHARE";
+        _shareButtonBounds = new SKRect(150, buttonY, 300, buttonY + buttonHeight);
+        FUIRenderer.DrawButton(canvas, _shareButtonBounds, shareBtnLabel, _hoveredButton == 1 ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
         // Replace (right)
         _replaceButtonBounds = new SKRect(350, buttonY, 460, buttonY + buttonHeight);

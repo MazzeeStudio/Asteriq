@@ -613,12 +613,25 @@ public partial class SCBindingsTabController
                 string primaryInputDisplay = SCBindingsRenderer.FormatInputName(existingOnOtherDevice.InputName);
                 string secondaryInputDisplay = SCBindingsRenderer.FormatInputName(inputName);
 
+                // Gather ALL other actions on the same primary button (same vJoy device + input)
+                var otherAffected = _scExportProfile.Bindings
+                    .Where(b => b.DeviceType == SCDeviceType.Joystick &&
+                        b.PhysicalDeviceId is null &&
+                        b.VJoyDevice == existingOnOtherDevice.VJoyDevice &&
+                        b.InputName == existingOnOtherDevice.InputName &&
+                        !(b.ActionMap == action.ActionMap && b.ActionName == action.ActionName))
+                    .ToList();
+                var affectedNames = otherAffected
+                    .Select(b => SCCategoryMapper.FormatActionName(b.ActionName))
+                    .Distinct().ToList();
+
                 using var sharedDialog = new SCSharedBindingDialog(
                     SCCategoryMapper.FormatActionName(action.ActionName),
                     $"JS{primaryInstance}",
                     primaryInputDisplay,
                     $"JS{col.SCInstance}",
-                    secondaryInputDisplay);
+                    secondaryInputDisplay,
+                    affectedNames);
                 sharedDialog.ShowDialog(_ctx.OwnerForm);
 
                 switch (sharedDialog.Result)
@@ -634,12 +647,25 @@ public partial class SCBindingsTabController
                         break;
 
                     case SCSharedBindingResult.Share:
-                        // Reroute physical button + update SharedWith — do not create a new SC binding
+                        // Reroute physical button + update SharedWith on ALL affected bindings
                         PerformShare(existingOnOtherDevice, col.VJoyDeviceId, inputName);
+                        foreach (var affected in otherAffected)
+                        {
+                            if (!affected.SharedWith.Any(s => s.VJoySlot == col.VJoyDeviceId))
+                            {
+                                affected.SharedWith.Add(new SCSharedInput
+                                {
+                                    VJoySlot = col.VJoyDeviceId,
+                                    InputName = inputName,
+                                    ReroutedMappingIds = new List<Guid>() // Reroute already done by PerformShare
+                                });
+                            }
+                        }
                         _scExportProfileService?.SaveProfile(_scExportProfile);
                         UpdateSharedCells();
                         UpdateConflictingBindings();
-                        SetStatus($"Shared: JS{col.SCInstance} {secondaryInputDisplay} → JS{primaryInstance} {primaryInputDisplay}");
+                        int totalShared = 1 + otherAffected.Count;
+                        SetStatus($"Shared: JS{col.SCInstance} {secondaryInputDisplay} → JS{primaryInstance} {primaryInputDisplay} ({totalShared} action(s))");
                         _ctx.MarkDirty();
                         return; // Don't create a new binding — the share is the assignment
                 }
@@ -741,7 +767,9 @@ public partial class SCBindingsTabController
 
         var reroutedIds = new List<Guid>();
 
-        // Reroute in the active mapping profile if possible
+        // Reroute secondary mappings to output the same vJoy button as the primary.
+        // The mapping engine OR's together all outputs to the same vJoy button, so both
+        // the original and rerouted mappings coexist without fighting.
         var mappingProfile = _ctx.ProfileManager.ActiveProfile;
         if (mappingProfile is not null && secondaryButtonIndex >= 0 && primaryButtonIndex >= 0)
         {
@@ -759,6 +787,7 @@ public partial class SCBindingsTabController
 
             if (reroutedIds.Count > 0)
             {
+                _ctx.ProfileManager.SaveActiveProfile();
                 _ctx.OnMappingsChanged();
                 System.Diagnostics.Debug.WriteLine(
                     $"[SCBindings] Rerouted {reroutedIds.Count} mapping(s) from vJoy{secondaryVJoySlot}/{secondaryInputName} → vJoy{primaryBinding.VJoyDevice}/{primaryBinding.InputName}");
@@ -798,15 +827,56 @@ public partial class SCBindingsTabController
         string primaryInputDisplay = SCBindingsRenderer.FormatInputName(primaryBinding.InputName);
         string secondaryInputDisplay = SCBindingsRenderer.FormatInputName(sharedEntry.InputName);
 
+        // Find ALL bindings that share the same button (same primary vJoy device + input + secondary slot)
+        var allSharedBindings = _scExportProfile.Bindings
+            .Where(b => b.DeviceType == SCDeviceType.Joystick &&
+                b.PhysicalDeviceId is null &&
+                b.VJoyDevice == linkInfo.PrimaryVJoyDevice &&
+                b.InputName == primaryBinding.InputName &&
+                b.SharedWith.Any(s => s.VJoySlot == col.VJoyDeviceId))
+            .ToList();
+
+        string message;
+        if (allSharedBindings.Count > 1)
+        {
+            var otherNames = allSharedBindings
+                .Where(b => !(b.ActionMap == action.ActionMap && b.ActionName == action.ActionName))
+                .Select(b => SCCategoryMapper.FormatActionName(b.ActionName))
+                .Distinct().ToList();
+            message = $"{secondaryInputDisplay} on JS{col.SCInstance} is shared with JS{primaryInstance} / {primaryInputDisplay}.\n\n" +
+                $"Unsharing will also affect:\n" +
+                string.Join("\n", otherNames.Select(n => $"  • {n}")) +
+                $"\n\nUnshare all {allSharedBindings.Count} binding(s)?";
+        }
+        else
+        {
+            message = $"{secondaryInputDisplay} on JS{col.SCInstance} is shared with JS{primaryInstance} / {primaryInputDisplay}.\n\nUnshare this binding?";
+        }
+
         using var dialog = new FUIConfirmDialog(
             "Shared Binding",
-            $"{secondaryInputDisplay} on JS{col.SCInstance} is shared with JS{primaryInstance} / {primaryInputDisplay}.\n\nUnshare this binding?",
+            message,
             "Unshare", "Cancel");
 
         if (dialog.ShowDialog(_ctx.OwnerForm) != DialogResult.Yes)
             return;
 
+        // Unshare the primary binding (restores the vJoy mapping reroute)
         PerformUnshare(primaryBinding, sharedEntry, col.SCInstance, primaryInstance, primaryInputDisplay, secondaryInputDisplay);
+
+        // Remove SharedWith entries from all other affected bindings
+        foreach (var binding in allSharedBindings)
+        {
+            if (binding == primaryBinding) continue;
+            var entry = binding.SharedWith.FirstOrDefault(s => s.VJoySlot == col.VJoyDeviceId);
+            if (entry is not null)
+                binding.SharedWith.Remove(entry);
+        }
+
+        // Save is already done inside PerformUnshare, but we modified additional bindings
+        _scExportProfileService?.SaveProfile(_scExportProfile);
+        UpdateSharedCells();
+        _ctx.MarkDirty();
     }
 
     /// <summary>
@@ -822,7 +892,7 @@ public partial class SCBindingsTabController
     {
         int secondaryButtonIndex = ParseButtonIndex(sharedEntry.InputName);
 
-        // Restore rerouted mappings
+        // Restore rerouted mappings back to their original output
         var mappingProfile = _ctx.ProfileManager.ActiveProfile;
         if (mappingProfile is not null && secondaryButtonIndex >= 0 && sharedEntry.ReroutedMappingIds.Count > 0)
         {
@@ -835,6 +905,7 @@ public partial class SCBindingsTabController
                     mapping.Output.Index = secondaryButtonIndex;
                 }
             }
+            _ctx.ProfileManager.SaveActiveProfile();
             _ctx.OnMappingsChanged();
             System.Diagnostics.Debug.WriteLine(
                 $"[SCBindings] Restored {sharedEntry.ReroutedMappingIds.Count} mapping(s) back to vJoy{sharedEntry.VJoySlot}/{sharedEntry.InputName}");

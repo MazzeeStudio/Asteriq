@@ -112,6 +112,36 @@ public class ApplicationSettingsService : IApplicationSettingsService
         }
     }
 
+    public bool LaunchOnWindowsStart
+    {
+        get => _cachedSettings.LaunchOnWindowsStart;
+        set
+        {
+            _cachedSettings.LaunchOnWindowsStart = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public bool AutoStartForwarding
+    {
+        get => _cachedSettings.AutoStartForwarding;
+        set
+        {
+            _cachedSettings.AutoStartForwarding = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
+    public bool OpenMinimized
+    {
+        get => _cachedSettings.OpenMinimized;
+        set
+        {
+            _cachedSettings.OpenMinimized = value;
+            SaveSettings(_cachedSettings);
+        }
+    }
+
 
     public string? LastSCExportProfile
     {
@@ -406,6 +436,9 @@ public class ApplicationSettingsService : IApplicationSettingsService
 
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
         public bool CloseToTray { get; set; }
+        public bool LaunchOnWindowsStart { get; set; }
+        public bool AutoStartForwarding { get; set; }
+        public bool OpenMinimized { get; set; }
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public bool SCBindingsShowPhysicalHeaders { get; set; } = true;

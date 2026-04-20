@@ -50,6 +50,22 @@ public interface IApplicationSettingsService
     bool CloseToTray { get; set; }
 
     /// <summary>
+    /// Launch Asteriq automatically when the user logs into Windows (HKCU Run key).
+    /// </summary>
+    bool LaunchOnWindowsStart { get; set; }
+
+    /// <summary>
+    /// Start input forwarding automatically once the active profile has loaded on startup.
+    /// </summary>
+    bool AutoStartForwarding { get; set; }
+
+    /// <summary>
+    /// Start Asteriq minimized. Combined with <see cref="CloseToTray"/>, starts hidden in the tray;
+    /// otherwise starts minimized to the taskbar.
+    /// </summary>
+    bool OpenMinimized { get; set; }
+
+    /// <summary>
     /// Get or set the last used SC export profile name
     /// </summary>
     string? LastSCExportProfile { get; set; }

@@ -32,6 +32,9 @@ public class SettingsTabController : ITabController, IDisposable
     private SKRect _closeToTrayToggleBounds;
     private SKRect _clientOnlyToggleBounds;
     private SKRect _checkUpdatesToggleBounds;
+    private SKRect _launchOnStartToggleBounds;
+    private SKRect _autoStartFwdToggleBounds;
+    private SKRect _openMinimizedToggleBounds;
     private string? _draggingBgSlider;
 
     // Support panel button bounds
@@ -76,6 +79,9 @@ public class SettingsTabController : ITabController, IDisposable
     private ToggleAnim _clientOnlyT;
     private ToggleAnim _networkEnabledT;
     private ToggleAnim _checkUpdatesT;
+    private ToggleAnim _launchOnStartT;
+    private ToggleAnim _autoStartFwdT;
+    private ToggleAnim _openMinimizedT;
     private const float ToggleLerpSpeed = 0.14f;  // per 60Hz tick ≈ ~120 ms transition
 
     // Settings right panel accordion state — PanelVisual | PanelNetwork | PanelHidHide
@@ -135,6 +141,9 @@ public class SettingsTabController : ITabController, IDisposable
         _clientOnlyT    = new ToggleAnim { T = ctx.AppSettings.ClientOnlyMode ? 1f : 0f };
         _networkEnabledT = new ToggleAnim { T = ctx.AppSettings.NetworkEnabled ? 1f : 0f };
         _checkUpdatesT  = new ToggleAnim { T = ctx.AppSettings.AutoCheckUpdates ? 1f : 0f };
+        _launchOnStartT = new ToggleAnim { T = ctx.AppSettings.LaunchOnWindowsStart ? 1f : 0f };
+        _autoStartFwdT  = new ToggleAnim { T = ctx.AppSettings.AutoStartForwarding ? 1f : 0f };
+        _openMinimizedT = new ToggleAnim { T = ctx.AppSettings.OpenMinimized ? 1f : 0f };
         var savedPanel = ctx.AppSettings.SettingsRightPanel ?? PanelVisual;
         _settingsRightPanelActive = (savedPanel == PanelNetwork && !ctx.AppSettings.NetworkEnabled) ? PanelVisual : savedPanel;
     }
@@ -206,7 +215,9 @@ public class SettingsTabController : ITabController, IDisposable
         // Toggles
         if (_autoLoadToggleBounds.Contains(pt) || _closeToTrayToggleBounds.Contains(pt) ||
             _clientOnlyToggleBounds.Contains(pt) || _checkUpdatesToggleBounds.Contains(pt) ||
-            _networkEnabledToggleBounds.Contains(pt))
+            _networkEnabledToggleBounds.Contains(pt) ||
+            _launchOnStartToggleBounds.Contains(pt) || _autoStartFwdToggleBounds.Contains(pt) ||
+            _openMinimizedToggleBounds.Contains(pt))
         { _ctx.OwnerForm.Cursor = Cursors.Hand; return; }
 
         // Background sliders
@@ -281,6 +292,9 @@ public class SettingsTabController : ITabController, IDisposable
         _clientOnlyT.Update(settings.ClientOnlyMode);
         _networkEnabledT.Update(settings.NetworkEnabled);
         _checkUpdatesT.Update(settings.AutoCheckUpdates);
+        _launchOnStartT.Update(settings.LaunchOnWindowsStart);
+        _autoStartFwdT.Update(settings.AutoStartForwarding);
+        _openMinimizedT.Update(settings.OpenMinimized);
         _cloakingT.Update(_hidHideCloaking);
         _inverseT.Update(_hidHideInverse);
 
@@ -636,6 +650,39 @@ public class SettingsTabController : ITabController, IDisposable
         float clientOnlyToggleY = y + (rowHeight - toggleHeight) / 2;
         _clientOnlyToggleBounds = new SKRect(rightMargin - toggleWidth, clientOnlyToggleY, rightMargin, clientOnlyToggleY + toggleHeight);
         FUIWidgets.DrawToggleSwitch(canvas, _clientOnlyToggleBounds, _clientOnlyT.T, _ctx.MousePosition);
+        y += rowHeight + 4;
+
+        // STARTUP section
+        FUIWidgets.DrawSectionLabel(canvas, "STARTUP", leftMargin, ref y);
+
+        // Launch on Windows startup
+        float launchLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float launchLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Launch on Windows startup", new SKPoint(leftMargin, launchLabelY),
+            launchLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float launchToggleY = y + (rowHeight - toggleHeight) / 2;
+        _launchOnStartToggleBounds = new SKRect(rightMargin - toggleWidth, launchToggleY, rightMargin, launchToggleY + toggleHeight);
+        FUIWidgets.DrawToggleSwitch(canvas, _launchOnStartToggleBounds, _launchOnStartT.T, _ctx.MousePosition);
+        y += rowHeight + sectionSpacing;
+
+        // Start forwarding on startup
+        float autoFwdLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float autoFwdLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Start forwarding on startup", new SKPoint(leftMargin, autoFwdLabelY),
+            autoFwdLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float autoFwdToggleY = y + (rowHeight - toggleHeight) / 2;
+        _autoStartFwdToggleBounds = new SKRect(rightMargin - toggleWidth, autoFwdToggleY, rightMargin, autoFwdToggleY + toggleHeight);
+        FUIWidgets.DrawToggleSwitch(canvas, _autoStartFwdToggleBounds, _autoStartFwdT.T, _ctx.MousePosition);
+        y += rowHeight + sectionSpacing;
+
+        // Open minimized
+        float openMinLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
+        float openMinLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;
+        FUIRenderer.DrawTextTruncated(canvas, "Open minimised", new SKPoint(leftMargin, openMinLabelY),
+            openMinLabelMaxWidth, FUIColors.TextPrimary, 14f);
+        float openMinToggleY = y + (rowHeight - toggleHeight) / 2;
+        _openMinimizedToggleBounds = new SKRect(rightMargin - toggleWidth, openMinToggleY, rightMargin, openMinToggleY + toggleHeight);
+        FUIWidgets.DrawToggleSwitch(canvas, _openMinimizedToggleBounds, _openMinimizedT.T, _ctx.MousePosition);
         y += rowHeight + 4;
 
         // DRIVERS section
@@ -1849,6 +1896,41 @@ public class SettingsTabController : ITabController, IDisposable
         {
             _ctx.AppSettings.ClientOnlyMode = !_ctx.AppSettings.ClientOnlyMode;
             _ctx.MarkDirty();
+            return;
+        }
+
+        // Launch on Windows startup toggle
+        if (_launchOnStartToggleBounds.Contains(pt))
+        {
+            bool next = !_ctx.AppSettings.LaunchOnWindowsStart;
+            try
+            {
+                WindowsStartupService.SetEnabled(next);
+                _ctx.AppSettings.LaunchOnWindowsStart = next;
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException
+                                    or UnauthorizedAccessException
+                                    or IOException)
+            {
+                Log.Warning(ex, "Failed to update Windows startup registry entry");
+            }
+            _ctx.InvalidateCanvas();
+            return;
+        }
+
+        // Start forwarding on startup toggle
+        if (_autoStartFwdToggleBounds.Contains(pt))
+        {
+            _ctx.AppSettings.AutoStartForwarding = !_ctx.AppSettings.AutoStartForwarding;
+            _ctx.InvalidateCanvas();
+            return;
+        }
+
+        // Open minimized toggle
+        if (_openMinimizedToggleBounds.Contains(pt))
+        {
+            _ctx.AppSettings.OpenMinimized = !_ctx.AppSettings.OpenMinimized;
+            _ctx.InvalidateCanvas();
             return;
         }
 

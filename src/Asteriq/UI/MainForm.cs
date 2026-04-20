@@ -265,6 +265,9 @@ public partial class MainForm : Form
         if (_appSettings.NetworkEnabled)
             InitializeNetworking();
 
+        // Apply startup preferences once the form is visible
+        Shown += OnStartupPreferencesApply;
+
         // Silent background update check — only if user has enabled auto-check
         if (_appSettings.AutoCheckUpdates)
             _ = _updateService.CheckAsync().ContinueWith(
@@ -272,6 +275,17 @@ public partial class MainForm : Form
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
+    }
+
+    private void OnStartupPreferencesApply(object? sender, EventArgs e)
+    {
+        Shown -= OnStartupPreferencesApply;
+
+        if (_appSettings.AutoStartForwarding)
+            StartForwarding();
+
+        if (_appSettings.OpenMinimized && _appSettings.CloseToTray)
+            Hide();
     }
 
     private void InitializeTabControllers(
@@ -1331,6 +1345,9 @@ public partial class MainForm : Form
         {
             StartPosition = FormStartPosition.CenterScreen;
         }
+
+        if (_appSettings.OpenMinimized)
+            WindowState = FormWindowState.Minimized;
     }
 
     private void ApplyFontScaleToWindowSize()

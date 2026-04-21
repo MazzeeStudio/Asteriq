@@ -1466,15 +1466,12 @@ public partial class MappingsTabController
         _ctx.OnMappingsChanged();
     }
 
-    private void UpdateMergeOperationForSelected(int mergeOpIndex)
+    private void UpdateMergeOperationForSelected(MergeOperation op)
     {
         var axisMapping = GetCurrentAxisMapping();
         if (axisMapping is null) return;
 
-        MergeOperation[] ops = { MergeOperation.Average, MergeOperation.Maximum, MergeOperation.Minimum, MergeOperation.Sum };
-        if (mergeOpIndex < 0 || mergeOpIndex >= ops.Length) return;
-
-        axisMapping.MergeOp = ops[mergeOpIndex];
+        axisMapping.MergeOp = op;
 
         var profile = _ctx.ProfileManager.ActiveProfile;
         if (profile is not null)

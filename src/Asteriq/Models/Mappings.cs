@@ -88,7 +88,13 @@ public enum MergeOperation
     Maximum,
 
     /// <summary>Sum (clamped to -1..1)</summary>
-    Sum
+    Sum,
+
+    /// <summary>Last-touched input wins; output snaps immediately (may jump)</summary>
+    LastSnap,
+
+    /// <summary>Last-touched input wins once its position crosses the current output (no jumps)</summary>
+    LastTakeover
 }
 
 /// <summary>

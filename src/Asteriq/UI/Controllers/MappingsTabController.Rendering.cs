@@ -683,6 +683,9 @@ public partial class MappingsTabController
         {
             DrawButtonSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
         }
+
+        // Merge-mode dropdown panel draws on top of subsequent content when open
+        DrawMergeDropdownOverlay(canvas);
     }
 
     private float DrawInputSourcesSection(SKCanvas canvas, float leftMargin, float rightMargin, float y)
@@ -830,14 +833,63 @@ public partial class MappingsTabController
         }
         else
         {
-            // Clear merge button bounds when not shown
-            for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
-                _mergeOpButtonBounds[i] = SKRect.Empty;
+            // Clear dropdown bounds when hidden so stale hit-tests don't fire
+            _merge.SelectorBounds = SKRect.Empty;
+            _merge.DropdownBounds = SKRect.Empty;
+            _merge.DropdownOpen = false;
             y += 8;  // Extra spacing when no merge selector
         }
 
         return y;
     }
+
+    // Ordered merge operations shown in the dropdown. Indices used by
+    // MergeModeDropdownState.HoveredIndex and panel item positions.
+    private static readonly MergeOperation[] s_mergeOps =
+    {
+        MergeOperation.Average,
+        MergeOperation.Maximum,
+        MergeOperation.Minimum,
+        MergeOperation.Sum,
+        MergeOperation.LastSnap,
+        MergeOperation.LastTakeover
+    };
+
+    private static string GetMergeOpLabel(MergeOperation op) => op switch
+    {
+        MergeOperation.Average => "Average",
+        MergeOperation.Maximum => "Maximum",
+        MergeOperation.Minimum => "Minimum",
+        MergeOperation.Sum => "Sum",
+        MergeOperation.LastSnap => "Last",
+        MergeOperation.LastTakeover => "Last",
+        _ => op.ToString()
+    };
+
+    private static string? GetMergeOpBadge(MergeOperation op) => op switch
+    {
+        MergeOperation.LastSnap => "SNAP",
+        MergeOperation.LastTakeover => "TAKEOVER",
+        _ => null
+    };
+
+    private static (SKColor bg, SKColor text) GetMergeOpBadgeColors(MergeOperation op) => op switch
+    {
+        MergeOperation.LastSnap => (FUIColors.Warning.WithAlpha(60), FUIColors.Warning),
+        MergeOperation.LastTakeover => (FUIColors.Active.WithAlpha(60), FUIColors.Active),
+        _ => (SKColors.Transparent, SKColors.Transparent)
+    };
+
+    private static string GetMergeOpDescription(MergeOperation op) => op switch
+    {
+        MergeOperation.Average => "Averages all input values",
+        MergeOperation.Maximum => "Uses highest input value",
+        MergeOperation.Minimum => "Uses lowest input value",
+        MergeOperation.Sum => "Adds values (clamped -1 to 1)",
+        MergeOperation.LastSnap => "Last-touched input wins; output snaps (may jump)",
+        MergeOperation.LastTakeover => "Last-touched wins after its position crosses the output (no jumps)",
+        _ => ""
+    };
 
     private float DrawMergeOperationSelector(SKCanvas canvas, float leftMargin, float rightMargin, float y)
     {
@@ -846,52 +898,129 @@ public partial class MappingsTabController
 
         FUIWidgets.DrawSectionLabel(canvas, "MERGE MODE", leftMargin, ref y);
 
-        // Four merge operation buttons in a row
-        string[] labels = { "AVG", "MAX", "MIN", "SUM" };
-        MergeOperation[] ops = { MergeOperation.Average, MergeOperation.Maximum, MergeOperation.Minimum, MergeOperation.Sum };
+        const float dropdownHeight = 28f;
+        _merge.SelectorBounds = new SKRect(leftMargin, y, rightMargin, y + dropdownHeight);
 
-        float width = rightMargin - leftMargin;
-        float buttonWidth = (width - 12) / 4; // 3 gaps of 4px each
-        float buttonHeight = 28f;  // 4px aligned, meets minimum touch target
+        // Draw dropdown chrome ourselves so the label + pill can be positioned precisely.
+        var bgColor = _merge.DropdownOpen ? FUIColors.Primary.WithAlpha(40)
+            : (_merge.SelectorHovered ? FUIColors.Primary.WithAlpha(30) : FUIColors.Background2);
+        using (var bgPaint = FUIRenderer.CreateFillPaint(bgColor))
+            canvas.DrawRect(_merge.SelectorBounds, bgPaint);
+        using (var framePaint = FUIRenderer.CreateStrokePaint(
+            _merge.DropdownOpen ? FUIColors.Primary : FUIColors.Frame))
+            canvas.DrawRect(_merge.SelectorBounds, framePaint);
 
-        for (int i = 0; i < 4; i++)
+        string label = GetMergeOpLabel(axisMapping.MergeOp);
+        string? badge = GetMergeOpBadge(axisMapping.MergeOp);
+
+        const float labelFont = 14f;
+        float labelX = _merge.SelectorBounds.Left + 8;
+        float labelBaselineY = _merge.SelectorBounds.MidY + 4;
+        FUIRenderer.DrawText(canvas, label, new SKPoint(labelX, labelBaselineY), FUIColors.TextPrimary, labelFont);
+
+        if (badge is not null)
         {
-            var btnBounds = new SKRect(
-                leftMargin + i * (buttonWidth + 4), y,
-                leftMargin + i * (buttonWidth + 4) + buttonWidth, y + buttonHeight);
-            _mergeOpButtonBounds[i] = btnBounds;
-
-            bool isActive = axisMapping.MergeOp == ops[i];
-            bool isHovered = _hoveredMergeOpButton == i;
-
-            var bgColor = isActive ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (isHovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-            var frameColor = isActive ? FUIColors.Active : (isHovered ? FUIColors.FrameBright : FUIColors.Frame);
-            var textColor = isActive ? FUIColors.TextBright : (isHovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-
-            using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-            canvas.DrawRoundRect(btnBounds, 3, 3, bgPaint);
-
-            using var framePaint = FUIRenderer.CreateStrokePaint(frameColor, isActive ? 2f : 1f);
-            canvas.DrawRoundRect(btnBounds, 3, 3, framePaint);
-
-            FUIRenderer.DrawTextCentered(canvas, labels[i], btnBounds, textColor, 13f);
+            float labelWidth = FUIRenderer.MeasureText(label, labelFont);
+            var (bgPill, txtPill) = GetMergeOpBadgeColors(axisMapping.MergeOp);
+            FUIWidgets.DrawPill(canvas, labelX + labelWidth + 6f, _merge.SelectorBounds.MidY, badge, bgPill, txtPill);
         }
 
-        y += buttonHeight + 4;
+        string arrow = _merge.DropdownOpen ? "▲" : "▼";
+        FUIRenderer.DrawText(canvas, arrow, new SKPoint(_merge.SelectorBounds.Right - 18, labelBaselineY),
+            FUIColors.TextDim, 13f);
 
-        // Description of current merge mode
-        string description = axisMapping.MergeOp switch
-        {
-            MergeOperation.Average => "Averages all input values",
-            MergeOperation.Maximum => "Uses highest input value",
-            MergeOperation.Minimum => "Uses lowest input value",
-            MergeOperation.Sum => "Adds values (clamped -1 to 1)",
-            _ => ""
-        };
-        FUIRenderer.DrawText(canvas, description, new SKPoint(leftMargin, y), FUIColors.TextDisabled, 12f);
-        y += 16;  // Space after description before next section
+        y += dropdownHeight + 8;
+
+        // Description text — baseline offset keeps it clear of the dropdown above
+        FUIRenderer.DrawText(canvas, GetMergeOpDescription(axisMapping.MergeOp),
+            new SKPoint(leftMargin, y + 10), FUIColors.TextDisabled, 12f);
+        y += 20;
 
         return y;
+    }
+
+    /// <summary>
+    /// Draws the expanded merge-mode dropdown panel as an overlay. Must be
+    /// called after all other right-panel content so the panel renders on top.
+    /// </summary>
+    private void DrawMergeDropdownOverlay(SKCanvas canvas)
+    {
+        if (!_merge.DropdownOpen || _merge.SelectorBounds.IsEmpty) return;
+
+        const float itemHeight = 28f;
+        float listHeight = s_mergeOps.Length * itemHeight + 4f;
+        _merge.DropdownBounds = new SKRect(
+            _merge.SelectorBounds.Left, _merge.SelectorBounds.Bottom + 2,
+            _merge.SelectorBounds.Right, _merge.SelectorBounds.Bottom + 2 + listHeight);
+
+        FUIRenderer.DrawPanelShadow(canvas, _merge.DropdownBounds, 4f, 4f, 15f);
+        using (var glowPaint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            Color = FUIColors.ActiveLight,
+            StrokeWidth = 3f,
+            IsAntialias = true,
+            ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
+        })
+            canvas.DrawRect(_merge.DropdownBounds, glowPaint);
+
+        using (var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Void))
+            canvas.DrawRect(_merge.DropdownBounds, bgPaint);
+        using (var innerPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0))
+            canvas.DrawRect(_merge.DropdownBounds.Inset(2, 2), innerPaint);
+
+        FUIRenderer.DrawLCornerFrame(canvas, _merge.DropdownBounds, FUIColors.ActiveStrong, 20f, 6f, 1.5f, true);
+
+        var axisMapping = GetCurrentAxisMapping();
+        int selectedIndex = axisMapping is null ? -1 : Array.IndexOf(s_mergeOps, axisMapping.MergeOp);
+
+        canvas.Save();
+        canvas.ClipRect(_merge.DropdownBounds);
+
+        float itemY = _merge.DropdownBounds.Top + 2f;
+        for (int i = 0; i < s_mergeOps.Length; i++)
+        {
+            var itemBounds = new SKRect(
+                _merge.DropdownBounds.Left + 2, itemY,
+                _merge.DropdownBounds.Right - 2, itemY + itemHeight);
+
+            bool isHovered = i == _merge.HoveredIndex;
+            bool isSelected = i == selectedIndex;
+
+            if (isHovered)
+            {
+                using var hoverBg = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
+                canvas.DrawRect(itemBounds, hoverBg);
+                using var accentBar = FUIRenderer.CreateFillPaint(FUIColors.Active);
+                canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
+            }
+            else if (isSelected)
+            {
+                using var selAccent = FUIRenderer.CreateFillPaint(FUIColors.Active.WithAlpha(FUIColors.AlphaGlow));
+                canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), selAccent);
+            }
+
+            var op = s_mergeOps[i];
+            string itemLabel = GetMergeOpLabel(op);
+            string? itemBadge = GetMergeOpBadge(op);
+
+            var textColor = isSelected ? FUIColors.Active : (isHovered ? FUIColors.TextBright : FUIColors.TextPrimary);
+            const float itemFont = 13f;
+            float itemX = itemBounds.Left + 10;
+            float itemBaselineY = itemBounds.MidY + 4;
+            FUIRenderer.DrawText(canvas, itemLabel, new SKPoint(itemX, itemBaselineY), textColor, itemFont);
+
+            if (itemBadge is not null)
+            {
+                float itemLabelWidth = FUIRenderer.MeasureText(itemLabel, itemFont);
+                var (bgPill, txtPill) = GetMergeOpBadgeColors(op);
+                FUIWidgets.DrawPill(canvas, itemX + itemLabelWidth + 6f, itemBounds.MidY, itemBadge, bgPill, txtPill);
+            }
+
+            itemY += itemHeight;
+        }
+
+        canvas.Restore();
     }
 
     private List<InputSource> GetInputsForSelectedOutput()

@@ -17,6 +17,18 @@ public class MappingEngine : IMappingEngine
     private readonly Dictionary<string, int[]> _deviceHatValues = new();
     private readonly Dictionary<Guid, float> _mergeAxisCache = new();
 
+    // Per-mapping state for "Last" merge modes (LastSnap / LastTakeover).
+    // Tracks which input currently owns the output and the last-seen value per
+    // input so crossings can be detected on the next tick.
+    private sealed class LastMergeState
+    {
+        public int OwningInputIndex;
+        public float OwnershipValue;
+        public float[]? PreviousValues;
+    }
+    private readonly Dictionary<Guid, LastMergeState> _lastMergeStates = new();
+    private const float LastMergeMoveDeadband = 0.005f;
+
     // Tracks which mappings currently assert "pressed" for each vJoy button.
     // When multiple mappings target the same button (e.g. shared bindings),
     // the output is true if ANY mapping asserts pressed — even across separate
@@ -60,6 +72,7 @@ public class MappingEngine : IMappingEngine
         {
             _activeProfile = profile;
             _mergeAxisCache.Clear();
+            _lastMergeStates.Clear();
             _buttonPressedBy.Clear();
             _dirtyButtonOutputs.Clear();
             _lastButtonState.Clear();
@@ -342,7 +355,9 @@ public class MappingEngine : IMappingEngine
             if (values.Count == 0)
                 return;
 
-            outputValue = ApplyMerge(values, mapping.MergeOp);
+            outputValue = mapping.MergeOp is MergeOperation.LastSnap or MergeOperation.LastTakeover
+                ? ApplyLastMerge(mapping, values)
+                : ApplyMerge(values, mapping.MergeOp);
         }
 
         // Apply curve
@@ -718,6 +733,63 @@ public class MappingEngine : IMappingEngine
             MergeOperation.Sum => Math.Clamp(values.Sum(), -1f, 1f),
             _ => values[0]
         };
+    }
+
+    /// <summary>
+    /// "Last touched" merge. Transfers ownership to whichever input moved most
+    /// recently. For LastTakeover, the new input must first cross the current
+    /// output value (soft pickup) so the hand-off is jump-free. For LastSnap,
+    /// any movement beyond the deadband claims ownership immediately.
+    /// </summary>
+    private float ApplyLastMerge(AxisMapping mapping, List<float> values)
+    {
+        if (!_lastMergeStates.TryGetValue(mapping.Id, out var st))
+        {
+            st = new LastMergeState();
+            _lastMergeStates[mapping.Id] = st;
+        }
+
+        // Reset if input count changed (user added/removed an input)
+        if (st.PreviousValues is null || st.PreviousValues.Length != values.Count)
+        {
+            st.PreviousValues = values.ToArray();
+            st.OwningInputIndex = 0;
+            st.OwnershipValue = values[0];
+            return values[0];
+        }
+
+        bool isTakeover = mapping.MergeOp == MergeOperation.LastTakeover;
+
+        for (int i = 0; i < values.Count; i++)
+        {
+            if (i == st.OwningInputIndex) continue;
+
+            float prev = st.PreviousValues[i];
+            float curr = values[i];
+            float delta = curr - prev;
+
+            if (Math.Abs(delta) <= LastMergeMoveDeadband)
+                continue;
+
+            if (isTakeover)
+            {
+                // Soft takeover: transfer only once the physical input crosses
+                // (or touches) the current ownership value.
+                bool crossed = (prev - st.OwnershipValue) * (curr - st.OwnershipValue) <= 0f;
+                if (!crossed) continue;
+            }
+
+            st.OwningInputIndex = i;
+            break;
+        }
+
+        float output = values[st.OwningInputIndex];
+        st.OwnershipValue = output;
+
+        for (int i = 0; i < values.Count; i++)
+            st.PreviousValues[i] = values[i];
+
+        return output;
     }
 
     private static string GetDeviceId(DeviceInputState state)

@@ -553,6 +553,37 @@ internal static class FUIWidgets
             FUIColors.TextDim, 13f);
     }
 
+    /// <summary>
+    /// Draws a small FUI-style pill/badge containing all-caps text. The pill has
+    /// square corners with a chamfer on the lower-right to echo the L-corner
+    /// frame language used elsewhere. Returns the pill bounds so callers can
+    /// position content that follows. Pass <paramref name="anchorY"/> as the
+    /// vertical centre of the pill.
+    /// </summary>
+    internal static SKRect DrawPill(SKCanvas canvas, float x, float anchorY, string text,
+        SKColor bgColor, SKColor textColor, float fontSize = 10f)
+    {
+        float textWidth = FUIRenderer.MeasureText(text, fontSize);
+        const float paddingX = 6f;
+        float height = fontSize + 8f;
+        var bounds = new SKRect(x, anchorY - height / 2f, x + textWidth + paddingX * 2, anchorY + height / 2f);
+
+        float chamfer = Math.Min(4f, height / 3f);
+        using var path = new SKPath();
+        path.MoveTo(bounds.Left, bounds.Top);
+        path.LineTo(bounds.Right, bounds.Top);
+        path.LineTo(bounds.Right, bounds.Bottom - chamfer);
+        path.LineTo(bounds.Right - chamfer, bounds.Bottom);
+        path.LineTo(bounds.Left, bounds.Bottom);
+        path.Close();
+
+        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
+        canvas.DrawPath(path, bgPaint);
+
+        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, fontSize);
+        return bounds;
+    }
+
     internal static void DrawSmallIconButton(SKCanvas canvas, SKRect bounds, string icon, bool hovered, bool isDanger = false)
     {
         var bgColor = hovered

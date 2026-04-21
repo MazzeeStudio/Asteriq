@@ -61,8 +61,7 @@ public partial class MappingsTabController : ITabController
     private int _hoveredInputSourceRemove = -1;
 
     // Merge operation selector (for axes with multiple inputs)
-    private SKRect[] _mergeOpButtonBounds = new SKRect[4]; // Average, Maximum, Minimum, Sum
-    private int _hoveredMergeOpButton = -1;
+    private readonly MergeModeDropdownState _merge = new();
 
     // Curve and deadzone preset button hover
     private int _hoveredCurvePreset = -1;
@@ -310,13 +309,38 @@ public partial class MappingsTabController : ITabController
             }
         }
 
-        // Merge operation (axis category, 2+ inputs)
+        // Merge operation dropdown (axis category, 2+ inputs)
         if (_mappingCategory == 1 && hasSelection)
         {
-            for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
+            // Panel open: click inside selects; click outside closes (and swallows)
+            if (_merge.DropdownOpen)
             {
-                if (_mergeOpButtonBounds[i].HitTest(e.X, e.Y))
-                { UpdateMergeOperationForSelected(i); return true; }
+                if (!_merge.DropdownBounds.IsEmpty && _merge.DropdownBounds.Contains(e.X, e.Y))
+                {
+                    const float itemHeight = 28f;
+                    int idx = (int)((e.Y - _merge.DropdownBounds.Top - 2f) / itemHeight);
+                    if (idx >= 0 && idx < s_mergeOps.Length)
+                    {
+                        UpdateMergeOperationForSelected(s_mergeOps[idx]);
+                    }
+                    _merge.DropdownOpen = false;
+                    _merge.HoveredIndex = -1;
+                    return true;
+                }
+
+                if (!_merge.SelectorBounds.Contains(e.X, e.Y))
+                {
+                    _merge.DropdownOpen = false;
+                    _merge.HoveredIndex = -1;
+                    return true;
+                }
+            }
+
+            if (_merge.SelectorBounds.Contains(e.X, e.Y))
+            {
+                _merge.DropdownOpen = !_merge.DropdownOpen;
+                if (!_merge.DropdownOpen) _merge.HoveredIndex = -1;
+                return true;
             }
         }
 
@@ -656,7 +680,8 @@ public partial class MappingsTabController : ITabController
         _addInputButtonHovered = false;
         _clearAllButtonHovered = false;
         _hoveredInputSourceRemove = -1;
-        _hoveredMergeOpButton = -1;
+        _merge.HoveredIndex = -1;
+        _merge.SelectorHovered = false;
         _hoveredCurvePreset = -1;
         _hoveredDeadzonePreset = -1;
         _threshold.HoveredOutputMode = -1;
@@ -703,13 +728,25 @@ public partial class MappingsTabController : ITabController
             { _hoveredInputSourceRemove = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         }
 
-        // Merge operation buttons (axis category)
+        // Merge operation dropdown (axis category)
         if (_mappingCategory == 1 && _selectedMappingRow >= 0)
         {
-            for (int i = 0; i < _mergeOpButtonBounds.Length; i++)
+            if (_merge.DropdownOpen && !_merge.DropdownBounds.IsEmpty
+                && _merge.DropdownBounds.Contains(e.X, e.Y))
             {
-                if (_mergeOpButtonBounds[i].HitTest(e.X, e.Y))
-                { _hoveredMergeOpButton = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+                const float itemHeight = 28f;
+                int idx = (int)((e.Y - _merge.DropdownBounds.Top - 2f) / itemHeight);
+                _merge.HoveredIndex = (idx >= 0 && idx < s_mergeOps.Length) ? idx : -1;
+                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                return true;
+            }
+
+            if (_merge.SelectorBounds.Contains(e.X, e.Y))
+            {
+                _merge.SelectorHovered = true;
+                _merge.HoveredIndex = -1;
+                _ctx.OwnerForm.Cursor = Cursors.Hand;
+                return true;
             }
         }
 
@@ -1331,6 +1368,15 @@ public partial class MappingsTabController : ITabController
         public bool ControlDropdownOpen;
         public int HoveredDeviceIndex = -1;
         public int HoveredControlIndex = -1;
+    }
+
+    private sealed class MergeModeDropdownState
+    {
+        public SKRect SelectorBounds;
+        public SKRect DropdownBounds;
+        public bool DropdownOpen;
+        public int HoveredIndex = -1;
+        public bool SelectorHovered;
     }
 
     private sealed class MappingHighlightState

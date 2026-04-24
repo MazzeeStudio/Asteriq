@@ -255,6 +255,23 @@ public class SCXmlExportService
             }
 
             actionElement.Add(rebindElement);
+
+            // Emit an additional rebind for each shared secondary. Shares are standalone
+            // input references — they don't inherit the primary's modifiers. This is what
+            // lets a throttle/button-box button fire an action that is gated by a modifier
+            // on the primary stick without needing the modifier held on the secondary.
+            foreach (var shared in binding.SharedWith)
+            {
+                if (string.IsNullOrEmpty(shared.InputName)) continue;
+                int secondaryInstance = profile.GetSCInstance(shared.VJoySlot);
+                var sharedRebind = new XElement("rebind",
+                    new XAttribute("input", $"js{secondaryInstance}_{shared.InputName}"));
+
+                if (activationModeStr is not null)
+                    sharedRebind.Add(new XAttribute("activationMode", activationModeStr));
+
+                actionElement.Add(sharedRebind);
+            }
         }
 
         return actionElement;
@@ -359,6 +376,23 @@ public class SCXmlExportService
             result.ProfileName = header?.Attribute("label")?.Value
                 ?? root.Attribute("profileName")?.Value
                 ?? Path.GetFileNameWithoutExtension(filePath);
+
+            // Collect every joystick instance declared in the profile — both the <joystick
+            // instance="N" /> elements under deviceMappings and the <options type="joystick"
+            // instance="N" /> elements under ActionMaps. A device can be declared without any
+            // rebind referencing it, so this is the authoritative list of columns the profile
+            // knows about.
+            foreach (var jsEl in root.Descendants("joystick"))
+            {
+                if (int.TryParse(jsEl.Attribute("instance")?.Value, out var instNum) && instNum > 0)
+                    result.DeclaredJoystickInstances.Add(instNum);
+            }
+            foreach (var opt in root.Elements("options"))
+            {
+                if (opt.Attribute("type")?.Value != "joystick") continue;
+                if (int.TryParse(opt.Attribute("instance")?.Value, out var instNum) && instNum > 0)
+                    result.DeclaredJoystickInstances.Add(instNum);
+            }
 
             // Parse all actionmap/action/rebind elements
             int totalRebinds = 0;
@@ -564,6 +598,13 @@ public class SCImportResult
     public string? Error { get; set; }
     public string ProfileName { get; set; } = string.Empty;
     public List<SCActionBinding> Bindings { get; set; } = new();
+
+    /// <summary>
+    /// Joystick instance numbers declared in the XML (e.g. &lt;joystick instance="3" /&gt;
+    /// or &lt;options type="joystick" instance="3" /&gt;). An instance may be declared even
+    /// when no rebind lines reference it — used to surface empty columns to callers.
+    /// </summary>
+    public HashSet<int> DeclaredJoystickInstances { get; set; } = new();
 }
 
 /// <summary>

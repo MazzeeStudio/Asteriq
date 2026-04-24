@@ -186,6 +186,22 @@ public partial class SCBindingsTabController
                         float badgesWidth = SCBindingsRenderer.MeasureMultiKeycapWidth(components, binding.InputType) + padding;
                         maxWidth = Math.Max(maxWidth, badgesWidth);
                     }
+
+                    // Shared cells also contribute to column width. A share is a standalone input
+                    // reference with no modifiers of its own, so measure with an empty modifier list.
+                    if (col.IsJoystick && !col.IsPhysical)
+                    {
+                        foreach (var primary in _scExportProfile.Bindings)
+                        {
+                            if (primary.DeviceType != SCDeviceType.Joystick || primary.PhysicalDeviceId is not null) continue;
+                            if (primary.ActionMap != action.ActionMap || primary.ActionName != action.ActionName) continue;
+                            var shared = primary.SharedWith.FirstOrDefault(s => s.VJoySlot == col.VJoyDeviceId);
+                            if (shared is null || string.IsNullOrEmpty(shared.InputName)) continue;
+                            var components = SCBindingsRenderer.GetBindingComponents(shared.InputName, null);
+                            float badgesWidth = SCBindingsRenderer.MeasureMultiKeycapWidth(components, primary.InputType) + padding;
+                            maxWidth = Math.Max(maxWidth, badgesWidth);
+                        }
+                    }
                 }
 
                 // Also check default bindings
@@ -349,10 +365,13 @@ public partial class SCBindingsTabController
         var mappingProfile = _ctx.ProfileManager.ActiveProfile;
         if (mappingProfile is null) return;
 
-        // Collect unique reroute specs: (fromVJoy, fromButton) → (toVJoy, toButton)
+        // Collect unique reroute specs: (fromVJoy, fromButton) → (toVJoy, toButton).
+        // Skip primaries with modifiers — those shares rely on per-<rebind> XML emission
+        // rather than reroute, so the secondary input reaches SC as its own vJoy button.
         var reroutes = new Dictionary<(uint fromVJoy, int fromButton), (uint toVJoy, int toButton)>();
         foreach (var binding in _scExportProfile.Bindings)
         {
+            if (binding.Modifiers.Count > 0) continue;
             int primaryButton = ParseButtonIndex(binding.InputName);
             if (primaryButton < 0) continue;
 
@@ -369,6 +388,7 @@ public partial class SCBindingsTabController
         bool changed = false;
         foreach (var binding in _scExportProfile.Bindings)
         {
+            if (binding.Modifiers.Count > 0) continue;
             foreach (var shared in binding.SharedWith)
             {
                 int secondaryButton = ParseButtonIndex(shared.InputName);
@@ -736,12 +756,16 @@ public partial class SCBindingsTabController
                 string primaryInputDisplay = SCBindingsRenderer.FormatInputName(existingOnOtherDevice.InputName);
                 string secondaryInputDisplay = SCBindingsRenderer.FormatInputName(inputName);
 
-                // Gather ALL other actions on the same primary button (same vJoy device + input)
+                // Gather ALL other actions on the same primary binding — same vJoy device,
+                // same input, AND same modifier set. Bindings that reuse the button number
+                // with a different modifier (e.g. button28 alone vs rctrl+button28) are
+                // different actions that can and should have independent shares.
                 var otherAffected = _scExportProfile.Bindings
                     .Where(b => b.DeviceType == SCDeviceType.Joystick &&
                         b.PhysicalDeviceId is null &&
                         b.VJoyDevice == existingOnOtherDevice.VJoyDevice &&
                         b.InputName == existingOnOtherDevice.InputName &&
+                        b.Modifiers.SequenceEqual(existingOnOtherDevice.Modifiers) &&
                         !(b.ActionMap == action.ActionMap && b.ActionName == action.ActionName))
                     .ToList();
                 var affectedNames = otherAffected
@@ -880,21 +904,51 @@ public partial class SCBindingsTabController
     }
 
     /// <summary>
-    /// Performs the Share operation: reroutes physical button mappings from secondary to primary
-    /// and adds a SharedWith entry to the primary binding.
+    /// Performs the Share operation: adds a SharedWith entry to the primary binding, and
+    /// for no-modifier primaries also reroutes physical button mappings to the primary vJoy
+    /// button so existing XML profiles keep firing the action via the primary's rebind.
+    /// When the primary has modifiers, skip the reroute — the secondary input must reach
+    /// SC on its own vJoy slot so the per-share <rebind> in the XML export can fire the
+    /// action without requiring the modifier held on the secondary device.
     /// </summary>
     private void PerformShare(SCActionBinding primaryBinding, uint secondaryVJoySlot, string secondaryInputName)
     {
+        // A primary can only have one shared secondary per target slot. If one already exists,
+        // remove it first so reassigning a shared cell replaces the input cleanly instead of
+        // stacking a second SharedWith entry (which would export two duplicate <rebind>s).
+        var stale = primaryBinding.SharedWith.Where(s => s.VJoySlot == secondaryVJoySlot).ToList();
+        primaryBinding.SharedWith.RemoveAll(s => s.VJoySlot == secondaryVJoySlot);
+
         int secondaryButtonIndex = ParseButtonIndex(secondaryInputName);
         int primaryButtonIndex = ParseButtonIndex(primaryBinding.InputName);
+        bool primaryHasModifiers = primaryBinding.Modifiers.Count > 0;
 
         var reroutedIds = new List<Guid>();
-
-        // Reroute secondary mappings to output the same vJoy button as the primary.
-        // The mapping engine OR's together all outputs to the same vJoy button, so both
-        // the original and rerouted mappings coexist without fighting.
         var mappingProfile = _ctx.ProfileManager.ActiveProfile;
-        if (mappingProfile is not null && secondaryButtonIndex >= 0 && primaryButtonIndex >= 0)
+        bool mappingChanged = false;
+
+        // Restore any runtime reroute the stale entry applied, so the secondary button is
+        // not stuck pointing at the old primary in the mapping profile.
+        if (mappingProfile is not null)
+        {
+            foreach (var s in stale)
+            {
+                int staleSecondaryButton = ParseButtonIndex(s.InputName);
+                if (staleSecondaryButton < 0) continue;
+                foreach (var mappingId in s.ReroutedMappingIds)
+                {
+                    var m = mappingProfile.ButtonMappings.FirstOrDefault(b => b.Id == mappingId);
+                    if (m is not null)
+                    {
+                        m.Output.VJoyDevice = s.VJoySlot;
+                        m.Output.Index = staleSecondaryButton;
+                        mappingChanged = true;
+                    }
+                }
+            }
+        }
+
+        if (!primaryHasModifiers && mappingProfile is not null && secondaryButtonIndex >= 0 && primaryButtonIndex >= 0)
         {
             foreach (var bm in mappingProfile.ButtonMappings)
             {
@@ -905,18 +959,19 @@ public partial class SCBindingsTabController
                     bm.Output.VJoyDevice = primaryBinding.VJoyDevice;
                     bm.Output.Index = primaryButtonIndex;
                     reroutedIds.Add(bm.Id);
+                    mappingChanged = true;
                 }
             }
 
             if (reroutedIds.Count > 0)
             {
-                // Do NOT save mapping profile — reroutes are runtime-only and re-applied
-                // from SCExportProfile SharedWith data on every startup/profile switch.
-                _ctx.OnMappingsChanged();
                 System.Diagnostics.Debug.WriteLine(
                     $"[SCBindings] Rerouted {reroutedIds.Count} mapping(s) from vJoy{secondaryVJoySlot}/{secondaryInputName} → vJoy{primaryBinding.VJoyDevice}/{primaryBinding.InputName}");
             }
         }
+
+        if (mappingChanged)
+            _ctx.OnMappingsChanged();
 
         primaryBinding.SharedWith.Add(new SCSharedInput
         {
@@ -951,12 +1006,15 @@ public partial class SCBindingsTabController
         string primaryInputDisplay = SCBindingsRenderer.FormatInputName(primaryBinding.InputName);
         string secondaryInputDisplay = SCBindingsRenderer.FormatInputName(sharedEntry.InputName);
 
-        // Find ALL bindings that share the same button (same primary vJoy device + input + secondary slot)
+        // Find ALL bindings that share the same primary binding (same vJoy device, input,
+        // AND modifier set) and are shared to this secondary slot. Bindings with the same
+        // button but different modifiers are independent actions — don't bundle them.
         var allSharedBindings = _scExportProfile.Bindings
             .Where(b => b.DeviceType == SCDeviceType.Joystick &&
                 b.PhysicalDeviceId is null &&
                 b.VJoyDevice == linkInfo.PrimaryVJoyDevice &&
                 b.InputName == primaryBinding.InputName &&
+                b.Modifiers.SequenceEqual(primaryBinding.Modifiers) &&
                 b.SharedWith.Any(s => s.VJoySlot == col.VJoyDeviceId))
             .ToList();
 

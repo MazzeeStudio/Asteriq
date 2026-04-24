@@ -772,7 +772,7 @@ public partial class SCBindingsTabController : ITabController
         public SKRect ProfileDropdownBounds;
         public int ProfileHoveredIndex = -1;
         public SCExportProfile? LoadedProfile;
-        public List<(string Label, uint VJoyDeviceId)> SourceColumns = new();
+        public List<(string Label, uint VJoyDeviceId, string? PhysicalDeviceId)> SourceColumns = new();
         public int ColumnIndex = -1;
         public bool ColumnDropdownOpen;
         public SKRect ColumnSelectorBounds;

@@ -826,6 +826,10 @@ public partial class SCBindingsTabController : ITabController
         public bool ProfileEditHovered;
         public SKRect DropdownDeleteBounds;
         public string DropdownDeleteProfileName = "";
+        // Populated when an SC control profile row is hovered; the file at this path is the
+        // one the row-level × button will delete. Mutually exclusive with DropdownDeleteProfileName.
+        public string DropdownDeleteSCFilePath = "";
+        public string DropdownDeleteSCDisplayName = "";
     }
 
     private sealed class SearchFilterState

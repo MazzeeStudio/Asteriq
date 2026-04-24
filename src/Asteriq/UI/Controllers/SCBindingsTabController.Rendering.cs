@@ -735,11 +735,14 @@ public partial class SCBindingsTabController
                                 }
                             }
 
-                            // For shared cells with no primary binding on this column, synthesize from secondary input name
+                            // For shared cells with no primary binding on this column, synthesize from secondary input name.
+                            // A share is a standalone input reference — it does not inherit the primary's
+                            // modifiers. Modifiers on a shared device (throttle, button box) are impractical,
+                            // so the secondary fires the action on its own without needing modifiers held.
                             if (binding is null && isCellShared)
                             {
                                 var (primaryVJoy, _, secondaryInputName) = _conflicts.SharedCells[sharedCellKey];
-                                bindingComponents = SCBindingsRenderer.GetBindingComponents(secondaryInputName, new List<string>());
+                                bindingComponents = SCBindingsRenderer.GetBindingComponents(secondaryInputName, null);
                                 inputType = InferInputTypeFromName(secondaryInputName);
                                 textColor = FUIColors.Primary.WithAlpha(180);
 
@@ -1722,7 +1725,7 @@ public partial class SCBindingsTabController
             canvas.DrawRect(_scAssignInputButtonBounds, waitBgPaint);
             FUIRenderer.DrawTextCentered(canvas, "LISTENING...", _scAssignInputButtonBounds, FUIColors.Active, 12f);
         }
-        else if (isCellShared || isCellReadOnly)
+        else if (isCellReadOnly)
         {
             using var disabledPaint = FUIRenderer.CreateFillPaint(FUIColors.DisabledBg);
             canvas.DrawRect(_scAssignInputButtonBounds, disabledPaint);
@@ -1730,6 +1733,8 @@ public partial class SCBindingsTabController
         }
         else
         {
+            // ASSIGN is available on shared cells too — it replaces the shared input with
+            // a new one without disturbing the primary or any other shares.
             FUIRenderer.DrawButton(canvas, _scAssignInputButtonBounds, "ASSIGN",
                 _scAssignInputButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
         }

@@ -244,6 +244,45 @@ public partial class SCBindingsTabController
                     return;
                 }
 
+                // SC control profile delete takes the same priority as the saved-profile delete
+                if (!string.IsNullOrEmpty(_profileMgmt.DropdownDeleteSCFilePath) &&
+                    _profileMgmt.DropdownDeleteBounds.Contains(point))
+                {
+                    var pathToDelete = _profileMgmt.DropdownDeleteSCFilePath;
+                    var nameToShow = _profileMgmt.DropdownDeleteSCDisplayName;
+                    int deleteResult = FUIMessageBox.Show(_ctx.OwnerForm,
+                        $"Delete SC control profile '{nameToShow}'?",
+                        "Delete SC Control Profile", FUIMessageBox.MessageBoxType.Question, "Delete", "Cancel");
+                    if (deleteResult == 0)
+                    {
+                        try
+                        {
+                            if (File.Exists(pathToDelete))
+                                File.Delete(pathToDelete);
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to delete SC control profile '{pathToDelete}': {ex.Message}");
+                            SetStatus($"Delete failed: {ex.Message}", SCStatusKind.Error);
+                        }
+
+                        if (_scInstall.SelectedInstallation >= 0 && _scInstall.SelectedInstallation < _scInstall.Installations.Count)
+                        {
+                            try
+                            {
+                                _scAvailableProfiles = SCInstallationService.GetExistingProfiles(_scInstall.Installations[_scInstall.SelectedInstallation]);
+                            }
+                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[SCBindings] Failed to refresh SC control profile list after delete: {ex.Message}");
+                            }
+                        }
+                        _ctx.InvalidateCanvas();
+                    }
+                    _profileMgmt.DropdownOpen = false;
+                    return;
+                }
+
                 // Click on dropdown item
                 if (_profileMgmt.HoveredProfileIndex >= 0)
                 {

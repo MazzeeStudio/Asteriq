@@ -1204,6 +1204,8 @@ public partial class SCBindingsTabController
         float y = bounds.Top + 8;
         _profileMgmt.HoveredProfileIndex = -1;
         _profileMgmt.DropdownDeleteProfileName = "";
+        _profileMgmt.DropdownDeleteSCFilePath = "";
+        _profileMgmt.DropdownDeleteSCDisplayName = "";
 
         // Section 1: Asteriq saved profiles (always shown)
         FUIRenderer.DrawText(canvas, "SAVED PROFILES", new SKPoint(bounds.Left + 10, y + 9f), FUIColors.TextDim, 12f, true);
@@ -1301,10 +1303,18 @@ public partial class SCBindingsTabController
                         canvas.DrawRect(rowBounds, hoverPaint);
                         using var accentPaint = FUIRenderer.CreateFillPaint(FUIColors.Active);
                         canvas.DrawRect(new SKRect(rowBounds.Left, rowBounds.Top + 2, rowBounds.Left + 2, rowBounds.Bottom - 2), accentPaint);
+
+                        // Delete (×) button — shown on hover, same pattern as saved profiles
+                        _profileMgmt.DropdownDeleteBounds = new SKRect(rowBounds.Right - 22, rowBounds.Top + 4, rowBounds.Right - 4, rowBounds.Bottom - 4);
+                        _profileMgmt.DropdownDeleteSCFilePath = scFile.FilePath;
+                        _profileMgmt.DropdownDeleteSCDisplayName = scFile.DisplayName;
+                        bool delHovered = _profileMgmt.DropdownDeleteBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+                        FUIRenderer.DrawText(canvas, "×", new SKPoint(_profileMgmt.DropdownDeleteBounds.MidX - 3f, _profileMgmt.DropdownDeleteBounds.MidY + 4f),
+                            FUIColors.SecondaryColor(delHovered), 14f);
                     }
 
                     var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-                    float maxTextWidth = rowBounds.Width - 20f;
+                    float maxTextWidth = rowBounds.Width - (isHovered ? 40f : 20f); // extra room for × on hover
                     string displayName = scFile.DisplayName;
                     displayName = FUIWidgets.TruncateTextToWidth(displayName, maxTextWidth, 10f);
                     FUIRenderer.DrawText(canvas, displayName, new SKPoint(rowBounds.Left + 10, rowBounds.MidY + 4f), textColor, 13f);

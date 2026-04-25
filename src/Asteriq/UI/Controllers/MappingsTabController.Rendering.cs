@@ -183,8 +183,9 @@ public partial class MappingsTabController
                     bool isHovered = rowIndex == _hoveredMappingRow;
                     bool isModifier = keyParts?.Count == 1 && IsModifierKeyName(keyParts[0]);
                     bool isSwitchBtn = rowIndex == switchRowIndex;
+                    bool isShared = GetSharedSlotInfo(vjoyDevice!.Id, i) is not null;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier, isSwitchBtn);
+                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier, isSwitchBtn, isShared);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -336,7 +337,7 @@ public partial class MappingsTabController
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
         bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false,
-        bool isSwitchButton = false)
+        bool isSwitchButton = false, bool isShared = false)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "ÔÇö";
         bool hasKeyParts = keyParts is not null && keyParts.Count > 0;
@@ -517,6 +518,21 @@ public partial class MappingsTabController
                 FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
             FUIRenderer.DrawTextCentered(canvas, "NET", pillRect, FUIColors.Warning, 10f);
         }
+        else if (isShared)
+        {
+            // Shared-away slot: SC's share feature has rerouted this slot's mapping output to
+            // the primary's vJoy button, so the slot has no standalone binding. Show a blue
+            // "SHARED" pill so the row's empty state isn't confusing.
+            const float pillW = 50f;
+            const float pillH = 14f;
+            float pillX = bounds.Right - pillW - 8f;
+            float pillY = bounds.MidY - pillH / 2f;
+            var pillRect = new SKRect(pillX, pillY, pillX + pillW, pillY + pillH);
+            FUIRenderer.DrawRoundedPanel(canvas, pillRect,
+                FUIColors.Primary.WithAlpha(FUIColors.AlphaHoverBg),
+                FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
+            FUIRenderer.DrawTextCentered(canvas, "SHARED", pillRect, FUIColors.Primary, 10f);
+        }
     }
 
     private void DrawDeviceVisualizationPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -649,6 +665,13 @@ public partial class MappingsTabController
         _netSwitch.BadgeXBounds = SKRect.Empty;
         _netSwitch.BadgeXHovered = false;
 
+        // Reset shared-manage button bounds each frame; populated only when the selected row
+        // is a shared-away slot (the early-return branch below).
+        _sharedManageButtonBounds = SKRect.Empty;
+        _sharedManageButtonHovered = false;
+        _sharedManageSearchText = null;
+        _sharedManageVJoyDevice = 0;
+
         // Show settings for selected row
         if (_selectedMappingRow < 0)
         {
@@ -664,6 +687,21 @@ public partial class MappingsTabController
 
         FUIRenderer.DrawText(canvas, outputName, new SKPoint(leftMargin, y + 16), FUIColors.Active, 16f, true);
         y += 36;
+
+        // Shared-away slot: SC's share feature rerouted this slot's mapping output to the
+        // primary's vJoy button. Replace the normal editor with a read-only message block
+        // explaining the state and a deep-link to the SC Bindings tab where the share is
+        // owned. Buttons-only — axes can't be shared via the SC share feature.
+        if (!isAxis && _ctx.VJoyDevices.Count > _ctx.SelectedVJoyDeviceIndex)
+        {
+            var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+            var sharedInfo = GetSharedSlotInfo(vjoyDevice.Id, _selectedMappingRow);
+            if (sharedInfo is not null)
+            {
+                DrawSharedSlotPanel(canvas, leftMargin, rightMargin, y, sharedInfo, vjoyDevice.Id);
+                return;
+            }
+        }
 
         // INPUT SOURCES section - shows mapped inputs with add/remove
         y = DrawInputSourcesSection(canvas, leftMargin, rightMargin, y);
@@ -1661,6 +1699,63 @@ public partial class MappingsTabController
 
         using var strokePaint = FUIRenderer.CreateStrokePaint(color, isSelected ? 2.5f : 1.5f);
         canvas.DrawCircle(x, centerY, drawRadius, strokePaint);
+    }
+
+    /// <summary>
+    /// Renders the read-only "this row has been shared from the SC Bindings tab" panel that
+    /// replaces the normal mapping editor. Shows the action display name + primary slot, an
+    /// explanation, and a "MANAGE IN KEYBINDINGS" button that deep-links to the SC Bindings
+    /// tab with the search box pre-set so the user can see / unshare the originating action.
+    /// </summary>
+    private void DrawSharedSlotPanel(SKCanvas canvas, float leftMargin, float rightMargin, float y, SharedSlotInfo info, uint rowVJoyDevice)
+    {
+        float width = rightMargin - leftMargin;
+
+        // Banner — blue rounded panel with [SHARED] tag + action display name.
+        var bannerRect = new SKRect(leftMargin, y, rightMargin, y + 36);
+        FUIRenderer.DrawRoundedPanel(canvas, bannerRect,
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaLightTint),
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
+
+        const float pillW = 50f;
+        const float pillH = 14f;
+        var pillRect = new SKRect(bannerRect.Left + 10f, bannerRect.MidY - pillH / 2f,
+            bannerRect.Left + 10f + pillW, bannerRect.MidY + pillH / 2f);
+        FUIRenderer.DrawRoundedPanel(canvas, pillRect,
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaHoverBg),
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
+        FUIRenderer.DrawTextCentered(canvas, "SHARED", pillRect, FUIColors.Primary, 10f);
+
+        FUIRenderer.DrawText(canvas, info.ActionDisplayName,
+            new SKPoint(pillRect.Right + 10f, bannerRect.MidY + 5f), FUIColors.Primary, 13f);
+        y += 36 + 12;
+
+        // Body — explanatory text. Plain prose so the user understands the state without
+        // jargon; specifics (action + primary slot) come from the banner above.
+        FUIRenderer.DrawText(canvas, "This output is shared from the Keybindings tab.",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 13f);
+        y += 22;
+        FUIRenderer.DrawText(canvas, $"Primary: vJoy {info.PrimaryVJoyDevice} Button {info.PrimaryButtonIndex + 1}",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+        y += 22;
+        FUIRenderer.DrawText(canvas, "Pressing this button now drives the primary's binding.",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+        y += 18;
+        FUIRenderer.DrawText(canvas, "To unshare, manage it from the Keybindings tab.",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+        y += 28;
+
+        // Manage button — deep-links to SC Bindings tab with search pre-filled.
+        var btnBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
+        _sharedManageButtonBounds = btnBounds;
+        _sharedManageButtonHovered = btnBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        // Search text is the share's InputName — i.e. the row's button name in SC's "buttonN" form.
+        // _selectedMappingRow is 0-based, SC uses 1-based.
+        _sharedManageSearchText = $"button{_selectedMappingRow + 1}";
+        _sharedManageVJoyDevice = rowVJoyDevice;
+
+        FUIRenderer.DrawButton(canvas, btnBounds, "MANAGE IN KEYBINDINGS",
+            _sharedManageButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)

@@ -60,6 +60,14 @@ public partial class MappingsTabController : ITabController
     private bool _clearAllButtonHovered;
     private int _hoveredInputSourceRemove = -1;
 
+    // "Manage in Keybindings" button shown in the right panel when the selected row has been
+    // rerouted by an SC share. Click handler invokes _ctx.OpenSCBindingsWithSearch with the
+    // share's vJoy id + input name. Bounds reset every frame in DrawMappingSettingsPanel.
+    private SKRect _sharedManageButtonBounds;
+    private bool _sharedManageButtonHovered;
+    private string? _sharedManageSearchText;
+    private uint _sharedManageVJoyDevice;
+
     // Merge operation selector (for axes with multiple inputs)
     private readonly MergeModeDropdownState _merge = new();
 
@@ -290,6 +298,15 @@ public partial class MappingsTabController : ITabController
     private bool HandleRightPanelClick(MouseEventArgs e)
     {
         bool hasSelection = _selectedMappingRow >= 0 && _selectionIsExplicit;
+
+        // Manage in Keybindings — first so stale bounds from a previously-rendered normal
+        // editor (e.g. _addInputButtonBounds, _clearAllButtonBounds) cannot intercept the
+        // click. _sharedManageButtonBounds is SKRect.Empty unless the shared panel is active.
+        if (_sharedManageButtonBounds.Contains(e.X, e.Y) && !string.IsNullOrEmpty(_sharedManageSearchText))
+        {
+            _ctx.OpenSCBindingsWithSearch?.Invoke(_sharedManageVJoyDevice, _sharedManageSearchText);
+            return true;
+        }
 
         // Add input button — toggles listening
         if (_addInputButtonBounds.Contains(e.X, e.Y) && hasSelection)
@@ -810,6 +827,10 @@ public partial class MappingsTabController : ITabController
             if (_clearAllButtonBounds.Contains(e.X, e.Y))
             { _clearAllButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         }
+
+        // Manage button only exists when the row is shared-away; bounds are SKRect.Empty otherwise.
+        if (_sharedManageButtonBounds.Contains(e.X, e.Y))
+        { _sharedManageButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
         return false;
     }

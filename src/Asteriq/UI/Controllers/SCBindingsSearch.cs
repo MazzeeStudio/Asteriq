@@ -49,6 +49,14 @@ public static class SCBindingsSearch
                 if (full.Contains(searchLower))
                     return true;
             }
+
+            // Shared bindings — typing the share's input name should find the action too,
+            // otherwise users cannot search for buttons that exist only as a SharedWith entry.
+            foreach (var shared in b.SharedWith)
+            {
+                if (shared.InputName.ToLowerInvariant().Contains(searchLower))
+                    return true;
+            }
         }
 
         foreach (var binding in action.DefaultBindings)

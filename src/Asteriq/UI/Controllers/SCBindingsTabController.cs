@@ -120,6 +120,67 @@ public partial class SCBindingsTabController : ITabController
     public bool IsExportFilenameBoxFocused => _scExportFilenameBoxFocused;
     public SCExportProfile ActiveSCExportProfile => _scExportProfile;
 
+    /// <summary>
+    /// Deep-link entry point used by the Mappings tab "Manage in Keybindings" button on
+    /// shared-away rows. Drops the search into button-capture mode scoped to the given vJoy
+    /// column + <paramref name="inputName"/> (e.g. "button21") so the result is exact and
+    /// column-restricted. Falls back to a plain substring search when the grid hasn't built
+    /// its column list yet (schema not yet loaded).
+    /// </summary>
+    public void SetButtonCaptureSearch(uint vjoyDevice, string inputName)
+    {
+        // Common reset — neutralises any prior capture-in-progress state plus collapse/scroll.
+        _searchFilter.ActionMapFilter = "";
+        _scCollapsedCategories.Clear();
+        _scBindingsScrollOffset = 0f;
+        _cell.SelectedCell = (-1, -1);
+        _searchFilter.ButtonCaptureActive = false;
+        _searchFilter.CaptureWaitingForRelease = false;
+        _searchFilter.CaptureDeviceHidPath = null;
+        _searchFilter.SelectionStart = -1;
+        _searchFilter.SelectionEnd = -1;
+
+        // Find the vJoy column in the SC Bindings grid. If the grid hasn't built columns yet
+        // (e.g. schema not yet loaded), we fall back to plain text search so the deep-link
+        // still gives the user something useful to scan.
+        int foundCol = -1;
+        if (_grid.Columns is not null)
+        {
+            for (int c = 0; c < _grid.Columns.Count; c++)
+            {
+                var col = _grid.Columns[c];
+                if (col.IsJoystick && !col.IsPhysical && col.VJoyDeviceId == vjoyDevice)
+                {
+                    foundCol = c;
+                    break;
+                }
+            }
+        }
+
+        var searchText = inputName ?? "";
+        _searchFilter.SearchText = searchText;
+        _searchFilter.CursorPos = searchText.Length;
+
+        if (foundCol >= 0)
+        {
+            // Button-capture mode: exact match scoped to this column.
+            _searchFilter.ButtonCaptureTextActive = true;
+            _colImport.HighlightedColumn = foundCol;
+            _colImport.ProfileIndex = -1;
+            _colImport.ColumnIndex = -1;
+            _colImport.LoadedProfile = null;
+            _colImport.SourceColumns.Clear();
+        }
+        else
+        {
+            // Fallback: plain substring search.
+            _searchFilter.ButtonCaptureTextActive = false;
+        }
+
+        RefreshFilteredActions();
+        _ctx.InvalidateCanvas();
+    }
+
     public SCBindingsTabController(
         TabContext ctx,
         ISCInstallationService scInstallationService,

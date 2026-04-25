@@ -1737,13 +1737,22 @@ public partial class SCBindingsTabController
 
             if (asteriqDesc.UseCases.Count > 0)
             {
-                y += 6f;
+                y += 8f;
+                FUIWidgets.DrawSectionLabel(canvas, "USE CASES", leftMargin, ref y);
+                y += 2f;
                 foreach (var useCase in asteriqDesc.UseCases)
                 {
-                    foreach (var wrapped in FUIWidgets.WrapTextToWidth($"  •  {useCase}", panelWidth - 4, 11f))
+                    var lines = FUIWidgets.WrapTextToWidth(useCase, panelWidth - 18f, 11f);
+                    bool first = true;
+                    foreach (var wrapped in lines)
                     {
-                        FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 13), FUIColors.TextDim, 11f);
+                        // First line of each use case gets the bullet; wrapped continuations
+                        // are indented to line up with the bullet text.
+                        var prefix = first ? "•  " : "    ";
+                        FUIRenderer.DrawText(canvas, prefix + wrapped,
+                            new SKPoint(leftMargin + 2f, y + 13), FUIColors.TextPrimary, 11f);
                         y += 14f;
+                        first = false;
                     }
                 }
             }
@@ -1807,10 +1816,11 @@ public partial class SCBindingsTabController
         uint sharedPrimaryVJoy = 0;
         string sharedPrimaryInput = "";
         SCActionBinding? existingBinding = null;
+        SCGridColumn? selCol = null;
 
         if (_cell.SelectedCell.colIndex >= 0 && _grid.Columns is not null && _cell.SelectedCell.colIndex < _grid.Columns.Count)
         {
-            var selCol = _grid.Columns[_cell.SelectedCell.colIndex];
+            selCol = _grid.Columns[_cell.SelectedCell.colIndex];
 
             // Check shared cell
             if (selCol.IsJoystick && !selCol.IsPhysical)
@@ -1838,9 +1848,31 @@ public partial class SCBindingsTabController
 
         y += 6f;
 
-        // Activation mode segmented control (only for button-type actions with a binding)
-        bool isButtonAction = selectedAction.InputType != SCInputType.Axis;
-        if (isButtonAction)
+        // Activation mode is per-binding in SC's XML — it controls how a press triggers the
+        // action. So the gate is the BINDING's input type, not the action's heuristic
+        // classification. KB / Mouse cells are always discrete, JS button + hat are discrete,
+        // only a true axis input (e.g. "x", "u", "rotz") is continuous and has no concept of
+        // press timing. When no binding exists yet, fall back to the column type so a freshly
+        // selected button-style cell still shows the controls.
+        bool bindingIsButtonLike;
+        if (existingBinding is not null)
+        {
+            var inputName = existingBinding.InputName;
+            bool isJoystickAxisBinding = existingBinding.DeviceType == SCDeviceType.Joystick
+                && !inputName.StartsWith("button", StringComparison.OrdinalIgnoreCase)
+                && !inputName.StartsWith("hat", StringComparison.OrdinalIgnoreCase);
+            bindingIsButtonLike = !isJoystickAxisBinding;
+        }
+        else
+        {
+            // No binding yet — use the column type as the proxy. Only a JS column on a true
+            // axis-typed action would default to "axis-style" (no activation mode).
+            bool jsAxisColumn = selCol is not null && selCol.IsJoystick
+                && selectedAction.InputType == SCInputType.Axis;
+            bindingIsButtonLike = !jsAxisColumn;
+        }
+
+        if (bindingIsButtonLike)
         {
             FUIRenderer.DrawText(canvas, "ACTIVATION MODE", new SKPoint(leftMargin, y), FUIColors.TextDim, 11f, true);
             y += 14f;

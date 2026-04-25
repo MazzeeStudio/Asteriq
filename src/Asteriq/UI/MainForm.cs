@@ -203,6 +203,7 @@ public partial class MainForm : Form
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
         SCExportProfileService scExportProfileService,
+        BindingDescriptionService bindingDescriptionService,
         ILogger<MainForm> logger,
         IHidHideService hidHideService,
         DeviceMatchingService deviceMatchingService,
@@ -248,6 +249,7 @@ public partial class MainForm : Form
             scSchemaService ?? throw new ArgumentNullException(nameof(scSchemaService)),
             scExportService ?? throw new ArgumentNullException(nameof(scExportService)),
             scExportProfileService ?? throw new ArgumentNullException(nameof(scExportProfileService)),
+            bindingDescriptionService ?? throw new ArgumentNullException(nameof(bindingDescriptionService)),
             _directInputService);
 
         // Apply correct MinimumSize now that font settings are loaded
@@ -295,6 +297,7 @@ public partial class MainForm : Form
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
         SCExportProfileService scExportProfileService,
+        BindingDescriptionService bindingDescriptionService,
         DirectInput.DirectInputService? directInputService = null)
     {
         _tabContext = new TabContext(
@@ -358,7 +361,7 @@ public partial class MainForm : Form
         _scBindingsController = new SCBindingsTabController(
             _tabContext, scInstallationService, scProfileCacheService,
             scSchemaService, scExportService, scExportProfileService,
-            directInputService);
+            bindingDescriptionService, directInputService);
         _scBindingsController.Initialize();
 
         // Wire up mapping-related callbacks (now delegated to MappingsTabController)

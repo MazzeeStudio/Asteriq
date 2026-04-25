@@ -23,7 +23,9 @@ public partial class SCBindingsTabController
         // Right panel stacking order (top → bottom):
         //   1. Game Environment (fixed, always visible)
         //   2. Control Profiles (fills remaining, collapses when contextual panel is expanded)
-        //   3. Column Actions or Cell Details (contextual, bottom-anchored, mutually exclusive)
+        //   3. Contextual panel (Column Actions, OR Binding Definition + Cell Details sub-stack)
+        // The contextual area itself can be a stacked pair of [Binding Definition, Cell Details]
+        // when a row is selected — see the sub-layout block below.
         float verticalGap = 8f;
         float installationHeight = 110f;
 
@@ -31,14 +33,14 @@ public partial class SCBindingsTabController
         var installationBounds = new SKRect(rightBounds.Left, rightBounds.Top,
             rightBounds.Right, rightBounds.Top + installationHeight);
 
-        // Determine which contextual panel is active (mutually exclusive)
+        // Determine which contextual content is active.
         bool showColumnActions = IsColumnActionsVisible();
-        bool showCellDetails = !showColumnActions
+        bool hasRowSelection = !showColumnActions
             && _cell.SelectedCell.actionIndex >= 0
-            && _cell.SelectedCell.colIndex >= 0
             && _scFilteredActions is not null
             && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
-        bool hasContextualPanel = showColumnActions || showCellDetails;
+        bool showCellDetails = hasRowSelection && _cell.SelectedCell.colIndex >= 0;
+        bool hasContextualPanel = showColumnActions || hasRowSelection;
         ref var anim = ref _cpPanel.Anim;
 
         float afterInstall = installationBounds.Bottom + verticalGap;
@@ -71,15 +73,58 @@ public partial class SCBindingsTabController
             isExpanded: cpExpanded, isCollapsible: cpCollapsible);
         canvas.Restore();
 
-        // RIGHT 3 — Contextual panel (Column Actions or Cell Details, clipped to bounds)
+        // RIGHT 3 — Contextual panel (Column Actions, or Binding Definition + Cell Details sub-stack)
+        // Reset header bounds each frame; the relevant panels populate them when drawn.
+        _bdPanel.HeaderBounds = SKRect.Empty;
+        _cellDetails.HeaderBounds = SKRect.Empty;
+
         if (anim.UseAnimatedLayout)
         {
             bool contextualExpanded = !_cpPanel.IsExpanded && !anim.IsAnimatingOut;
             canvas.SaveLayer(contextualBounds, null);
+
             if (showColumnActions)
+            {
                 DrawColumnActionsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
-            else if (showCellDetails)
-                DrawCellDetailsPanel(canvas, contextualBounds, frameInset, contextualExpanded);
+            }
+            else if (hasRowSelection)
+            {
+                if (!showCellDetails)
+                {
+                    // Row selected, no cell — Binding Definition fills the contextual area.
+                    DrawBindingDefinitionPanel(canvas, contextualBounds, frameInset, contextualExpanded);
+                }
+                else
+                {
+                    // Row + cell selected — stack [BD, Cell Details]. Whichever is "expanded"
+                    // takes the bulk of the area; the other shows just its header. _bdPanel
+                    // determines which one. Default-cell-click sets _bdPanel.IsExpanded = false.
+                    float collapsedH = FUIRenderer.CollapsedPanelHeight;
+                    float subGap = 4f;
+
+                    SKRect bdBounds, detailsBounds;
+                    if (_bdPanel.IsExpanded)
+                    {
+                        detailsBounds = new SKRect(contextualBounds.Left, contextualBounds.Bottom - collapsedH,
+                            contextualBounds.Right, contextualBounds.Bottom);
+                        bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
+                            contextualBounds.Right, detailsBounds.Top - subGap);
+                    }
+                    else
+                    {
+                        bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
+                            contextualBounds.Right, contextualBounds.Top + collapsedH);
+                        detailsBounds = new SKRect(contextualBounds.Left, bdBounds.Bottom + subGap,
+                            contextualBounds.Right, contextualBounds.Bottom);
+                    }
+
+                    DrawBindingDefinitionPanel(canvas, bdBounds, frameInset,
+                        isExpanded: _bdPanel.IsExpanded && contextualExpanded);
+                    DrawCellDetailsPanel(canvas, detailsBounds, frameInset,
+                        isExpanded: !_bdPanel.IsExpanded && contextualExpanded);
+                }
+            }
+
             canvas.Restore();
         }
 
@@ -1630,6 +1675,85 @@ public partial class SCBindingsTabController
         var items = _colImport.SourceColumns.Select(c => c.Label).ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _colImport.ColumnDropdownBounds, items,
             _colImport.ColumnIndex, _colImport.ColumnHoveredIndex, itemH);
+    }
+
+    /// <summary>
+    /// Read-only "Binding Definition" panel — renders Asteriq's authored long-form description and
+    /// use cases for the currently-selected action, plus CIG's short tagline if available. Lives
+    /// in the contextual slot above Cell Details when a row is selected. Auto-expanded when the
+    /// user clicks the action name; auto-collapsed (header only) when they click a cell.
+    /// </summary>
+    private void DrawBindingDefinitionPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded)
+    {
+        if (_scFilteredActions is null
+            || _cell.SelectedCell.actionIndex < 0
+            || _cell.SelectedCell.actionIndex >= _scFilteredActions.Count)
+            return;
+
+        bool headerHovered = !isExpanded
+            && new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + FUIRenderer.PanelHeaderHeight)
+                .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        var m = FUIWidgets.DrawCollapsiblePanelHeader(canvas, bounds, "BINDING DEFINITION",
+            isExpanded, headerHovered, out var hdrBounds);
+        _bdPanel.HeaderBounds = hdrBounds;
+        if (!isExpanded) return;
+
+        float y = m.Y;
+        float leftMargin = m.LeftMargin;
+        float rightMargin = m.RightMargin;
+        float panelWidth = rightMargin - leftMargin;
+
+        var selectedAction = _scFilteredActions[_cell.SelectedCell.actionIndex];
+
+        // Action label heading — prefer SC's localised label, fall back to mechanical formatter.
+        string actionLabel = selectedAction.DisplayLabel
+            ?? SCCategoryMapper.FormatActionName(selectedAction.ActionName);
+        FUIRenderer.DrawText(canvas, actionLabel,
+            new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 14f, true);
+        y += 24f;
+
+        // CIG's short tagline when present.
+        if (!string.IsNullOrEmpty(selectedAction.Description))
+        {
+            foreach (var wrapped in FUIWidgets.WrapTextToWidth(selectedAction.Description, panelWidth - 4, 11f))
+            {
+                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 11f);
+                y += 14f;
+            }
+            y += 6f;
+        }
+
+        // Asteriq long-form description + use cases. Renders nothing when the action has no
+        // entry in the locale JSON yet — we surface a small "no description yet" line below
+        // instead so the panel doesn't look broken on un-documented actions.
+        var asteriqDesc = _bindingDescriptionService.Get(selectedAction.ActionName);
+        if (asteriqDesc is not null)
+        {
+            foreach (var wrapped in FUIWidgets.WrapTextToWidth(asteriqDesc.Description, panelWidth - 4, 12f))
+            {
+                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 12f);
+                y += 16f;
+            }
+
+            if (asteriqDesc.UseCases.Count > 0)
+            {
+                y += 6f;
+                foreach (var useCase in asteriqDesc.UseCases)
+                {
+                    foreach (var wrapped in FUIWidgets.WrapTextToWidth($"  •  {useCase}", panelWidth - 4, 11f))
+                    {
+                        FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 13), FUIColors.TextDim, 11f);
+                        y += 14f;
+                    }
+                }
+            }
+        }
+        else if (string.IsNullOrEmpty(selectedAction.Description))
+        {
+            // No tagline AND no Asteriq entry — make the empty state explicit.
+            FUIRenderer.DrawText(canvas, "No description yet for this action.",
+                new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 11f);
+        }
     }
 
     private void DrawCellDetailsPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded)

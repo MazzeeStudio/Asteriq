@@ -349,11 +349,12 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Determine if CP panel content is visible (not collapsed behind a contextual panel)
-        bool showCellDetails = !showColumnActions
-            && _cell.SelectedCell.actionIndex >= 0 && _cell.SelectedCell.colIndex >= 0
+        // Determine if CP panel content is visible (not collapsed behind a contextual panel).
+        // Row-only selection also creates a contextual panel (Binding Definition).
+        bool hasRowSelection = !showColumnActions
+            && _cell.SelectedCell.actionIndex >= 0
             && _scFilteredActions is not null && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
-        bool hasContextualPanel = showColumnActions || showCellDetails;
+        bool hasContextualPanel = showColumnActions || hasRowSelection;
         bool cpContentVisible = !hasContextualPanel || _cpPanel.IsExpanded;
 
         // CP panel content handlers — must run BEFORE header click, since header bounds overlap content
@@ -404,9 +405,26 @@ public partial class SCBindingsTabController
             _ctx.MarkDirty();
             return;
         }
+        if (_bdPanel.HeaderBounds.HitTest(point))
+        {
+            // BD header — toggle expansion within the contextual area. When BD expands, Cell
+            // Details collapses to a header at the bottom and vice versa.
+            _bdPanel.IsExpanded = !_bdPanel.IsExpanded;
+            _ctx.MarkDirty();
+            return;
+        }
         if (_cellDetails.HeaderBounds.HitTest(point))
         {
-            _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
+            // Cell Details header — when BD is expanded, this expands Details (collapses BD).
+            // Otherwise fall through to the existing CP↔contextual top-level toggle.
+            if (_bdPanel.IsExpanded)
+            {
+                _bdPanel.IsExpanded = false;
+            }
+            else
+            {
+                _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
+            }
             _ctx.MarkDirty();
             return;
         }
@@ -776,12 +794,33 @@ public partial class SCBindingsTabController
                             if (TryShowDuplicateResolveDialog(clickedAction))
                                 return;
                         }
-                        _cell.SelectedCell = (-1, -1);
+
+                        // Row-only selection: clicking the action name selects the row without
+                        // a cell, opening the Binding Definition panel for the user to read about
+                        // the action. Re-clicking the same row's name with BD already expanded
+                        // toggles back to no-selection (matches the legacy "click name = back to CP"
+                        // muscle memory).
+                        bool sameRowAlreadyOpen =
+                            _cell.SelectedCell.actionIndex == i && _cell.SelectedCell.colIndex < 0
+                            && _bdPanel.IsExpanded;
+
                         _scListening.IsListening = false;
                         _conflicts.ConflictLinks.Clear();
                         _conflicts.ConflictLinkBounds.Clear();
-                        if (_colImport.HighlightedColumn < 0)
-                            _cpPanel.IsExpanded = true;
+
+                        if (sameRowAlreadyOpen)
+                        {
+                            _cell.SelectedCell = (-1, -1);
+                            _bdPanel.IsExpanded = false;
+                            if (_colImport.HighlightedColumn < 0)
+                                _cpPanel.IsExpanded = true;
+                        }
+                        else
+                        {
+                            _cell.SelectedCell = (i, -1);
+                            _bdPanel.IsExpanded = true;
+                            _cpPanel.IsExpanded = false;
+                        }
                     }
                     return;
                 }
@@ -841,6 +880,7 @@ public partial class SCBindingsTabController
             _cell.SelectedCell = (actionIndex, colIndex);
             _cell.LastCellClickTicks = Environment.TickCount64;
             _cpPanel.IsExpanded = false; // Auto-expand Cell Details
+            _bdPanel.IsExpanded = false; // Cell-click intent is "configure" — collapse Definition panel
             UpdateConflictLinks();
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected read-only cell ({actionIndex}, {colIndex}) - {col.Header}");
             return;
@@ -862,6 +902,7 @@ public partial class SCBindingsTabController
                 _cell.SelectedCell = (actionIndex, colIndex);
                 _cell.LastCellClickTicks = Environment.TickCount64;
                 _cpPanel.IsExpanded = false; // Auto-expand Cell Details
+            _bdPanel.IsExpanded = false; // Cell-click intent is "configure" — collapse Definition panel
                 UpdateConflictLinks();
                 return;
             }
@@ -903,6 +944,7 @@ public partial class SCBindingsTabController
             _cell.LastCellClickTicks = Environment.TickCount64;
             _conflicts.HighlightActionIndex = -1;
             _cpPanel.IsExpanded = false; // Auto-expand Cell Details
+            _bdPanel.IsExpanded = false; // Cell-click intent is "configure" — collapse Definition panel
             UpdateConflictLinks();
             System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected cell ({actionIndex}, {colIndex}) - {col.Header}");
         }

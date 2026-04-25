@@ -19,6 +19,7 @@ public partial class SCBindingsTabController : ITabController
     private readonly SCSchemaService _scSchemaService;
     private readonly SCXmlExportService _scExportService;
     private readonly SCExportProfileService _scExportProfileService;
+    private readonly BindingDescriptionService _bindingDescriptionService;
     private readonly DirectInputService? _directInputService;
 
     // ── Grouped state objects ──────────────────────────────────────────────────
@@ -30,6 +31,7 @@ public partial class SCBindingsTabController : ITabController
     private readonly ConflictState _conflicts = new();
     private readonly ControlProfilesPanelState _cpPanel = new();
     private readonly CellDetailsState _cellDetails = new();
+    private readonly BindingDefinitionPanelState _bdPanel = new();
     private readonly ProfileMgmtState _profileMgmt = new();
     private readonly SearchFilterState _searchFilter = new();
     private readonly ScrollState _scroll = new();
@@ -189,6 +191,7 @@ public partial class SCBindingsTabController : ITabController
         SCSchemaService scSchemaService,
         SCXmlExportService scExportService,
         SCExportProfileService scExportProfileService,
+        BindingDescriptionService bindingDescriptionService,
         DirectInputService? directInputService = null)
     {
         _ctx = ctx;
@@ -197,6 +200,7 @@ public partial class SCBindingsTabController : ITabController
         _scSchemaService = scSchemaService;
         _scExportService = scExportService;
         _scExportProfileService = scExportProfileService;
+        _bindingDescriptionService = bindingDescriptionService;
         _directInputService = directInputService;
 
         _ctx.SendProfileListToClient = () =>
@@ -475,7 +479,10 @@ public partial class SCBindingsTabController : ITabController
         bool overCellDetailsHeader = _cpPanel.IsExpanded
             && !_cellDetails.HeaderBounds.IsEmpty
             && _cellDetails.HeaderBounds.Contains(e.X, e.Y);
-        if (overCPHeader || overColActionsHeader || overCellDetailsHeader)
+        bool overBDHeader = _cpPanel.IsExpanded
+            && !_bdPanel.HeaderBounds.IsEmpty
+            && _bdPanel.HeaderBounds.Contains(e.X, e.Y);
+        if (overCPHeader || overColActionsHeader || overCellDetailsHeader || overBDHeader)
         {
             _ctx.OwnerForm.Cursor = Cursors.Hand;
             _ctx.MarkDirty();
@@ -700,9 +707,10 @@ public partial class SCBindingsTabController : ITabController
         if (_searchFilter.CaptureWaitingForRelease)
             CheckCaptureRelease();
 
-        // Animate panel expand/collapse
+        // Animate panel expand/collapse. Row-only selection (action name clicked, no cell)
+        // also counts as a contextual panel — Binding Definition fills the contextual area.
         bool hasContextual = IsColumnActionsVisible()
-            || (_cell.SelectedCell.actionIndex >= 0 && _cell.SelectedCell.colIndex >= 0);
+            || _cell.SelectedCell.actionIndex >= 0;
         if (_cpPanel.Anim.Update(_cpPanel.IsExpanded, hasContextual))
             _ctx.MarkDirty();
     }
@@ -712,6 +720,11 @@ public partial class SCBindingsTabController : ITabController
         // Defer schema load to first tab activation so BeginInvoke runs with a valid form handle.
         if (_scInstall.Actions is null && !_scInstall.Loading)
             StartSchemaLoad();
+
+        // Load Asteriq's authored binding descriptions from disk on first activation.
+        // Service is idempotent — re-Load just clears + reloads — so guard once is enough.
+        if (!_bindingDescriptionService.Loaded)
+            _bindingDescriptionService.Load();
 
         UpdateModifierKeys();
     }
@@ -871,6 +884,17 @@ public partial class SCBindingsTabController : ITabController
         public SKRect HeaderBounds;
         public SKRect[] ActivationModeBounds = new SKRect[5];
         public int HoveredModeIndex = -1;
+    }
+
+    /// <summary>
+    /// Binding Definition panel state. Stacks ABOVE Cell Details inside the contextual slot
+    /// when a row is selected. Auto-expands when only the row (not a cell) is selected;
+    /// auto-collapses when the user clicks a cell so Cell Details takes focus.
+    /// </summary>
+    private sealed class BindingDefinitionPanelState
+    {
+        public bool IsExpanded;
+        public SKRect HeaderBounds;
     }
 
     private sealed class ProfileMgmtState

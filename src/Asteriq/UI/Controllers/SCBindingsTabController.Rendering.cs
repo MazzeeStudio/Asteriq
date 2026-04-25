@@ -103,31 +103,28 @@ public partial class SCBindingsTabController
                 }
                 else
                 {
-                    // Row + cell selected — stack [BD, Cell Details]. Whichever is "expanded"
-                    // takes the bulk of the area; the other shows just its header. _bdPanel
-                    // determines which one. Default-cell-click sets _bdPanel.IsExpanded = false.
+                    // Row + cell selected — animated [BD, Cell Details] sub-stack. SubAnim
+                    // lerps the split: T=1 → BD expanded, T=0 → Cell Details expanded.
+                    // During animation both panels render full content; ClipRect prevents
+                    // the shrinking panel's content from bleeding into the growing one.
                     float collapsedH = FUIRenderer.CollapsedPanelHeight;
+                    var (bdBounds, detailsBounds) = _bdPanel.SubAnim.ComputeBounds(
+                        contextualBounds, subStackGap, collapsedH, collapsedH);
 
-                    SKRect bdBounds, detailsBounds;
-                    if (_bdPanel.IsExpanded)
-                    {
-                        detailsBounds = new SKRect(contextualBounds.Left, contextualBounds.Bottom - collapsedH,
-                            contextualBounds.Right, contextualBounds.Bottom);
-                        bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
-                            contextualBounds.Right, detailsBounds.Top - subStackGap);
-                    }
-                    else
-                    {
-                        bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
-                            contextualBounds.Right, contextualBounds.Top + collapsedH);
-                        detailsBounds = new SKRect(contextualBounds.Left, bdBounds.Bottom + subStackGap,
-                            contextualBounds.Right, contextualBounds.Bottom);
-                    }
+                    bool bdHasArea = _bdPanel.SubAnim.T > 0.001f;
+                    bool cdHasArea = _bdPanel.SubAnim.T < 0.999f;
 
+                    canvas.Save();
+                    canvas.ClipRect(bdBounds);
                     DrawBindingDefinitionPanel(canvas, bdBounds, frameInset,
-                        isExpanded: _bdPanel.IsExpanded && contextualExpanded);
+                        isExpanded: contextualExpanded && bdHasArea);
+                    canvas.Restore();
+
+                    canvas.Save();
+                    canvas.ClipRect(detailsBounds);
                     DrawCellDetailsPanel(canvas, detailsBounds, frameInset,
-                        isExpanded: !_bdPanel.IsExpanded && contextualExpanded);
+                        isExpanded: contextualExpanded && cdHasArea);
+                    canvas.Restore();
                 }
             }
 

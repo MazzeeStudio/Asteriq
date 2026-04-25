@@ -183,7 +183,7 @@ public partial class MappingsTabController
                     bool isHovered = rowIndex == _hoveredMappingRow;
                     bool isModifier = keyParts?.Count == 1 && IsModifierKeyName(keyParts[0]);
                     bool isSwitchBtn = rowIndex == switchRowIndex;
-                    bool isShared = GetSharedSlotInfo(vjoyDevice!.Id, i) is not null;
+                    bool isShared = GetSharedSlotInfos(vjoyDevice!.Id, i).Count > 0;
 
                     DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier, isSwitchBtn, isShared);
                     _mappingRowBounds.Add(rowBounds);
@@ -695,10 +695,10 @@ public partial class MappingsTabController
         if (!isAxis && _ctx.VJoyDevices.Count > _ctx.SelectedVJoyDeviceIndex)
         {
             var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
-            var sharedInfo = GetSharedSlotInfo(vjoyDevice.Id, _selectedMappingRow);
-            if (sharedInfo is not null)
+            var sharedInfos = GetSharedSlotInfos(vjoyDevice.Id, _selectedMappingRow);
+            if (sharedInfos.Count > 0)
             {
-                DrawSharedSlotPanel(canvas, leftMargin, rightMargin, y, sharedInfo, vjoyDevice.Id);
+                DrawSharedSlotPanel(canvas, leftMargin, rightMargin, y, sharedInfos, vjoyDevice.Id);
                 return;
             }
         }
@@ -1703,15 +1703,13 @@ public partial class MappingsTabController
 
     /// <summary>
     /// Renders the read-only "this row has been shared from the SC Bindings tab" panel that
-    /// replaces the normal mapping editor. Shows the action display name + primary slot, an
+    /// replaces the normal mapping editor. Lists every action sharing this slot, an
     /// explanation, and a "MANAGE IN KEYBINDINGS" button that deep-links to the SC Bindings
-    /// tab with the search box pre-set so the user can see / unshare the originating action.
+    /// tab with the search box pre-set so the user can see / unshare the originating actions.
     /// </summary>
-    private void DrawSharedSlotPanel(SKCanvas canvas, float leftMargin, float rightMargin, float y, SharedSlotInfo info, uint rowVJoyDevice)
+    private void DrawSharedSlotPanel(SKCanvas canvas, float leftMargin, float rightMargin, float y, List<SharedSlotInfo> infos, uint rowVJoyDevice)
     {
-        float width = rightMargin - leftMargin;
-
-        // Banner — blue rounded panel with [SHARED] tag + action display name.
+        // Banner — blue rounded panel with [SHARED] pill + summary count.
         var bannerRect = new SKRect(leftMargin, y, rightMargin, y + 36);
         FUIRenderer.DrawRoundedPanel(canvas, bannerRect,
             FUIColors.Primary.WithAlpha(FUIColors.AlphaLightTint),
@@ -1726,18 +1724,53 @@ public partial class MappingsTabController
             FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
         FUIRenderer.DrawTextCentered(canvas, "SHARED", pillRect, FUIColors.Primary, 10f);
 
-        FUIRenderer.DrawText(canvas, info.ActionDisplayName,
+        string headline = infos.Count == 1
+            ? infos[0].ActionDisplayName
+            : $"{infos.Count} keybindings";
+        FUIRenderer.DrawText(canvas, headline,
             new SKPoint(pillRect.Right + 10f, bannerRect.MidY + 5f), FUIColors.Primary, 13f);
         y += 36 + 12;
 
-        // Body — explanatory text. Plain prose so the user understands the state without
-        // jargon; specifics (action + primary slot) come from the banner above.
         FUIRenderer.DrawText(canvas, "This output is shared from the Keybindings tab.",
             new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 13f);
         y += 22;
-        FUIRenderer.DrawText(canvas, $"Primary: vJoy {info.PrimaryVJoyDevice} Button {info.PrimaryButtonIndex + 1}",
-            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
-        y += 22;
+
+        // When every share targets the same primary slot we collapse the primary into a
+        // single line; otherwise show the primary inline with each action so the panel
+        // never lies about what's driving what.
+        bool allSamePrimary = infos.All(i =>
+            i.PrimaryVJoyDevice == infos[0].PrimaryVJoyDevice
+            && i.PrimaryButtonIndex == infos[0].PrimaryButtonIndex);
+
+        // List of sharing actions. Soft cap on rendered rows so the panel can't overflow
+        // the right column on extreme cases — full list is still findable via the deep-link.
+        const int maxVisible = 6;
+        int rendered = Math.Min(infos.Count, maxVisible);
+        for (int i = 0; i < rendered; i++)
+        {
+            var info = infos[i];
+            string line = allSamePrimary
+                ? $"  • {info.ActionDisplayName}"
+                : $"  • {info.ActionDisplayName} (vJoy {info.PrimaryVJoyDevice} Button {info.PrimaryButtonIndex + 1})";
+            FUIRenderer.DrawText(canvas, line, new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+            y += 18;
+        }
+        if (infos.Count > maxVisible)
+        {
+            FUIRenderer.DrawText(canvas, $"  …and {infos.Count - maxVisible} more",
+                new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+            y += 18;
+        }
+        y += 4;
+
+        if (allSamePrimary)
+        {
+            FUIRenderer.DrawText(canvas,
+                $"Primary: vJoy {infos[0].PrimaryVJoyDevice} Button {infos[0].PrimaryButtonIndex + 1}",
+                new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+            y += 22;
+        }
+
         FUIRenderer.DrawText(canvas, "Pressing this button now drives the primary's binding.",
             new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
         y += 18;
@@ -1749,8 +1782,6 @@ public partial class MappingsTabController
         var btnBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
         _sharedManageButtonBounds = btnBounds;
         _sharedManageButtonHovered = btnBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-        // Search text is the share's InputName — i.e. the row's button name in SC's "buttonN" form.
-        // _selectedMappingRow is 0-based, SC uses 1-based.
         _sharedManageSearchText = $"button{_selectedMappingRow + 1}";
         _sharedManageVJoyDevice = rowVJoyDevice;
 

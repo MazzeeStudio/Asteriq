@@ -105,25 +105,25 @@ public partial class SCBindingsTabController
                 {
                     // Row + cell selected — animated [BD, Cell Details] sub-stack. SubAnim
                     // lerps the split: T=1 → BD expanded, T=0 → Cell Details expanded.
-                    // During animation both panels render full content; ClipRect prevents
-                    // the shrinking panel's content from bleeding into the growing one.
+                    // Content gating mirrors CP's pattern: only the spotlight (target-expanded)
+                    // panel draws content; the collapsing panel draws header-only so its
+                    // bottom-anchored content (e.g. ASSIGN/CLEAR) doesn't hover in place
+                    // while the header slides down underneath. ClipRect on the growing
+                    // panel keeps its content from bleeding past its current bounds.
                     float collapsedH = FUIRenderer.CollapsedPanelHeight;
                     var (bdBounds, detailsBounds) = _bdPanel.SubAnim.ComputeBounds(
                         contextualBounds, subStackGap, collapsedH, collapsedH);
 
-                    bool bdHasArea = _bdPanel.SubAnim.T > 0.001f;
-                    bool cdHasArea = _bdPanel.SubAnim.T < 0.999f;
-
                     canvas.Save();
                     canvas.ClipRect(bdBounds);
                     DrawBindingDefinitionPanel(canvas, bdBounds, frameInset,
-                        isExpanded: contextualExpanded && bdHasArea);
+                        isExpanded: contextualExpanded && _bdPanel.IsExpanded);
                     canvas.Restore();
 
                     canvas.Save();
                     canvas.ClipRect(detailsBounds);
                     DrawCellDetailsPanel(canvas, detailsBounds, frameInset,
-                        isExpanded: contextualExpanded && cdHasArea);
+                        isExpanded: contextualExpanded && !_bdPanel.IsExpanded);
                     canvas.Restore();
                 }
             }

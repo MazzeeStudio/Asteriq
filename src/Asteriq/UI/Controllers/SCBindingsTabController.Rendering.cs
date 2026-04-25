@@ -47,12 +47,19 @@ public partial class SCBindingsTabController
         float bottomAreaBottom = rightBounds.Bottom;
         var splitArea = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, bottomAreaBottom);
 
+        // When the contextual area stacks Binding Definition + Cell Details, B's collapsed
+        // minimum must fit BOTH headers (single collapsedH would leave one off-screen).
+        const float subStackGap = 4f;
+        float collapsedBH = showCellDetails
+            ? 2 * FUIRenderer.CollapsedPanelHeight + subStackGap
+            : FUIRenderer.CollapsedPanelHeight;
+
         SKRect controlProfilesBounds;
         SKRect contextualBounds = SKRect.Empty;
         if (anim.UseAnimatedLayout)
         {
             (controlProfilesBounds, contextualBounds) = anim.ComputeBounds(
-                splitArea, verticalGap, FUIRenderer.CollapsedPanelHeight);
+                splitArea, verticalGap, FUIRenderer.CollapsedPanelHeight, collapsedBH);
         }
         else
         {
@@ -96,32 +103,28 @@ public partial class SCBindingsTabController
                 }
                 else
                 {
-                    // Row + cell selected — stack [BD, Cell Details]. Whichever is "expanded"
-                    // takes the bulk of the area; the other shows just its header. _bdPanel
-                    // determines which one. Default-cell-click sets _bdPanel.IsExpanded = false.
+                    // Row + cell selected — animated [BD, Cell Details] sub-stack. SubAnim
+                    // lerps the split: T=1 → BD expanded, T=0 → Cell Details expanded.
+                    // Content gating mirrors CP's pattern: only the spotlight (target-expanded)
+                    // panel draws content; the collapsing panel draws header-only so its
+                    // bottom-anchored content (e.g. ASSIGN/CLEAR) doesn't hover in place
+                    // while the header slides down underneath. ClipRect on the growing
+                    // panel keeps its content from bleeding past its current bounds.
                     float collapsedH = FUIRenderer.CollapsedPanelHeight;
-                    float subGap = 4f;
+                    var (bdBounds, detailsBounds) = _bdPanel.SubAnim.ComputeBounds(
+                        contextualBounds, subStackGap, collapsedH, collapsedH);
 
-                    SKRect bdBounds, detailsBounds;
-                    if (_bdPanel.IsExpanded)
-                    {
-                        detailsBounds = new SKRect(contextualBounds.Left, contextualBounds.Bottom - collapsedH,
-                            contextualBounds.Right, contextualBounds.Bottom);
-                        bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
-                            contextualBounds.Right, detailsBounds.Top - subGap);
-                    }
-                    else
-                    {
-                        bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
-                            contextualBounds.Right, contextualBounds.Top + collapsedH);
-                        detailsBounds = new SKRect(contextualBounds.Left, bdBounds.Bottom + subGap,
-                            contextualBounds.Right, contextualBounds.Bottom);
-                    }
-
+                    canvas.Save();
+                    canvas.ClipRect(bdBounds);
                     DrawBindingDefinitionPanel(canvas, bdBounds, frameInset,
-                        isExpanded: _bdPanel.IsExpanded && contextualExpanded);
+                        isExpanded: contextualExpanded && _bdPanel.IsExpanded);
+                    canvas.Restore();
+
+                    canvas.Save();
+                    canvas.ClipRect(detailsBounds);
                     DrawCellDetailsPanel(canvas, detailsBounds, frameInset,
-                        isExpanded: !_bdPanel.IsExpanded && contextualExpanded);
+                        isExpanded: contextualExpanded && !_bdPanel.IsExpanded);
+                    canvas.Restore();
                 }
             }
 

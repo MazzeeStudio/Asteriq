@@ -713,6 +713,19 @@ public partial class SCBindingsTabController : ITabController
             || _cell.SelectedCell.actionIndex >= 0;
         if (_cpPanel.Anim.Update(_cpPanel.IsExpanded, hasContextual))
             _ctx.MarkDirty();
+
+        // Animate the BD↔Cell Details swap inside the contextual area when both are present.
+        // Snap T to match IsExpanded on first appearance so the initial render isn't an
+        // unwanted slide from whatever the previous T was — only header-click swaps animate.
+        bool hasSubStack = !IsColumnActionsVisible()
+            && _cell.SelectedCell.actionIndex >= 0
+            && _scFilteredActions is not null
+            && _cell.SelectedCell.actionIndex < _scFilteredActions.Count
+            && _cell.SelectedCell.colIndex >= 0;
+        if (hasSubStack && !_bdPanel.SubAnim.HadPanelB)
+            _bdPanel.SubAnim.T = _bdPanel.IsExpanded ? 1f : 0f;
+        if (_bdPanel.SubAnim.Update(_bdPanel.IsExpanded, hasSubStack))
+            _ctx.MarkDirty();
     }
 
     public void OnActivated()
@@ -895,6 +908,9 @@ public partial class SCBindingsTabController : ITabController
     {
         public bool IsExpanded;
         public SKRect HeaderBounds;
+        // Drives the BD↔Cell Details swap inside the contextual area. Panel A = BD,
+        // Panel B = Cell Details. T=1 means BD expanded; T=0 means Cell Details expanded.
+        public FUIWidgets.PanelSplitAnimator SubAnim;
     }
 
     private sealed class ProfileMgmtState

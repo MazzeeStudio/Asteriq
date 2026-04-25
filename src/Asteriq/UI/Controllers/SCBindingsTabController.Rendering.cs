@@ -1710,15 +1710,21 @@ public partial class SCBindingsTabController
             ?? SCCategoryMapper.FormatActionName(selectedAction.ActionName);
         FUIRenderer.DrawText(canvas, actionLabel,
             new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 14f, true);
-        y += 24f;
+        y += 18f;
+
+        // Raw action code (the identifier SC writes to the .xml profile) shown as a subtitle so
+        // power users can correlate the friendly label back to the underlying binding name.
+        FUIRenderer.DrawText(canvas, selectedAction.ActionName,
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 14f);
+        y += 30f;
 
         // CIG's short tagline when present.
         if (!string.IsNullOrEmpty(selectedAction.Description))
         {
-            foreach (var wrapped in FUIWidgets.WrapTextToWidth(selectedAction.Description, panelWidth - 4, 11f))
+            foreach (var wrapped in FUIWidgets.WrapTextToWidth(selectedAction.Description, panelWidth - 4, 14f))
             {
-                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 12), FUIColors.TextDim, 11f);
-                y += 14f;
+                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 14f);
+                y += 18f;
             }
             y += 6f;
         }
@@ -1729,10 +1735,10 @@ public partial class SCBindingsTabController
         var asteriqDesc = _bindingDescriptionService.Get(selectedAction.ActionName);
         if (asteriqDesc is not null)
         {
-            foreach (var wrapped in FUIWidgets.WrapTextToWidth(asteriqDesc.Description, panelWidth - 4, 12f))
+            foreach (var wrapped in FUIWidgets.WrapTextToWidth(asteriqDesc.Description, panelWidth - 4, 14f))
             {
-                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 12f);
-                y += 16f;
+                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 14f);
+                y += 18f;
             }
 
             if (asteriqDesc.UseCases.Count > 0)
@@ -1742,7 +1748,7 @@ public partial class SCBindingsTabController
                 y += 2f;
                 foreach (var useCase in asteriqDesc.UseCases)
                 {
-                    var lines = FUIWidgets.WrapTextToWidth(useCase, panelWidth - 18f, 11f);
+                    var lines = FUIWidgets.WrapTextToWidth(useCase, panelWidth - 18f, 14f);
                     bool first = true;
                     foreach (var wrapped in lines)
                     {
@@ -1750,8 +1756,8 @@ public partial class SCBindingsTabController
                         // are indented to line up with the bullet text.
                         var prefix = first ? "•  " : "    ";
                         FUIRenderer.DrawText(canvas, prefix + wrapped,
-                            new SKPoint(leftMargin + 2f, y + 13), FUIColors.TextPrimary, 11f);
-                        y += 14f;
+                            new SKPoint(leftMargin + 2f, y + 14), FUIColors.TextPrimary, 14f);
+                        y += 18f;
                         first = false;
                     }
                 }
@@ -1761,7 +1767,7 @@ public partial class SCBindingsTabController
         {
             // No tagline AND no Asteriq entry — make the empty state explicit.
             FUIRenderer.DrawText(canvas, "No description yet for this action.",
-                new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 11f);
+                new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 14f);
         }
     }
 
@@ -1791,22 +1797,22 @@ public partial class SCBindingsTabController
         // mechanical name-formatter so un-hydrated actions still get a readable heading.
         string actionLabel = selectedAction.DisplayLabel
             ?? SCCategoryMapper.FormatActionName(selectedAction.ActionName);
-        string actionDisplay = FUIWidgets.TruncateTextToWidth(actionLabel, panelWidth - 10, 10f);
-        FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 13f);
-        y += lineHeight;
+        string actionDisplay = FUIWidgets.TruncateTextToWidth(actionLabel, panelWidth - 10, 14f);
+        FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 14f, true);
+        y += 18f;
 
-        FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
-        y += lineHeight;
+        FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 14f);
+        y += 18f;
 
         // Optional description — sourced from ui_<action>_desc in SC's localisation.
         // Only present when SC ships a genuinely different sentence from the label.
         if (!string.IsNullOrEmpty(selectedAction.Description))
         {
             y += 2f;
-            foreach (var wrapped in FUIWidgets.WrapTextToWidth(selectedAction.Description, panelWidth - 4, 11f))
+            foreach (var wrapped in FUIWidgets.WrapTextToWidth(selectedAction.Description, panelWidth - 4, 14f))
             {
-                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
-                y += 13f;
+                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y), FUIColors.TextDim, 14f);
+                y += 18f;
             }
             y += 2f;
         }
@@ -1846,7 +1852,7 @@ public partial class SCBindingsTabController
             y += lineHeight;
         }
 
-        y += 6f;
+        y += 12f;
 
         // Activation mode is per-binding in SC's XML — it controls how a press triggers the
         // action. So the gate is the BINDING's input type, not the action's heuristic

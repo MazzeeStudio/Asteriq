@@ -36,6 +36,13 @@ public class MappingEngine : IMappingEngine
     private readonly Dictionary<(uint vjoyDevice, int buttonIndex), HashSet<Guid>> _buttonPressedBy = new();
     private readonly HashSet<(uint vjoyDevice, int buttonIndex)> _dirtyButtonOutputs = new();
     private readonly Dictionary<(uint vjoyDevice, int buttonIndex), bool> _lastButtonState = new();
+
+    // Same OR-dedup as _buttonPressedBy but for keyboard output. Without it, two
+    // mappings sharing one keyboard key (e.g. two physical buttons both outputting
+    // LCtrl as a modifier) would race: when one releases, it would send key-up
+    // even though the other is still held.
+    private readonly Dictionary<int, HashSet<Guid>> _keyPressedBy = new();
+    private readonly Dictionary<int, bool> _lastKeyOutputState = new();
     private readonly object _lock = new();
 
     private MappingProfile? _activeProfile;
@@ -76,6 +83,8 @@ public class MappingEngine : IMappingEngine
             _buttonPressedBy.Clear();
             _dirtyButtonOutputs.Clear();
             _lastButtonState.Clear();
+            _keyPressedBy.Clear();
+            _lastKeyOutputState.Clear();
 
             // Initialize merge cache for axis mappings with multiple inputs
             foreach (var mapping in profile.AxisMappings.Where(m => m.Inputs.Count > 1))
@@ -421,7 +430,7 @@ public class MappingEngine : IMappingEngine
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
-            _keyboard.SetKey(mapping.Output.KeyName, outputPressed, mapping.Output.Modifiers);
+            CollectKeyboardOutput(mapping.Output.KeyName, mapping.Output.Modifiers, outputPressed, mapping.Id);
         }
     }
 
@@ -560,7 +569,7 @@ public class MappingEngine : IMappingEngine
         }
         else if (mapping.Output.Type == OutputType.Keyboard)
         {
-            _keyboard.SetKey(mapping.Output.KeyName, outputPressed, mapping.Output.Modifiers);
+            CollectKeyboardOutput(mapping.Output.KeyName, mapping.Output.Modifiers, outputPressed, mapping.Id);
         }
     }
 
@@ -701,6 +710,62 @@ public class MappingEngine : IMappingEngine
             sources.Remove(mappingId);
 
         _dirtyButtonOutputs.Add(key);
+    }
+
+    /// <summary>
+    /// Routes keyboard output through per-VK OR-dedup so multiple mappings can drive
+    /// the same key without racing — when one mapping releases the key, the OS only
+    /// sees key-up if no other mapping is still asserting it. Preserves the existing
+    /// modifier ordering: on press, modifiers down before main key; on release,
+    /// main key up before modifiers (in reverse).
+    /// </summary>
+    private void CollectKeyboardOutput(string? keyName, List<string>? modifierNames, bool pressed, Guid mappingId)
+    {
+        if (string.IsNullOrEmpty(keyName)) return;
+        var mainCode = KeyboardService.GetKeyCode(keyName);
+        if (!mainCode.HasValue) return;
+
+        int[]? modCodes = null;
+        if (modifierNames is not null && modifierNames.Count > 0)
+        {
+            modCodes = modifierNames
+                .Select(KeyboardService.GetKeyCode)
+                .Where(c => c.HasValue)
+                .Select(c => c!.Value)
+                .ToArray();
+        }
+
+        if (pressed)
+        {
+            if (modCodes is not null)
+                foreach (var mod in modCodes) ApplyKeyOR(mod, mappingId, want: true);
+            ApplyKeyOR(mainCode.Value, mappingId, want: true);
+        }
+        else
+        {
+            ApplyKeyOR(mainCode.Value, mappingId, want: false);
+            if (modCodes is not null)
+                for (int i = modCodes.Length - 1; i >= 0; i--)
+                    ApplyKeyOR(modCodes[i], mappingId, want: false);
+        }
+    }
+
+    private void ApplyKeyOR(int vk, Guid mappingId, bool want)
+    {
+        if (!_keyPressedBy.TryGetValue(vk, out var sources))
+        {
+            sources = new HashSet<Guid>();
+            _keyPressedBy[vk] = sources;
+        }
+        if (want) sources.Add(mappingId);
+        else sources.Remove(mappingId);
+
+        bool nowPressed = sources.Count > 0;
+        if (!_lastKeyOutputState.TryGetValue(vk, out var lastState) || lastState != nowPressed)
+        {
+            _keyboard.SetKey(vk, nowPressed);
+            _lastKeyOutputState[vk] = nowPressed;
+        }
     }
 
     private void FlushButtonOutputs()

@@ -62,6 +62,41 @@ public class SCSchemaService
     }
 
     /// <summary>
+    /// Hydrates <c>DisplayLabel</c> and <c>Description</c> on each action using SC's
+    /// localisation strings (keys <c>ui_&lt;actionName&gt;</c> and
+    /// <c>ui_&lt;actionName&gt;_desc</c>). Safe to call with an unloaded service — it
+    /// leaves the actions untouched so the UI falls back to mechanical formatting.
+    /// Description is only set when it differs from the label, so the UI never draws
+    /// duplicate text for actions whose _desc just echoes the label.
+    /// </summary>
+    public static void HydrateLocalisation(List<SCAction> actions, SCLocalisationService localisation)
+    {
+        if (!localisation.Loaded) return;
+
+        int labelHits = 0;
+        int descHits = 0;
+        foreach (var action in actions)
+        {
+            var label = localisation.Get($"ui_{action.ActionName}");
+            if (!string.IsNullOrEmpty(label))
+            {
+                action.DisplayLabel = label;
+                labelHits++;
+            }
+
+            var desc = localisation.Get($"ui_{action.ActionName}_desc");
+            if (!string.IsNullOrEmpty(desc) && !string.Equals(desc, label, StringComparison.Ordinal))
+            {
+                action.Description = desc;
+                descHits++;
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine(
+            $"[SCSchemaService] Hydrated {labelHits} labels / {descHits} descriptions from localisation");
+    }
+
+    /// <summary>
     /// Parses default bindings from an action element
     /// </summary>
     private static List<SCDefaultBinding> ParseDefaultBindings(XmlElement actionNode)

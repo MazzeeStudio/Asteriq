@@ -812,6 +812,42 @@ internal static class FUIWidgets
         return low > 0 ? string.Concat(text.AsSpan(0, low), "...") : "...";
     }
 
+    /// <summary>
+    /// Word-wraps text into lines that each fit within <paramref name="maxWidth"/> at the
+    /// given font size. Long single words that exceed the width are emitted unbroken rather
+    /// than hard-truncated — callers that need to clip can post-process with TruncateTextToWidth.
+    /// </summary>
+    internal static IReadOnlyList<string> WrapTextToWidth(string text, float maxWidth, float fontSize)
+    {
+        var lines = new List<string>();
+        if (string.IsNullOrEmpty(text)) return lines;
+
+        var words = text.Split(' ');
+        var current = new System.Text.StringBuilder();
+        foreach (var word in words)
+        {
+            if (current.Length == 0)
+            {
+                current.Append(word);
+                continue;
+            }
+
+            var candidate = current + " " + word;
+            if (FUIRenderer.MeasureText(candidate, fontSize) <= maxWidth)
+            {
+                current.Append(' ').Append(word);
+            }
+            else
+            {
+                lines.Add(current.ToString());
+                current.Clear();
+                current.Append(word);
+            }
+        }
+        if (current.Length > 0) lines.Add(current.ToString());
+        return lines;
+    }
+
     // ─── SC Bindings Shared Widgets ───────────────────────────────────────────
 
 

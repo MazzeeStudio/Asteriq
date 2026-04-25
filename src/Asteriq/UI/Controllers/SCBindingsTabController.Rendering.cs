@@ -611,9 +611,11 @@ public partial class SCBindingsTabController
 
                     float textY = scrollY + rowHeight / 2 + 4;
 
-                    // Draw action name with ellipsis if too long
+                    // Draw action name with ellipsis if too long. Prefer SC's localised label
+                    // when available; fall back to the mechanical formatter otherwise.
                     float actionIndent = 18f;
-                    string displayName = SCCategoryMapper.FormatActionName(action.ActionName);
+                    string displayName = action.DisplayLabel
+                        ?? SCCategoryMapper.FormatActionName(action.ActionName);
                     float maxNameWidth = actionColWidth - actionIndent - 10f;
                     displayName = FUIWidgets.TruncateTextToWidth(displayName, maxNameWidth, 10f);
                     var nameColor = FUIColors.ContentColor(isSelected);
@@ -1650,14 +1652,31 @@ public partial class SCBindingsTabController
 
         var selectedAction = _scFilteredActions[_cell.SelectedCell.actionIndex];
         float lineHeight = 15f;
+        float panelWidth = rightMargin - leftMargin;
 
-        // Action name + type
-        string actionDisplay = FUIWidgets.TruncateTextToWidth(selectedAction.ActionName, rightMargin - leftMargin - 10, 10f);
+        // Action name — prefer SC's own localised label when available, fall back to the
+        // mechanical name-formatter so un-hydrated actions still get a readable heading.
+        string actionLabel = selectedAction.DisplayLabel
+            ?? SCCategoryMapper.FormatActionName(selectedAction.ActionName);
+        string actionDisplay = FUIWidgets.TruncateTextToWidth(actionLabel, panelWidth - 10, 10f);
         FUIRenderer.DrawText(canvas, actionDisplay, new SKPoint(leftMargin, y), FUIColors.TextPrimary, 13f);
         y += lineHeight;
 
         FUIRenderer.DrawText(canvas, $"Type: {selectedAction.InputType}", new SKPoint(leftMargin, y), FUIColors.TextDim, 12f);
         y += lineHeight;
+
+        // Optional description — sourced from ui_<action>_desc in SC's localisation.
+        // Only present when SC ships a genuinely different sentence from the label.
+        if (!string.IsNullOrEmpty(selectedAction.Description))
+        {
+            y += 2f;
+            foreach (var wrapped in FUIWidgets.WrapTextToWidth(selectedAction.Description, panelWidth - 4, 11f))
+            {
+                FUIRenderer.DrawText(canvas, wrapped, new SKPoint(leftMargin, y), FUIColors.TextDim, 11f);
+                y += 13f;
+            }
+            y += 2f;
+        }
 
         // Detect shared cell state
         bool isCellShared = false;

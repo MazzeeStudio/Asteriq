@@ -185,6 +185,16 @@ public partial class SCBindingsTabController
                     {
                         ReportProgress(version, "Parsing actions...");
                         actions = SCSchemaService.ParseActions(profile);
+
+                        // Hydrate display labels and descriptions from SC's own localisation
+                        // file. Stored on the cached actions so subsequent environment
+                        // switches reuse the hydrated state. If the locale file is missing
+                        // the actions stay un-hydrated and the UI falls back gracefully.
+                        ReportProgress(version, "Loading action labels...");
+                        var localisation = new SCLocalisationService();
+                        localisation.Load(installation.InstallPath);
+                        SCSchemaService.HydrateLocalisation(actions, localisation);
+
                         s_schemaCache[cacheKey] = actions;
                     }
                 }

@@ -474,6 +474,32 @@ public partial class MappingsTabController
         row >= 0 && row < _visibleAxisIndices.Count ? _visibleAxisIndices[row] : -1;
 
     /// <summary>
+    /// Switches the Mappings tab to a specific vJoy device + axis slot. Used by the
+    /// "GO TO MERGED AXIS" button on the merged-away panel. _visibleAxisIndices is
+    /// recomputed each render, so we resolve the row against the target device's axis
+    /// list directly rather than the currently-cached one.
+    /// </summary>
+    private void NavigateToAxisSlot(uint vjoyDeviceId, int axisIndex)
+    {
+        int devIndex = -1;
+        for (int i = 0; i < _ctx.VJoyDevices.Count; i++)
+        {
+            if (_ctx.VJoyDevices[i].Id == vjoyDeviceId) { devIndex = i; break; }
+        }
+        if (devIndex < 0) return;
+
+        _ctx.SelectedVJoyDeviceIndex = devIndex;
+        _mappingCategory = 1;
+
+        var axisIndices = GetVJoyAxisIndices(_ctx.VJoyDevices[devIndex]);
+        int row = axisIndices.IndexOf(axisIndex);
+        if (row < 0) return;
+
+        _selectedMappingRow = row;
+        _selectionIsExplicit = true;
+    }
+
+    /// <summary>
     /// Get a human-readable name for a vJoy axis index.
     /// </summary>
     private static string GetVJoyAxisName(int index)

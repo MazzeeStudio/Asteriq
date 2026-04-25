@@ -68,6 +68,13 @@ public partial class MappingsTabController : ITabController
     private string? _sharedManageSearchText;
     private uint _sharedManageVJoyDevice;
 
+    // "Go to merged axis" button shown when the selected axis row's natural physical input
+    // is being consumed by a merge on another vJoy slot. Click navigates to the merge target.
+    // Bounds reset every frame in DrawMappingSettingsPanel.
+    private SKRect _mergedAwayManageButtonBounds;
+    private bool _mergedAwayManageButtonHovered;
+    private (uint vjoyDevice, int axisIndex)? _mergedAwayManageTarget;
+
     // Merge operation selector (for axes with multiple inputs)
     private readonly MergeModeDropdownState _merge = new();
 
@@ -305,6 +312,14 @@ public partial class MappingsTabController : ITabController
         if (_sharedManageButtonBounds.Contains(e.X, e.Y) && !string.IsNullOrEmpty(_sharedManageSearchText))
         {
             _ctx.OpenSCBindingsWithSearch?.Invoke(_sharedManageVJoyDevice, _sharedManageSearchText);
+            return true;
+        }
+
+        // Go to merged axis — same priority pattern. Bounds are SKRect.Empty unless the
+        // merged-away panel is active.
+        if (_mergedAwayManageButtonBounds.Contains(e.X, e.Y) && _mergedAwayManageTarget is not null)
+        {
+            NavigateToAxisSlot(_mergedAwayManageTarget.Value.vjoyDevice, _mergedAwayManageTarget.Value.axisIndex);
             return true;
         }
 
@@ -831,6 +846,10 @@ public partial class MappingsTabController : ITabController
         // Manage button only exists when the row is shared-away; bounds are SKRect.Empty otherwise.
         if (_sharedManageButtonBounds.Contains(e.X, e.Y))
         { _sharedManageButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        // Same pattern for the merged-away "go to merged axis" button.
+        if (_mergedAwayManageButtonBounds.Contains(e.X, e.Y))
+        { _mergedAwayManageButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
         return false;
     }

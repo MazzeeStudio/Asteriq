@@ -214,8 +214,10 @@ public partial class MappingsTabController
                     string binding = GetAxisBindingText(profile, vjoyDevice!.Id, axisIdx);
                     bool isSelected = rowIndex == _selectedMappingRow;
                     bool isHovered = rowIndex == _hoveredMappingRow;
+                    bool isMergedAway = GetMergedAwayInfo(profile, vjoyDevice!.Id, axisIdx) is not null;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered, rowIndex);
+                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered, rowIndex,
+                        isMergedAway: isMergedAway);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -337,7 +339,7 @@ public partial class MappingsTabController
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
         bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false,
-        bool isSwitchButton = false, bool isShared = false)
+        bool isSwitchButton = false, bool isShared = false, bool isMergedAway = false)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "ÔÇö";
         bool hasKeyParts = keyParts is not null && keyParts.Count > 0;
@@ -533,6 +535,22 @@ public partial class MappingsTabController
                 FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
             FUIRenderer.DrawTextCentered(canvas, "SHARED", pillRect, FUIColors.Primary, 10f);
         }
+        else if (isMergedAway)
+        {
+            // Merged-away slot: this axis's natural physical input is being consumed by a
+            // merge on another vJoy slot. Blue pill mirrors the SHARED treatment for buttons —
+            // same "this slot is owned by something elsewhere" semantic. Editor is replaced
+            // with an explanatory panel when selected.
+            const float pillW = 60f;
+            const float pillH = 14f;
+            float pillX = bounds.Right - pillW - 8f;
+            float pillY = bounds.MidY - pillH / 2f;
+            var pillRect = new SKRect(pillX, pillY, pillX + pillW, pillY + pillH);
+            FUIRenderer.DrawRoundedPanel(canvas, pillRect,
+                FUIColors.Primary.WithAlpha(FUIColors.AlphaHoverBg),
+                FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
+            FUIRenderer.DrawTextCentered(canvas, "MERGED →", pillRect, FUIColors.Primary, 10f);
+        }
     }
 
     private void DrawDeviceVisualizationPanel(SKCanvas canvas, SKRect bounds, float frameInset)
@@ -672,6 +690,12 @@ public partial class MappingsTabController
         _sharedManageSearchText = null;
         _sharedManageVJoyDevice = 0;
 
+        // Reset merged-away manage button bounds each frame; populated only when the selected
+        // axis row is a merged-away slot (the early-return branch in the axis section below).
+        _mergedAwayManageButtonBounds = SKRect.Empty;
+        _mergedAwayManageButtonHovered = false;
+        _mergedAwayManageTarget = null;
+
         // Show settings for selected row
         if (_selectedMappingRow < 0)
         {
@@ -699,6 +723,22 @@ public partial class MappingsTabController
             if (sharedInfos.Count > 0)
             {
                 DrawSharedSlotPanel(canvas, leftMargin, rightMargin, y, sharedInfos, vjoyDevice.Id);
+                return;
+            }
+        }
+
+        // Merged-away slot: this axis's natural physical input is being consumed by a merge
+        // on another vJoy slot. Replace the editor with a panel pointing at the merge target —
+        // editing here would either be ignored (no input bound) or duplicate effort with the
+        // merge. The "GO TO MERGED AXIS" button switches to the target slot.
+        if (isAxis && _ctx.VJoyDevices.Count > _ctx.SelectedVJoyDeviceIndex)
+        {
+            var vjoyDevice = _ctx.VJoyDevices[_ctx.SelectedVJoyDeviceIndex];
+            int axisIdx = AxisIndexForRow(_selectedMappingRow);
+            var info = GetMergedAwayInfo(_ctx.ProfileManager.ActiveProfile, vjoyDevice.Id, axisIdx);
+            if (info is not null)
+            {
+                DrawMergedAwaySlotPanel(canvas, leftMargin, rightMargin, y, info.Value.SecondaryInput, info.Value.Target);
                 return;
             }
         }
@@ -1787,6 +1827,61 @@ public partial class MappingsTabController
 
         FUIRenderer.DrawButton(canvas, btnBounds, "MANAGE IN KEYBINDINGS",
             _sharedManageButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
+    }
+
+    /// <summary>
+    /// Renders the read-only "this slot's natural input is consumed by a merge elsewhere"
+    /// panel that replaces the normal axis editor. Mirrors DrawSharedSlotPanel — banner +
+    /// explanation + manage button that jumps to the merge-target slot. Editor is hidden so
+    /// the user can't make changes here that would be silently overridden by the merge.
+    /// </summary>
+    private void DrawMergedAwaySlotPanel(SKCanvas canvas, float leftMargin, float rightMargin, float y,
+        InputSource source, AxisMapping target)
+    {
+        // Banner — blue rounded panel with [MERGED →] pill + target headline.
+        var bannerRect = new SKRect(leftMargin, y, rightMargin, y + 36);
+        FUIRenderer.DrawRoundedPanel(canvas, bannerRect,
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaLightTint),
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
+
+        const float pillW = 60f;
+        const float pillH = 14f;
+        var pillRect = new SKRect(bannerRect.Left + 10f, bannerRect.MidY - pillH / 2f,
+            bannerRect.Left + 10f + pillW, bannerRect.MidY + pillH / 2f);
+        FUIRenderer.DrawRoundedPanel(canvas, pillRect,
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaHoverBg),
+            FUIColors.Primary.WithAlpha(FUIColors.AlphaBorderSoft));
+        FUIRenderer.DrawTextCentered(canvas, "MERGED →", pillRect, FUIColors.Primary, 10f);
+
+        string headline = $"vJoy {target.Output.VJoyDevice} {GetVJoyAxisName(target.Output.Index)}";
+        FUIRenderer.DrawText(canvas, headline,
+            new SKPoint(pillRect.Right + 10f, bannerRect.MidY + 5f), FUIColors.Primary, 13f);
+        y += 36 + 12;
+
+        FUIRenderer.DrawText(canvas, "This input is merged into another vJoy axis.",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextPrimary, 13f);
+        y += 22;
+
+        FUIRenderer.DrawText(canvas, $"  • Source: {source.DeviceName} Axis {source.Index}",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+        y += 18;
+        FUIRenderer.DrawText(canvas,
+            $"  • Feeds vJoy {target.Output.VJoyDevice} {GetVJoyAxisName(target.Output.Index)} ({target.Inputs.Count} merged inputs, {target.MergeOp})",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+        y += 22;
+
+        FUIRenderer.DrawText(canvas, "Settings on this slot are inactive — manage from the merge target.",
+            new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
+        y += 28;
+
+        // Manage button — switches to the merge-target slot.
+        var btnBounds = new SKRect(leftMargin, y, rightMargin, y + 32);
+        _mergedAwayManageButtonBounds = btnBounds;
+        _mergedAwayManageButtonHovered = btnBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
+        _mergedAwayManageTarget = (target.Output.VJoyDevice, target.Output.Index);
+
+        FUIRenderer.DrawButton(canvas, btnBounds, "GO TO MERGED AXIS",
+            _mergedAwayManageButtonHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
     }
 
     private void DrawButtonSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
@@ -2979,6 +3074,68 @@ public partial class MappingsTabController
             y += rowHeight + rowGap;
             rowIndex++;
         }
+    }
+
+    /// <summary>
+    /// Auto-derives whether the (vjoyId, axisIndex) slot is a merged-away secondary slot of
+    /// some merge in the profile. For every input of every merge we compute its "natural
+    /// slot" — the vJoy slot whose VJoyPrimaryDevices entry matches the input's physical
+    /// device, at the same axis index. The input that lands ON the merge target's own slot
+    /// is the primary; every other input's natural slot is a merged-away secondary.
+    /// Returns the merge target + the input that landed here, or null when the slot
+    /// doesn't qualify (no matching merge, or the slot is mapped independently to a
+    /// different input — we don't hijack legit mappings).
+    /// </summary>
+    private static (AxisMapping Target, InputSource SecondaryInput)? GetMergedAwayInfo(MappingProfile? profile, uint vjoyId, int axisIndex)
+    {
+        if (profile is null) return null;
+
+        var slot = profile.AxisMappings.FirstOrDefault(m =>
+            m.Output.Type == OutputType.VJoyAxis &&
+            m.Output.VJoyDevice == vjoyId &&
+            m.Output.Index == axisIndex);
+
+        foreach (var merge in profile.AxisMappings)
+        {
+            if (merge.Inputs.Count < 2) continue;
+            if (merge.Output.Type != OutputType.VJoyAxis) continue;
+            if (merge.Output.VJoyDevice == vjoyId && merge.Output.Index == axisIndex)
+                continue; // skip merge target itself
+
+            foreach (var input in merge.Inputs)
+            {
+                // Natural slot for this physical input = (its primary vJoy device, its axis index).
+                uint? naturalVJoy = null;
+                foreach (var kv in profile.VJoyPrimaryDevices)
+                {
+                    if (kv.Value == input.DeviceId) { naturalVJoy = kv.Key; break; }
+                }
+                if (naturalVJoy is null) continue;
+
+                // Skip the input that IS at the merge target — that one is the primary, not
+                // a merged-away secondary. (Robust whether the user added inputs in primary-
+                // first order or any other order.)
+                if (naturalVJoy == merge.Output.VJoyDevice && input.Index == merge.Output.Index)
+                    continue;
+
+                if (naturalVJoy != vjoyId) continue;
+                if (input.Index != axisIndex) continue;
+
+                // Slot is the merged-away secondary. Mark it iff the slot is empty OR mapped
+                // solo to the same physical input (a parallel single mapping rendered
+                // redundant by the merge). Otherwise the slot is doing something independent.
+                if (slot is null || slot.Inputs.Count == 0)
+                    return (merge, input);
+                if (slot.Inputs.Count == 1 &&
+                    slot.Inputs[0].DeviceId == input.DeviceId &&
+                    slot.Inputs[0].Type == input.Type &&
+                    slot.Inputs[0].Index == input.Index)
+                    return (merge, input);
+                return null;
+            }
+        }
+
+        return null;
     }
 
     private static string GetAxisBindingText(MappingProfile? profile, uint vjoyId, int axisIndex)

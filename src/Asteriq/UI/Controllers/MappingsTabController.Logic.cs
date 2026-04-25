@@ -2356,4 +2356,69 @@ public partial class MappingsTabController
         _ctx.MarkDirty();
     }
 
+    /// <summary>
+    /// Describes the SC share that has rerouted a vJoy slot to fire a primary action's button.
+    /// When non-null, the Mappings tab should render the slot as read-only with a deep-link
+    /// to the SC Bindings tab instead of the normal mapping editor.
+    /// </summary>
+    private sealed class SharedSlotInfo
+    {
+        public required string ActionName;
+        public required string ActionMap;
+        public required string ActionDisplayName;
+        public required uint PrimaryVJoyDevice;
+        public required int PrimaryButtonIndex;
+    }
+
+    /// <summary>
+    /// Returns share info for every SC action that has rerouted this vJoy slot. Returns an
+    /// empty list if the slot is standalone. Mirrors the reroute gate in PerformShare: only
+    /// JS primaries with no modifiers are considered shared-away.
+    /// </summary>
+    private List<SharedSlotInfo> GetSharedSlotInfos(uint vjoyDevice, int buttonIndex)
+    {
+        var result = new List<SharedSlotInfo>();
+        var profile = _ctx.GetActiveSCExportProfile?.Invoke();
+        if (profile is null) return result;
+
+        foreach (var binding in profile.Bindings)
+        {
+            if (binding.DeviceType != SCDeviceType.Joystick) continue;
+            if (binding.Modifiers.Count > 0) continue;
+
+            int primaryBtn = ParseSCButtonIndex(binding.InputName);
+            if (primaryBtn < 0) continue;
+
+            foreach (var shared in binding.SharedWith)
+            {
+                if (shared.VJoySlot != vjoyDevice) continue;
+                int sharedBtn = ParseSCButtonIndex(shared.InputName);
+                if (sharedBtn != buttonIndex) continue;
+
+                result.Add(new SharedSlotInfo
+                {
+                    ActionName = binding.ActionName,
+                    ActionMap = binding.ActionMap,
+                    ActionDisplayName = SCCategoryMapper.FormatActionName(binding.ActionName),
+                    PrimaryVJoyDevice = binding.VJoyDevice,
+                    PrimaryButtonIndex = primaryBtn,
+                });
+                break; // a single binding can only target one slot once; move on
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Parses an SC button input name like "button21" into a 0-based index. Returns -1 for
+    /// non-button inputs.
+    /// </summary>
+    private static int ParseSCButtonIndex(string inputName)
+    {
+        if (inputName.StartsWith("button", StringComparison.OrdinalIgnoreCase) &&
+            int.TryParse(inputName.AsSpan(6), out var n) && n >= 1)
+            return n - 1;
+        return -1;
+    }
+
 }

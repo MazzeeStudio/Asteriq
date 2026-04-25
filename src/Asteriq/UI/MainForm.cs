@@ -256,10 +256,11 @@ public partial class MainForm : Form
         // Snap to a visible tab on startup (e.g. client-only mode hides Devices/Mappings)
         SnapToValidTab();
 
-        // If we landed on the SC Bindings tab at startup, trigger OnActivated once the
-        // form handle exists (BeginInvoke inside StartSchemaLoad needs a valid HWND).
-        if (_activeTab == 2)
-            Shown += (_, _) => _scBindingsController.OnActivated();
+        // Eagerly trigger SC Bindings activation at startup so the schema starts loading in
+        // the background regardless of which tab the user lands on. Makes the first SC tab
+        // visit and the Mappings → Keybindings deep-link feel instant. BeginInvoke inside
+        // StartSchemaLoad needs a valid HWND, so we hook Shown rather than the constructor.
+        Shown += (_, _) => _scBindingsController.OnActivated();
 
         // Start network services if enabled in settings
         if (_appSettings.NetworkEnabled)
@@ -377,6 +378,22 @@ public partial class MainForm : Form
 
         // Wire up SC export profile access (for Device Order in Mappings tab)
         _tabContext.GetActiveSCExportProfile = () => _scBindingsController.ActiveSCExportProfile;
+
+        // Wire up Mappings → SC Bindings deep-link (used when a Mappings row is shared-away).
+        // Mirror what a normal tab click does in OnCanvasMouseDown — deactivate the source
+        // tab and activate the destination — otherwise SC's schema load / state init never
+        // fires and the tab renders empty.
+        _tabContext.OpenSCBindingsWithSearch = (vjoyDevice, inputName) =>
+        {
+            if (_activeTab != 2)
+            {
+                if (_activeTab == 1) _mappingsController.OnDeactivated();
+                _scBindingsController.OnActivated();
+                _activeTab = 2;
+            }
+            _scBindingsController.SetButtonCaptureSearch(vjoyDevice, inputName);
+            _tabContext.InvalidateCanvas();
+        };
     }
 
     /// <summary>

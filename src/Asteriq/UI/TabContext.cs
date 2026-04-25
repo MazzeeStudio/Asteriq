@@ -130,6 +130,14 @@ public class TabContext
     /// </summary>
     public Func<SCExportProfile?>? GetActiveSCExportProfile { get; set; }
 
+    /// <summary>
+    /// Switches to the SC Bindings tab and sets the search filter using button-capture mode
+    /// scoped to the given vJoy column + input name (e.g. "button21"). Falls back to plain
+    /// text search if the SC Bindings grid hasn't built its column list yet.
+    /// Used by the Mappings tab to deep-link from a "shared away" row to the share's origin.
+    /// </summary>
+    public Action<uint, string>? OpenSCBindingsWithSearch { get; set; }
+
     // Network forwarding (set after construction by MainForm)
     public INetworkDiscoveryService? NetworkDiscovery { get; set; }
     public INetworkInputService? NetworkInput { get; set; }

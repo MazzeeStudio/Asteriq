@@ -256,21 +256,35 @@ public class SCXmlExportService
 
             actionElement.Add(rebindElement);
 
-            // Emit an additional rebind for each shared secondary. Shares are standalone
-            // input references — they don't inherit the primary's modifiers. This is what
-            // lets a throttle/button-box button fire an action that is gated by a modifier
-            // on the primary stick without needing the modifier held on the secondary.
-            foreach (var shared in binding.SharedWith)
+            // Per-share rebind emission mirrors the engine reroute gate in PerformShare
+            // (SCBindingsTabController.Grid.cs). Two cases:
+            //
+            // 1. Primary has modifiers OR is non-JS → engine does NOT reroute. The share's
+            //    physical button still fires its own vJoy slot, so SC needs an explicit
+            //    <rebind> for the secondary to trigger the action.
+            //
+            // 2. JS primary with no modifiers → engine reroutes the share's mapping output
+            //    to the primary's vJoy button. Emitting a second <rebind> here is worse
+            //    than redundant: SC collapses two same-class no-modifier <rebind>s for
+            //    one action down to the last one parsed, which then points at a vJoy slot
+            //    the engine has rerouted away from — breaking the action entirely.
+            bool engineReroutesShare = binding.Modifiers.Count == 0
+                && binding.DeviceType == SCDeviceType.Joystick;
+
+            if (!engineReroutesShare)
             {
-                if (string.IsNullOrEmpty(shared.InputName)) continue;
-                int secondaryInstance = profile.GetSCInstance(shared.VJoySlot);
-                var sharedRebind = new XElement("rebind",
-                    new XAttribute("input", $"js{secondaryInstance}_{shared.InputName}"));
+                foreach (var shared in binding.SharedWith)
+                {
+                    if (string.IsNullOrEmpty(shared.InputName)) continue;
+                    int secondaryInstance = profile.GetSCInstance(shared.VJoySlot);
+                    var sharedRebind = new XElement("rebind",
+                        new XAttribute("input", $"js{secondaryInstance}_{shared.InputName}"));
 
-                if (activationModeStr is not null)
-                    sharedRebind.Add(new XAttribute("activationMode", activationModeStr));
+                    if (activationModeStr is not null)
+                        sharedRebind.Add(new XAttribute("activationMode", activationModeStr));
 
-                actionElement.Add(sharedRebind);
+                    actionElement.Add(sharedRebind);
+                }
             }
         }
 

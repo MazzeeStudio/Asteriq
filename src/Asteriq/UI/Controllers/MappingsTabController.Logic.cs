@@ -2371,14 +2371,15 @@ public partial class MappingsTabController
     }
 
     /// <summary>
-    /// Returns share info for the given vJoy slot if an SC share has rerouted it to a primary,
-    /// or null if the slot is standalone. Mirrors the reroute gate in PerformShare: a slot is
-    /// only treated as shared-away when the primary is a JS button with no modifiers.
+    /// Returns share info for every SC action that has rerouted this vJoy slot. Returns an
+    /// empty list if the slot is standalone. Mirrors the reroute gate in PerformShare: only
+    /// JS primaries with no modifiers are considered shared-away.
     /// </summary>
-    private SharedSlotInfo? GetSharedSlotInfo(uint vjoyDevice, int buttonIndex)
+    private List<SharedSlotInfo> GetSharedSlotInfos(uint vjoyDevice, int buttonIndex)
     {
+        var result = new List<SharedSlotInfo>();
         var profile = _ctx.GetActiveSCExportProfile?.Invoke();
-        if (profile is null) return null;
+        if (profile is null) return result;
 
         foreach (var binding in profile.Bindings)
         {
@@ -2394,17 +2395,18 @@ public partial class MappingsTabController
                 int sharedBtn = ParseSCButtonIndex(shared.InputName);
                 if (sharedBtn != buttonIndex) continue;
 
-                return new SharedSlotInfo
+                result.Add(new SharedSlotInfo
                 {
                     ActionName = binding.ActionName,
                     ActionMap = binding.ActionMap,
                     ActionDisplayName = SCCategoryMapper.FormatActionName(binding.ActionName),
                     PrimaryVJoyDevice = binding.VJoyDevice,
                     PrimaryButtonIndex = primaryBtn,
-                };
+                });
+                break; // a single binding can only target one slot once; move on
             }
         }
-        return null;
+        return result;
     }
 
     /// <summary>

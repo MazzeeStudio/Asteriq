@@ -55,6 +55,7 @@ public static class ServiceConfiguration
         services.AddSingleton<SCSchemaService>();
         services.AddSingleton<SCXmlExportService>();
         services.AddSingleton<SCExportProfileService>();
+        services.AddSingleton<BindingDescriptionService>();
 
         // Device services (Singleton - maintain device state)
         services.AddSingleton<HidDeviceService>();

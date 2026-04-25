@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "locale": "en",
+  "lastUpdated": "2026-04-25",
+  "actions": {
+    "v_eject": {
+      "description": "Trigger the pilot ejection sequence — last-resort exit when the ship is unrecoverable.",
+      "useCases": [
+        "Catastrophic hull failure or imminent destruction.",
+        "Prevent capture when boarding parties breach the ship."
+      ],
+      "source": "asteriq"
+    }
+  }
+}

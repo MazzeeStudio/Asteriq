@@ -32,6 +32,20 @@ public class SCAction
     public List<SCDefaultBinding> DefaultBindings { get; set; } = new();
 
     /// <summary>
+    /// Human-readable label sourced from SC's localisation (ui_&lt;actionName&gt;).
+    /// Null when no localised string is available — callers should fall back to
+    /// SCCategoryMapper.FormatActionName().
+    /// </summary>
+    public string? DisplayLabel { get; set; }
+
+    /// <summary>
+    /// Longer description sourced from SC's localisation (ui_&lt;actionName&gt;_desc).
+    /// Only populated when the description is meaningfully different from the label;
+    /// otherwise null so callers don't render duplicate text.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
     /// Unique key for this action (ActionMap + ActionName)
     /// </summary>
     public string Key => $"{ActionMap}.{ActionName}";

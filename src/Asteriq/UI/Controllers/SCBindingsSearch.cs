@@ -22,6 +22,12 @@ public static class SCBindingsSearch
         if (action.ActionName.ToLowerInvariant().Contains(searchLower))
             return true;
 
+        // Match against the localised label when available — this is what the user sees in
+        // the grid, so searching for words from it must work.
+        if (!string.IsNullOrEmpty(action.DisplayLabel)
+            && action.DisplayLabel.ToLowerInvariant().Contains(searchLower))
+            return true;
+
         if (SCCategoryMapper.FormatActionName(action.ActionName).ToLowerInvariant().Contains(searchLower))
             return true;
 

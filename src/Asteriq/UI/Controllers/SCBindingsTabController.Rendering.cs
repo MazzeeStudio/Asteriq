@@ -47,12 +47,19 @@ public partial class SCBindingsTabController
         float bottomAreaBottom = rightBounds.Bottom;
         var splitArea = new SKRect(rightBounds.Left, afterInstall, rightBounds.Right, bottomAreaBottom);
 
+        // When the contextual area stacks Binding Definition + Cell Details, B's collapsed
+        // minimum must fit BOTH headers (single collapsedH would leave one off-screen).
+        const float subStackGap = 4f;
+        float collapsedBH = showCellDetails
+            ? 2 * FUIRenderer.CollapsedPanelHeight + subStackGap
+            : FUIRenderer.CollapsedPanelHeight;
+
         SKRect controlProfilesBounds;
         SKRect contextualBounds = SKRect.Empty;
         if (anim.UseAnimatedLayout)
         {
             (controlProfilesBounds, contextualBounds) = anim.ComputeBounds(
-                splitArea, verticalGap, FUIRenderer.CollapsedPanelHeight);
+                splitArea, verticalGap, FUIRenderer.CollapsedPanelHeight, collapsedBH);
         }
         else
         {
@@ -100,7 +107,6 @@ public partial class SCBindingsTabController
                     // takes the bulk of the area; the other shows just its header. _bdPanel
                     // determines which one. Default-cell-click sets _bdPanel.IsExpanded = false.
                     float collapsedH = FUIRenderer.CollapsedPanelHeight;
-                    float subGap = 4f;
 
                     SKRect bdBounds, detailsBounds;
                     if (_bdPanel.IsExpanded)
@@ -108,13 +114,13 @@ public partial class SCBindingsTabController
                         detailsBounds = new SKRect(contextualBounds.Left, contextualBounds.Bottom - collapsedH,
                             contextualBounds.Right, contextualBounds.Bottom);
                         bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
-                            contextualBounds.Right, detailsBounds.Top - subGap);
+                            contextualBounds.Right, detailsBounds.Top - subStackGap);
                     }
                     else
                     {
                         bdBounds = new SKRect(contextualBounds.Left, contextualBounds.Top,
                             contextualBounds.Right, contextualBounds.Top + collapsedH);
-                        detailsBounds = new SKRect(contextualBounds.Left, bdBounds.Bottom + subGap,
+                        detailsBounds = new SKRect(contextualBounds.Left, bdBounds.Bottom + subStackGap,
                             contextualBounds.Right, contextualBounds.Bottom);
                     }
 

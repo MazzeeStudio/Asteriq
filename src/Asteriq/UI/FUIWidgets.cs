@@ -1617,12 +1617,14 @@ internal static class FUIWidgets
 
         /// <summary>
         /// Computes the two panel bounds. Panel A height proportional to T, panel B gets the rest.
+        /// Each panel's collapsed minimum height is specified separately so callers whose B contains
+        /// a sub-stack of headers can reserve the full stack height (rather than a single header).
         /// </summary>
         public readonly (SKRect boundsA, SKRect boundsB) ComputeBounds(
-            SKRect area, float gap, float collapsedH)
+            SKRect area, float gap, float collapsedAH, float collapsedBH)
         {
-            float expandableH = area.Height - 2 * collapsedH - gap;
-            float aH = collapsedH + expandableH * T;
+            float expandableH = area.Height - collapsedAH - collapsedBH - gap;
+            float aH = collapsedAH + expandableH * T;
             var boundsA = new SKRect(area.Left, area.Top, area.Right, area.Top + aH);
             var boundsB = new SKRect(area.Left, boundsA.Bottom + gap, area.Right, area.Bottom);
             return (boundsA, boundsB);

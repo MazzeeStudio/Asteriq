@@ -407,23 +407,28 @@ public partial class SCBindingsTabController
         }
         if (_bdPanel.HeaderBounds.HitTest(point))
         {
-            // BD header — toggle expansion within the contextual area. When BD expands, Cell
-            // Details collapses to a header at the bottom and vice versa.
-            _bdPanel.IsExpanded = !_bdPanel.IsExpanded;
+            // BD header — bring Binding Definition to the spotlight. If it's already the
+            // spotlight panel (CP collapsed + BD expanded), toggle back to CP-expanded.
+            if (!_cpPanel.IsExpanded && _bdPanel.IsExpanded)
+                _cpPanel.IsExpanded = true;
+            else
+            {
+                _cpPanel.IsExpanded = false;
+                _bdPanel.IsExpanded = true;
+            }
             _ctx.MarkDirty();
             return;
         }
         if (_cellDetails.HeaderBounds.HitTest(point))
         {
-            // Cell Details header — when BD is expanded, this expands Details (collapses BD).
-            // Otherwise fall through to the existing CP↔contextual top-level toggle.
-            if (_bdPanel.IsExpanded)
-            {
-                _bdPanel.IsExpanded = false;
-            }
+            // Cell Details header — bring Cell Details to the spotlight. If it's already the
+            // spotlight panel (CP collapsed + BD collapsed), toggle back to CP-expanded.
+            if (!_cpPanel.IsExpanded && !_bdPanel.IsExpanded)
+                _cpPanel.IsExpanded = true;
             else
             {
-                _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
+                _cpPanel.IsExpanded = false;
+                _bdPanel.IsExpanded = false;
             }
             _ctx.MarkDirty();
             return;

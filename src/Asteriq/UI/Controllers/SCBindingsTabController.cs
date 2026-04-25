@@ -140,20 +140,21 @@ public partial class SCBindingsTabController : ITabController
         _searchFilter.SelectionStart = -1;
         _searchFilter.SelectionEnd = -1;
 
-        // Find the vJoy column in the SC Bindings grid. If the grid hasn't built columns yet
-        // (e.g. schema not yet loaded), we fall back to plain text search so the deep-link
-        // still gives the user something useful to scan.
+        // Columns are normally cached during SC Bindings render — but the deep-link runs
+        // BEFORE the tab has had a chance to render, so the cache is stale or null on the
+        // first click. GetSCGridColumns is pure (no canvas / layout dependencies), so we
+        // can build it here to make the column lookup work on the very first click.
+        if (_grid.Columns is null)
+            _grid.Columns = GetSCGridColumns();
+
         int foundCol = -1;
-        if (_grid.Columns is not null)
+        for (int c = 0; c < _grid.Columns.Count; c++)
         {
-            for (int c = 0; c < _grid.Columns.Count; c++)
+            var col = _grid.Columns[c];
+            if (col.IsJoystick && !col.IsPhysical && col.VJoyDeviceId == vjoyDevice)
             {
-                var col = _grid.Columns[c];
-                if (col.IsJoystick && !col.IsPhysical && col.VJoyDeviceId == vjoyDevice)
-                {
-                    foundCol = c;
-                    break;
-                }
+                foundCol = c;
+                break;
             }
         }
 

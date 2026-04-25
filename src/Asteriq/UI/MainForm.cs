@@ -256,10 +256,11 @@ public partial class MainForm : Form
         // Snap to a visible tab on startup (e.g. client-only mode hides Devices/Mappings)
         SnapToValidTab();
 
-        // If we landed on the SC Bindings tab at startup, trigger OnActivated once the
-        // form handle exists (BeginInvoke inside StartSchemaLoad needs a valid HWND).
-        if (_activeTab == 2)
-            Shown += (_, _) => _scBindingsController.OnActivated();
+        // Eagerly trigger SC Bindings activation at startup so the schema starts loading in
+        // the background regardless of which tab the user lands on. Makes the first SC tab
+        // visit and the Mappings → Keybindings deep-link feel instant. BeginInvoke inside
+        // StartSchemaLoad needs a valid HWND, so we hook Shown rather than the constructor.
+        Shown += (_, _) => _scBindingsController.OnActivated();
 
         // Start network services if enabled in settings
         if (_appSettings.NetworkEnabled)

@@ -659,7 +659,7 @@ public class MappingDialog : FUIBaseDialog
         if (_keyboardMode && canUseKeyboard)
         {
             // Keyboard mode UI
-            DrawKeyboardOutput(canvas, bounds, y, pad, buttons, canUseKeyboard ? 2 : 0);
+            DrawKeyboardOutput(canvas, bounds, y, pad, buttons, 2);
         }
         else
         {

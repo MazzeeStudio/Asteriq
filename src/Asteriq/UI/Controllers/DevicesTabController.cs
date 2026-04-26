@@ -543,7 +543,7 @@ public class DevicesTabController : ITabController
         float titleBarHeight = 32f;
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
         string categoryCode = _devCat.Active == 0 ? "D1" : "D2";
-        string categoryName = _devCat.Active == 0 ? "DEVICES" : "DEVICES";
+        string categoryName = _devCat.Active == 0 ? "PHYSICAL" : "VIRTUAL";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
         // Complete pending hide after delay

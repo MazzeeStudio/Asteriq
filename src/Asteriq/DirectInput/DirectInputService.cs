@@ -316,7 +316,7 @@ public class DirectInputService : IDisposable
                     var enumObjects = Marshal.GetDelegateForFunctionPointer<EnumObjectsDelegate>(enumObjectsPtr);
                     enumObjects(device, axisCallback, IntPtr.Zero, DIDFT_AXIS);
 
-                    if (axes.Count > 0 && !result.ContainsKey(name))
+                    if (axes.Count > 0 && !result.ContainsKey(name)) // NOSONAR S2583: axes mutated via COM callback
                         result[name] = axes;
                 }
                 finally

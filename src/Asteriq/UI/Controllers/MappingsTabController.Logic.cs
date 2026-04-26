@@ -1582,7 +1582,7 @@ public partial class MappingsTabController
         _deadzone.CenterMin = curve.DeadzoneCenterLow;
         _deadzone.CenterMax = curve.DeadzoneCenterHigh;
         _deadzone.Max = curve.DeadzoneHigh;
-        _deadzone.CenterEnabled = curve.DeadzoneCenterLow != 0 || curve.DeadzoneCenterHigh != 0;
+        _deadzone.CenterEnabled = curve.DeadzoneCenterLow > 0f || curve.DeadzoneCenterHigh > 0f;
 
         // Load control points for custom curve
         if (curve.Type == CurveType.Custom && curve.ControlPoints is not null && curve.ControlPoints.Count >= 2)

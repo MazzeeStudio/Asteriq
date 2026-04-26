@@ -2231,7 +2231,7 @@ public partial class MappingsTabController
             canvas.DrawLine(x, bounds.Bottom, x, bounds.Bottom + tickLen, tickPaint);
 
             // Label below tick
-            float labelX = x - (t == 0 ? 0 : (t == 1 ? 12 : 6));
+            float labelX = x - (t < 0.001f ? 0 : (t > 0.999f ? 12 : 6));
             FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, bounds.Bottom + tickLen + labelOffset + 7), FUIColors.TextDim, 12f);
         }
 
@@ -2245,7 +2245,7 @@ public partial class MappingsTabController
             canvas.DrawLine(bounds.Left - tickLen, y, bounds.Left, y, tickPaint);
 
             // Label left of tick
-            float labelY = y + (t == 0 ? 3 : (t == 1 ? 7 : 3));
+            float labelY = y + (t < 0.001f ? 3 : (t > 0.999f ? 7 : 3));
             float labelX = bounds.Left - tickLen - labelOffset - (tickLabels[i].Length > 1 ? 12 : 6);
             FUIRenderer.DrawText(canvas, tickLabels[i], new SKPoint(labelX, labelY), FUIColors.TextDim, 12f);
         }

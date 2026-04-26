@@ -1301,6 +1301,7 @@ public partial class MainForm : Form
 
         float minX = float.MaxValue, minY = float.MaxValue;
         float maxX = float.MinValue, maxY = float.MinValue;
+        bool any = false;
 
         // Process pairs of numbers as x,y coordinates (very simplified)
         for (int i = 0; i < numbers.Count - 1; i += 2)
@@ -1312,10 +1313,11 @@ public partial class MainForm : Form
                 maxX = Math.Max(maxX, x + tx);
                 minY = Math.Min(minY, y + ty);
                 maxY = Math.Max(maxY, y + ty);
+                any = true;
             }
         }
 
-        if (minX == float.MaxValue) return null;
+        if (!any) return null;
 
         return new SKRect(minX, minY, maxX, maxY);
     }

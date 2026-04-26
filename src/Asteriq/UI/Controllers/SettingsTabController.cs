@@ -349,7 +349,9 @@ public class SettingsTabController : ITabController, IDisposable
         _networkExpandW = LerpSnap(_networkExpandW, nTarget, panelLerp);
         _hidHideExpandW = LerpSnap(_hidHideExpandW, hTarget, panelLerp);
 
-        if (_visualExpandW != vTarget || _networkExpandW != nTarget || _hidHideExpandW != hTarget)
+        if (MathF.Abs(_visualExpandW - vTarget) > 0.0001f
+            || MathF.Abs(_networkExpandW - nTarget) > 0.0001f
+            || MathF.Abs(_hidHideExpandW - hTarget) > 0.0001f)
             _ctx.MarkDirty();
     }
 

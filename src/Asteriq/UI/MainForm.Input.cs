@@ -9,7 +9,7 @@ public partial class MainForm
     private static MouseEventArgs ScaleMouseEvent(MouseEventArgs e)
     {
         float s = FUIRenderer.CanvasScaleFactor;
-        if (s == 1.0f) return e;
+        if (MathF.Abs(s - 1.0f) < 0.0001f) return e;
         return new MouseEventArgs(e.Button, e.Clicks, (int)(e.X / s), (int)(e.Y / s), e.Delta);
     }
 

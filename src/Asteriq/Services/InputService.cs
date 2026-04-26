@@ -389,7 +389,7 @@ public class InputService : IInputService
             normalized = string.Concat("RIGHT ", normalized.AsSpan(2));
 
         // Remove extra whitespace
-        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\s+", " ");
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\s+", " ", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
 
         return normalized;
     }

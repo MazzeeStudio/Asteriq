@@ -11,7 +11,7 @@ public class DevicesTabController : ITabController
     private readonly TabContext _ctx;
 
     // Cached regex for parsing vJoy slot numbers from device names
-    private static readonly Regex s_vjoySlotNumberRegex = new(@"\d+", RegexOptions.Compiled);
+    private static readonly Regex s_vjoySlotNumberRegex = new(@"\d+", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     // Device list hover/selection (local to this tab)
     private int _hoveredDevice = -1;

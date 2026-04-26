@@ -1568,6 +1568,7 @@ public class DevicesTabController : ITabController
         if (vjoyDevice.HasAxisRY) currentFlags.Add("RY");
         if (vjoyDevice.HasAxisRZ) currentFlags.Add("RZ");
         if (vjoyDevice.HasSlider0) currentFlags.Add("SL0");
+        if (vjoyDevice.HasSlider1) currentFlags.Add("SL1");
 
         int currentPovs = vjoyDevice.ContPovCount + vjoyDevice.DiscPovCount;
         bool currentContinuous = vjoyDevice.ContPovCount > 0;

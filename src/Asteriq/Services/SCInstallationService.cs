@@ -230,7 +230,9 @@ public class SCInstallationService : ISCInstallationService
             // Format: {"Data": {"Version": "4.4.164.18318", ...}}
             var versionMatch = System.Text.RegularExpressions.Regex.Match(
                 json,
-                @"""Version""\s*:\s*""([^""]+)""");
+                @"""Version""\s*:\s*""([^""]+)""",
+                System.Text.RegularExpressions.RegexOptions.None,
+                TimeSpan.FromSeconds(1));
 
             if (versionMatch.Success)
             {
@@ -240,7 +242,9 @@ public class SCInstallationService : ISCInstallationService
             // Fallback: try to get RequestedP4ChangeNum (unique per build)
             var changeNumMatch = System.Text.RegularExpressions.Regex.Match(
                 json,
-                @"""RequestedP4ChangeNum""\s*:\s*""([^""]+)""");
+                @"""RequestedP4ChangeNum""\s*:\s*""([^""]+)""",
+                System.Text.RegularExpressions.RegexOptions.None,
+                TimeSpan.FromSeconds(1));
 
             if (changeNumMatch.Success)
             {
@@ -389,7 +393,7 @@ public class SCInstallationService : ISCInstallationService
                     var content = new string(buffer, 0, read);
 
                     // Look for profileName="..." in the content
-                    var match = System.Text.RegularExpressions.Regex.Match(content, @"profileName=""([^""]+)""");
+                    var match = System.Text.RegularExpressions.Regex.Match(content, @"profileName=""([^""]+)""", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
                     if (match.Success)
                     {
                         mappingFile.ProfileName = match.Groups[1].Value;
@@ -398,7 +402,7 @@ public class SCInstallationService : ISCInstallationService
                     // Also check CustomisationUIHeader label
                     if (string.IsNullOrEmpty(mappingFile.ProfileName))
                     {
-                        match = System.Text.RegularExpressions.Regex.Match(content, @"<CustomisationUIHeader\s+label=""([^""]+)""");
+                        match = System.Text.RegularExpressions.Regex.Match(content, @"<CustomisationUIHeader\s+label=""([^""]+)""", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
                         if (match.Success)
                         {
                             mappingFile.ProfileName = match.Groups[1].Value;

@@ -11,7 +11,7 @@ public class DevicesTabController : ITabController
     private readonly TabContext _ctx;
 
     // Cached regex for parsing vJoy slot numbers from device names
-    private static readonly Regex s_vjoySlotNumberRegex = new(@"\d+", RegexOptions.Compiled);
+    private static readonly Regex s_vjoySlotNumberRegex = new(@"\d+", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     // Device list hover/selection (local to this tab)
     private int _hoveredDevice = -1;
@@ -543,7 +543,7 @@ public class DevicesTabController : ITabController
         float titleBarHeight = 32f;
         var titleBounds = new SKRect(contentBounds.Left, contentBounds.Top, contentBounds.Right, contentBounds.Top + titleBarHeight);
         string categoryCode = _devCat.Active == 0 ? "D1" : "D2";
-        string categoryName = _devCat.Active == 0 ? "DEVICES" : "DEVICES";
+        string categoryName = _devCat.Active == 0 ? "PHYSICAL" : "VIRTUAL";
         FUIRenderer.DrawPanelTitle(canvas, titleBounds, categoryCode, categoryName);
 
         // Complete pending hide after delay
@@ -1568,6 +1568,7 @@ public class DevicesTabController : ITabController
         if (vjoyDevice.HasAxisRY) currentFlags.Add("RY");
         if (vjoyDevice.HasAxisRZ) currentFlags.Add("RZ");
         if (vjoyDevice.HasSlider0) currentFlags.Add("SL0");
+        if (vjoyDevice.HasSlider1) currentFlags.Add("SL1");
 
         int currentPovs = vjoyDevice.ContPovCount + vjoyDevice.DiscPovCount;
         bool currentContinuous = vjoyDevice.ContPovCount > 0;

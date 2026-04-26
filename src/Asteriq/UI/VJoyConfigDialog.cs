@@ -5,6 +5,8 @@ using SkiaSharp.Views.Desktop;
 
 namespace Asteriq.UI;
 
+public sealed record VJoyConfigResult(List<string> AxisFlags, int ButtonCount, int PovCount, bool PovContinuous);
+
 /// <summary>
 /// Dialog for configuring a vJoy device's axes, buttons, and POVs.
 /// Used during device creation and from the CONFIGURE button in the Devices tab.
@@ -366,12 +368,12 @@ public class VJoyConfigDialog : FUIBaseDialog
     /// Shows the vJoy configuration dialog, optionally pre-populated from existing config.
     /// Returns null if cancelled.
     /// </summary>
-    public static VJoyConfigDialog? ShowConfig(IWin32Window? owner, string deviceName,
+    public static VJoyConfigResult? ShowConfig(IWin32Window? owner, string deviceName,
         List<string>? currentFlags = null, int buttonCount = 32, int povCount = 0, bool povContinuous = false)
     {
         using var dialog = new VJoyConfigDialog(deviceName, currentFlags ?? new(), buttonCount, povCount, povContinuous);
-        if (dialog.ShowDialog(owner) == DialogResult.OK)
-            return dialog;
-        return null;
+        if (dialog.ShowDialog(owner) != DialogResult.OK)
+            return null;
+        return new VJoyConfigResult(dialog.AxisFlags, dialog.ButtonCount, dialog.PovCount, dialog.PovContinuous);
     }
 }

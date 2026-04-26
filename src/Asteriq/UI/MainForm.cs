@@ -696,7 +696,7 @@ public partial class MainForm : Form
             // Fallback: parse from name (e.g. "vJoy Device 1" → 1)
             if (vjoyId == 0)
             {
-                var vMatch = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+");
+                var vMatch = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
                 if (vMatch.Success && uint.TryParse(vMatch.Value, out uint parsedId))
                     vjoyId = parsedId;
             }
@@ -1224,7 +1224,7 @@ public partial class MainForm : Form
         float tx = 0, ty = 0;
         if (transform is not null && transform.StartsWith("translate("))
         {
-            var match = System.Text.RegularExpressions.Regex.Match(transform, @"translate\(([\d.-]+),?\s*([\d.-]*)\)");
+            var match = System.Text.RegularExpressions.Regex.Match(transform, @"translate\(([\d.-]+),?\s*([\d.-]*)\)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
             if (match.Success)
             {
                 float.TryParse(match.Groups[1].Value, out tx);
@@ -1296,11 +1296,12 @@ public partial class MainForm : Form
     private static SKRect? GetPathApproximateBounds(string d, float tx, float ty)
     {
         // Simple extraction of coordinate values from path data
-        var numbers = System.Text.RegularExpressions.Regex.Matches(d, @"[-+]?\d*\.?\d+");
+        var numbers = System.Text.RegularExpressions.Regex.Matches(d, @"[-+]?\d*\.?\d+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
         if (numbers.Count < 2) return null;
 
         float minX = float.MaxValue, minY = float.MaxValue;
         float maxX = float.MinValue, maxY = float.MinValue;
+        bool any = false;
 
         // Process pairs of numbers as x,y coordinates (very simplified)
         for (int i = 0; i < numbers.Count - 1; i += 2)
@@ -1312,10 +1313,11 @@ public partial class MainForm : Form
                 maxX = Math.Max(maxX, x + tx);
                 minY = Math.Min(minY, y + ty);
                 maxY = Math.Max(maxY, y + ty);
+                any = true;
             }
         }
 
-        if (minX == float.MaxValue) return null;
+        if (!any) return null;
 
         return new SKRect(minX, minY, maxX, maxY);
     }

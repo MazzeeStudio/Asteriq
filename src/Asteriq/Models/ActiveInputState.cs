@@ -100,7 +100,7 @@ public class ActiveInputTracker
                 // Only update activity time if value actually changed
                 bool changed = isAxis
                     ? Math.Abs(existing.Value - value) > 0.01f
-                    : existing.Value != value;
+                    : Math.Abs(existing.Value - value) > 0.001f;
 
                 if (changed)
                 {

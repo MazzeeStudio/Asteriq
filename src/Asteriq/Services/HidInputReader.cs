@@ -301,7 +301,7 @@ public class HidInputReader : IDisposable
             {
                 try
                 {
-                    int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, _cts?.Token ?? CancellationToken.None);
+                    int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
                     if (bytesRead > 0)
                     {
                         ParseReport(buffer);

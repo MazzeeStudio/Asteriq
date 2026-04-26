@@ -225,7 +225,7 @@ public class P4kExtractorService : IDisposable
 
             // Read local file header (minimum 30 bytes)
             var localHeader = new byte[30];
-            _fileStream.Read(localHeader, 0, 30);
+            _fileStream.ReadExactly(localHeader, 0, 30);
 
             // Verify signature (0x04034b50 = "PK\x03\x04")
             if (localHeader[0] != 0x50 || localHeader[1] != 0x4B ||

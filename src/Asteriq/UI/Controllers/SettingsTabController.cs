@@ -120,6 +120,9 @@ public class SettingsTabController : ITabController, IDisposable
     private readonly List<(SKRect Bounds, PhysicalDeviceInfo Device)> _hidHideDeviceToggleBounds = new();
     // Cached hidden device-instance paths, populated by the same background load as the toggles
     private List<string>? _hidHideHiddenPaths;
+    // Transient status line for HidHide operations (e.g. failed toggle), 4-second display
+    private string? _hidHideStatusMessage;
+    private DateTime _hidHideStatusTime;
 
     private enum HidHideInstallPhase { Idle, Downloading, Launching, Error }
 
@@ -1536,7 +1539,32 @@ public class SettingsTabController : ITabController, IDisposable
             }
         }
 
+        // Transient HidHide status line (4 seconds after the operation)
+        if (_hidHideStatusMessage is not null)
+        {
+            var elapsed = (DateTime.Now - _hidHideStatusTime).TotalSeconds;
+            if (elapsed < 4.0)
+            {
+                y += 4f;
+                FUIRenderer.DrawText(canvas, _hidHideStatusMessage,
+                    new SKPoint(leftMargin, y + rowH / 2f + 4f), FUIColors.Danger, 11.5f);
+            }
+            else
+            {
+                _hidHideStatusMessage = null;
+            }
+        }
+
         canvas.Restore();
+    }
+
+    private void SetHidHideStatus(string message)
+    {
+        _hidHideStatusMessage = message;
+        _hidHideStatusTime = DateTime.Now;
+        // Schedule a repaint after the fade so the line disappears even with no further user input
+        var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+        _ = Task.Delay(4100).ContinueWith(_ => _ctx.InvalidateCanvas(), uiScheduler);
     }
 
     private void DrawHidHideDownloadButton(SKCanvas canvas, float leftMargin, float rightMargin,
@@ -2079,6 +2107,25 @@ public class SettingsTabController : ITabController, IDisposable
                 if (bounds.Contains(pt))
                 {
                     var localDevice = device;
+                    var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(localDevice.InstanceGuid);
+                    var pattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
+                    bool wasHidden = pattern is not null && _hidHideHiddenPaths is not null
+                        && _hidHideHiddenPaths.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                    bool willHide = !wasHidden;
+
+                    // Optimistic local update so the switch flips immediately.
+                    // For hide we add the pattern as a sentinel — the Contains check below
+                    // matches it just like a real path. The continuation overwrites the
+                    // cache with the real result either way.
+                    if (pattern is not null)
+                    {
+                        _hidHideHiddenPaths ??= new List<string>();
+                        if (wasHidden)
+                            _hidHideHiddenPaths.RemoveAll(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                        else
+                            _hidHideHiddenPaths.Add(pattern);
+                    }
+
                     var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
                     _ = Task.Run(() =>
                     {
@@ -2086,9 +2133,28 @@ public class SettingsTabController : ITabController, IDisposable
                         return hidhide.GetHiddenDevices();
                     }).ContinueWith(t =>
                     {
-                        if (t.IsCompletedSuccessfully) _hidHideHiddenPaths = t.Result;
+                        if (t.IsCompletedSuccessfully)
+                        {
+                            _hidHideHiddenPaths = t.Result;
+                            // Failure detection: if the real state diverges from what the user asked for,
+                            // surface a status line. The cache assignment above already snapped the toggle back.
+                            if (pattern is not null)
+                            {
+                                bool actuallyHidden = t.Result.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                                if (actuallyHidden != willHide)
+                                {
+                                    var verb = willHide ? "hide" : "unhide";
+                                    SetHidHideStatus($"Failed to {verb} {localDevice.Name}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            SetHidHideStatus($"HidHide command failed for {localDevice.Name}");
+                        }
                         _ctx.InvalidateCanvas();
                     }, uiScheduler);
+                    _ctx.InvalidateCanvas();
                     return;
                 }
             }

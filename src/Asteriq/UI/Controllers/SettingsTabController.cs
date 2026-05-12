@@ -106,6 +106,7 @@ public class SettingsTabController : ITabController, IDisposable
     private bool _hidHideCloaking;
     private bool _hidHideInverse;
     private bool _hidHideStateLoaded;
+    private bool _hidHideStateLoading;
     private ToggleAnim _cloakingT;
     private ToggleAnim _inverseT;
     private string? _hidHideInstalledVersion;
@@ -1247,14 +1248,26 @@ public class SettingsTabController : ITabController, IDisposable
             _hidHidePanelHeaderBounds = SKRect.Empty;
         }
 
-        // Load HidHide state fresh when the panel first opens
-        if (_settingsRightPanelActive == PanelHidHide && !_hidHideStateLoaded)
+        // Load HidHide state once on first panel open. The CLI calls spawn HidHideCLI.exe
+        // and block for ~1-2s each, so run them off the UI thread and marshal back when done.
+        if (_settingsRightPanelActive == PanelHidHide && !_hidHideStateLoaded && !_hidHideStateLoading && _ctx.HidHide is not null)
         {
-            _hidHideCloaking = _ctx.HidHide!.IsCloakingEnabled();
-            _hidHideInverse  = _ctx.HidHide!.IsInverseMode();
-            _cloakingT = new ToggleAnim { T = _hidHideCloaking ? 1f : 0f };
-            _inverseT  = new ToggleAnim { T = _hidHideInverse  ? 1f : 0f };
-            _hidHideStateLoaded = true;
+            _hidHideStateLoading = true;
+            var hidhide = _ctx.HidHide;
+            _ = Task.Run(() => (Cloak: hidhide.IsCloakingEnabled(), Inv: hidhide.IsInverseMode()))
+                .ContinueWith(t =>
+                {
+                    if (!t.IsFaulted)
+                    {
+                        _hidHideCloaking = t.Result.Cloak;
+                        _hidHideInverse  = t.Result.Inv;
+                        _cloakingT = new ToggleAnim { T = t.Result.Cloak ? 1f : 0f };
+                        _inverseT  = new ToggleAnim { T = t.Result.Inv  ? 1f : 0f };
+                    }
+                    _hidHideStateLoaded  = true;
+                    _hidHideStateLoading = false;
+                    _ctx.InvalidateCanvas();
+                }, TaskScheduler.Default);
         }
 
         if (!networkEnabled && !hidHideInstalled)
@@ -1997,8 +2010,8 @@ public class SettingsTabController : ITabController, IDisposable
         {
             _settingsRightPanelActive = PanelHidHide;
             _ctx.AppSettings.SettingsRightPanel = PanelHidHide;
-            _hidHideStateLoaded = false;    // force toggle state reload
-            _hidHideVersionChecked = false; // force version re-check
+            // State and version are loaded once per session in DrawRightPanel.
+            // Don't force a reload here — each reload spawns blocking CLI calls and stalls the UI.
             _hidHideInstallPhase = HidHideInstallPhase.Idle;
             _ctx.InvalidateCanvas();
             return;

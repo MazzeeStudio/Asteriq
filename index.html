@@ -68,6 +68,21 @@
         </div>
     </section>
 
+    <!-- What's New strip -->
+    <section class="whats-new-section">
+        <div class="whats-new-inner">
+            <span class="whats-new-label">Recently added</span>
+            <ul class="whats-new-list">
+                <li>Axis-to-button threshold mode. Turn an analogue slider into a key press at any position.</li>
+                <li>Two new axis merge modes for split throttles: last-touched snap and smooth takeover.</li>
+                <li>Action Definitions panel that tells you what each Star Citizen action actually does.</li>
+                <li>Nightly release channel if you want the latest builds straight from the dev branch.</li>
+                <li>One-click vJoy configuration sync between TX and RX machines.</li>
+                <li>Create new vJoy devices from the Devices tab without needing physical hardware first.</li>
+            </ul>
+        </div>
+    </section>
+
     <!-- Replaces strip -->
     <div class="replaces-section">
         <div class="replaces-inner">
@@ -156,7 +171,8 @@
                 <div class="feature-text">
                     <h3>Axis Mapping &amp; Curves</h3>
                     <p>Shape your stick response with interactive curve editors. Choose from linear, S-curve, exponential presets, or drag control points for a fully custom response. Adjust deadzone per-axis with centre or throttle modes.</p>
-                    <p>Multiple physical inputs can merge into one vJoy axis using average, minimum, maximum, or sum operations.</p>
+                    <p>Multiple physical inputs can merge into one vJoy axis with six modes: average, minimum, maximum, sum, last-touched snap, or last-touched smooth takeover. The smooth takeover mode is great for split throttles. Whichever lever you moved most recently takes control, but only once it crosses the current value, so there's no jump.</p>
+                    <p>You can also turn any axis into a button. Set above and below thresholds with hysteresis to fire a key or vJoy button when your slider passes a chosen position.</p>
                     <p><a href="#/mappings">Learn more &rarr;</a></p>
                 </div>
                 <div class="feature-image">
@@ -168,7 +184,7 @@
                 <div class="feature-text">
                     <h3>Star Citizen Bindings</h3>
                     <p>A full binding grid shows every SC action alongside your keyboard, mouse, and joystick assignments. Click a cell and press a button to assign. Asteriq detects the input automatically.</p>
-                    <p>Set activation modes (Hold, Double Tap, Triple Tap, Delayed Press) per binding. Import bindings from other profiles or SC XML files. Export generates a clean <code>actionmaps.xml</code> for Star Citizen.</p>
+                    <p>Set activation modes (Press, Hold, Double Tap, Triple Tap, Delayed Press) per binding. Every action carries its display label, use cases, and raw action code, all pulled from SC's own localisation files, so you know exactly what you're binding. Import from other profiles or SC XML files. Export generates a clean <code>actionmaps.xml</code> for Star Citizen.</p>
                     <p><a href="#/bindings">Learn more &rarr;</a></p>
                 </div>
                 <div class="feature-image">
@@ -192,7 +208,7 @@
                 <div class="feature-text">
                     <h3>Network Forwarding</h3>
                     <p>Use your HOTAS on any machine on your network without disconnecting or re-connecting. The TX machine reads your physical devices and forwards vJoy state to whichever RX machine you select.</p>
-                    <p>Automatic peer discovery finds machines on your network. Assign a physical button as a TX toggle to switch between machines from your stick.</p>
+                    <p>Automatic peer discovery finds machines on your network. Assign a physical button as a TX toggle to switch between machines from your stick. And when you're ready, the RX machine can clone the master's vJoy configuration in one click, so both ends have matching virtual hardware without you setting up vJoy twice.</p>
                     <p><a href="#/settings">Learn more &rarr;</a></p>
                 </div>
                 <div class="feature-image">
@@ -326,6 +342,28 @@
                 </div>
             </div>
 
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Create vJoy Devices</h3>
+                    <p>Spin up new vJoy devices directly from the Devices tab. You don't need physical hardware plugged in first. Pick the axes you want, set the button count, configure POV hats, and you're done.</p>
+                    <p>Useful for building demo profiles, testing a layout before you order new hardware, or setting up a headless RX machine that only ever receives forwarded input over the network.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-vjoy-create.png" alt="vJoy device creation entry point in the Devices tab" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>vJoy Configuration</h3>
+                    <p>Every vJoy device's layout is editable from inside Asteriq. Toggle individual axes (X, Y, Z, RX, RY, RZ, SL0, SL1) on or off, choose how many buttons the device exposes, and configure POV hats as continuous or discrete.</p>
+                    <p>Pick a silhouette from the device library so your virtual device looks the part too. No need to open the vJoy Configurator separately.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-vjoy-config-dialog.png" alt="vJoy configuration dialog with axis toggles and button count" loading="lazy">
+                </div>
+            </div>
+
         </div>
     </section>
 
@@ -397,6 +435,28 @@
 
             <div class="feature">
                 <div class="feature-text">
+                    <h3>Axis-to-Button Threshold</h3>
+                    <p>Turn an axis into a button. Set above and below thresholds with hysteresis to fire a keyboard key or vJoy button when your slider passes a chosen position. Useful for detents, warning-zone triggers, or wing-fold commands tied to a throttle lever.</p>
+                    <p>Both directions fire independently, each with its own threshold, hysteresis, and output binding. The hysteresis stops the button from chattering when your slider sits right on the edge.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-axis-threshold.png" alt="Axis threshold mode with above and below directions configured" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Axis Merge</h3>
+                    <p>Combine multiple physical axes into one vJoy output with six modes: average, minimum, maximum, sum, last-touched snap, or last-touched smooth takeover.</p>
+                    <p>Smooth takeover is ideal for split throttles. Whichever lever you moved most recently gains control, but only after it crosses the current position, so there's no jump when you hand off.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-axis-merge-modes.png" alt="Axis merge mode dropdown showing all six options" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
                     <h3>Button Modes</h3>
                     <p>Four output modes for button mappings:</p>
                     <ul class="feature-list">
@@ -426,11 +486,23 @@
             <div class="feature">
                 <div class="feature-text">
                     <h3>Mapping List</h3>
-                    <p>The left panel lists all mappings for the selected vJoy device, with M1 (Buttons) and M2 (Axes) category tabs. Each row shows the mapped output and any assigned modifiers.</p>
+                    <p>The left panel lists all mappings for the selected vJoy device, with M1 (Buttons) and M2 (Axes) category tabs. Each row shows the mapped output, any assigned modifiers, and a status pill if something on another tab is touching the same output.</p>
                     <p>Rows with active modifier keys display the modifier name alongside the button number. Use the vJoy device arrows at the top to switch between virtual devices.</p>
                 </div>
                 <div class="feature-image">
                     <img src="screenshots/detail-mappings-list.png" alt="Mapping list showing button outputs with modifier indicators" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Output Status at a Glance</h3>
+                    <p>Asteriq tells you when a mapping's output isn't doing what it looks like. Rows that share an output with a Star Citizen binding show a SHARED pill, with a one-click jump to the Keybindings tab so you can see the other side of the conflict.</p>
+                    <p>Axis rows whose input has been claimed by a merge on another vJoy slot show a MERGED pill instead, with a direct link to the row that owns the merged output. No more wondering where your axis went.</p>
+                </div>
+                <div class="feature-image feature-image--stacked">
+                    <img src="screenshots/detail-mappings-shared-indicator.png" alt="SHARED indicator on a button mapping with a jump-to-Keybindings link" loading="lazy">
+                    <img src="screenshots/detail-mappings-merged-indicator.png" alt="MERGED indicator on an axis mapping linking to the target row" loading="lazy">
                 </div>
             </div>
 
@@ -474,6 +546,17 @@
 
             <div class="feature feature--reverse">
                 <div class="feature-text">
+                    <h3>Action Definitions</h3>
+                    <p>Every Star Citizen action carries its display label and use-case description, pulled straight from SC's own localisation files. Selecting an action opens a Binding Definition panel that explains what the action does, when it's useful, and shows the raw action code for cross-reference with community guides.</p>
+                    <p>No more guessing what <code>v_target_cycle_friendly_back</code> means before you bind it.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-binding-definition.png" alt="Action Definitions panel showing display label, use cases, and raw action code" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
                     <h3>Binding Details &amp; Activation Modes</h3>
                     <p>Select any cell to open the Binding Details panel. See action info, current binding, and set the activation mode with a segmented control:</p>
                     <ul class="feature-list">
@@ -487,6 +570,17 @@
                 </div>
                 <div class="feature-image">
                     <img src="screenshots/detail-sc-cell-details.png" alt="Binding Details with activation mode selector" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature feature--reverse">
+                <div class="feature-text">
+                    <h3>Game Environment &amp; Libraries</h3>
+                    <p>Select your Star Citizen environment (LIVE, PTU, EPTU, and so on) from the right panel. Asteriq auto-detects standard install locations and reads bindings from the matching profile so you can build separate layouts per environment.</p>
+                    <p>For installs the RSI launcher doesn't expose in its store, the Manage Libraries dialog lets you register additional library paths by hand. Custom paths persist across sessions.</p>
+                </div>
+                <div class="feature-image">
+                    <img src="screenshots/detail-sc-libraries-dialog.png" alt="Manage Libraries dialog with auto-detected and custom paths" loading="lazy">
                 </div>
             </div>
 
@@ -504,8 +598,8 @@
             <div class="feature feature--reverse">
                 <div class="feature-text">
                     <h3>Conflict Detection</h3>
-                    <p>Asteriq highlights binding conflicts in real-time. Amber cells indicate shared bindings across devices (allowed but warned). Red cells block export until resolved.</p>
-                    <p>Click a conflict cell to see all affected actions with navigation links. Jump directly to the conflicting binding to resolve it.</p>
+                    <p>Asteriq highlights binding conflicts in real-time across every input type: joystick, keyboard, and mouse. Amber cells flag shared bindings (allowed but worth knowing about). Red cells block export until you fix them.</p>
+                    <p>Click a conflict cell to see all affected actions with navigation links. Jump directly to the conflicting binding to resolve it without hunting through the grid.</p>
                 </div>
                 <div class="feature-image">
                     <img src="screenshots/detail-sc-conflicts.png" alt="Conflict highlighting with navigation" loading="lazy">
@@ -515,8 +609,8 @@
             <div class="feature">
                 <div class="feature-text">
                     <h3>Search &amp; Button Capture</h3>
-                    <p>Type to search actions by name. Use the button capture mode to press a physical button on your HOTAS. Asteriq filters the grid to show only actions bound to that exact input.</p>
-                    <p>Combined with the "Bound only" toggle and category filter, you can quickly find and manage any binding in a list of 1000+ SC actions.</p>
+                    <p>Type to search actions by name. Button capture mode listens on any device, whether that's a joystick, your keyboard, or your mouse (wheel and AltGr+Mouse combos included), and filters the grid to only the actions bound to that exact input.</p>
+                    <p>Combined with the "Bound only" toggle and category filter, you can find and manage any binding in a list of 1000+ SC actions in a few seconds.</p>
                 </div>
                 <div class="feature-image">
                     <img src="screenshots/detail-sc-search.png" alt="Search with button capture" loading="lazy">
@@ -626,6 +720,7 @@
                     <h3>Network Forwarding: RX Mode</h3>
                     <p>The client (RX) machine receives vJoy snapshots from the master. Once a trusted master is found on the network, the connection is established automatically. Your local vJoy devices then mirror the master's output.</p>
                     <p>Devices and Mappings tabs lock to read-only while connected, preventing accidental changes. Use the Disconnect button to regain local control.</p>
+                    <p>Need matching virtual hardware on both ends? The Match Master vJoy Config button clones the master's vJoy layout to your local machine in one click. Asteriq provisions the devices for you and shows progress as it goes, so you don't have to set vJoy up twice.</p>
                 </div>
                 <div class="feature-image">
                     <img src="screenshots/detail-network-rx.png" alt="Network RX mode with trust code" loading="lazy">
@@ -636,10 +731,22 @@
                 <div class="feature-text">
                     <h3>Auto-Updates</h3>
                     <p>Asteriq checks for updates automatically on startup. When a new version is available, download and apply it with two clicks. The app extracts, swaps, and relaunches without manual intervention.</p>
-                    <p>Toggle auto-check on or off, or trigger a manual check any time from the Settings panel.</p>
+                    <p>Toggle auto-check on or off, switch between Stable and Nightly channels, or trigger a manual check any time. Stable is the standard release rhythm. Nightly tracks the latest green build on the dev branch for anyone who wants new features as soon as they land.</p>
+                </div>
+                <div class="feature-image feature-image--stacked">
+                    <img src="screenshots/detail-update-available.png" alt="Update notification" loading="lazy">
+                    <img src="screenshots/detail-update-nightly.png" alt="Stable and Nightly channel selector" loading="lazy">
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-text">
+                    <h3>Launch Behaviour</h3>
+                    <p>Three toggles control how Asteriq starts. Launch at Login adds Asteriq to Windows autostart. Auto-Forward on Start switches network forwarding on the moment the app launches, which is useful for headless TX machines. Open Minimised starts the app straight into the system tray.</p>
+                    <p>Pair these with TX mode and you've got a "set it and forget it" forwarding box that's ready after every reboot without you touching anything.</p>
                 </div>
                 <div class="feature-image">
-                    <img src="screenshots/detail-update-available.png" alt="Update notification" loading="lazy">
+                    <img src="screenshots/detail-startup-settings.png" alt="Launch behaviour panel with three toggles" loading="lazy">
                 </div>
             </div>
 

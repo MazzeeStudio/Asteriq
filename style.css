@@ -468,6 +468,73 @@ img {
 }
 
 
+/* ===== What's New strip ===== */
+
+.whats-new-section {
+    padding: 3rem 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface);
+}
+
+.whats-new-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.whats-new-label {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent-hi);
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+}
+
+.whats-new-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem 2rem;
+}
+
+.whats-new-list li {
+    font-size: 0.92rem;
+    color: var(--text-dim);
+    padding-left: 1.4rem;
+    position: relative;
+    line-height: 1.55;
+}
+
+.whats-new-list li::before {
+    content: "+";
+    position: absolute;
+    left: 0;
+    top: -0.05rem;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+@media (max-width: 720px) {
+    .whats-new-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Stacked images inside a feature row */
+.feature-image--stacked img {
+    margin-bottom: 0.75rem;
+}
+.feature-image--stacked img:last-child {
+    margin-bottom: 0;
+}
+
+
 /* ===== Value Props ===== */
 
 .value-props-section {

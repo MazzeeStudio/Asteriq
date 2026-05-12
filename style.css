@@ -493,6 +493,14 @@ img {
     margin-top: 0.85rem !important;
 }
 
+.replaces-note__signature {
+    margin-top: 0.5rem !important;
+    text-align: right;
+    font-style: normal !important;
+    color: var(--accent-hi) !important;
+    letter-spacing: 0.08em;
+}
+
 
 /* ===== What's New strip ===== */
 

@@ -36,8 +36,10 @@ public partial class SCBindingsTabController
         // Column actions panel is only active when a vJoy (non-physical, non-readonly joystick) column is highlighted
         bool showColumnActions = IsColumnActionsVisible();
 
-        // Column actions panel interactions — all guarded so stale bounds never intercept other panel clicks
-        if (showColumnActions)
+        // Column actions panel interactions — all guarded so stale bounds never intercept other panel clicks.
+        // Skip when CP is spotlighted (column actions body is collapsed; body bounds are stale)
+        // or when the CP dropdown overlay is open (its list visually covers column actions).
+        if (showColumnActions && !_cpPanel.IsExpanded && !_profileMgmt.DropdownOpen)
         {
             // Profile dropdown — close on outside click
             if (_colImport.ProfileDropdownOpen)

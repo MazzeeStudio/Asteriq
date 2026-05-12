@@ -489,6 +489,10 @@ img {
     font-weight: 600;
 }
 
+.replaces-note__sign-off {
+    margin-top: 0.85rem !important;
+}
+
 
 /* ===== What's New strip ===== */
 

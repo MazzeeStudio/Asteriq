@@ -1250,10 +1250,14 @@ public class SettingsTabController : ITabController, IDisposable
 
         // Load HidHide state once on first panel open. The CLI calls spawn HidHideCLI.exe
         // and block for ~1-2s each, so run them off the UI thread and marshal back when done.
+        // Continuation must run on the UI thread because the struct fields below
+        // (_cloakingT, _inverseT) are not atomic and would tear if written from a worker
+        // thread while paint reads them.
         if (_settingsRightPanelActive == PanelHidHide && !_hidHideStateLoaded && !_hidHideStateLoading && _ctx.HidHide is not null)
         {
             _hidHideStateLoading = true;
             var hidhide = _ctx.HidHide;
+            var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
             _ = Task.Run(() => (Cloak: hidhide.IsCloakingEnabled(), Inv: hidhide.IsInverseMode()))
                 .ContinueWith(t =>
                 {
@@ -1267,7 +1271,7 @@ public class SettingsTabController : ITabController, IDisposable
                     _hidHideStateLoaded  = true;
                     _hidHideStateLoading = false;
                     _ctx.InvalidateCanvas();
-                }, TaskScheduler.Default);
+                }, uiScheduler);
         }
 
         if (!networkEnabled && !hidHideInstalled)

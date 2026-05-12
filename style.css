@@ -621,11 +621,10 @@ img {
 
 .screenshots-section .section-label {
     max-width: 1080px;
-    margin-left: auto;
+    margin: 0 auto 2.5rem;
     padding-left: calc(2rem + 0.8rem);
     padding-right: 2rem;
     display: block;
-    margin-bottom: 2.5rem;
 }
 
 /* Flex track — JS translates this to centre the active slide */

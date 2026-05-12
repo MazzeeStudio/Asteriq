@@ -783,6 +783,12 @@
 
     </main>
 
+    <!-- ===== Image lightbox ===== -->
+    <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog">
+        <button class="lightbox__close" id="lightbox-close" type="button" aria-label="Close">&times;</button>
+        <img class="lightbox__img" id="lightbox-img" alt="">
+    </div>
+
     <!-- ===== Footer ===== -->
     <footer>
         <div class="footer-links">
@@ -841,6 +847,62 @@
 
         window.addEventListener('hashchange', navigate);
         navigate(); // initial route
+
+
+        // ── Image lightbox ──────────────────────────────────────────
+        var lightbox = document.getElementById('lightbox');
+        var lightboxImg = document.getElementById('lightbox-img');
+        var lightboxClose = document.getElementById('lightbox-close');
+
+        if (lightbox && lightboxImg) {
+            var zoomTargets = document.querySelectorAll(
+                '.feature-image img, .gallery-item img, .section-hero-image img, .hero-shot'
+            );
+
+            function openLightbox(src, alt) {
+                lightboxImg.src = src;
+                lightboxImg.alt = alt || '';
+                lightbox.classList.add('active');
+                lightbox.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeLightbox() {
+                lightbox.classList.remove('active');
+                lightbox.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+                // Clear src after the fade-out so the next open doesn't briefly show the previous image
+                setTimeout(function() {
+                    if (!lightbox.classList.contains('active')) lightboxImg.src = '';
+                }, 200);
+            }
+
+            zoomTargets.forEach(function(img) {
+                img.addEventListener('click', function() {
+                    openLightbox(img.src, img.alt);
+                });
+            });
+
+            // Click backdrop closes; click on the image itself does not
+            lightbox.addEventListener('click', function(e) {
+                if (e.target === lightbox) closeLightbox();
+            });
+
+            if (lightboxClose) {
+                lightboxClose.addEventListener('click', closeLightbox);
+            }
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+                    closeLightbox();
+                }
+            });
+
+            // Close lightbox on SPA navigation so it doesn't linger over the next page
+            window.addEventListener('hashchange', function() {
+                if (lightbox.classList.contains('active')) closeLightbox();
+            });
+        }
 
 
         // ── Carousel ────────────────────────────────────────────────

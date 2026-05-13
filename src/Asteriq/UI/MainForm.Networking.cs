@@ -111,7 +111,7 @@ public partial class MainForm : Form
 
         if (_isNetworkConnecting)
         {
-            _logger.LogDebug("[ConnectMaster] BLOCKED — connect already in progress");
+            _logger.LogDebug("[ConnectMaster] BLOCKED, connect already in progress");
             return;
         }
 
@@ -250,7 +250,7 @@ public partial class MainForm : Form
         _tabContext.RemoteControlProfiles = new();
         _tabContext.RemoteControlProfilesMasterName = "";
         _tabContext.MasterVJoyConfigs.Clear();
-        _logger.LogInformation("[Disconnect] Disconnected — mode=Local");
+        _logger.LogInformation("[Disconnect] Disconnected, mode=Local");
         BeginInvoke(MarkDirty);
     }
 

@@ -79,9 +79,9 @@ public sealed class NetworkInputService : INetworkInputService
         IApplicationSettingsService settings,
         ILogger<NetworkInputService> logger)
     {
-        _vjoy     = vjoy     ?? throw new ArgumentNullException(nameof(vjoy));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _logger   = logger   ?? throw new ArgumentNullException(nameof(logger));
+        _vjoy = vjoy;
+        _settings = settings;
+        _logger = logger;
     }
 
     // ── Listener (client / receiver side) ────────────────────────────────────
@@ -310,7 +310,7 @@ public sealed class NetworkInputService : INetworkInputService
             }
             catch (IOException ex)
             {
-                _logger.LogWarning(ex, "SendVJoyState failed — connection lost");
+                _logger.LogWarning(ex, "SendVJoyState failed, connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
@@ -327,7 +327,7 @@ public sealed class NetworkInputService : INetworkInputService
             try   { WritePacketSync(_stream, MsgType.VJoyConfig, payload); }
             catch (IOException ex)
             {
-                _logger.LogWarning(ex, "SendVJoyConfig failed — connection lost");
+                _logger.LogWarning(ex, "SendVJoyConfig failed, connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
@@ -359,7 +359,7 @@ public sealed class NetworkInputService : INetworkInputService
             try   { WritePacketSync(_stream, MsgType.ProfileList, payload); }
             catch (IOException ex)
             {
-                _logger.LogWarning(ex, "SendProfileList failed — connection lost");
+                _logger.LogWarning(ex, "SendProfileList failed, connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
@@ -431,7 +431,7 @@ public sealed class NetworkInputService : INetworkInputService
             // so if it's already Local here this is a clean shutdown — don't fire ConnectionLost.
             if (_mode != NetworkInputMode.Local)
             {
-                _logger.LogWarning(ex, "Receive loop error — connection lost");
+                _logger.LogWarning(ex, "Receive loop error, connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }
@@ -458,7 +458,7 @@ public sealed class NetworkInputService : INetworkInputService
         else
         {
             _failedDevices.Add(deviceId);
-            _logger.LogWarning("vJoy device {DeviceId} not available on this machine — skipping", deviceId);
+            _logger.LogWarning("vJoy device {DeviceId} not available on this machine, skipping", deviceId);
         }
     }
 
@@ -517,7 +517,7 @@ public sealed class NetworkInputService : INetworkInputService
         {
             if (_mode != NetworkInputMode.Local)
             {
-                _logger.LogWarning(ex, "Ping failed — connection lost");
+                _logger.LogWarning(ex, "Ping failed, connection lost");
                 _mode = NetworkInputMode.Local;
                 ConnectionLost?.Invoke(this, EventArgs.Empty);
             }

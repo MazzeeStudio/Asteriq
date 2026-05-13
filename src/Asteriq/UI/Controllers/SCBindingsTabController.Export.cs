@@ -283,7 +283,7 @@ public partial class SCBindingsTabController
             _scExportProfile = new SCExportProfile();
             foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
                 _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] No remembered profile for {environment} — started blank");
+            System.Diagnostics.Debug.WriteLine($"[SCBindings] No remembered profile for {environment}, started blank");
         }
 
 

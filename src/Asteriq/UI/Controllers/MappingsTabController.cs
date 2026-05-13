@@ -1303,7 +1303,7 @@ public partial class MappingsTabController : ITabController
             else if (_autoScroll.Enabled)
             {
                 // Button pressed with no mapping - flash an indicator
-                _highlight.FlashText = $"BUTTON {i + 1} — NO MAPPING";
+                _highlight.FlashText = $"BUTTON {i + 1}: NO MAPPING";
                 _highlight.FlashTicks = Environment.TickCount64;
                 _highlight.Debounce[debounceKey] = Environment.TickCount64; // Debounce the no-mapping flash too
             }

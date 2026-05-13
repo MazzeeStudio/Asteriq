@@ -106,6 +106,7 @@ public class SettingsTabController : ITabController, IDisposable
     private bool _hidHideCloaking;
     private bool _hidHideInverse;
     private bool _hidHideStateLoaded;
+    private bool _hidHideStateLoading;
     private ToggleAnim _cloakingT;
     private ToggleAnim _inverseT;
     private string? _hidHideInstalledVersion;
@@ -117,6 +118,11 @@ public class SettingsTabController : ITabController, IDisposable
     private CancellationTokenSource? _hidHideDownloadCts;
     // Per-device HidHide toggle rows in the Settings panel
     private readonly List<(SKRect Bounds, PhysicalDeviceInfo Device)> _hidHideDeviceToggleBounds = new();
+    // Cached hidden device-instance paths, populated by the same background load as the toggles
+    private List<string>? _hidHideHiddenPaths;
+    // Transient status line for HidHide operations (e.g. failed toggle), 4-second display
+    private string? _hidHideStatusMessage;
+    private DateTime _hidHideStatusTime;
 
     private enum HidHideInstallPhase { Idle, Downloading, Launching, Error }
 
@@ -1247,14 +1253,35 @@ public class SettingsTabController : ITabController, IDisposable
             _hidHidePanelHeaderBounds = SKRect.Empty;
         }
 
-        // Load HidHide state fresh when the panel first opens
-        if (_settingsRightPanelActive == PanelHidHide && !_hidHideStateLoaded)
+        // Load HidHide state once on first panel open. Each CLI call spawns HidHideCLI.exe
+        // and blocks for ~1-2s, so fan them out in parallel on worker threads and marshal
+        // the result back to the UI thread (struct fields below are not atomic).
+        if (_settingsRightPanelActive == PanelHidHide && !_hidHideStateLoaded && !_hidHideStateLoading && _ctx.HidHide is not null)
         {
-            _hidHideCloaking = _ctx.HidHide!.IsCloakingEnabled();
-            _hidHideInverse  = _ctx.HidHide!.IsInverseMode();
-            _cloakingT = new ToggleAnim { T = _hidHideCloaking ? 1f : 0f };
-            _inverseT  = new ToggleAnim { T = _hidHideInverse  ? 1f : 0f };
-            _hidHideStateLoaded = true;
+            _hidHideStateLoading = true;
+            var hidhide = _ctx.HidHide;
+            var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+            var cloakTask  = Task.Run(() => hidhide.IsCloakingEnabled());
+            var invTask    = Task.Run(() => hidhide.IsInverseMode());
+            var hiddenTask = Task.Run(() => hidhide.GetHiddenDevices());
+            _ = Task.WhenAll(cloakTask, invTask, hiddenTask).ContinueWith(_ =>
+            {
+                if (cloakTask.IsCompletedSuccessfully)
+                {
+                    _hidHideCloaking = cloakTask.Result;
+                    _cloakingT = new ToggleAnim { T = cloakTask.Result ? 1f : 0f };
+                }
+                if (invTask.IsCompletedSuccessfully)
+                {
+                    _hidHideInverse = invTask.Result;
+                    _inverseT = new ToggleAnim { T = invTask.Result ? 1f : 0f };
+                }
+                if (hiddenTask.IsCompletedSuccessfully)
+                    _hidHideHiddenPaths = hiddenTask.Result;
+                _hidHideStateLoaded  = true;
+                _hidHideStateLoading = false;
+                _ctx.InvalidateCanvas();
+            }, uiScheduler);
         }
 
         if (!networkEnabled && !hidHideInstalled)
@@ -1488,7 +1515,10 @@ public class SettingsTabController : ITabController, IDisposable
                 FUIColors.TextDim, 11f);
             y += rowH;
 
-            var hiddenPaths = _ctx.HidHide!.GetHiddenDevices();
+            // Use the cached list populated by the panel-open background load. If still
+            // null (first-time load in flight), every row renders as not-hidden until the
+            // cache arrives — much better than spawning a CLI per paint frame.
+            var hiddenPaths = _hidHideHiddenPaths ?? new List<string>();
             foreach (var device in physicalDevices)
             {
                 var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
@@ -1509,7 +1539,32 @@ public class SettingsTabController : ITabController, IDisposable
             }
         }
 
+        // Transient HidHide status line (4 seconds after the operation)
+        if (_hidHideStatusMessage is not null)
+        {
+            var elapsed = (DateTime.Now - _hidHideStatusTime).TotalSeconds;
+            if (elapsed < 4.0)
+            {
+                y += 4f;
+                FUIRenderer.DrawText(canvas, _hidHideStatusMessage,
+                    new SKPoint(leftMargin, y + rowH / 2f + 4f), FUIColors.Danger, 11.5f);
+            }
+            else
+            {
+                _hidHideStatusMessage = null;
+            }
+        }
+
         canvas.Restore();
+    }
+
+    private void SetHidHideStatus(string message)
+    {
+        _hidHideStatusMessage = message;
+        _hidHideStatusTime = DateTime.Now;
+        // Schedule a repaint after the fade so the line disappears even with no further user input
+        var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+        _ = Task.Delay(4100).ContinueWith(_ => _ctx.InvalidateCanvas(), uiScheduler);
     }
 
     private void DrawHidHideDownloadButton(SKCanvas canvas, float leftMargin, float rightMargin,
@@ -1997,8 +2052,8 @@ public class SettingsTabController : ITabController, IDisposable
         {
             _settingsRightPanelActive = PanelHidHide;
             _ctx.AppSettings.SettingsRightPanel = PanelHidHide;
-            _hidHideStateLoaded = false;    // force toggle state reload
-            _hidHideVersionChecked = false; // force version re-check
+            // State and version are loaded once per session in DrawRightPanel.
+            // Don't force a reload here — each reload spawns blocking CLI calls and stalls the UI.
             _hidHideInstallPhase = HidHideInstallPhase.Idle;
             _ctx.InvalidateCanvas();
             return;
@@ -2017,23 +2072,31 @@ public class SettingsTabController : ITabController, IDisposable
 
         if (_settingsRightPanelActive == PanelHidHide && _ctx.HidHide?.IsAvailable() == true)
         {
+            // All toggle handlers below flip local UI state immediately for snappy feedback
+            // and run the blocking HidHideCLI command on a worker thread.
+            var hidhide = _ctx.HidHide;
+
             if (_hidHideCloakingToggleBounds.HitTest(pt))
             {
                 _hidHideCloaking = !_hidHideCloaking;
-                if (_hidHideCloaking)
-                    _ctx.HidHide.EnableCloaking();
-                else
-                    _ctx.HidHide.DisableCloaking();
+                bool enable = _hidHideCloaking;
+                _ = Task.Run(() =>
+                {
+                    if (enable) hidhide.EnableCloaking();
+                    else hidhide.DisableCloaking();
+                });
                 _ctx.InvalidateCanvas();
                 return;
             }
             if (_hidHideInverseToggleBounds.HitTest(pt))
             {
                 _hidHideInverse = !_hidHideInverse;
-                if (_hidHideInverse)
-                    _ctx.HidHide.EnableInverseMode();
-                else
-                    _ctx.HidHide.DisableInverseMode();
+                bool enable = _hidHideInverse;
+                _ = Task.Run(() =>
+                {
+                    if (enable) hidhide.EnableInverseMode();
+                    else hidhide.DisableInverseMode();
+                });
                 _ctx.InvalidateCanvas();
                 return;
             }
@@ -2043,7 +2106,55 @@ public class SettingsTabController : ITabController, IDisposable
             {
                 if (bounds.Contains(pt))
                 {
-                    _ctx.ToggleHidHideForDevice?.Invoke(device);
+                    var localDevice = device;
+                    var (vid, pid) = DeviceMatchingService.ExtractVidPidFromSdlGuid(localDevice.InstanceGuid);
+                    var pattern = vid > 0 ? $"VID_{vid:X4}&PID_{pid:X4}" : null;
+                    bool wasHidden = pattern is not null && _hidHideHiddenPaths is not null
+                        && _hidHideHiddenPaths.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                    bool willHide = !wasHidden;
+
+                    // Optimistic local update so the switch flips immediately.
+                    // For hide we add the pattern as a sentinel — the Contains check below
+                    // matches it just like a real path. The continuation overwrites the
+                    // cache with the real result either way.
+                    if (pattern is not null)
+                    {
+                        _hidHideHiddenPaths ??= new List<string>();
+                        if (wasHidden)
+                            _hidHideHiddenPaths.RemoveAll(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                        else
+                            _hidHideHiddenPaths.Add(pattern);
+                    }
+
+                    var uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+                    _ = Task.Run(() =>
+                    {
+                        _ctx.ToggleHidHideForDevice?.Invoke(localDevice);
+                        return hidhide.GetHiddenDevices();
+                    }).ContinueWith(t =>
+                    {
+                        if (t.IsCompletedSuccessfully)
+                        {
+                            _hidHideHiddenPaths = t.Result;
+                            // Failure detection: if the real state diverges from what the user asked for,
+                            // surface a status line. The cache assignment above already snapped the toggle back.
+                            if (pattern is not null)
+                            {
+                                bool actuallyHidden = t.Result.Any(p => p.Contains(pattern, StringComparison.OrdinalIgnoreCase));
+                                if (actuallyHidden != willHide)
+                                {
+                                    var verb = willHide ? "hide" : "unhide";
+                                    SetHidHideStatus($"Failed to {verb} {localDevice.Name}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            SetHidHideStatus($"HidHide command failed for {localDevice.Name}");
+                        }
+                        _ctx.InvalidateCanvas();
+                    }, uiScheduler);
+                    _ctx.InvalidateCanvas();
                     return;
                 }
             }

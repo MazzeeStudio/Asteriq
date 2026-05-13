@@ -7,7 +7,7 @@ namespace Asteriq.DirectInput;
 /// Service for querying DirectInput devices to get axis type information.
 /// This is needed because SDL2 doesn't expose HID usage codes / axis semantics.
 /// </summary>
-public class DirectInputService : IDisposable
+public sealed class DirectInputService : IDisposable
 {
     private IntPtr _directInput;
     private bool _disposed;

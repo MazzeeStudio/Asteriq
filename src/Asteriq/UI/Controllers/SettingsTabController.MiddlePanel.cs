@@ -7,7 +7,7 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController
+public sealed partial class SettingsTabController
 {
     private void DrawApplicationSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {

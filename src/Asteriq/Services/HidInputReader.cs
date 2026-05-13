@@ -10,7 +10,7 @@ namespace Asteriq.Services;
 /// This bypasses SDL2 which sometimes misreports sliders as buttons.
 /// Based on SCVirtStick's InputReader implementation.
 /// </summary>
-public class HidInputReader : IDisposable
+public sealed class HidInputReader : IDisposable
 {
     // HID Usage IDs for parsing
     private const int HID_USAGE_PAGE_GENERIC = 0x01;
@@ -162,7 +162,7 @@ public class HidInputReader : IDisposable
     /// <summary>
     /// Internal class that manages reading from a single HID device
     /// </summary>
-    private class DeviceReader : IDisposable
+    private sealed class DeviceReader : IDisposable
     {
         private readonly HidDevice _hidDevice;
         private readonly string _devicePath;

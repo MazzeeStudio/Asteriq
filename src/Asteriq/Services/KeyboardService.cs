@@ -7,7 +7,7 @@ namespace Asteriq.Services;
 /// <summary>
 /// Service for sending keyboard input using Windows SendInput API
 /// </summary>
-public class KeyboardService : IDisposable
+public sealed class KeyboardService : IDisposable
 {
     // Track key states to avoid repeated press/release
     private readonly Dictionary<int, bool> _keyStates = new();

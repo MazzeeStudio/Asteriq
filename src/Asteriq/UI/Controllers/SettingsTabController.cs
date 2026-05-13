@@ -7,7 +7,7 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController : ITabController, IDisposable
+public sealed partial class SettingsTabController : ITabController, IDisposable
 {
     private readonly TabContext _ctx;
 

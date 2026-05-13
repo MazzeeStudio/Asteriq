@@ -774,7 +774,7 @@ public partial class MainForm : Form
                     allMaps.Add((mapFile, map));
             }
 
-            // Step 1: Try VID:PID match (most reliable)
+            // VID:PID match (most reliable)
             if (!string.IsNullOrEmpty(vidPidStr))
             {
                 foreach (var (path, map) in allMaps)
@@ -789,7 +789,7 @@ public partial class MainForm : Form
                 }
             }
 
-            // Step 2: Try device name match (skip generic maps)
+            // Device name match (skip generic maps).
             // Strip manufacturer prefixes before comparing so map display names (e.g. "MongoosT-50CM3 Throttle")
             // still match SDL-reported names (e.g. "VPC MongoosT-50CM3").
             static string StripMfr(string s) => s
@@ -815,7 +815,7 @@ public partial class MainForm : Form
                 }
             }
 
-            // Step 3: Try device type match based on keywords in device name
+            // Type match based on keywords in device name
             string detectedType = DetectDeviceType(deviceName);
             if (detectedType != "Joystick")
             {
@@ -831,8 +831,7 @@ public partial class MainForm : Form
                 }
             }
 
-            // Step 4: No specific map found - check if device name indicates left-hand
-            // and apply mirror to the default joystick map
+            // Fallback: detect left-hand from device name to mirror the default joystick map
             bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
                               deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
                               deviceName.EndsWith(" L", StringComparison.OrdinalIgnoreCase);
@@ -1753,7 +1752,7 @@ public partial class MainForm : Form
                     }
                     else
                     {
-                        _logger.LogDebug("[NetToggle] No peers discovered — ignoring");
+                        _logger.LogDebug("[NetToggle] No peers discovered, ignoring");
                     }
                 }
                 else

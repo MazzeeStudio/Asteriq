@@ -500,7 +500,7 @@ public partial class MainForm
         if (inClientRole || _networkMode == NetworkInputMode.Receiving)
         {
             string banner = _isClientConnected
-                ? $"CLIENT MODE — {_connectedMasterName.ToUpperInvariant()}"
+                ? $"CLIENT MODE: {_connectedMasterName.ToUpperInvariant()}"
                 : "CLIENT MODE";
             float bannerWidth = FUIRenderer.MeasureText(banner, 15f);
             FUIRenderer.DrawText(canvas, banner,

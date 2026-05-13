@@ -1585,7 +1585,7 @@ public class SettingsTabController : ITabController, IDisposable
                 state = FUIRenderer.ButtonState.Disabled;
                 break;
             case HidHideInstallPhase.Error:
-                label = "Download failed — retry";
+                label = "Download failed. Retry";
                 state = _hidHideUpdateButtonBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y)
                     ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
                 break;
@@ -1767,7 +1767,7 @@ public class SettingsTabController : ITabController, IDisposable
             }
 
             bool isConnected = netMode == NetworkInputMode.Remote;
-            string statusText = isConnecting ? "Connecting..." : isConnected ? "Connected — sending" : "Not connected";
+            string statusText = isConnecting ? "Connecting..." : isConnected ? "Connected, sending" : "Not connected";
             var statusColor = isConnected ? FUIColors.Active : isConnecting ? FUIColors.Warning : FUIColors.TextDim;
             y += sectionGap;
             FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText}",
@@ -1793,7 +1793,7 @@ public class SettingsTabController : ITabController, IDisposable
             }
             else
             {
-                FUIRenderer.DrawTextTruncated(canvas, "No trusted master — waiting for connection",
+                FUIRenderer.DrawTextTruncated(canvas, "Waiting for trusted master",
                     new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, FUIColors.TextDim, 13f);
                 y += rowH + sectionGap;
             }

@@ -240,25 +240,20 @@ public class AxisCurve
     /// </summary>
     public float Apply(float input)
     {
-        // Step 1: Apply deadzone
         float deadzoned;
         if (DeadzoneMode == DeadzoneMode.Centered)
         {
-            // Centered deadzone (4-parameter model like JoystickGremlinEx)
             deadzoned = ApplyCenteredDeadzone(input);
         }
         else
         {
-            // End-only deadzone (for throttle/slider)
             float normalized = (input + 1f) / 2f; // -1..1 -> 0..1
             deadzoned = ApplyEndDeadzone(normalized);
-            deadzoned = deadzoned * 2f - 1f; // 0..1 -> -1..1
+            deadzoned = deadzoned * 2f - 1f;      // 0..1 -> -1..1
         }
 
-        // Step 2: Apply saturation (scales so Saturation input -> 1.0 output)
         float saturated = ApplySaturation(deadzoned);
 
-        // Step 3: Apply response curve to magnitude
         float sign = Math.Sign(saturated);
         float magnitude = Math.Abs(saturated);
 
@@ -273,7 +268,6 @@ public class AxisCurve
 
         curved = Math.Clamp(curved, 0f, 1f);
 
-        // Step 4: Apply inversion
         if (Inverted)
             curved = 1f - curved;
 

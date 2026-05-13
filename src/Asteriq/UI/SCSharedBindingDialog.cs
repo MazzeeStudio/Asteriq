@@ -146,11 +146,11 @@ public class SCSharedBindingDialog : FUIBaseDialog
 
         // Share option explanation
         string shareLabel = _affectedActionNames.Count > 0 ? "SHARE ALL" : "SHARE";
-        FUIRenderer.DrawText(canvas, shareLabel + " — reroute the physical button on " + _secondaryDeviceLabel +
+        FUIRenderer.DrawText(canvas, shareLabel + ": reroute the physical button on " + _secondaryDeviceLabel +
             " so both inputs trigger the same action.",
             new SKPoint(20, y), FUIColors.TextDim, 11f);
         y += 18;
-        FUIRenderer.DrawText(canvas, "REPLACE — remove the " + _primaryDeviceLabel +
+        FUIRenderer.DrawText(canvas, "REPLACE: remove the " + _primaryDeviceLabel +
             " binding and use " + _secondaryDeviceLabel + " instead.",
             new SKPoint(20, y), FUIColors.TextDim, 11f);
 

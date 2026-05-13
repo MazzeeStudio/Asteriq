@@ -1870,7 +1870,7 @@ public partial class MappingsTabController
             new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
         y += 22;
 
-        FUIRenderer.DrawText(canvas, "Settings on this slot are inactive — manage from the merge target.",
+        FUIRenderer.DrawText(canvas, "Settings on this slot are inactive. Manage from the merge target.",
             new SKPoint(leftMargin, y + 14), FUIColors.TextDim, 12f);
         y += 28;
 

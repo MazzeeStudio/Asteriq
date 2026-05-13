@@ -44,59 +44,38 @@ public class HidHideService : IHidHideService
 {
     private readonly string _cliPath;
 
-    /// <summary>
-    /// Creates a new HidHideService with default CLI path
-    /// </summary>
     public HidHideService()
         : this(new HidHideSettings())
     {
     }
 
-    /// <summary>
-    /// Creates a new HidHideService with the specified settings
-    /// </summary>
     public HidHideService(HidHideSettings settings)
     {
         _cliPath = settings.CliPath;
     }
 
-    /// <summary>
-    /// Creates a new HidHideService with a custom CLI path
-    /// </summary>
     public HidHideService(string cliPath)
     {
         _cliPath = cliPath;
     }
 
-    /// <summary>
-    /// Check if HidHide CLI is available
-    /// </summary>
     public bool IsAvailable()
     {
         return File.Exists(_cliPath);
     }
 
-    /// <summary>
-    /// Get all gaming HID devices
-    /// </summary>
     public List<HidHideDeviceGroup> GetGamingDevices()
     {
         var output = RunCommand("--dev-gaming");
         return ParseDeviceJson(output);
     }
 
-    /// <summary>
-    /// Get all HID devices
-    /// </summary>
     public List<HidHideDeviceGroup> GetAllDevices()
     {
         var output = RunCommand("--dev-all");
         return ParseDeviceJson(output);
     }
 
-    /// <summary>
-    /// Get list of hidden device instance paths
-    /// </summary>
     public List<string> GetHiddenDevices()
     {
         var output = RunCommand("--dev-list");
@@ -120,83 +99,54 @@ public class HidHideService : IHidHideService
         return paths;
     }
 
-    /// <summary>
-    /// Hide a device by its instance path
-    /// </summary>
     public bool HideDevice(string deviceInstancePath)
     {
         var result = RunCommand("--dev-hide", deviceInstancePath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Unhide a device by its instance path
-    /// </summary>
     public bool UnhideDevice(string deviceInstancePath)
     {
         var result = RunCommand("--dev-unhide", deviceInstancePath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Get current cloaking state
-    /// </summary>
     public bool IsCloakingEnabled()
     {
         var output = RunCommand("--cloak-state");
         return output.Contains("--cloak-on", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Enable cloaking (hiding becomes active)
-    /// </summary>
     public bool EnableCloaking()
     {
         RunCommand("--cloak-on");
         return IsCloakingEnabled();
     }
 
-    /// <summary>
-    /// Disable cloaking (all devices visible)
-    /// </summary>
     public bool DisableCloaking()
     {
         RunCommand("--cloak-off");
         return !IsCloakingEnabled();
     }
 
-    /// <summary>
-    /// Check if inverse application cloak is enabled.
-    /// In inverse mode, whitelisted apps are BLOCKED from seeing hidden devices.
-    /// In normal mode, whitelisted apps CAN see hidden devices.
-    /// </summary>
     public bool IsInverseMode()
     {
         var output = RunCommand("--inv-state");
         return output.Contains("--inv-on", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Enable inverse application cloak mode
-    /// </summary>
     public bool EnableInverseMode()
     {
         RunCommand("--inv-on");
         return IsInverseMode();
     }
 
-    /// <summary>
-    /// Disable inverse application cloak mode
-    /// </summary>
     public bool DisableInverseMode()
     {
         RunCommand("--inv-off");
         return !IsInverseMode();
     }
 
-    /// <summary>
-    /// Get list of whitelisted application paths
-    /// </summary>
     public List<string> GetWhitelistedApps()
     {
         var output = RunCommand("--app-list");
@@ -220,18 +170,12 @@ public class HidHideService : IHidHideService
         return apps;
     }
 
-    /// <summary>
-    /// Add an application to the whitelist (can see hidden devices)
-    /// </summary>
     public bool WhitelistApp(string appPath)
     {
         var result = RunCommand("--app-reg", appPath);
         return !result.Contains("error", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Remove an application from the whitelist
-    /// </summary>
     public bool UnwhitelistApp(string appPath)
     {
         var result = RunCommand("--app-unreg", appPath);
@@ -293,9 +237,6 @@ public class HidHideService : IHidHideService
         return true;
     }
 
-    /// <summary>
-    /// Hide all gaming devices except vJoy devices
-    /// </summary>
     public int HideAllPhysicalDevices()
     {
         int hiddenCount = 0;
@@ -320,9 +261,6 @@ public class HidHideService : IHidHideService
         return hiddenCount;
     }
 
-    /// <summary>
-    /// Unhide all currently hidden devices
-    /// </summary>
     public int UnhideAllDevices()
     {
         int unhiddenCount = 0;
@@ -342,9 +280,6 @@ public class HidHideService : IHidHideService
 
     private const string HidHideGitHubApiUrl = "https://api.github.com/repos/nefarius/HidHide/releases/latest";
 
-    /// <summary>
-    /// Get the file version of the installed HidHide CLI executable.
-    /// </summary>
     public string? GetInstalledVersion()
     {
         if (!File.Exists(_cliPath))
@@ -354,9 +289,6 @@ public class HidHideService : IHidHideService
         return info.FileVersion;
     }
 
-    /// <summary>
-    /// Fetch the latest HidHide release info from GitHub.
-    /// </summary>
     public async Task<HidHideRelease?> GetLatestReleaseAsync(CancellationToken ct = default)
     {
         try
@@ -397,10 +329,6 @@ public class HidHideService : IHidHideService
         }
     }
 
-    /// <summary>
-    /// Download the HidHide installer to a temp file, reporting 0–100 progress.
-    /// Returns the path to the downloaded file, or null on failure.
-    /// </summary>
     public async Task<string?> DownloadInstallerAsync(string downloadUrl, IProgress<int>? progress = null,
         CancellationToken ct = default)
     {

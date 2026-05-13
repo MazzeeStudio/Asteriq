@@ -242,7 +242,7 @@ img {
 }
 
 .hero-headline {
-    font-size: clamp(2.8rem, 6vw, 4.5rem);
+    font-size: clamp(2.2rem, 4vw, 3rem);
     font-weight: 700;
     line-height: 1.05;
     color: var(--white);
@@ -1101,7 +1101,7 @@ footer {
     }
 
     .hero-headline {
-        font-size: 2.4rem;
+        font-size: 2rem;
     }
 
     .feature,

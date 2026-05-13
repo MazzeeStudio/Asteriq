@@ -36,12 +36,12 @@ public partial class SCBindingsTabController
         // Column actions panel is only active when a vJoy (non-physical, non-readonly joystick) column is highlighted
         bool showColumnActions = IsColumnActionsVisible();
 
-        // Column actions panel interactions — all guarded so stale bounds never intercept other panel clicks.
+        // Column actions panel interactions â€” all guarded so stale bounds never intercept other panel clicks.
         // Skip when CP is spotlighted (column actions body is collapsed; body bounds are stale)
         // or when the CP dropdown overlay is open (its list visually covers column actions).
         if (showColumnActions && !_cpPanel.IsExpanded && !_profileMgmt.DropdownOpen)
         {
-            // Profile dropdown — close on outside click
+            // Profile dropdown â€” close on outside click
             if (_colImport.ProfileDropdownOpen)
             {
                 if (_colImport.ProfileDropdownBounds.HitTest(point))
@@ -67,7 +67,7 @@ public partial class SCBindingsTabController
                 }
             }
 
-            // Column dropdown — close on outside click
+            // Column dropdown â€” close on outside click
             if (_colImport.ColumnDropdownOpen)
             {
                 if (_colImport.ColumnDropdownBounds.HitTest(point))
@@ -293,7 +293,7 @@ public partial class SCBindingsTabController
 
                     if (_profileMgmt.HoveredProfileIndex >= remoteIndexOffset)
                     {
-                        // Remote profile from TX master — write to temp file and import
+                        // Remote profile from TX master â€” write to temp file and import
                         int remoteIdx = _profileMgmt.HoveredProfileIndex - remoteIndexOffset;
                         var remotes = _ctx.RemoteControlProfiles;
                         if (remoteIdx >= 0 && remoteIdx < remotes.Count)
@@ -301,14 +301,14 @@ public partial class SCBindingsTabController
                     }
                     else if (_profileMgmt.HoveredProfileIndex >= scFileIndexOffset)
                     {
-                        // SC mapping file — import it
+                        // SC mapping file â€” import it
                         int scFileIndex = _profileMgmt.HoveredProfileIndex - scFileIndexOffset;
                         if (scFileIndex >= 0 && scFileIndex < _scAvailableProfiles.Count)
                             ImportSCProfile(_scAvailableProfiles[scFileIndex]);
                     }
                     else if (_profileMgmt.HoveredProfileIndex < _profileMgmt.ExportProfiles.Count)
                     {
-                        // Asteriq saved profile — load it
+                        // Asteriq saved profile â€” load it
                         LoadSCExportProfile(_profileMgmt.ExportProfiles[_profileMgmt.HoveredProfileIndex].ProfileName);
                     }
                 }
@@ -359,7 +359,7 @@ public partial class SCBindingsTabController
         bool hasContextualPanel = showColumnActions || hasRowSelection;
         bool cpContentVisible = !hasContextualPanel || _cpPanel.IsExpanded;
 
-        // CP panel content handlers — must run BEFORE header click, since header bounds overlap content
+        // CP panel content handlers â€” must run BEFORE header click, since header bounds overlap content
         if (cpContentVisible)
         {
             // Profile edit icon click (inside dropdown box)
@@ -393,10 +393,10 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Panel header clicks — Control Profiles / contextual panel mutual-exclusive expand
+        // Panel header clicks â€” Control Profiles / contextual panel mutual-exclusive expand
         if (_cpPanel.HeaderBounds.HitTest(point))
         {
-            // Toggle Control Profiles expand — contextual panel stays visible but collapses
+            // Toggle Control Profiles expand â€” contextual panel stays visible but collapses
             _cpPanel.IsExpanded = !_cpPanel.IsExpanded;
             _ctx.MarkDirty();
             return;
@@ -409,7 +409,7 @@ public partial class SCBindingsTabController
         }
         if (_bdPanel.HeaderBounds.HitTest(point))
         {
-            // BD header — bring Binding Definition to the spotlight. If it's already the
+            // BD header â€” bring Binding Definition to the spotlight. If it's already the
             // spotlight panel (CP collapsed + BD expanded), toggle back to CP-expanded.
             if (!_cpPanel.IsExpanded && _bdPanel.IsExpanded)
                 _cpPanel.IsExpanded = true;
@@ -423,7 +423,7 @@ public partial class SCBindingsTabController
         }
         if (_cellDetails.HeaderBounds.HitTest(point))
         {
-            // Cell Details header — bring Cell Details to the spotlight. If it's already the
+            // Cell Details header â€” bring Cell Details to the spotlight. If it's already the
             // spotlight panel (CP collapsed + BD collapsed), toggle back to CP-expanded.
             if (!_cpPanel.IsExpanded && !_bdPanel.IsExpanded)
                 _cpPanel.IsExpanded = true;
@@ -577,7 +577,7 @@ public partial class SCBindingsTabController
             return;
         }
 
-        // Export / Clear All / Reset Defaults — inside CP panel, guard against stale bounds
+        // Export / Clear All / Reset Defaults â€” inside CP panel, guard against stale bounds
         if (cpContentVisible)
         {
             if (_scExportButtonBounds.Contains(point))
@@ -604,7 +604,7 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Conflict link clicks — navigate to the conflicting action
+        // Conflict link clicks â€” navigate to the conflicting action
         for (int ci = 0; ci < _conflicts.ConflictLinkBounds.Count; ci++)
         {
             if (_conflicts.ConflictLinkBounds[ci].HitTest(point))
@@ -633,7 +633,7 @@ public partial class SCBindingsTabController
             }
         }
 
-        // Assign input button — activates the listener on the selected cell (same as double-click)
+        // Assign input button â€” activates the listener on the selected cell (same as double-click)
         if (_scAssignInputButtonBounds.Contains(point) && _scSelectedActionIndex >= 0)
         {
             if (_cell.SelectedCell.actionIndex >= 0 && _cell.SelectedCell.colIndex >= 0 &&
@@ -642,7 +642,7 @@ public partial class SCBindingsTabController
                 var col = _grid.Columns[_cell.SelectedCell.colIndex];
                 if (!col.IsReadOnly)
                 {
-                    // Block ASSIGN for shared cells — user must unshare first
+                    // Block ASSIGN for shared cells â€” user must unshare first
                     if (col.IsJoystick && !col.IsPhysical && _scFilteredActions is not null
                         && _cell.SelectedCell.actionIndex < _scFilteredActions.Count)
                     {
@@ -794,7 +794,7 @@ public partial class SCBindingsTabController
                     }
                     else
                     {
-                        // Action name area clicked — check for cross-column duplicates first
+                        // Action name area clicked â€” check for cross-column duplicates first
                         if (_scFilteredActions is not null && i < _scFilteredActions.Count)
                         {
                             var clickedAction = _scFilteredActions[i];
@@ -863,660 +863,6 @@ public partial class SCBindingsTabController
         return -1;
     }
 
-    private void HandleCellClick(int actionIndex, int colIndex)
-    {
-        if (_grid.Columns is null || colIndex < 0 || colIndex >= _grid.Columns.Count)
-            return;
-        if (_scFilteredActions is null || actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
-            return;
-
-        var col = _grid.Columns[colIndex];
-
-        // If already listening, cancel
-        if (_scListening.IsListening)
-        {
-            _scListening.IsListening = false;
-            _cell.ListeningColumn = null;
-        }
-
-        // Read-only columns (no backing device): allow selection but block listening
-        if (col.IsReadOnly)
-        {
-            if (_colImport.HighlightedColumn >= 0)
-                DeselectColumn();
-            _cell.SelectedCell = (actionIndex, colIndex);
-            _cell.LastCellClickTicks = Environment.TickCount64;
-            _cpPanel.IsExpanded = false; // Auto-expand Cell Details
-            _bdPanel.IsExpanded = false; // Cell-click intent is "configure" — collapse Definition panel
-            UpdateConflictLinks();
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected read-only cell ({actionIndex}, {colIndex}) - {col.Header}");
-            return;
-        }
-
-        // Check for double-click on the same cell (within 400ms)
-        bool isDoubleClick = _cell.SelectedCell == (actionIndex, colIndex) &&
-                            Environment.TickCount64 - _cell.LastCellClickTicks < SystemInformation.DoubleClickTime;
-
-        // Shared cells: select normally but never enter listen mode — use CLEAR/right-click to unshare
-        if (col.IsJoystick && !col.IsPhysical)
-        {
-            var action = _scFilteredActions[actionIndex];
-            string sharedKey = $"{action.Key}|{col.VJoyDeviceId}";
-            if (_conflicts.SharedCells.ContainsKey(sharedKey))
-            {
-                if (_colImport.HighlightedColumn >= 0)
-                    DeselectColumn();
-                _cell.SelectedCell = (actionIndex, colIndex);
-                _cell.LastCellClickTicks = Environment.TickCount64;
-                _cpPanel.IsExpanded = false; // Auto-expand Cell Details
-            _bdPanel.IsExpanded = false; // Cell-click intent is "configure" — collapse Definition panel
-                UpdateConflictLinks();
-                return;
-            }
-        }
-
-        // Clicking a cell always deselects any highlighted column
-        if (_colImport.HighlightedColumn >= 0)
-            DeselectColumn();
-
-        if (isDoubleClick)
-        {
-            // Double-click: enter listening mode
-            _scListening.IsListening = true;
-            _scListening.StartTime = DateTime.Now;
-            _cell.ListeningColumn = col;
-            _conflicts.ConflictLinks.Clear();
-            _conflicts.ConflictLinkBounds.Clear();
-
-            // Clear stale presses before detecting
-            if (col.IsKeyboard)
-                ClearStaleKeyPresses();
-            if (col.IsMouse)
-                ClearStaleMousePresses();
-
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Started listening for input on cell ({actionIndex}, {colIndex}) - {col.Header}");
-        }
-        else
-        {
-            // Single click — check if this row has a cross-column duplicate to resolve
-            if (col.IsJoystick && !col.IsPhysical && _scFilteredActions is not null)
-            {
-                var action = _scFilteredActions[actionIndex];
-                if (TryShowDuplicateResolveDialog(action))
-                    return;
-            }
-
-            // Single click: just select the cell
-            _cell.SelectedCell = (actionIndex, colIndex);
-            _cell.LastCellClickTicks = Environment.TickCount64;
-            _conflicts.HighlightActionIndex = -1;
-            _cpPanel.IsExpanded = false; // Auto-expand Cell Details
-            _bdPanel.IsExpanded = false; // Cell-click intent is "configure" — collapse Definition panel
-            UpdateConflictLinks();
-            System.Diagnostics.Debug.WriteLine($"[SCBindings] Selected cell ({actionIndex}, {colIndex}) - {col.Header}");
-        }
-    }
-
-    /// <summary>
-    /// If the given action has a cross-column duplicate binding, opens the SCSharedBindingDialog
-    /// so the user can REPLACE (clear the higher JS) or SHARE (reroute physical button).
-    /// Returns true if the dialog was shown (caller should not proceed with normal selection).
-    /// </summary>
-    private bool TryShowDuplicateResolveDialog(SCAction action)
-    {
-        // Find the duplicate (higher-JS) binding for this action
-        var dupBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
-            b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
-            b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
-            _conflicts.DuplicateActionBindings.Contains(b.Key));
-
-        if (dupBinding is null) return false;
-
-        // Find the base (lower-JS) binding
-        var baseBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
-            b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
-            b.DeviceType == SCDeviceType.Joystick && b.PhysicalDeviceId is null &&
-            b.VJoyDevice != dupBinding.VJoyDevice &&
-            _scExportProfile.GetSCInstance(b.VJoyDevice) < _scExportProfile.GetSCInstance(dupBinding.VJoyDevice));
-
-        if (baseBinding is null) return false;
-
-        int baseInst = _scExportProfile.GetSCInstance(baseBinding.VJoyDevice);
-        int dupInst  = _scExportProfile.GetSCInstance(dupBinding.VJoyDevice);
-
-        using var dialog = new SCSharedBindingDialog(
-            SCCategoryMapper.FormatActionName(action.ActionName),
-            $"JS{baseInst}",
-            SCBindingsRenderer.FormatInputName(baseBinding.InputName),
-            $"JS{dupInst}",
-            SCBindingsRenderer.FormatInputName(dupBinding.InputName));
-
-        dialog.ShowDialog(_ctx.OwnerForm);
-
-        switch (dialog.Result)
-        {
-            case SCSharedBindingResult.Replace:
-                // Remove the higher-JS duplicate, keep the base
-                _scExportProfile.RemoveBinding(dupBinding);
-                _scExportProfile.Modified = DateTime.UtcNow;
-                _scExportProfileService?.SaveProfile(_scExportProfile);
-                UpdateConflictingBindings();
-                UpdateSharedCells();
-                SetStatus($"Cleared JS{dupInst} binding for {SCCategoryMapper.FormatActionName(action.ActionName)}");
-                _ctx.MarkDirty();
-                return true;
-
-            case SCSharedBindingResult.Share:
-                // Keep base binding, reroute the duplicate's physical button to the base slot
-                PerformShare(baseBinding, dupBinding.VJoyDevice, dupBinding.InputName);
-                _scExportProfile.RemoveBinding(dupBinding);
-                _scExportProfile.Modified = DateTime.UtcNow;
-                _scExportProfileService?.SaveProfile(_scExportProfile);
-                UpdateSharedCells();
-                UpdateConflictingBindings();
-                SetStatus($"Shared: JS{dupInst} → JS{baseInst}");
-                _ctx.MarkDirty();
-                return true;
-        }
-
-        // Cancel: no change was made — let the caller proceed with normal cell selection
-        // so the user can still see conflict links and binding details in the right panel.
-        return false;
-    }
-
-    private void HandleCellRightClick(int actionIndex, int colIndex)
-    {
-        if (_grid.Columns is null || colIndex < 0 || colIndex >= _grid.Columns.Count)
-            return;
-        if (_scFilteredActions is null || actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
-            return;
-
-        var col = _grid.Columns[colIndex];
-        var action = _scFilteredActions[actionIndex];
-
-        // Cancel listening if active
-        if (_scListening.IsListening)
-        {
-            CancelSCInputListening();
-        }
-
-        // Clear binding for this action on this column's device
-        if (col.IsPhysical)
-        {
-            // Physical device column: find the specific binding by PhysicalDeviceId
-            var binding = _scExportProfile.Bindings.FirstOrDefault(b =>
-                b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
-                b.DeviceType == SCDeviceType.Joystick &&
-                b.PhysicalDeviceId == col.PhysicalDeviceKey);
-            if (binding is not null)
-            {
-                _scExportProfile.RemoveBinding(binding);
-                _scExportProfileService?.SaveProfile(_scExportProfile);
-                UpdateConflictingBindings();
-                UpdateSharedCells();
-                UpdateConflictLinks();
-                _ctx.MarkDirty();
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared physical JS binding for {action.ActionName} on {col.Header}");
-            }
-        }
-        else if (col.IsJoystick)
-        {
-            // For shared cells, show the unshare dialog instead of clearing a binding
-            if (!col.IsPhysical)
-            {
-                string rightClickSharedKey = $"{action.Key}|{col.VJoyDeviceId}";
-                if (_conflicts.SharedCells.ContainsKey(rightClickSharedKey))
-                {
-                    HandleSharedCellClick(action, col);
-                    return;
-                }
-            }
-
-            // vJoy column: find binding matching this column's SCInstance
-            var userBinding = _scExportProfile.Bindings.FirstOrDefault(b =>
-                b.ActionMap == action.ActionMap && b.ActionName == action.ActionName &&
-                b.DeviceType == SCDeviceType.Joystick &&
-                b.PhysicalDeviceId is null &&
-                _scExportProfile.GetSCInstance(b.VJoyDevice) == col.SCInstance);
-            if (userBinding is not null)
-            {
-                _scExportProfile.RemoveBinding(userBinding);
-                _scExportProfileService?.SaveProfile(_scExportProfile);
-                UpdateConflictingBindings();
-                UpdateSharedCells();
-                UpdateConflictLinks();
-                _ctx.MarkDirty();
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared vJoy JS binding for {action.ActionName} on {col.Header}");
-            }
-        }
-        else if (col.Header == "KB")
-        {
-            // Clear user keyboard binding
-            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Keyboard);
-            if (userBinding is not null)
-            {
-                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName, SCDeviceType.Keyboard);
-                _scExportProfileService?.SaveProfile(_scExportProfile);
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared KB binding for {action.ActionName}");
-            }
-        }
-        else if (col.Header == "Mouse")
-        {
-            // Clear user mouse binding
-            var userBinding = _scExportProfile.GetBinding(action.ActionMap, action.ActionName, SCDeviceType.Mouse);
-            if (userBinding is not null)
-            {
-                _scExportProfile.RemoveBinding(action.ActionMap, action.ActionName, SCDeviceType.Mouse);
-                _scExportProfileService?.SaveProfile(_scExportProfile);
-                System.Diagnostics.Debug.WriteLine($"[SCBindings] Cleared Mouse binding for {action.ActionName}");
-            }
-        }
-    }
-
-    private void HandleBindingsTabRightClick(SKPoint point)
-    {
-        // Check if click is in the bindings list area
-        if (!_scBindingsListBounds.Contains(point) || _scFilteredActions is null)
-            return;
-
-        // Find which row was clicked accounting for scroll offset and collapsed categories
-        float rowHeight = 28f;  // Updated row height
-        float rowGap = 2f;
-        float categoryHeaderHeight = 28f;
-        float relativeY = point.Y - _scBindingsListBounds.Top + _scBindingsScrollOffset;
-
-        string? lastCategoryName = null;
-        float currentY = 0;
-
-        for (int i = 0; i < _scFilteredActions.Count; i++)
-        {
-            var action = _scFilteredActions[i];
-            string categoryName = SCCategoryMapper.GetCategoryNameForAction(action.ActionMap, action.ActionName);
-
-            // Account for category header
-            if (categoryName != lastCategoryName)
-            {
-                lastCategoryName = categoryName;
-                currentY += categoryHeaderHeight;
-
-                // If category is collapsed, skip all its actions
-                if (_scCollapsedCategories.Contains(categoryName))
-                {
-                    while (i < _scFilteredActions.Count - 1 &&
-                           SCCategoryMapper.GetCategoryNameForAction(_scFilteredActions[i + 1].ActionMap, _scFilteredActions[i + 1].ActionName) == categoryName)
-                    {
-                        i++;
-                    }
-                    continue;
-                }
-            }
-
-            float rowTop = currentY;
-            float rowBottom = currentY + rowHeight;
-
-            if (relativeY >= rowTop && relativeY < rowBottom)
-            {
-                // Check if right-click was in a device column cell
-                int clickedCol = GetClickedColumnIndex(point.X);
-                if (clickedCol >= 0 && _grid.Columns is not null && clickedCol < _grid.Columns.Count)
-                {
-                    HandleCellRightClick(i, clickedCol);
-                }
-                return;
-            }
-
-            currentY += rowHeight + rowGap;
-        }
-    }
-
-    private bool HasSearchSelection() =>
-        _searchFilter.SelectionStart >= 0 && _searchFilter.SelectionEnd >= 0
-        && _searchFilter.SelectionStart != _searchFilter.SelectionEnd;
-
-    private (int start, int end) GetOrderedSelection()
-    {
-        int s = _searchFilter.SelectionStart;
-        int e = _searchFilter.SelectionEnd;
-        return s <= e ? (s, e) : (e, s);
-    }
-
-    private void DeleteSearchSelection()
-    {
-        var (start, end) = GetOrderedSelection();
-        _searchFilter.SearchText = string.Concat(
-            _searchFilter.SearchText.AsSpan(0, start),
-            _searchFilter.SearchText.AsSpan(end));
-        _searchFilter.CursorPos = start;
-        _searchFilter.SelectionStart = -1;
-        _searchFilter.SelectionEnd = -1;
-        _searchFilter.ButtonCaptureTextActive = false;
-        _searchFilter.CaptureDeviceHidPath = null;
-    }
-
-    private void ClearSearchSelection()
-    {
-        _searchFilter.SelectionStart = -1;
-        _searchFilter.SelectionEnd = -1;
-    }
-
-    private const int MaxSearchLength = 50;
-
-    private void ResetSearchCaptureState()
-    {
-        _searchFilter.ButtonCaptureTextActive = false;
-        _searchFilter.CaptureDeviceHidPath = null;
-    }
-
-    /// <summary>
-    /// Applies cursor movement with optional shift-selection. Returns the final cursor position.
-    /// When shift is held, extends selection. Without shift, collapses selection to the
-    /// appropriate edge (start for left movement, end for right movement).
-    /// </summary>
-    private int ApplySearchCursorMove(int cursor, int newPos, bool shift, bool collapseToStart)
-    {
-        if (shift)
-        {
-            if (_searchFilter.SelectionStart < 0)
-                _searchFilter.SelectionStart = cursor;
-            _searchFilter.SelectionEnd = newPos;
-        }
-        else
-        {
-            if (HasSearchSelection())
-            {
-                var (s, e) = GetOrderedSelection();
-                newPos = collapseToStart ? s : e;
-            }
-            ClearSearchSelection();
-        }
-        return newPos;
-    }
-
-    private bool HandleSearchBoxKey(Keys keyData)
-    {
-        var key = keyData & Keys.KeyCode;
-        bool ctrl = keyData.HasFlag(Keys.Control);
-        bool shift = keyData.HasFlag(Keys.Shift);
-        var text = _searchFilter.SearchText;
-        int cursor = _searchFilter.CursorPos;
-
-        if (key == Keys.Escape)
-        {
-            _searchFilter.SearchBoxFocused = false;
-            ClearSearchSelection();
-            return true;
-        }
-
-        // Arrow keys — move cursor and optionally extend selection
-        if (key == Keys.Left)
-        {
-            int newPos = ctrl ? FindWordBoundaryLeft(text, cursor) : Math.Max(0, cursor - 1);
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, newPos, shift, collapseToStart: true);
-            return true;
-        }
-
-        if (key == Keys.Right)
-        {
-            int newPos = ctrl ? FindWordBoundaryRight(text, cursor) : Math.Min(text.Length, cursor + 1);
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, newPos, shift, collapseToStart: false);
-            return true;
-        }
-
-        if (key == Keys.Home)
-        {
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, 0, shift, collapseToStart: true);
-            return true;
-        }
-
-        if (key == Keys.End)
-        {
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, text.Length, shift, collapseToStart: false);
-            return true;
-        }
-
-        // Clipboard operations
-        if (ctrl && key == Keys.C)
-        {
-            if (HasSearchSelection())
-            {
-                var (s, e) = GetOrderedSelection();
-                Clipboard.SetText(text[s..e]);
-            }
-            else if (!string.IsNullOrEmpty(text))
-            {
-                Clipboard.SetText(text);
-            }
-            return true;
-        }
-
-        if (ctrl && key == Keys.X)
-        {
-            if (HasSearchSelection())
-            {
-                var (s, e) = GetOrderedSelection();
-                Clipboard.SetText(text[s..e]);
-                DeleteSearchSelection();
-            }
-            else if (!string.IsNullOrEmpty(text))
-            {
-                Clipboard.SetText(text);
-                _searchFilter.SearchText = "";
-                _searchFilter.CursorPos = 0;
-                ClearSearchSelection();
-            }
-            ResetSearchCaptureState();
-            RefreshFilteredActions();
-            return true;
-        }
-
-        if (ctrl && key == Keys.V)
-        {
-            if (Clipboard.ContainsText())
-            {
-                string pasted = Clipboard.GetText().ReplaceLineEndings(" ").Trim();
-                ResetSearchCaptureState();
-
-                if (HasSearchSelection())
-                    DeleteSearchSelection();
-
-                text = _searchFilter.SearchText;
-                cursor = _searchFilter.CursorPos;
-                int remaining = MaxSearchLength - text.Length;
-                if (remaining > 0)
-                {
-                    string toInsert = pasted.Length > remaining ? pasted[..remaining] : pasted;
-                    _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), toInsert, text.AsSpan(cursor));
-                    _searchFilter.CursorPos = cursor + toInsert.Length;
-                    RefreshFilteredActions();
-                }
-            }
-            return true;
-        }
-
-        if (ctrl && key == Keys.A)
-        {
-            if (!string.IsNullOrEmpty(text))
-            {
-                _searchFilter.SelectionStart = 0;
-                _searchFilter.SelectionEnd = text.Length;
-                _searchFilter.CursorPos = text.Length;
-            }
-            return true;
-        }
-
-        // Text-modifying keys — reset capture state once up front
-        bool modifiesText = key is Keys.Back or Keys.Delete || KeyToChar(key, shift) != '\0';
-        if (modifiesText)
-            ResetSearchCaptureState();
-
-        if (key == Keys.Back)
-        {
-            if (HasSearchSelection())
-            {
-                DeleteSearchSelection();
-            }
-            else if (cursor > 0)
-            {
-                int deleteFrom = ctrl ? FindWordBoundaryLeft(text, cursor) : cursor - 1;
-                _searchFilter.SearchText = string.Concat(text.AsSpan(0, deleteFrom), text.AsSpan(cursor));
-                _searchFilter.CursorPos = deleteFrom;
-            }
-            RefreshFilteredActions();
-            return true;
-        }
-
-        if (key == Keys.Delete)
-        {
-            if (HasSearchSelection())
-            {
-                DeleteSearchSelection();
-            }
-            else if (cursor < text.Length)
-            {
-                int deleteTo = ctrl ? FindWordBoundaryRight(text, cursor) : cursor + 1;
-                _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), text.AsSpan(deleteTo));
-            }
-            RefreshFilteredActions();
-            return true;
-        }
-
-        char c = KeyToChar(key, shift);
-        if (c != '\0')
-        {
-            if (HasSearchSelection())
-                DeleteSearchSelection();
-
-            text = _searchFilter.SearchText;
-            cursor = _searchFilter.CursorPos;
-            if (text.Length < MaxSearchLength)
-            {
-                _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), c.ToString(), text.AsSpan(cursor));
-                _searchFilter.CursorPos = cursor + 1;
-                RefreshFilteredActions();
-            }
-            return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Given a click offset (relative to text start) and font size,
-    /// returns the character index closest to that position.
-    /// </summary>
-    private static int HitTestSearchCursorPos(string text, float clickOffset, float fontSize)
-    {
-        if (clickOffset <= 0) return 0;
-        for (int i = 1; i <= text.Length; i++)
-        {
-            float w = FUIRenderer.MeasureText(text[..i], fontSize);
-            float prevW = i > 1 ? FUIRenderer.MeasureText(text[..(i - 1)], fontSize) : 0;
-            float midpoint = (prevW + w) / 2f;
-            if (clickOffset < midpoint)
-                return i - 1;
-        }
-        return text.Length;
-    }
-
-    private static int FindWordBoundaryLeft(string text, int pos)
-    {
-        if (pos <= 0) return 0;
-        int i = pos - 1;
-        while (i > 0 && text[i] == ' ') i--;
-        while (i > 0 && text[i - 1] != ' ') i--;
-        return i;
-    }
-
-    private static int FindWordBoundaryRight(string text, int pos)
-    {
-        if (pos >= text.Length) return text.Length;
-        int i = pos;
-        while (i < text.Length && text[i] != ' ') i++;
-        while (i < text.Length && text[i] == ' ') i++;
-        return i;
-    }
-
-    private bool HandleExportFilenameBoxKey(Keys keyData)
-    {
-        var key = keyData & Keys.KeyCode;
-
-        if (key == Keys.Escape || key == Keys.Enter)
-        {
-            _scExportFilenameBoxFocused = false;
-            return true;
-        }
-
-        if (key == Keys.Back)
-        {
-            if (_scExportFilename.Length > 0)
-            {
-                _scExportFilename = _scExportFilename.Substring(0, _scExportFilename.Length - 1);
-            }
-            return true;
-        }
-
-        if (key == Keys.Delete)
-        {
-            _scExportFilename = "";
-            return true;
-        }
-
-        char c = KeyToFilenameChar(key, (keyData & Keys.Shift) == Keys.Shift);
-        if (c != '\0' && _scExportFilename.Length < 50)
-        {
-            _scExportFilename += c;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static char KeyToFilenameChar(Keys key, bool shift)
-    {
-        if (key >= Keys.A && key <= Keys.Z)
-        {
-            char c = (char)('a' + (key - Keys.A));
-            return shift ? char.ToUpper(c) : c;
-        }
-
-        if (key >= Keys.D0 && key <= Keys.D9)
-        {
-            return (char)('0' + (key - Keys.D0));
-        }
-
-        return key switch
-        {
-            Keys.OemMinus => shift ? '_' : '-',
-            Keys.Oemplus => '=',
-            Keys.OemPeriod => '.',
-            _ => '\0'
-        };
-    }
-
-    private static char KeyToChar(Keys key, bool shift)
-    {
-        if (key >= Keys.A && key <= Keys.Z)
-        {
-            char c = (char)('a' + (key - Keys.A));
-            return shift ? char.ToUpper(c) : c;
-        }
-
-        if (key >= Keys.D0 && key <= Keys.D9)
-        {
-            return (char)('0' + (key - Keys.D0));
-        }
-
-        return key switch
-        {
-            Keys.Space => ' ',
-            Keys.OemMinus => shift ? '_' : '-',
-            Keys.Oemplus => shift ? '+' : '=',
-            Keys.OemPeriod => '.',
-            Keys.Oemcomma => ',',
-            _ => '\0'
-        };
-    }
-
     private int GetHoveredColumnIndex(float x)
     {
         if (_grid.Columns is null || x < _grid.DeviceColsStart || x > _grid.DeviceColsStart + _grid.VisibleDeviceWidth)
@@ -1553,228 +899,4 @@ public partial class SCBindingsTabController
     /// list of its vJoy columns available to import from.
     /// Supports both saved Asteriq profiles and SC XML mapping files.
     /// </summary>
-    private void LoadColImportSourceColumns()
-    {
-        _colImport.LoadedProfile = null;
-        _colImport.SourceColumns.Clear();
-        _colImport.ColumnIndex = -1;
-
-        if (_colImport.ProfileIndex < 0) return;
-
-        var (savedProfiles, xmlFiles) = GetColImportSources();
-        int savedCount = savedProfiles.Count;
-
-        if (_colImport.ProfileIndex < savedCount)
-        {
-            // Load saved Asteriq JSON profile
-            _colImport.LoadedProfile = _scExportProfileService.LoadProfile(savedProfiles[_colImport.ProfileIndex].ProfileName);
-        }
-        else
-        {
-            // Load from SC XML mapping file
-            int xmlIdx = _colImport.ProfileIndex - savedCount;
-            if (xmlIdx < xmlFiles.Count)
-            {
-                var xmlFile = xmlFiles[xmlIdx];
-                var importResult = SCXmlExportService.ImportFromFile(xmlFile.FilePath);
-                if (importResult.Success)
-                {
-                    _colImport.LoadedProfile = new SCExportProfile { ProfileName = xmlFile.DisplayName };
-                    foreach (var binding in importResult.Bindings)
-                        _colImport.LoadedProfile.Bindings.Add(binding);
-                    // SC XML bindings use the instance number directly as VJoyDevice. Union with
-                    // DeclaredJoystickInstances so devices declared via <joystick instance="N"/>
-                    // but without any rebind lines still surface as columns (they typically
-                    // carry only shared-binding secondaries, exported from the JSON side).
-                    var usedInstances = importResult.Bindings
-                        .Where(b => b.DeviceType == SCDeviceType.Joystick)
-                        .Select(b => (int)b.VJoyDevice)
-                        .Concat(importResult.DeclaredJoystickInstances)
-                        .Distinct();
-                    foreach (var inst in usedInstances)
-                        _colImport.LoadedProfile.SetSCInstance((uint)inst, inst);
-                }
-            }
-        }
-
-        if (_colImport.LoadedProfile is null) return;
-
-        // Enumerate every joystick instance the source profile knows about — both the vJoy
-        // slots persisted in VJoyToSCInstance and the physical devices in
-        // PhysicalDeviceToSCInstance. We intentionally list instances that have no bindings
-        // yet so the dropdown matches the profile's declared column structure (same basis as
-        // GetSCGridColumns uses for the current grid).
-        var profile = _colImport.LoadedProfile;
-        var entries = new List<(string Label, uint VJoyDeviceId, string? PhysicalDeviceId, int SCInstance)>();
-
-        foreach (var kv in profile.VJoyToSCInstance)
-            entries.Add(($"JS{kv.Value}", kv.Key, null, kv.Value));
-
-        foreach (var kv in profile.PhysicalDeviceToSCInstance)
-            entries.Add(($"JS{kv.Value}", 0u, kv.Key, kv.Value));
-
-        _colImport.SourceColumns = entries
-            .OrderBy(e => e.SCInstance)
-            .ThenBy(e => e.Label, StringComparer.Ordinal)
-            .Select(e => (e.Label, e.VJoyDeviceId, e.PhysicalDeviceId))
-            .ToList();
-
-        if (_colImport.SourceColumns.Count == 1)
-            _colImport.ColumnIndex = 0;
-    }
-
-    private void ExecuteImportFromProfile()
-    {
-        if (_grid.Columns is null || _colImport.HighlightedColumn < 0 || _colImport.HighlightedColumn >= _grid.Columns.Count)
-            return;
-        if (_colImport.LoadedProfile is null || _colImport.ColumnIndex < 0 || _colImport.ColumnIndex >= _colImport.SourceColumns.Count)
-            return;
-
-        var targetCol = _grid.Columns[_colImport.HighlightedColumn];
-        var (sourceLabel, sourceVJoyId, sourcePhysicalId) = _colImport.SourceColumns[_colImport.ColumnIndex];
-        string sourceName = _colImport.LoadedProfile.ProfileName;
-
-        // Split the source column's bindings into two groups so we can preserve the shared
-        // relationship on the target side instead of flattening everything into primaries.
-        //  - sourcePrimaries: bindings whose primary input IS the source column.
-        //  - sourceSharedRefs: bindings primary on a DIFFERENT column whose SharedWith list
-        //    references the source column (these should become shared on the target too).
-        var sourcePrimaries = new List<SCActionBinding>();
-        var sourceSharedRefs = new List<(SCActionBinding SourcePrimary, string SharedInputName)>();
-        foreach (var b in _colImport.LoadedProfile.Bindings)
-        {
-            if (b.DeviceType != SCDeviceType.Joystick) continue;
-
-            if (sourcePhysicalId is not null)
-            {
-                if (b.PhysicalDeviceId == sourcePhysicalId)
-                    sourcePrimaries.Add(b);
-                continue;
-            }
-
-            if (b.PhysicalDeviceId is null && b.VJoyDevice == sourceVJoyId)
-            {
-                sourcePrimaries.Add(b);
-                continue;
-            }
-
-            var shared = b.SharedWith.FirstOrDefault(s => s.VJoySlot == sourceVJoyId);
-            if (shared is not null)
-                sourceSharedRefs.Add((b, shared.InputName));
-        }
-
-        int totalToImport = sourcePrimaries.Count + sourceSharedRefs.Count;
-        if (totalToImport == 0)
-        {
-            DeselectColumn();
-            return;
-        }
-
-        int existingPrimaries = _scExportProfile.Bindings.Count(b =>
-            b.DeviceType == SCDeviceType.Joystick &&
-            b.PhysicalDeviceId is null &&
-            _scExportProfile.GetSCInstance(b.VJoyDevice) == targetCol.SCInstance);
-        int existingSharedRefs = _scExportProfile.Bindings.Sum(b =>
-            b.SharedWith.Count(s => s.VJoySlot == targetCol.VJoyDeviceId));
-        int existingCount = existingPrimaries + existingSharedRefs;
-
-        string replaceNote = existingCount > 0
-            ? $"\n\nThis will replace {existingCount} existing binding{(existingCount == 1 ? "" : "s")} on JS{targetCol.SCInstance}."
-            : string.Empty;
-
-        int btnCount = sourcePrimaries.Count(b => b.InputType == SCInputType.Button) + sourceSharedRefs.Count;
-        int axisCount = sourcePrimaries.Count(b => b.InputType == SCInputType.Axis);
-        int hatCount = sourcePrimaries.Count(b => b.InputType == SCInputType.Hat);
-        var detailParts = new List<string>();
-        if (btnCount > 0)  detailParts.Add($"  {btnCount} button binding{(btnCount == 1 ? "" : "s")}");
-        if (axisCount > 0) detailParts.Add($"  {axisCount} axis binding{(axisCount == 1 ? "" : "s")}");
-        if (hatCount > 0)  detailParts.Add($"  {hatCount} hat binding{(hatCount == 1 ? "" : "s")}");
-        if (sourceSharedRefs.Count > 0)
-            detailParts.Add($"  {sourceSharedRefs.Count} will come in as shared");
-
-        string message = $"Import {totalToImport} binding{(totalToImport == 1 ? "" : "s")} from '{sourceName}' ({sourceLabel}) into JS{targetCol.SCInstance}?{replaceNote}";
-        bool confirmed = FUIMessageBox.ShowDestructiveConfirm(
-            _ctx.OwnerForm,
-            message,
-            "Import Bindings",
-            "IMPORT",
-            detailParts.Count > 0 ? detailParts.ToArray() : null);
-
-        if (!confirmed) return;
-
-        // Clear existing state for the target column — both primary bindings and shared
-        // secondary references — so the import is a clean replace.
-        _scExportProfile.Bindings.RemoveAll(b =>
-            b.DeviceType == SCDeviceType.Joystick &&
-            b.PhysicalDeviceId is null &&
-            _scExportProfile.GetSCInstance(b.VJoyDevice) == targetCol.SCInstance);
-        foreach (var b in _scExportProfile.Bindings)
-            b.SharedWith.RemoveAll(s => s.VJoySlot == targetCol.VJoyDeviceId);
-
-        // Primary imports land as primaries on the target column.
-        foreach (var b in sourcePrimaries)
-        {
-            _scExportProfile.Bindings.Add(new SCActionBinding
-            {
-                ActionMap = b.ActionMap,
-                ActionName = b.ActionName,
-                DeviceType = b.DeviceType,
-                VJoyDevice = targetCol.VJoyDeviceId,
-                InputName = b.InputName,
-                InputType = b.InputType,
-                Inverted = b.Inverted,
-                ActivationMode = b.ActivationMode,
-                Modifiers = new List<string>(b.Modifiers)
-            });
-        }
-
-        // Shared refs attach to the matching primary in the target. If the target has no
-        // primary for that action yet (user hasn't imported that column), fall back to
-        // creating the binding as a primary on the target column so no bindings are lost.
-        // The fallback primary is created WITHOUT the source primary's modifiers — a share
-        // represents a standalone input that fires the action on its own, matching how the
-        // secondary would behave if attached to a real primary via SharedWith.
-        foreach (var (srcPrimary, sharedInputName) in sourceSharedRefs)
-        {
-            var targetPrimary = _scExportProfile.Bindings.FirstOrDefault(b =>
-                b.DeviceType == SCDeviceType.Joystick &&
-                b.PhysicalDeviceId is null &&
-                b.ActionMap == srcPrimary.ActionMap &&
-                b.ActionName == srcPrimary.ActionName &&
-                b.VJoyDevice != targetCol.VJoyDeviceId);
-
-            if (targetPrimary is not null)
-            {
-                targetPrimary.SharedWith.Add(new SCSharedInput
-                {
-                    VJoySlot = targetCol.VJoyDeviceId,
-                    InputName = sharedInputName
-                });
-            }
-            else
-            {
-                _scExportProfile.Bindings.Add(new SCActionBinding
-                {
-                    ActionMap = srcPrimary.ActionMap,
-                    ActionName = srcPrimary.ActionName,
-                    DeviceType = srcPrimary.DeviceType,
-                    VJoyDevice = targetCol.VJoyDeviceId,
-                    InputName = sharedInputName,
-                    InputType = srcPrimary.InputType,
-                    Inverted = srcPrimary.Inverted,
-                    ActivationMode = srcPrimary.ActivationMode,
-                    Modifiers = new List<string>()
-                });
-            }
-        }
-
-        _scExportProfile.Modified = DateTime.UtcNow;
-        _scExportProfileService.SaveProfile(_scExportProfile);
-        UpdateConflictingBindings();
-        UpdateSharedCells();
-        RefreshFilteredActions();
-        DeselectColumn();
-        _ctx.MarkDirty();
-    }
-
 }

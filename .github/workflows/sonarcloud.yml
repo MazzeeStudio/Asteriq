@@ -52,12 +52,19 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
+        # NOTE: SonarScanner for .NET refuses to coexist with sonar-project.properties,
+        # so all analysis properties are passed on the command line here instead.
+        # See https://docs.sonarcloud.io/.../scanners/sonarscanner-for-dotnet/
         run: |
           ${{ runner.temp }}\scanner\dotnet-sonarscanner begin `
             /k:"MazzeeStudio_Asteriq" `
             /o:"mazzeestudio" `
             /d:sonar.token="$env:SONAR_TOKEN" `
-            /d:sonar.host.url="https://sonarcloud.io"
+            /d:sonar.host.url="https://sonarcloud.io" `
+            /d:sonar.exclusions="website/**,**/bin/**,**/obj/**" `
+            /d:sonar.text.inclusions="src/**,tests/**" `
+            /d:sonar.cpd.exclusions="website/**" `
+            /d:sonar.coverage.exclusions="website/**"
           dotnet build src\Asteriq\Asteriq.csproj -c Release
           ${{ runner.temp }}\scanner\dotnet-sonarscanner end `
             /d:sonar.token="$env:SONAR_TOKEN"

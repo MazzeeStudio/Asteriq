@@ -396,8 +396,7 @@ public class HidHideService : IHidHideService
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
-            Console.WriteLine($"HidHide CLI command failed. Args: '{string.Join(" ", args)}', " +
-                              $"CLI path: '{_cliPath}', Error type: {ex.GetType().Name}, Details: {ex.Message}");
+            Console.WriteLine($"HidHide CLI failed ({string.Join(" ", args)}): {ex.Message}");
             return "";
         }
     }

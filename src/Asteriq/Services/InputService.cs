@@ -43,9 +43,6 @@ public class InputService : IInputService
     private bool _isInitialized;
     private int _pollRateHz;
 
-    /// <summary>
-    /// The poll rate passed to StartPolling, in Hz. 0 if not yet started.
-    /// </summary>
     public int PollRateHz => _pollRateHz;
     private HidDeviceService? _hidDeviceService;
     private List<HidDeviceService.HidDeviceInfo>? _hidDevicesCache;
@@ -56,34 +53,13 @@ public class InputService : IInputService
     private DirectInputService? _directInputService;
     private readonly ConcurrentDictionary<int, Guid> _sdlToDirectInputGuid = new();
 
-    /// <summary>
-    /// When true, only fires InputReceived when state changes. Default: false (fire every poll)
-    /// </summary>
     public bool OnlyFireOnChange { get; set; } = false;
-
-    /// <summary>
-    /// Input backend to use for reading device state. Default: DirectInput (more reliable)
-    /// </summary>
     public InputPollingBackend InputBackend { get; set; } = InputPollingBackend.DirectInput;
 
-    /// <summary>
-    /// Fired when input state changes on any device
-    /// </summary>
     public event EventHandler<DeviceInputState>? InputReceived;
-
-    /// <summary>
-    /// Fired when a device is connected
-    /// </summary>
     public event EventHandler<PhysicalDeviceInfo>? DeviceConnected;
-
-    /// <summary>
-    /// Fired when a device is disconnected
-    /// </summary>
     public event EventHandler<int>? DeviceDisconnected;
 
-    /// <summary>
-    /// Initialize SDL2 joystick subsystem and DirectInput
-    /// </summary>
     public bool Initialize()
     {
         if (_isInitialized) return true;
@@ -126,9 +102,6 @@ public class InputService : IInputService
         return true;
     }
 
-    /// <summary>
-    /// Get list of currently connected devices
-    /// </summary>
     public List<PhysicalDeviceInfo> EnumerateDevices()
     {
         if (!_isInitialized) return new List<PhysicalDeviceInfo>();
@@ -183,9 +156,6 @@ public class InputService : IInputService
         return null;
     }
 
-    /// <summary>
-    /// Get info about a specific device by index. Returns the SDL instance ID.
-    /// </summary>
     private (PhysicalDeviceInfo? info, int instanceId) GetDeviceInfo(int deviceIndex)
     {
         string name = SDL.SDL_JoystickNameForIndex(deviceIndex) ?? $"Unknown Device {deviceIndex}";
@@ -224,9 +194,6 @@ public class InputService : IInputService
         return (info, instanceId);
     }
 
-    /// <summary>
-    /// Map SDL device to DirectInput GUID and open for DirectInput polling
-    /// </summary>
     private void MapToDirectInput(int sdlInstanceId, PhysicalDeviceInfo info)
     {
         if (_directInputService is null || _directInputReader is null)
@@ -266,9 +233,6 @@ public class InputService : IInputService
         }
     }
 
-    /// <summary>
-    /// Populate axis type information from HidSharp
-    /// </summary>
     private void PopulateAxisTypes(PhysicalDeviceInfo info)
     {
         if (_hidDeviceService is null)
@@ -394,9 +358,6 @@ public class InputService : IInputService
         return normalized;
     }
 
-    /// <summary>
-    /// Check if a device name indicates a virtual device (vJoy, vXBox, etc.)
-    /// </summary>
     private static bool IsVirtualDevice(string name)
     {
         var upper = name.ToUpperInvariant();
@@ -407,9 +368,6 @@ public class InputService : IInputService
                upper.Contains("FEEDER");
     }
 
-    /// <summary>
-    /// Start polling for input
-    /// </summary>
     public void StartPolling(int pollRateHz = 500)
     {
         if (_isPolling) return;
@@ -472,9 +430,6 @@ public class InputService : IInputService
         _pollDelayMs = newDelayMs;
     }
 
-    /// <summary>
-    /// Stop polling for input
-    /// </summary>
     public void StopPolling()
     {
         _isPolling = false;
@@ -505,9 +460,6 @@ public class InputService : IInputService
         _pollRateHz = 0;
     }
 
-    /// <summary>
-    /// Stop polling for input asynchronously
-    /// </summary>
     public async Task StopPollingAsync(CancellationToken ct = default)
     {
         _isPolling = false;
@@ -539,9 +491,6 @@ public class InputService : IInputService
         _pollRateHz = 0;
     }
 
-    /// <summary>
-    /// Poll all open joysticks and fire events
-    /// </summary>
     private void PollAllDevices()
     {
         // Process SDL events (needed for hot-plug detection)
@@ -590,9 +539,6 @@ public class InputService : IInputService
         }
     }
 
-    /// <summary>
-    /// Check if input state has changed (axes beyond threshold or any button change)
-    /// </summary>
     private static bool HasStateChanged(DeviceInputState last, DeviceInputState current, float axisThreshold = 0.01f)
     {
         // Check buttons - any change triggers
@@ -619,9 +565,6 @@ public class InputService : IInputService
         return false;
     }
 
-    /// <summary>
-    /// Read current state from a joystick using either SDL2 or DirectInput
-    /// </summary>
     private DeviceInputState ReadDeviceState(int instanceId, IntPtr joystick, PhysicalDeviceInfo info)
     {
         // Use DirectInput if configured and available for this device
@@ -636,9 +579,6 @@ public class InputService : IInputService
         return ReadDeviceStateSDL(joystick, info);
     }
 
-    /// <summary>
-    /// Read device state using DirectInput
-    /// </summary>
     private DeviceInputState ReadDeviceStateDirectInput(Guid diGuid, PhysicalDeviceInfo info)
     {
         // Read axes
@@ -674,9 +614,6 @@ public class InputService : IInputService
         };
     }
 
-    /// <summary>
-    /// Read device state using SDL2
-    /// </summary>
     private static DeviceInputState ReadDeviceStateSDL(IntPtr joystick, PhysicalDeviceInfo info)
     {
         // Read axes (normalize from -32768..32767 to -1.0..1.0)
@@ -714,9 +651,6 @@ public class InputService : IInputService
         };
     }
 
-    /// <summary>
-    /// Convert SDL hat bitmask to angle in degrees (-1 for center)
-    /// </summary>
     private static int HatToAngle(byte hatState)
     {
         return hatState switch
@@ -733,9 +667,6 @@ public class InputService : IInputService
         };
     }
 
-    /// <summary>
-    /// Check for newly connected devices and open them
-    /// </summary>
     private void CheckForNewDevices()
     {
         int numJoysticks = SDL.SDL_NumJoysticks();

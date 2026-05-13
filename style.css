@@ -977,7 +977,6 @@ code {
     border: 1px solid var(--border-hi);
     border-left: 3px solid var(--accent);
     padding: 1.75rem 2rem;
-    max-width: 640px;
     display: flex;
     flex-direction: column;
     gap: 1rem;

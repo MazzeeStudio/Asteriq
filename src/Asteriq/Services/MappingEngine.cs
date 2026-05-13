@@ -7,7 +7,7 @@ namespace Asteriq.Services;
 /// <summary>
 /// Processes input mappings and outputs to vJoy/keyboard
 /// </summary>
-public class MappingEngine : IMappingEngine
+public sealed class MappingEngine : IMappingEngine
 {
     private readonly IVJoyService _vjoy;
     private readonly KeyboardService _keyboard;

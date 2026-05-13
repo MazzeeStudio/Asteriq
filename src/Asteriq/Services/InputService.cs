@@ -21,7 +21,7 @@ public enum InputPollingBackend
 /// <summary>
 /// Handles physical device input using SDL2 or DirectInput
 /// </summary>
-public class InputService : IInputService
+public sealed class InputService : IInputService
 {
     [DllImport("winmm.dll")]
     private static extern int timeBeginPeriod(uint uPeriod);

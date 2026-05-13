@@ -6,7 +6,7 @@ namespace Asteriq.Diagnostics;
 /// <summary>
 /// Console-based diagnostic display with live in-place updates
 /// </summary>
-public class ConsoleDiagnostics : IDisposable
+public sealed class ConsoleDiagnostics : IDisposable
 {
     private readonly InputService _inputService;
     private readonly Dictionary<int, int> _deviceLineMap = new();

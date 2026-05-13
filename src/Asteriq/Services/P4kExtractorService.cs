@@ -8,7 +8,7 @@ namespace Asteriq.Services;
 /// Extracts files from Star Citizen's Data.p4k archive.
 /// P4K files are ZIP archives with PKZip Classic encryption used by CryEngine/Star Citizen.
 /// </summary>
-public class P4kExtractorService : IDisposable
+public sealed class P4kExtractorService : IDisposable
 {
     private readonly string _p4kPath;
     private ZipFile? _zipFile;

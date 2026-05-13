@@ -7,7 +7,7 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController
+public sealed partial class SettingsTabController
 {
     private const float RightPanelCollapsedH = 40f;
 

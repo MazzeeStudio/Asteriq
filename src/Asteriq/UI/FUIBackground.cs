@@ -7,7 +7,7 @@ namespace Asteriq.UI;
 /// noise texture, scanlines, and vignette effects.
 /// Inspired by GalaxiaWeb's FUI background system.
 /// </summary>
-public class FUIBackground : IDisposable
+public sealed class FUIBackground : IDisposable
 {
     // Cached bitmaps for static elements
     private SKBitmap? _gridBitmap;

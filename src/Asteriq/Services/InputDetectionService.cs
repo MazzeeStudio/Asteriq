@@ -113,7 +113,7 @@ public enum InputDetectionFilter
 /// 3. Require intentional movement: large delta from stable baseline AND sustained over multiple samples
 /// 4. Noise filtering: ignore small fluctuations (jitter threshold ~0.02 = 2% of range)
 /// </summary>
-public class InputDetectionService : IDisposable
+public sealed class InputDetectionService : IDisposable
 {
     private readonly IInputService _inputService;
     private readonly object _lock = new();

@@ -61,6 +61,7 @@ jobs:
             /o:"mazzeestudio" `
             /d:sonar.token="$env:SONAR_TOKEN" `
             /d:sonar.host.url="https://sonarcloud.io" `
+            /d:sonar.projectBaseDir="$env:GITHUB_WORKSPACE" `
             /d:sonar.exclusions="website/**,**/bin/**,**/obj/**" `
             /d:sonar.text.inclusions="src/**,tests/**" `
             /d:sonar.cpd.exclusions="website/**" `

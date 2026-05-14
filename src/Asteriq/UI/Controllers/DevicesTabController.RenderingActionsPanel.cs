@@ -92,7 +92,6 @@ public partial class DevicesTabController
                     _actions.ClearMappingsBounds = new SKRect(contentBounds.Left + pad, y, contentBounds.Left + pad + buttonWidth, y + buttonHeight);
                     var clearState2 = _actions.ClearMappingsHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal;
                     FUIRenderer.DrawButton(canvas, _actions.ClearMappingsBounds, "CLEAR MAPPINGS", clearState2, isDanger: true);
-                    y += buttonHeight + buttonGap;
                 }
                 else
                 {

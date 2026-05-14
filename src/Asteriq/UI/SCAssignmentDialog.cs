@@ -351,7 +351,6 @@ public class SCAssignmentDialog : FUIBaseDialog
             FUIWidgets.DrawSCCheckbox(canvas, checkboxBoxBounds, _inverted, _hoveredButton == 4);
             FUIRenderer.DrawText(canvas, "Inverted", new SKPoint(pad + 26, y + 18),
                 FUIColors.SecondaryColor(_inverted), 13f);
-            y += 36;
         }
         else
         {

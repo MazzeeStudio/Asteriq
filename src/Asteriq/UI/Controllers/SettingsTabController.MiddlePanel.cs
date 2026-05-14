@@ -324,7 +324,6 @@ public sealed partial class SettingsTabController
                     break;
                 }
             }
-            y += bannerHeight + 8f;
         }
     }
 

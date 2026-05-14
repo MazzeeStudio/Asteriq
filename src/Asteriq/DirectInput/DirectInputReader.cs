@@ -308,7 +308,7 @@ public sealed class DirectInputReader : IDisposable
                     return false;
                 }
                 handle.IsAcquired = true;
-                hr = handle.Poll(handle.Device);
+                _ = handle.Poll(handle.Device);
             }
 
             // Get device state

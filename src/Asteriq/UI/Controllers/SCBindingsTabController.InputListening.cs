@@ -577,7 +577,6 @@ public partial class SCBindingsTabController
                 _captureCandidateInput = $"kb:{modPrefix}{scInput}";
                 _captureCandidatePath = null;
                 _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
-                detectedThisEvent = true;
             }
         }
 

@@ -19,7 +19,6 @@ public sealed partial class SettingsTabController
         float leftMargin = m.LeftMargin;
         float rightMargin = m.RightMargin;
         float contentWidth = m.ContentWidth;
-        float sectionSpacing = 16f;
 
         // Theme section
         float themeLabelWidth = 36f;
@@ -200,8 +199,6 @@ public sealed partial class SettingsTabController
         _bgVignetteSliderBounds = new SKRect(sliderLeft, y + sliderYOff, sliderRight, y + sliderYOff + sliderHeight);
         FUIWidgets.DrawSettingsSlider(canvas, _bgVignetteSliderBounds, bg.VignetteStrength, 100);
         FUIRenderer.DrawText(canvas, bg.VignetteStrength.ToString(), new SKPoint(sliderRight + 8, y + textY), FUIColors.TextDim, 13f);
-        y += sliderRowHeight + sectionSpacing;
-
     }
 
     private void StoreThemeButtonBounds(int index, SKRect bounds)

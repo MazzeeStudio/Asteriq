@@ -41,7 +41,7 @@ public partial class MappingsTabController
 
         if (_threshold.BelowEnabled)
         {
-            y = DrawThresholdSection(canvas, leftMargin, rightMargin, y, width, liveValue,
+            DrawThresholdSection(canvas, leftMargin, rightMargin, y, width, liveValue,
                 _threshold.BelowThreshold, _threshold.BelowHysteresis, false,
                 _threshold.BelowKeyName, _threshold.BelowModifiers,
                 ref _threshold.BelowSliderBounds, ref _threshold.BelowHystSliderBounds,

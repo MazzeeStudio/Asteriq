@@ -12,7 +12,7 @@ public class WindowStateManager : IWindowStateManager
     private readonly ILogger<WindowStateManager> _logger;
     private readonly string _settingsFile;
     private readonly JsonSerializerOptions _jsonOptions;
-    private WindowState _cachedState;
+    private readonly WindowState _cachedState;
 
     public WindowStateManager(ILogger<WindowStateManager> logger)
     {

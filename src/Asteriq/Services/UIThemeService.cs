@@ -14,7 +14,7 @@ public class UIThemeService : IUIThemeService
     private readonly ILogger<UIThemeService> _logger;
     private readonly string _settingsFile;
     private readonly JsonSerializerOptions _jsonOptions;
-    private ThemeSettings _cachedSettings;
+    private readonly ThemeSettings _cachedSettings;
 
     public event EventHandler<FUITheme>? ThemeChanged;
 

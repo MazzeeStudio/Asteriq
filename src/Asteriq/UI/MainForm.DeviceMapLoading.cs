@@ -18,7 +18,6 @@ public partial class MainForm
     private void LoadSvgAssets()
     {
         var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices");
-        var mapsDir = Path.Combine(imagesDir, "Maps");
 
         var joystickPath = Path.Combine(imagesDir, "joystick.svg");
         if (File.Exists(joystickPath))

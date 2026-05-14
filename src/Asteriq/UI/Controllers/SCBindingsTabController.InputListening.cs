@@ -24,7 +24,7 @@ public partial class SCBindingsTabController
             return;
         }
 
-        var (actionIndex, colIndex) = _cell.SelectedCell;
+        var (actionIndex, _) = _cell.SelectedCell;
         if (actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
             return;
 

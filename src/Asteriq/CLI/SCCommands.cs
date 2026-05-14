@@ -213,7 +213,6 @@ internal static class SCCommands
 
         var scService = new SCInstallationService();
         var cacheService = new SCProfileCacheService();
-        var schemaService = new SCSchemaService();
 
         Console.WriteLine("Scanning for Star Citizen installations...\n");
 
@@ -341,9 +340,6 @@ internal static class SCCommands
         }
 
         var scService = new SCInstallationService();
-        var cacheService = new SCProfileCacheService();
-        var schemaService = new SCSchemaService();
-        var exportService = new SCXmlExportService();
 
         Console.WriteLine("Scanning for Star Citizen installations...\n");
 

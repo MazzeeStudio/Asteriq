@@ -62,9 +62,6 @@ public class DriverSetupForm : FUIBaseDialog
     private const float InstallBtnH = 30f;
     private const float InstallBtnOffsetY = 78f;
 
-    // Top section - computed each paint so panels flow below status text naturally
-    private float _panel1Y = 90f;
-    private float _panel2Y = 222f;
 
     public bool SetupComplete { get; private set; }
     public bool SkippedVJoy { get; private set; }
@@ -214,17 +211,17 @@ public class DriverSetupForm : FUIBaseDialog
         }
 
         // Panels start 10px below the last text baseline — tight but readable
-        _panel1Y = statusY + 10f;
-        _panel2Y = _panel1Y + PanelH + 10f;
+        float panel1Y = statusY + 10f;
+        float panel2Y = panel1Y + PanelH + 10f;
 
         DrawDriverPanel(canvas,
-            new SKRect(Pad, _panel1Y, Pad + contentW, _panel1Y + PanelH),
+            new SKRect(Pad, panel1Y, Pad + contentW, panel1Y + PanelH),
             "vJOY VIRTUAL JOYSTICK", "REQUIRED",
             "Creates virtual joystick devices visible to Star Citizen",
             _vJoyStatusText, _vJoyStatusColor, required: true);
 
         DrawDriverPanel(canvas,
-            new SKRect(Pad, _panel2Y, Pad + contentW, _panel2Y + PanelH),
+            new SKRect(Pad, panel2Y, Pad + contentW, panel2Y + PanelH),
             "HIDHIDE DEVICE HIDING", "RECOMMENDED",
             "Hides physical devices so only virtual devices are visible",
             _hidHideStatusText, _hidHideStatusColor, required: false);
@@ -232,16 +229,16 @@ public class DriverSetupForm : FUIBaseDialog
         // Canvas-drawn install buttons (inside panels)
         float installBtnX = Pad + contentW - InstallBtnW - 14f;
 
-        _vJoyInstallBounds = new SKRect(installBtnX, _panel1Y + InstallBtnOffsetY,
-            installBtnX + InstallBtnW, _panel1Y + InstallBtnOffsetY + InstallBtnH);
+        _vJoyInstallBounds = new SKRect(installBtnX, panel1Y + InstallBtnOffsetY,
+            installBtnX + InstallBtnW, panel1Y + InstallBtnOffsetY + InstallBtnH);
         DrawInstallButton(canvas, _vJoyInstallBounds, _vJoyInstalled, _vJoyInstalling, _hoveredRegion == 4);
 
-        _hidHideInstallBounds = new SKRect(installBtnX, _panel2Y + InstallBtnOffsetY,
-            installBtnX + InstallBtnW, _panel2Y + InstallBtnOffsetY + InstallBtnH);
+        _hidHideInstallBounds = new SKRect(installBtnX, panel2Y + InstallBtnOffsetY,
+            installBtnX + InstallBtnW, panel2Y + InstallBtnOffsetY + InstallBtnH);
         DrawInstallButton(canvas, _hidHideInstallBounds, _hidHideInstalled, _hidHideInstalling, _hoveredRegion == 5);
 
         // Manual download links — anchored below panel 2
-        float linkY = _panel2Y + PanelH + 18f;
+        float linkY = panel2Y + PanelH + 18f;
         FUIRenderer.DrawText(canvas, "MANUAL DOWNLOAD:", new SKPoint(Pad, linkY), FUIColors.TextDim, 12f, false);
 
         using var linkPaint = FUIRenderer.CreateTextPaint(FUIColors.Active, 12f);

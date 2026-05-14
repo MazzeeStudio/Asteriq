@@ -11,7 +11,6 @@ public sealed class ConsoleDiagnostics : IDisposable
     private readonly InputService _inputService;
     private readonly Dictionary<int, int> _deviceLineMap = new();
     private int _nextLine;
-    private int _headerLines;
     private volatile bool _running;
 
     public ConsoleDiagnostics(InputService inputService)
@@ -76,8 +75,8 @@ public sealed class ConsoleDiagnostics : IDisposable
         Console.WriteLine("║                    ASTERIQ - Input Diagnostics                               ║");
         Console.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
         Console.ResetColor();
-        _headerLines = 3;
-        _nextLine = _headerLines;
+        const int headerLines = 3;
+        _nextLine = headerLines;
     }
 
     private static void WriteFooter()

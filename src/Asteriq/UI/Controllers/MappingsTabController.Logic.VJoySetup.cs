@@ -224,43 +224,6 @@ public partial class MappingsTabController
     }
 
     /// <summary>
-    /// Converts a visual row index (in the axis list) to the actual vJoy axis index (0-7).
-    /// Returns -1 if the row is out of range.
-    /// </summary>
-    private VJoyDeviceInfo? FindBestVJoyDevice(PhysicalDeviceInfo physical)
-    {
-        VJoyDeviceInfo? best = null;
-        int bestScore = -1;
-
-        foreach (var vjoy in _ctx.VJoyDevices)
-        {
-            int axes = CountVJoyAxes(vjoy);
-            int buttons = vjoy.ButtonCount;
-            int povs = vjoy.ContPovCount + vjoy.DiscPovCount;
-
-            // Check if this vJoy can accommodate all controls
-            if (axes >= physical.AxisCount &&
-                buttons >= physical.ButtonCount &&
-                povs >= physical.HatCount)
-            {
-                // Score based on how close the match is (lower excess = better)
-                int excess = (axes - physical.AxisCount) +
-                            (buttons - physical.ButtonCount) +
-                            (povs - physical.HatCount);
-                int score = 1000 - excess; // Higher score = better match
-
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    best = vjoy;
-                }
-            }
-        }
-
-        return best;
-    }
-
-    /// <summary>
     /// Programmatically create a new vJoy device using vJoyConfig.exe CLI,
     /// configured to match the physical device's capabilities.
     /// Returns the created device on success, or null if cancelled or failed.

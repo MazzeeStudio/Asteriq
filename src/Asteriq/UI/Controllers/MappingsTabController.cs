@@ -37,13 +37,7 @@ public partial class MappingsTabController : ITabController
     private List<SKRect> _mappingRowBounds = new();
     private List<SKRect> _mappingAddButtonBounds = new();
     private List<SKRect> _mappingRemoveButtonBounds = new();
-    private int _hoveredAddButton = -1;
-    private int _hoveredRemoveButton = -1;
 
-    // Mappings tab UI state - Right panel (mapping editor)
-    private bool _mappingEditorOpen;
-    private int _editingRowIndex = -1;
-    private bool _isEditingAxis;
     private InputDetectionService? _inputDetectionService;
 
     private const int KeyCaptureTimeoutMs = 10000; // 10 second timeout for key capture
@@ -82,10 +76,6 @@ public partial class MappingsTabController : ITabController
     private int _hoveredCurvePreset = -1;
     private int _hoveredDeadzonePreset = -1;
 
-    // Mapping editor - action buttons (hover state not wired; rendering passes false literally)
-    private SKRect _saveButtonBounds;
-    private SKRect _cancelButtonBounds;
-
     private const int HighlightDurationMs = 1500; // How long the attention highlight lasts (1.5 seconds)
     private const int HighlightDebounceCooldownMs = 500; // Minimum time between highlights for same button
 
@@ -100,16 +90,6 @@ public partial class MappingsTabController : ITabController
     private readonly NetworkSwitchState _netSwitch = new();
     private readonly ListScrollState _listScroll = new();
     private readonly ThresholdEditorState _threshold = new();
-    // Legacy compatibility â€” computed alias kept for use in axis logic
-    private float _axisDeadzone
-    {
-        get => Math.Max(Math.Abs(_deadzone.CenterMin), Math.Abs(_deadzone.CenterMax));
-        set
-        {
-            _deadzone.CenterMin = -Math.Abs(value);
-            _deadzone.CenterMax = Math.Abs(value);
-        }
-    }
 
     // Keyboard interop delegated to KeyboardHelper
 

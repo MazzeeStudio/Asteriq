@@ -53,9 +53,6 @@ public partial class SCBindingsTabController : ITabController
     private bool _scExportFilenameBoxFocused;
     private string _scExportFilename = "";
     private List<SCMappingFile> _scAvailableProfiles = new();
-    private bool _scImportDropdownOpen;
-    private SKRect _scImportDropdownBounds;
-    private int _scHoveredImportProfile = -1;
     private SKRect _scClearAllButtonBounds;
     private bool _scClearAllButtonHovered;
     private SKRect _scResetDefaultsButtonBounds;

@@ -137,25 +137,6 @@ public partial class MappingsTabController
         _buttonMode.SelectedMode = ButtonMode.Normal;
     }
 
-    /// <summary>
-    /// Clear just the keyboard binding for the selected button mapping (keeps physical inputs)
-    /// </summary>
-    private void ClearKeyboardBinding()
-    {
-        if (!TryGetSelectedButtonContext(out var profile, out _, out _, out var mapping)) return;
-        if (mapping is null) return;
-
-        mapping.Output.Type = OutputType.VJoyButton;
-        mapping.Output.KeyName = null;
-        mapping.Output.Modifiers = null;
-        profile.ModifiedAt = DateTime.UtcNow;
-        _ctx.ProfileManager.SaveActiveProfile();
-
-        _keyboardOutput.SelectedKeyName = "";
-        _keyboardOutput.SelectedModifiers = null;
-        _keyboardOutput.IsKeyboard = false;
-    }
-
     private void UpdateDurationForSelectedMapping()
     {
         if (!TryGetSelectedButtonContext(out var profile, out _, out _, out var mapping)) return;

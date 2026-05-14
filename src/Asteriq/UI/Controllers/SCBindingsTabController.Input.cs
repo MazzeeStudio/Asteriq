@@ -326,31 +326,6 @@ public partial class SCBindingsTabController
             }
         }
 
-        // SC Import dropdown handling
-        if (_scImportDropdownOpen)
-        {
-            if (_scImportDropdownBounds.Contains(point))
-            {
-                // Calculate which item was clicked based on Y position
-                float itemHeight = 28f;
-                float relativeY = point.Y - _scImportDropdownBounds.Top - 2;
-                int clickedIndex = (int)(relativeY / itemHeight);
-
-                if (clickedIndex >= 0 && clickedIndex < _scAvailableProfiles.Count)
-                {
-                    ImportSCProfile(_scAvailableProfiles[clickedIndex]);
-                }
-                _scImportDropdownOpen = false;
-                return;
-            }
-            else
-            {
-                // Click outside - close dropdown
-                _scImportDropdownOpen = false;
-                // Don't return - allow other clicks to process
-            }
-        }
-
         // Determine if CP panel content is visible (not collapsed behind a contextual panel).
         // Row-only selection also creates a contextual panel (Binding Definition).
         bool hasRowSelection = !showColumnActions

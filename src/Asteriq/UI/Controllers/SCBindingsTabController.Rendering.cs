@@ -40,7 +40,6 @@ public partial class SCBindingsTabController
             && _scFilteredActions is not null
             && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
         bool showCellDetails = hasRowSelection && _cell.SelectedCell.colIndex >= 0;
-        bool hasContextualPanel = showColumnActions || hasRowSelection;
         ref var anim = ref _cpPanel.Anim;
 
         float afterInstall = installationBounds.Bottom + verticalGap;

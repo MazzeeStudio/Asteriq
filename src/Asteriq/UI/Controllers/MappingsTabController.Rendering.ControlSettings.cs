@@ -205,8 +205,6 @@ public partial class MappingsTabController
         float rowHeight = 16f;
         float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
         float fontSize = 12f;
-        float scaledFontSize = fontSize;
-        float textY = y + (rowHeight / 2) + (scaledFontSize / 3); // Center text baseline
 
         // Symmetrical checkbox (leftmost) - checkbox then label
         _curve.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);

@@ -115,7 +115,6 @@ public partial class MainForm
         connectItem.DropDownItems.Clear();
 
         var peers     = _networkDiscovery.KnownPeers.Values.ToList();
-        var textColor = SkiaColorToGdi(FUIColors.TextPrimary);
         var dimColor  = SkiaColorToGdi(FUIColors.TextDim);
 
         if (peers.Count == 0)

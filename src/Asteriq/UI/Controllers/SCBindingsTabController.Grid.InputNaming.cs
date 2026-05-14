@@ -5,7 +5,7 @@ namespace Asteriq.UI.Controllers;
 
 public partial class SCBindingsTabController
 {
-    private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex, SCGridColumn col)
+    private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex)
     {
         // Look up the mapping in the active profile
         var profile = _ctx.ProfileManager.ActiveProfile;

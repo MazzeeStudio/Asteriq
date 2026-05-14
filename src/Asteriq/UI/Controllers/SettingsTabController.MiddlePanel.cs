@@ -9,7 +9,7 @@ namespace Asteriq.UI.Controllers;
 
 public sealed partial class SettingsTabController
 {
-    private void DrawSystemSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawSystemSettingsSubPanel(SKCanvas canvas, SKRect bounds)
     {
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
         float y = m.Y;

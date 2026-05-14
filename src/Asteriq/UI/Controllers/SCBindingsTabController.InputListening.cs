@@ -286,7 +286,7 @@ public partial class SCBindingsTabController
                     {
                         string axisName = col.IsPhysical
                             ? GetSCAxisNameFromDevice(i, device)
-                            : GetVJoyAxisNameFromMapping(device, i, col);
+                            : GetVJoyAxisNameFromMapping(device, i);
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> {axisName} on {device.Name}, deflection: {deflection:F2}");
                         ResetJoystickDetectionState();
                         return (axisName, device.InstanceGuid);

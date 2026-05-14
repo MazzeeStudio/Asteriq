@@ -33,7 +33,7 @@ public partial class MainForm
                 string id = group.Attribute("id")!.Value;
 
                 // Calculate bounding box by examining child elements
-                var bounds = CalculateGroupBounds(group, svg);
+                var bounds = CalculateGroupBounds(group);
                 if (bounds.HasValue)
                 {
                     _controlBounds[id] = bounds.Value;
@@ -46,7 +46,7 @@ public partial class MainForm
         }
     }
 
-    private static SKRect? CalculateGroupBounds(XElement group, XNamespace svg)
+    private static SKRect? CalculateGroupBounds(XElement group)
     {
         float minX = float.MaxValue, minY = float.MaxValue;
         float maxX = float.MinValue, maxY = float.MinValue;

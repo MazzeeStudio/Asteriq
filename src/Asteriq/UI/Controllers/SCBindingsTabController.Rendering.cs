@@ -69,7 +69,7 @@ public partial class SCBindingsTabController
         DrawSCBindingsTablePanel(canvas, leftBounds, frameInset);
 
         // RIGHT 1 — Game Environment (always visible)
-        DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
+        DrawSCInstallationPanelCompact(canvas, installationBounds);
 
         // RIGHT 2 — Control Profiles (clipped to bounds during animation)
         bool cpExpanded = !anim.UseAnimatedLayout || _cpPanel.IsExpanded || anim.IsAnimatingOut;
@@ -98,7 +98,7 @@ public partial class SCBindingsTabController
                 if (!showCellDetails)
                 {
                     // Row selected, no cell — Binding Definition fills the contextual area.
-                    DrawBindingDefinitionPanel(canvas, contextualBounds, frameInset, contextualExpanded);
+                    DrawBindingDefinitionPanel(canvas, contextualBounds, contextualExpanded);
                 }
                 else
                 {
@@ -115,7 +115,7 @@ public partial class SCBindingsTabController
 
                     canvas.Save();
                     canvas.ClipRect(bdBounds);
-                    DrawBindingDefinitionPanel(canvas, bdBounds, frameInset,
+                    DrawBindingDefinitionPanel(canvas, bdBounds,
                         isExpanded: contextualExpanded && _bdPanel.IsExpanded);
                     canvas.Restore();
 
@@ -156,7 +156,7 @@ public partial class SCBindingsTabController
             && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
     }
 
-    private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds)
     {
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
         float y = m.Y;

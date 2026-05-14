@@ -24,7 +24,7 @@ public class FUISelectionDialog : FUIBaseDialog
     private SKRect[] _itemBounds = Array.Empty<SKRect>();
     private int _result = -1;
     private int _scrollOffset;
-    private int _maxVisibleItems = 6;
+    private readonly int _maxVisibleItems = 6;
 
     // Dragging support
     private bool _isDragging;

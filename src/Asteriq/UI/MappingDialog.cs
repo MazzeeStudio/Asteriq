@@ -58,7 +58,7 @@ public class MappingDialog : FUIBaseDialog
     private DetectedInput? _detectedInput;
     private int _selectedVJoyDevice;
     private int _selectedOutputIndex;
-    private ButtonMode _selectedButtonMode = ButtonMode.Normal;
+    private readonly ButtonMode _selectedButtonMode = ButtonMode.Normal;
     private int _timeoutRemaining = 30; // seconds
 
     // Output mode state (vJoy vs Keyboard)

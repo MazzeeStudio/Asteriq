@@ -15,7 +15,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
     private readonly ILogger<ApplicationSettingsService> _logger;
     private readonly string _settingsFile;
     private readonly JsonSerializerOptions _jsonOptions;
-    private AppSettings _cachedSettings;
+    private readonly AppSettings _cachedSettings;
 
     public event EventHandler<float>? FontSizeChanged;
 

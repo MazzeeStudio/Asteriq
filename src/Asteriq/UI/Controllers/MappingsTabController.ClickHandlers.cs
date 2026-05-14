@@ -43,150 +43,188 @@ public partial class MappingsTabController
         return true;
     }
 
-    private bool HandleRightPanelClick(MouseEventArgs e)
-    {
-        bool hasSelection = _selectedMappingRow >= 0 && _selectionIsExplicit;
+    private bool HandleRightPanelClick(MouseEventArgs e) =>
+        TryClickPriorityManageButtons(e)
+        || TryClickAddInputButton(e)
+        || TryClickInputSourceRemoveButtons(e)
+        || TryClickMergeDropdown(e)
+        || TryClickButtonCategoryEditor(e);
 
-        // Manage in Keybindings â€” first so stale bounds from a previously-rendered normal
-        // editor (e.g. _addInputButtonBounds, _clearAllButtonBounds) cannot intercept the
-        // click. _sharedManageButtonBounds is SKRect.Empty unless the shared panel is active.
+    // Manage in Keybindings first so stale bounds from a previously-rendered normal
+    // editor (e.g. _addInputButtonBounds, _clearAllButtonBounds) cannot intercept the
+    // click. _sharedManageButtonBounds and _mergedAwayManageButtonBounds are SKRect.Empty
+    // unless their respective panels are active.
+    private bool TryClickPriorityManageButtons(MouseEventArgs e)
+    {
         if (_sharedManageButtonBounds.Contains(e.X, e.Y) && !string.IsNullOrEmpty(_sharedManageSearchText))
         {
             _ctx.OpenSCBindingsWithSearch?.Invoke(_sharedManageVJoyDevice, _sharedManageSearchText);
             return true;
         }
 
-        // Go to merged axis â€” same priority pattern. Bounds are SKRect.Empty unless the
-        // merged-away panel is active.
         if (_mergedAwayManageButtonBounds.Contains(e.X, e.Y) && _mergedAwayManageTarget is not null)
         {
             NavigateToAxisSlot(_mergedAwayManageTarget.Value.vjoyDevice, _mergedAwayManageTarget.Value.axisIndex);
             return true;
         }
 
-        // Add input button â€” toggles listening
-        if (_addInputButtonBounds.Contains(e.X, e.Y) && hasSelection)
-        {
-            if (_inputDetection.IsListening) CancelInputListening();
-            else StartInputListening(_selectedMappingRow);
-            return true;
-        }
+        return false;
+    }
 
-        // Remove input source
-        if (_selectionIsExplicit)
+    private bool TryClickAddInputButton(MouseEventArgs e)
+    {
+        if (!_addInputButtonBounds.Contains(e.X, e.Y)) return false;
+        if (_selectedMappingRow < 0 || !_selectionIsExplicit) return false;
+
+        if (_inputDetection.IsListening) CancelInputListening();
+        else StartInputListening(_selectedMappingRow);
+        return true;
+    }
+
+    private bool TryClickInputSourceRemoveButtons(MouseEventArgs e)
+    {
+        if (!_selectionIsExplicit) return false;
+        for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
         {
-            for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
+            if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
             {
-                if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
-                { RemoveInputSourceAtIndex(i); return true; }
+                RemoveInputSourceAtIndex(i);
+                return true;
             }
         }
+        return false;
+    }
 
-        // Merge operation dropdown (axis category, 2+ inputs)
-        if (_mappingCategory == 1 && hasSelection)
+    // Merge operation dropdown (axis category, 2+ inputs). When the dropdown is open,
+    // a click inside the list selects + closes; a click outside both the list and the
+    // selector closes (and swallows the click); a click on the selector itself falls
+    // through to the toggle below.
+    private bool TryClickMergeDropdown(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0 || !_selectionIsExplicit)
+            return false;
+
+        if (_merge.DropdownOpen)
         {
-            // Panel open: click inside selects; click outside closes (and swallows)
-            if (_merge.DropdownOpen)
+            if (!_merge.DropdownBounds.IsEmpty && _merge.DropdownBounds.Contains(e.X, e.Y))
             {
-                if (!_merge.DropdownBounds.IsEmpty && _merge.DropdownBounds.Contains(e.X, e.Y))
-                {
-                    const float itemHeight = 28f;
-                    int idx = (int)((e.Y - _merge.DropdownBounds.Top - 2f) / itemHeight);
-                    if (idx >= 0 && idx < s_mergeOps.Length)
-                    {
-                        UpdateMergeOperationForSelected(s_mergeOps[idx]);
-                    }
-                    _merge.DropdownOpen = false;
-                    _merge.HoveredIndex = -1;
-                    return true;
-                }
-
-                if (!_merge.SelectorBounds.Contains(e.X, e.Y))
-                {
-                    _merge.DropdownOpen = false;
-                    _merge.HoveredIndex = -1;
-                    return true;
-                }
+                const float itemHeight = 28f;
+                int idx = (int)((e.Y - _merge.DropdownBounds.Top - 2f) / itemHeight);
+                if (idx >= 0 && idx < s_mergeOps.Length)
+                    UpdateMergeOperationForSelected(s_mergeOps[idx]);
+                _merge.DropdownOpen = false;
+                _merge.HoveredIndex = -1;
+                return true;
             }
 
-            if (_merge.SelectorBounds.Contains(e.X, e.Y))
+            if (!_merge.SelectorBounds.Contains(e.X, e.Y))
             {
-                _merge.DropdownOpen = !_merge.DropdownOpen;
-                if (!_merge.DropdownOpen) _merge.HoveredIndex = -1;
+                _merge.DropdownOpen = false;
+                _merge.HoveredIndex = -1;
                 return true;
             }
         }
 
-        // Button mode selection â€” blocked for modifier keys
-        bool selectedIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
-        if (_mappingCategory == 0 && hasSelection && !selectedIsModifier)
+        if (_merge.SelectorBounds.Contains(e.X, e.Y))
         {
-            for (int i = 0; i < _buttonMode.ModeBounds.Length; i++)
-            {
-                if (_buttonMode.ModeBounds[i].Contains(e.X, e.Y))
-                {
-                    _buttonMode.SelectedMode = (ButtonMode)i;
-                    UpdateButtonModeForSelected();
-                    return true;
-                }
-            }
-        }
-
-        // Pulse duration slider
-        if (_mappingCategory == 0 && hasSelection && _buttonMode.SelectedMode == ButtonMode.Pulse
-            && _buttonMode.PulseSliderBounds.Contains(e.X, e.Y))
-        {
-            _buttonMode.DraggingPulse = true;
-            UpdatePulseDurationFromMouse(e.X);
+            _merge.DropdownOpen = !_merge.DropdownOpen;
+            if (!_merge.DropdownOpen) _merge.HoveredIndex = -1;
             return true;
         }
-
-        // Hold duration slider
-        if (_mappingCategory == 0 && hasSelection && _buttonMode.SelectedMode == ButtonMode.HoldToActivate
-            && _buttonMode.HoldSliderBounds.Contains(e.X, e.Y))
-        {
-            _buttonMode.DraggingHold = true;
-            UpdateHoldDurationFromMouse(e.X);
-            return true;
-        }
-
-        // Output type selection
-        if (_mappingCategory == 0 && hasSelection)
-        {
-            if (_keyboardOutput.BtnBounds.Contains(e.X, e.Y))
-            {
-                _keyboardOutput.IsKeyboard = false;
-                _keyboardOutput.SelectedKeyName = "";
-                UpdateOutputTypeForSelected();
-                return true;
-            }
-            if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
-            {
-                _keyboardOutput.IsKeyboard = true;
-                UpdateOutputTypeForSelected();
-                return true;
-            }
-        }
-
-        // Key clear button
-        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard
-            && _keyboardOutput.ClearBounds.HitTest(e.X, e.Y))
-        { ClearKeyboardBinding(); return true; }
-
-        // Key capture field
-        if (_mappingCategory == 0 && hasSelection && _keyboardOutput.IsKeyboard
-            && _keyboardOutput.CaptureBounds.Contains(e.X, e.Y))
-        {
-            _keyboardOutput.IsCapturing = true;
-            _keyboardOutput.CaptureStartTicks = Environment.TickCount64;
-            return true;
-        }
-
-        // Clear Mapping button
-        if (_mappingCategory == 0 && hasSelection && _clearAllButtonBounds.Contains(e.X, e.Y))
-        { ClearSelectedButtonMapping(); return true; }
 
         return false;
+    }
+
+    private bool TryClickButtonCategoryEditor(MouseEventArgs e)
+    {
+        if (_mappingCategory != 0 || _selectedMappingRow < 0 || !_selectionIsExplicit)
+            return false;
+
+        return TryClickButtonModeButtons(e)
+            || TryClickPulseSlider(e)
+            || TryClickHoldSlider(e)
+            || TryClickOutputTypeButtons(e)
+            || TryClickKeyClear(e)
+            || TryClickKeyCapture(e)
+            || TryClickClearMapping(e);
+    }
+
+    private bool TryClickButtonModeButtons(MouseEventArgs e)
+    {
+        // Blocked for modifier keys
+        bool selectedIsModifier = _keyboardOutput.IsKeyboard && IsModifierKeyName(_keyboardOutput.SelectedKeyName);
+        if (selectedIsModifier) return false;
+
+        for (int i = 0; i < _buttonMode.ModeBounds.Length; i++)
+        {
+            if (_buttonMode.ModeBounds[i].Contains(e.X, e.Y))
+            {
+                _buttonMode.SelectedMode = (ButtonMode)i;
+                UpdateButtonModeForSelected();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool TryClickPulseSlider(MouseEventArgs e)
+    {
+        if (_buttonMode.SelectedMode != ButtonMode.Pulse) return false;
+        if (!_buttonMode.PulseSliderBounds.Contains(e.X, e.Y)) return false;
+        _buttonMode.DraggingPulse = true;
+        UpdatePulseDurationFromMouse(e.X);
+        return true;
+    }
+
+    private bool TryClickHoldSlider(MouseEventArgs e)
+    {
+        if (_buttonMode.SelectedMode != ButtonMode.HoldToActivate) return false;
+        if (!_buttonMode.HoldSliderBounds.Contains(e.X, e.Y)) return false;
+        _buttonMode.DraggingHold = true;
+        UpdateHoldDurationFromMouse(e.X);
+        return true;
+    }
+
+    private bool TryClickOutputTypeButtons(MouseEventArgs e)
+    {
+        if (_keyboardOutput.BtnBounds.Contains(e.X, e.Y))
+        {
+            _keyboardOutput.IsKeyboard = false;
+            _keyboardOutput.SelectedKeyName = "";
+            UpdateOutputTypeForSelected();
+            return true;
+        }
+        if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
+        {
+            _keyboardOutput.IsKeyboard = true;
+            UpdateOutputTypeForSelected();
+            return true;
+        }
+        return false;
+    }
+
+    private bool TryClickKeyClear(MouseEventArgs e)
+    {
+        if (!_keyboardOutput.IsKeyboard) return false;
+        if (!_keyboardOutput.ClearBounds.HitTest(e.X, e.Y)) return false;
+        ClearKeyboardBinding();
+        return true;
+    }
+
+    private bool TryClickKeyCapture(MouseEventArgs e)
+    {
+        if (!_keyboardOutput.IsKeyboard) return false;
+        if (!_keyboardOutput.CaptureBounds.Contains(e.X, e.Y)) return false;
+        _keyboardOutput.IsCapturing = true;
+        _keyboardOutput.CaptureStartTicks = Environment.TickCount64;
+        return true;
+    }
+
+    private bool TryClickClearMapping(MouseEventArgs e)
+    {
+        if (!_clearAllButtonBounds.Contains(e.X, e.Y)) return false;
+        ClearSelectedButtonMapping();
+        return true;
     }
 
     private bool HandleThresholdClick(MouseEventArgs e)

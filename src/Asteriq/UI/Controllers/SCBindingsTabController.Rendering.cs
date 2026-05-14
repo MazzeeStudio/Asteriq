@@ -253,14 +253,6 @@ public partial class SCBindingsTabController
             _scInstall.SelectedInstallation, _scInstall.HoveredInstallation, itemH);
     }
 
-    private static void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
-    {
-        float lineHeight = 18f;
-        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 13f);
-        y += lineHeight;
-    }
-
     private static void DrawButtonCaptureToggle(SKCanvas canvas, SKRect bounds, bool active, bool hovered)
     {
         // Background

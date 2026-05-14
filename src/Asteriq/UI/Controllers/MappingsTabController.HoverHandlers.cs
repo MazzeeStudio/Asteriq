@@ -14,12 +14,9 @@ public partial class MappingsTabController
         _vjoyPrevHovered = false;
         _vjoyNextHovered = false;
         _hoveredMappingRow = -1;
-        _hoveredAddButton = -1;
-        _hoveredRemoveButton = -1;
         _buttonMode.HoveredMode = -1;
         _keyboardOutput.HoveredOutputType = -1;
         _keyboardOutput.CaptureHovered = false;
-        _keyboardOutput.ClearHovered = false;
         _addInputButtonHovered = false;
         _clearAllButtonHovered = false;
         _hoveredInputSourceRemove = -1;
@@ -194,8 +191,6 @@ public partial class MappingsTabController
         if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
         { _keyboardOutput.HoveredOutputType = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
-        if (_keyboardOutput.IsKeyboard && _keyboardOutput.ClearBounds.HitTest(e.X, e.Y))
-        { _keyboardOutput.ClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
         if (_keyboardOutput.IsKeyboard && _keyboardOutput.CaptureBounds.Contains(e.X, e.Y))
         { _keyboardOutput.CaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
 

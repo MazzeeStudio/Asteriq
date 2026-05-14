@@ -144,7 +144,6 @@ public partial class MappingsTabController
             || TryClickPulseSlider(e)
             || TryClickHoldSlider(e)
             || TryClickOutputTypeButtons(e)
-            || TryClickKeyClear(e)
             || TryClickKeyCapture(e)
             || TryClickClearMapping(e);
     }
@@ -201,14 +200,6 @@ public partial class MappingsTabController
             return true;
         }
         return false;
-    }
-
-    private bool TryClickKeyClear(MouseEventArgs e)
-    {
-        if (!_keyboardOutput.IsKeyboard) return false;
-        if (!_keyboardOutput.ClearBounds.HitTest(e.X, e.Y)) return false;
-        ClearKeyboardBinding();
-        return true;
     }
 
     private bool TryClickKeyCapture(MouseEventArgs e)

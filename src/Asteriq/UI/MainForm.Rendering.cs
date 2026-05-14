@@ -138,14 +138,6 @@ public partial class MainForm
         }
     }
 
-    private static void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-        => FUIWidgets.DrawSelector(canvas, bounds, text, isHovered, isEnabled);
-
-    private static void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
-        => FUIWidgets.DrawTextFieldReadOnly(canvas, bounds, text, isHovered);
-
-
-
     private void DrawTitleBar(SKCanvas canvas, SKRect bounds)
     {
         float titleBarY = FUIRenderer.TitleBarPadding;  // 16px - was 15
@@ -477,11 +469,6 @@ public partial class MainForm
     private static void DrawDropdownItem(SKCanvas canvas, float x, float itemY, float width, float itemHeight,
         string text, bool isHovered, bool isActive, bool isEnabled)
         => FUIWidgets.DrawDropdownItem(canvas, x, itemY, width, itemHeight, text, isHovered, isActive, isEnabled);
-
-    private static void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
-        => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
-
-
 
     private void DrawStatusBar(SKCanvas canvas, SKRect bounds)
     {

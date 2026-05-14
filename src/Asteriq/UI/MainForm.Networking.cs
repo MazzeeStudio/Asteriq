@@ -178,54 +178,6 @@ public partial class MainForm : Form
         BeginInvoke(MarkDirty);
     }
 
-    private async Task SwitchToRemoteAsync()
-    {
-        // Pick first known peer for MVP (2-machine scenario).
-        // Skip staleness check — TCP connect fails fast (<1s) if truly unreachable.
-        var peer = _networkDiscovery.KnownPeers.Values.FirstOrDefault();
-        if (peer is null)
-        {
-            BeginInvoke(() => _tabContext.MarkDirty()); // flash handled by status bar
-            return;
-        }
-
-        // Set capture mode first (same as ConnectAsMasterAsync) so AcquireDevice skips vJoy.
-        _networkVjoy.ForwardingMode = true;
-
-        // Ensure MappingEngine is running so snapshots are populated from physical input.
-        if (!_isForwarding)
-        {
-            var profile = _profileManager.ActiveProfile;
-            if (profile is not null)
-            {
-                _mappingEngine.LoadProfile(profile);
-                if (_mappingEngine.Start())
-                {
-                    _isForwarding = true;
-                    _tabContext.IsForwarding = true;
-                    _trayIcon.SetActive(true);
-                    BeginInvoke(UpdateTrayMenu);
-                }
-            }
-        }
-
-        try
-        {
-            await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
-            _networkMode = NetworkInputMode.Remote;
-            _tabContext.NetworkMode = _networkMode;
-            _tabContext.ConnectedPeerIp = peer.IpAddress;
-            PreInitializeAllNetworkSnapshots();
-            StartNetworkHeartbeat();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Connection refused or rejected — roll back
-            _networkVjoy.ForwardingMode = false;
-            System.Diagnostics.Debug.WriteLine($"[Network] SwitchToRemote failed: {ex.Message}");
-        }
-        BeginInvoke(MarkDirty);
-    }
 
     private async Task SwitchToLocalAsync()
     {

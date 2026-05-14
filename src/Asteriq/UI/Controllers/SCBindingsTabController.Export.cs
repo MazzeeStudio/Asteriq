@@ -156,7 +156,6 @@ public partial class SCBindingsTabController
         _searchFilter.ActionMaps.Clear();
         _scAvailableProfiles = new();      // clear stale profiles from previous installation immediately
         _profileMgmt.DropdownOpen = false;    // close dropdown so it doesn't show stale data
-        _scImportDropdownOpen = false;
         _ctx.InvalidateCanvas();
 
         Task.Run(() =>
@@ -475,55 +474,6 @@ public partial class SCBindingsTabController
         }
     }
 
-    private void DeleteSCExportProfile()
-    {
-        if (_scExportProfileService is null || _profileMgmt.ExportProfiles.Count == 0) return;
-
-        using var confirmDialog = new FUIConfirmDialog(
-            "Delete Profile",
-            $"Delete control profile '{_scExportProfile.ProfileName}'?\n\nThis cannot be undone.",
-            "Delete", "Cancel");
-
-        if (confirmDialog.ShowDialog(_ctx.OwnerForm) == DialogResult.Yes)
-        {
-            var deletedName = _scExportProfile.ProfileName;
-            RevertSharedBindingReroutes();
-            _scExportProfileService.DeleteProfile(deletedName);
-            RefreshSCExportProfiles();
-
-            // Load another profile or create default
-            if (_profileMgmt.ExportProfiles.Count > 0)
-            {
-                var nextProfile = _scExportProfileService.LoadProfile(_profileMgmt.ExportProfiles[0].ProfileName);
-                if (nextProfile is not null)
-                {
-                    _scExportProfile = nextProfile;
-            
-                    if (CurrentEnvironment is not null)
-                        _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, nextProfile.ProfileName);
-                    _ctx.AppSettings.LastSCExportProfile = nextProfile.ProfileName;
-                }
-            }
-            else
-            {
-                // All profiles deleted - reset to blank unnamed state
-                if (CurrentEnvironment is not null)
-                    _ctx.AppSettings.SetLastSCExportProfileForEnvironment(CurrentEnvironment, null);
-                _ctx.AppSettings.LastSCExportProfile = null;
-        
-                _scExportProfile = new SCExportProfile();
-                foreach (var vjoy in _ctx.VJoyDevices.Where(v => v.Exists))
-                {
-                    _scExportProfile.SetSCInstance(vjoy.Id, (int)vjoy.Id);
-                }
-            }
-
-            UpdateConflictingBindings();
-            UpdateSharedCells();
-            ReapplySharedBindingReroutes();
-            SetStatus($"Deleted profile '{deletedName}'");
-        }
-    }
 
     private void LoadSCExportProfile(string profileName)
     {
@@ -771,17 +721,6 @@ public partial class SCBindingsTabController
         _scStatusKind = kind;
         _scExportStatusTime = DateTime.Now;
         _ctx.InvalidateCanvas();
-    }
-
-    private static string TruncatePath(string path, int maxLength)
-    {
-        if (string.IsNullOrEmpty(path) || path.Length <= maxLength)
-            return path;
-
-        // Try to truncate by removing middle part
-        int start = maxLength / 3;
-        int end = maxLength - start - 3;  // 3 for "..."
-        return string.Concat(path.AsSpan(0, start), "...", path.AsSpan(path.Length - end));
     }
 
     /// <summary>

@@ -9,18 +9,6 @@ namespace Asteriq.UI.Controllers;
 
 public sealed partial class SettingsTabController
 {
-    private void DrawApplicationSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
-    {
-        float gap = FUIRenderer.SpaceSM;
-        float leftWidth = (bounds.Width - gap) * 0.52f;
-
-        var leftBounds = new SKRect(bounds.Left, bounds.Top, bounds.Left + leftWidth, bounds.Bottom);
-        var rightBounds = new SKRect(bounds.Left + leftWidth + gap, bounds.Top, bounds.Right, bounds.Bottom);
-
-        DrawSystemSettingsSubPanel(canvas, leftBounds, frameInset);
-        DrawVisualSettingsSubPanel(canvas, rightBounds, frameInset);
-    }
-
     private void DrawSystemSettingsSubPanel(SKCanvas canvas, SKRect bounds, float frameInset)
     {
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds);

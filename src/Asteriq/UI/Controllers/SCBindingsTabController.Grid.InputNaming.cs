@@ -121,23 +121,6 @@ public partial class SCBindingsTabController
         return 3; // Left
     }
 
-    private static int GetAxisIndexFromBinding(string binding)
-    {
-        return binding.ToLowerInvariant() switch
-        {
-            "x" => 0,
-            "y" => 1,
-            "z" => 2,
-            "rx" => 3,
-            "ry" => 4,
-            "rz" => 5,
-            "slider1" => 6,
-            "slider2" => 7,
-            _ when binding.StartsWith("axis") && int.TryParse(binding.AsSpan(4), out int idx) => idx,
-            _ => -1
-        };
-    }
-
     private static SCInputType InferInputTypeFromName(string inputName)
     {
         if (string.IsNullOrEmpty(inputName))

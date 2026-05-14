@@ -177,19 +177,6 @@ public partial class MappingsTabController
         return y;
     }
 
-    private static void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
-    {
-        var bg = active ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-        var frame = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = active ? FUIColors.TextBright : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-
-        using (var bgPaint = FUIRenderer.CreateFillPaint(bg))
-            canvas.DrawRoundRect(bounds, 3, 3, bgPaint);
-        using (var framePaint = FUIRenderer.CreateStrokePaint(frame, active ? 2f : 1f))
-            canvas.DrawRoundRect(bounds, 3, 3, framePaint);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
-    }
-
     private float GetLiveAxisValueForThreshold()
     {
         var mappings = GetCurrentAxisToButtonMappings();

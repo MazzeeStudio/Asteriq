@@ -102,8 +102,6 @@ public partial class SCBindingsTabController
         FUIRenderer.DrawButton(canvas, _profileMgmt.ImportProfileBounds, "Import",
             _profileMgmt.ImportProfileHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
-        y += textBtnHeight + 10f;
-
         // Compute profile dropdown list bounds so the draw-last pass can render it on top of all panels
         if (_profileMgmt.DropdownOpen)
         {

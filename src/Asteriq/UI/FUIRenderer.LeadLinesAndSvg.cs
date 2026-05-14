@@ -61,7 +61,7 @@ public static partial class FUIRenderer
         using var path = new SKPath();
         path.MoveTo(point1);
 
-        SKPoint currentEnd = point1;
+        SKPoint currentEnd;
 
         if (progress <= seg1Ratio)
         {
@@ -183,7 +183,7 @@ public static partial class FUIRenderer
         using var path = new SKPath();
         path.MoveTo(point1);
 
-        SKPoint currentEnd = point1;
+        SKPoint currentEnd;
 
         if (progress <= seg1Ratio)
         {

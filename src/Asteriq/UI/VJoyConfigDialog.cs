@@ -198,7 +198,6 @@ public class VJoyConfigDialog : FUIBaseDialog
                 ? FUIRenderer.ButtonState.Hover
                 : FUIRenderer.ButtonState.Normal;
             FUIRenderer.DrawButton(canvas, _povTypeBounds, typeLabel, typeState, false, 12f);
-            y += RowH + SectionGap;
         }
         else
         {

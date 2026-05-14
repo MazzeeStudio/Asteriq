@@ -144,7 +144,7 @@ public partial class MappingsTabController
                     bool isSwitchBtn = rowIndex == switchRowIndex;
                     bool isShared = GetSharedSlotInfos(vjoyDevice!.Id, i).Count > 0;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier, isSwitchBtn, isShared);
+                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, keyParts, isModifier, isSwitchBtn, isShared);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -175,7 +175,7 @@ public partial class MappingsTabController
                     bool isHovered = rowIndex == _hoveredMappingRow;
                     bool isMergedAway = GetMergedAwayInfo(profile, vjoyDevice!.Id, axisIdx) is not null;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered, rowIndex,
+                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered,
                         isMergedAway: isMergedAway);
                     _mappingRowBounds.Add(rowBounds);
                 }
@@ -262,7 +262,7 @@ public partial class MappingsTabController
 
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
-        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false,
+        bool isSelected, bool isHovered, List<string>? keyParts = null, bool isModifier = false,
         bool isSwitchButton = false, bool isShared = false, bool isMergedAway = false)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "ÔÇö";

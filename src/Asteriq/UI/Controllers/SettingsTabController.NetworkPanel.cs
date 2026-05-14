@@ -107,7 +107,7 @@ public sealed partial class SettingsTabController
         return true;
     }
 
-    private void DrawNetworkSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawNetworkSettingsPanel(SKCanvas canvas, SKRect bounds)
     {
         bool headerHovered = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH)
             .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);

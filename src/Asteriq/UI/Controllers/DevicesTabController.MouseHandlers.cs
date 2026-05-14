@@ -99,7 +99,7 @@ public partial class DevicesTabController
         return false;
     }
 
-    private bool HandleDeviceListClick(MouseEventArgs e)
+    private bool HandleDeviceListClick()
     {
         if (!IsValidDeviceIndex(_hoveredDevice)) return false;
 

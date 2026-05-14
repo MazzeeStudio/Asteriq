@@ -7,7 +7,7 @@ namespace Asteriq.UI.Controllers;
 
 public partial class MappingsTabController
 {
-    private void DrawThresholdSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
+    private void DrawThresholdSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y)
     {
         float width = rightMargin - leftMargin;
 

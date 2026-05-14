@@ -217,7 +217,7 @@ public partial class SCBindingsTabController : ITabController
     /// <summary>
     /// Represents a column in the SC bindings grid
     /// </summary>
-    private class SCGridColumn
+    private sealed class SCGridColumn
     {
         public string Id { get; set; } = "";
         public string Header { get; set; } = "";

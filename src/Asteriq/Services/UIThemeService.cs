@@ -96,7 +96,7 @@ public class UIThemeService : IUIThemeService
         File.WriteAllText(_settingsFile, json);
     }
 
-    private class ThemeSettings
+    private sealed class ThemeSettings
     {
         public FUITheme Theme { get; set; } = FUITheme.Drake;
         public int GridStrength { get; set; } = 30;

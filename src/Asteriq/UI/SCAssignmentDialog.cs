@@ -28,9 +28,9 @@ public class SCAssignmentDialog : FUIBaseDialog
     private System.Windows.Forms.Timer _renderTimer = null!;
 
     // Dialog state
-    private int _selectedDevice = 0;
-    private int _selectedInputIndex = 0; // Index in the combined list of axes + buttons
-    private bool _inverted = false;
+    private int _selectedDevice;
+    private int _selectedInputIndex; // Index in the combined list of axes + buttons
+    private bool _inverted;
 
     // UI state
     private int _hoveredButton = -1;

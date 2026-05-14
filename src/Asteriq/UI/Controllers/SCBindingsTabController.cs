@@ -65,8 +65,8 @@ public partial class SCBindingsTabController : ITabController
     private List<SCAction>? _scFilteredActions;
     private int _scSelectedActionIndex = -1;
     private int _scHoveredActionIndex = -1;
-    private float _scBindingsScrollOffset = 0;
-    private float _scBindingsContentHeight = 0;
+    private float _scBindingsScrollOffset;
+    private float _scBindingsContentHeight;
     private SKRect _scBindingsListBounds;
     private List<SKRect> _scActionRowBounds = new();
 

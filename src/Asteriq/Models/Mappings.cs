@@ -174,7 +174,7 @@ public class AxisCurve
     public CurveType Type { get; set; } = CurveType.Linear;
 
     /// <summary>Curvature amount (-1.0 to 1.0, 0 = linear)</summary>
-    public float Curvature { get; set; } = 0f;
+    public float Curvature { get; set; }
 
     /// <summary>Deadzone mode - centered (joystick) vs end-only (throttle)</summary>
     public DeadzoneMode DeadzoneMode { get; set; } = DeadzoneMode.Centered;
@@ -191,14 +191,14 @@ public class AxisCurve
     /// Values between DeadzoneLow and DeadzoneCenterLow ramp from -1 to 0
     /// Default 0 means no center deadzone on negative side
     /// </summary>
-    public float DeadzoneCenterLow { get; set; } = 0f;
+    public float DeadzoneCenterLow { get; set; }
 
     /// <summary>
     /// Deadzone center-right edge (Centered mode only, 0.0 to 1.0)
     /// Values between DeadzoneCenterRight and DeadzoneHigh ramp from 0 to 1
     /// Default 0 means no center deadzone on positive side
     /// </summary>
-    public float DeadzoneCenterHigh { get; set; } = 0f;
+    public float DeadzoneCenterHigh { get; set; }
 
     /// <summary>
     /// Deadzone at high end (for EndOnly mode: 0.0 to 1.0)
@@ -222,13 +222,13 @@ public class AxisCurve
     public float Saturation { get; set; } = 1f;
 
     /// <summary>Invert the axis output</summary>
-    public bool Inverted { get; set; } = false;
+    public bool Inverted { get; set; }
 
     /// <summary>Custom curve control points (for CurveType.Custom)</summary>
     public List<CurvePoint>? ControlPoints { get; set; }
 
     /// <summary>When true, custom curve is symmetrical around center (mirrored)</summary>
-    public bool Symmetrical { get; set; } = false;
+    public bool Symmetrical { get; set; }
 
     /// <summary>
     /// Apply the curve to an input value (-1 to 1 range)
@@ -426,7 +426,7 @@ public class ShiftLayer
     public InputSource? ActivatorButton { get; set; }
 
     /// <summary>Whether this layer is currently active (runtime state)</summary>
-    internal bool IsActive { get; set; } = false;
+    internal bool IsActive { get; set; }
 }
 
 /// <summary>
@@ -453,7 +453,7 @@ public class Mapping
     public MergeOperation MergeOp { get; set; } = MergeOperation.Average;
 
     /// <summary>Invert the output</summary>
-    public bool Invert { get; set; } = false;
+    public bool Invert { get; set; }
 
     /// <summary>Layer this mapping belongs to (null = base layer, always active)</summary>
     public Guid? LayerId { get; set; }
@@ -483,7 +483,7 @@ public class ButtonMapping : Mapping
     public int HoldDurationMs { get; set; } = 500;
 
     /// <summary>Internal toggle state</summary>
-    internal bool ToggleState { get; set; } = false;
+    internal bool ToggleState { get; set; }
 
     /// <summary>Internal timestamp for hold detection</summary>
     internal DateTime? HoldStartTime { get; set; }
@@ -519,7 +519,7 @@ public class AxisToButtonMapping : Mapping
     public int SourceAxisIndex { get; set; } = -1;
 
     /// <summary>Internal state tracking</summary>
-    internal bool IsActivated { get; set; } = false;
+    internal bool IsActivated { get; set; }
 }
 
 /// <summary>
@@ -531,13 +531,13 @@ public class ButtonToAxisMapping : Mapping
     public float PressedValue { get; set; } = 1.0f;
 
     /// <summary>Axis value when button is released (-1.0 to 1.0)</summary>
-    public float ReleasedValue { get; set; } = 0.0f;
+    public float ReleasedValue { get; set; }
 
     /// <summary>Smoothing time in milliseconds (0 = instant)</summary>
-    public int SmoothingMs { get; set; } = 0;
+    public int SmoothingMs { get; set; }
 
     /// <summary>Internal current value for smoothing</summary>
-    internal float CurrentValue { get; set; } = 0f;
+    internal float CurrentValue { get; set; }
 
     /// <summary>Internal timestamp for smoothing</summary>
     internal DateTime? LastUpdate { get; set; }

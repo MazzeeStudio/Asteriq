@@ -187,6 +187,6 @@ public partial class MainForm
     // (Networking methods moved to MainForm.Networking.cs)
 
 
-    private bool _forceClose = false;
+    private bool _forceClose;
 
 }

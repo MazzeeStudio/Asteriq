@@ -86,8 +86,8 @@ public partial class MappingsTabController
         _saveButtonBounds = new SKRect(rightMargin - buttonWidth, buttonY,
             rightMargin, buttonY + buttonHeight);
 
-        FUIWidgets.DrawActionButton(canvas, _cancelButtonBounds, "Cancel", _cancelButtonHovered, false);
-        FUIWidgets.DrawActionButton(canvas, _saveButtonBounds, "Save", _saveButtonHovered, true);
+        FUIWidgets.DrawActionButton(canvas, _cancelButtonBounds, "Cancel", false, false);
+        FUIWidgets.DrawActionButton(canvas, _saveButtonBounds, "Save", false, true);
     }
 
     private string GetEditingOutputName()

@@ -37,9 +37,7 @@ public class MappingDialogResult
 /// </summary>
 public class MappingDialog : FUIBaseDialog
 {
-    private readonly IInputService _inputService;
     private readonly InputDetectionService _detectionService;
-    private readonly IVJoyService _vjoyService;
     private readonly List<VJoyDeviceInfo> _vjoyDevices;
 
     // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
@@ -82,10 +80,8 @@ public class MappingDialog : FUIBaseDialog
 
     public MappingDialog(IInputService inputService, IVJoyService vjoyService, DetectedInput? preSelectedInput)
     {
-        _inputService = inputService;
-        _vjoyService = vjoyService;
-        _detectionService = new InputDetectionService(_inputService);
-        _vjoyDevices = _vjoyService.EnumerateDevices();
+        _detectionService = new InputDetectionService(inputService);
+        _vjoyDevices = vjoyService.EnumerateDevices();
 
         InitializeForm();
         InitializeCanvas();

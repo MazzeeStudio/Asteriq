@@ -127,18 +127,23 @@ public class SettingsMigrationService
     }
 
     /// <summary>
-    /// Old unified settings structure
+    /// Old unified settings structure. Properties are populated by
+    /// System.Text.Json via reflection; Sonar's static analysis can't see
+    /// the reflection-based writes, so S1144 is suppressed for the whole
+    /// class. Properties without default-value initialisers use `init` to
+    /// signal "set once at deserialization, immutable after".
     /// </summary>
+    #pragma warning disable S1144 // Setters are invoked via JSON deserialization (reflection)
     private sealed class OldAppSettings
     {
-        public Guid? LastProfileId { get; set; }
+        public Guid? LastProfileId { get; init; }
         public bool AutoLoadLastProfile { get; set; } = true;
         #pragma warning disable CS0618 // FontSizeOption is obsolete — needed for reading legacy settings
         public FontSizeOption FontSize { get; set; } = FontSizeOption.Medium;
         #pragma warning restore CS0618
         public UIFontFamily FontFamily { get; set; } = UIFontFamily.Carbon;
-        public bool CloseToTray { get; set; }
-        public string? LastSCExportProfile { get; set; }
+        public bool CloseToTray { get; init; }
+        public string? LastSCExportProfile { get; init; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public FUITheme Theme { get; set; } = FUITheme.Midnight;
         public int GridStrength { get; set; } = 30;
@@ -151,4 +156,5 @@ public class SettingsMigrationService
         public int WindowX { get; set; } = 100;
         public int WindowY { get; set; } = 100;
     }
+    #pragma warning restore S1144
 }

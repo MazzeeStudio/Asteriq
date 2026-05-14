@@ -299,7 +299,7 @@ public static class CryXmlService
         return element;
     }
 
-    private class CryXmlNode
+    private sealed class CryXmlNode
     {
         public int NameOffset { get; set; }
         public int ContentOffset { get; set; }
@@ -310,7 +310,7 @@ public static class CryXmlService
         public int FirstChildIndex { get; set; }
     }
 
-    private class CryXmlAttribute
+    private sealed class CryXmlAttribute
     {
         public int NameOffset { get; set; }
         public int ValueOffset { get; set; }

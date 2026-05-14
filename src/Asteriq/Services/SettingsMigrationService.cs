@@ -129,7 +129,7 @@ public class SettingsMigrationService
     /// <summary>
     /// Old unified settings structure
     /// </summary>
-    private class OldAppSettings
+    private sealed class OldAppSettings
     {
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;

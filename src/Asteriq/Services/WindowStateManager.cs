@@ -79,7 +79,7 @@ public class WindowStateManager : IWindowStateManager
         File.WriteAllText(_settingsFile, json);
     }
 
-    private class WindowState
+    private sealed class WindowState
     {
         public int WindowWidth { get; set; } = 1280;
         public int WindowHeight { get; set; } = 800;

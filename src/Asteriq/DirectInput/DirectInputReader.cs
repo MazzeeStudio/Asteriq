@@ -19,7 +19,7 @@ public sealed class DirectInputReader : IDisposable
     // Cached delegates to prevent GC collection
     private readonly EnumDevicesCallback _enumCallback;
 
-    private class DeviceHandle
+    private sealed class DeviceHandle
     {
         public IntPtr Device;
         public Guid InstanceGuid;

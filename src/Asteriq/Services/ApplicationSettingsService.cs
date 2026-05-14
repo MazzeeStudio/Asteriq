@@ -424,7 +424,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         File.WriteAllText(_settingsFile, json);
     }
 
-    private class AppSettings
+    private sealed class AppSettings
     {
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;
@@ -475,7 +475,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
     /// Reads legacy FontSizeOption strings ("VSmall"…"XLarge") as floats,
     /// and passes through numeric values unchanged.
     /// </summary>
-    private class FontScaleConverter : JsonConverter<float>
+    private sealed class FontScaleConverter : JsonConverter<float>
     {
         public override float Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

@@ -8,13 +8,13 @@ namespace Asteriq.UI;
 public partial class MainForm : Form
 {
     // Input forwarding state (physical → vJoy)
-    private bool _isForwarding = false;
+    private bool _isForwarding;
 
     // Network forwarding state
     private volatile NetworkInputMode _networkMode = NetworkInputMode.Local;
     private bool _isNetworkConnecting;    // true while master-side handshake is in-flight
-    private bool _lastSwitchButtonState = false;
-    private long _lastSwitchButtonTick = 0;
+    private bool _lastSwitchButtonState;
+    private long _lastSwitchButtonTick;
     private const int SwitchDebounceMs = 400;
 
     // NetworkVJoyService wrapper — provides capture-mode forwarding; always the same object as _vjoyService

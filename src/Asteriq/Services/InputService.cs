@@ -53,7 +53,7 @@ public sealed class InputService : IInputService
     private DirectInputService? _directInputService;
     private readonly ConcurrentDictionary<int, Guid> _sdlToDirectInputGuid = new();
 
-    public bool OnlyFireOnChange { get; set; } = false;
+    public bool OnlyFireOnChange { get; set; }
     public InputPollingBackend InputBackend { get; set; } = InputPollingBackend.DirectInput;
 
     public event EventHandler<DeviceInputState>? InputReceived;

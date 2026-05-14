@@ -67,7 +67,7 @@ public partial class MainForm : Form
     private const int TitleBarHeight = 75;
 
     // Manual maximize state (we handle maximize ourselves for better control)
-    private bool _isManuallyMaximized = false;
+    private bool _isManuallyMaximized;
     private Rectangle _restoreBounds;  // Bounds to restore to when unmaximizing
 
     // Version from assembly (set at build time via MSBuild)
@@ -114,10 +114,10 @@ public partial class MainForm : Form
 #pragma warning restore CA2213
     private System.Windows.Forms.Timer _renderTimer = null!;
     private FUIBackground _background = new();
-    private float _scanLineProgress = 0f;
-    private float _dashPhase = 0f;
-    private float _pulsePhase = 0f;
-    private float _leadLineProgress = 0f;
+    private float _scanLineProgress;
+    private float _dashPhase;
+    private float _pulsePhase;
+    private float _leadLineProgress;
 
     // Custom form icon (tracked separately so we never accidentally Dispose the shared WinForms DefaultIcon)
     private Icon? _customFormIcon;
@@ -125,7 +125,7 @@ public partial class MainForm : Form
     // Performance optimization
     private bool _isDirty = true;  // Force initial render
     private bool _enableAnimations = true;  // Can be toggled for performance
-    private bool _isResizing = false;  // Suppress renders during resize
+    private bool _isResizing;  // Suppress renders during resize
     private int _unfocusedFrameCount;  // Tracks ticks for background frame-rate throttle
 
     // Phase 2: Render caching
@@ -140,7 +140,7 @@ public partial class MainForm : Form
     // (Mapping tab fields moved to MappingsTabController)
 
     // Tab state
-    private int _activeTab = 0;
+    private int _activeTab;
     private readonly string[] _tabNames = { "DEVICES", "MAPPINGS", "KEYBINDINGS", "SETTINGS" };
     private float _tabsStartX; // cached each draw pass, used by HitTest
 
@@ -174,7 +174,7 @@ public partial class MainForm : Form
     private readonly ActiveInputTracker _activeInputTracker = new();
 
     // Shared vJoy state (used by SyncTabContext, UpdateMappingsPrimaryDeviceMap)
-    private int _selectedVJoyDeviceIndex = 0;
+    private int _selectedVJoyDeviceIndex;
     private List<VJoyDeviceInfo> _vjoyDevices = new();
 
     // (Mappings tab UI fields moved to MappingsTabController)

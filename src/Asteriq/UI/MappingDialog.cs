@@ -56,16 +56,16 @@ public class MappingDialog : FUIBaseDialog
     // Dialog state
     private MappingDialogState _state = MappingDialogState.WaitingForInput;
     private DetectedInput? _detectedInput;
-    private int _selectedVJoyDevice = 0;
-    private int _selectedOutputIndex = 0;
+    private int _selectedVJoyDevice;
+    private int _selectedOutputIndex;
     private ButtonMode _selectedButtonMode = ButtonMode.Normal;
     private int _timeoutRemaining = 30; // seconds
 
     // Output mode state (vJoy vs Keyboard)
-    private bool _keyboardMode = false;
+    private bool _keyboardMode;
     private string _selectedKey = "";
     private List<string> _capturedModifiers = new();  // Stores captured modifiers (LCtrl, RCtrl, LShift, RShift, LAlt, RAlt)
-    private bool _waitingForKeyCapture = false;
+    private bool _waitingForKeyCapture;
 
     // Keyboard interop delegated to KeyboardHelper
 

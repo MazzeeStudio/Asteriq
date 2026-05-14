@@ -85,6 +85,7 @@ public partial class MainForm : Form
             _isForwarding = true;
             _tabContext.IsForwarding = true;
             _trayIcon.SetActive(true);
+            UpdateTrayMenu();
         }
     }
 
@@ -98,6 +99,7 @@ public partial class MainForm : Form
         _isForwarding = false;
         _tabContext.IsForwarding = false;
         _trayIcon.SetActive(false);
+        UpdateTrayMenu();
     }
 
     /// <summary>

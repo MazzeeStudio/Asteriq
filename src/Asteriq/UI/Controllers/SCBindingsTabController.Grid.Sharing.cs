@@ -67,9 +67,20 @@ public partial class SCBindingsTabController
         var mappingProfile = _ctx.ProfileManager.ActiveProfile;
         if (mappingProfile is null) return;
 
-        // Collect unique reroute specs: (fromVJoy, fromButton) â†’ (toVJoy, toButton).
-        // Skip primaries with modifiers â€” those shares rely on per-<rebind> XML emission
-        // rather than reroute, so the secondary input reaches SC as its own vJoy button.
+        var reroutes = BuildRerouteMap();
+        if (reroutes.Count == 0) return;
+
+        bool changed = ApplyReroutesToMappingProfile(mappingProfile, reroutes);
+
+        if (changed && notifyEngine)
+            _ctx.OnMappingsChanged();
+    }
+
+    // Collect unique reroute specs: (fromVJoy, fromButton) -> (toVJoy, toButton).
+    // Skip primaries with modifiers — those shares rely on per-<rebind> XML emission
+    // rather than reroute, so the secondary input reaches SC as its own vJoy button.
+    private Dictionary<(uint fromVJoy, int fromButton), (uint toVJoy, int toButton)> BuildRerouteMap()
+    {
         var reroutes = new Dictionary<(uint fromVJoy, int fromButton), (uint toVJoy, int toButton)>();
         foreach (var binding in _scExportProfile.Bindings)
         {
@@ -84,65 +95,91 @@ public partial class SCBindingsTabController
                 reroutes[(shared.VJoySlot, secondaryButton)] = (binding.VJoyDevice, primaryButton);
             }
         }
+        return reroutes;
+    }
 
-        if (reroutes.Count == 0) return;
-
+    private bool ApplyReroutesToMappingProfile(
+        MappingProfile mappingProfile,
+        IReadOnlyDictionary<(uint fromVJoy, int fromButton), (uint toVJoy, int toButton)> reroutes)
+    {
         bool changed = false;
         foreach (var binding in _scExportProfile.Bindings)
         {
             if (binding.Modifiers.Count > 0) continue;
             foreach (var shared in binding.SharedWith)
             {
-                int secondaryButton = ParseButtonIndex(shared.InputName);
-                if (secondaryButton < 0) continue;
-
-                var newIds = new List<Guid>();
-                foreach (var bm in mappingProfile.ButtonMappings)
-                {
-                    if (bm.Output.Type == OutputType.VJoyButton &&
-                        bm.Output.VJoyDevice == shared.VJoySlot &&
-                        bm.Output.Index == secondaryButton)
-                    {
-                        int primaryButton = ParseButtonIndex(binding.InputName);
-                        if (primaryButton < 0) continue;
-                        bm.Output.VJoyDevice = binding.VJoyDevice;
-                        bm.Output.Index = primaryButton;
-                        newIds.Add(bm.Id);
-                        changed = true;
-                    }
-                }
-
-                // Skip if this reroute was already applied by a previous SharedWith entry
-                // on the same binding (PerformShare only reroutes once, other entries share the IDs).
-                if (newIds.Count == 0 && reroutes.ContainsKey((shared.VJoySlot, ParseButtonIndex(shared.InputName))))
-                {
-                    // Another SharedWith entry for the same button already applied the reroute.
-                    // Copy the IDs from the reroute spec so RevertSharedBindingReroutes can find them.
-                    var key = (shared.VJoySlot, ParseButtonIndex(shared.InputName));
-                    var target = reroutes[key];
-                    foreach (var bm in mappingProfile.ButtonMappings)
-                    {
-                        if (bm.Output.Type == OutputType.VJoyButton &&
-                            bm.Output.VJoyDevice == target.toVJoy &&
-                            bm.Output.Index == target.toButton)
-                        {
-                            // This mapping is already rerouted to the primary
-                            if (shared.ReroutedMappingIds.Count == 0 || shared.ReroutedMappingIds.Contains(bm.Id))
-                                newIds.Add(bm.Id);
-                        }
-                    }
-                }
-
-                if (newIds.Count > 0)
-                    shared.ReroutedMappingIds = newIds;
+                if (ApplyRerouteForSharedEntry(mappingProfile, binding, shared, reroutes))
+                    changed = true;
             }
         }
+        return changed;
+    }
 
-        if (changed)
+    private static bool ApplyRerouteForSharedEntry(
+        MappingProfile mappingProfile,
+        SCActionBinding binding,
+        SCSharedInput shared,
+        IReadOnlyDictionary<(uint fromVJoy, int fromButton), (uint toVJoy, int toButton)> reroutes)
+    {
+        int secondaryButton = ParseButtonIndex(shared.InputName);
+        if (secondaryButton < 0) return false;
+
+        var newIds = RerouteMatchingMappings(mappingProfile, binding, shared.VJoySlot, secondaryButton);
+        bool changed = newIds.Count > 0;
+
+        // Fallback: another SharedWith entry on the same binding already applied the
+        // reroute (PerformShare only reroutes once, other entries share the IDs).
+        // Copy the IDs from the reroute spec so RevertSharedBindingReroutes can find them.
+        if (newIds.Count == 0 && reroutes.TryGetValue((shared.VJoySlot, secondaryButton), out var target))
+            newIds = CollectAlreadyReroutedIds(mappingProfile, target, shared.ReroutedMappingIds);
+
+        if (newIds.Count > 0)
+            shared.ReroutedMappingIds = newIds;
+
+        return changed;
+    }
+
+    private static List<Guid> RerouteMatchingMappings(
+        MappingProfile mappingProfile,
+        SCActionBinding binding,
+        uint fromVJoy,
+        int fromButton)
+    {
+        var newIds = new List<Guid>();
+        int primaryButton = ParseButtonIndex(binding.InputName);
+        if (primaryButton < 0) return newIds;
+
+        foreach (var bm in mappingProfile.ButtonMappings)
         {
-            if (notifyEngine)
-                _ctx.OnMappingsChanged();
+            if (bm.Output.Type == OutputType.VJoyButton &&
+                bm.Output.VJoyDevice == fromVJoy &&
+                bm.Output.Index == fromButton)
+            {
+                bm.Output.VJoyDevice = binding.VJoyDevice;
+                bm.Output.Index = primaryButton;
+                newIds.Add(bm.Id);
+            }
         }
+        return newIds;
+    }
+
+    private static List<Guid> CollectAlreadyReroutedIds(
+        MappingProfile mappingProfile,
+        (uint toVJoy, int toButton) target,
+        IReadOnlyCollection<Guid> existingIds)
+    {
+        var newIds = new List<Guid>();
+        foreach (var bm in mappingProfile.ButtonMappings)
+        {
+            if (bm.Output.Type == OutputType.VJoyButton &&
+                bm.Output.VJoyDevice == target.toVJoy &&
+                bm.Output.Index == target.toButton &&
+                (existingIds.Count == 0 || existingIds.Contains(bm.Id)))
+            {
+                newIds.Add(bm.Id);
+            }
+        }
+        return newIds;
     }
 
     /// <summary>

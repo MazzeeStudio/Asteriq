@@ -173,7 +173,7 @@ public partial class SCBindingsTabController
     /// in the contextual slot above Cell Details when a row is selected. Auto-expanded when the
     /// user clicks the action name; auto-collapsed (header only) when they click a cell.
     /// </summary>
-    private void DrawBindingDefinitionPanel(SKCanvas canvas, SKRect bounds, float frameInset, bool isExpanded)
+    private void DrawBindingDefinitionPanel(SKCanvas canvas, SKRect bounds, bool isExpanded)
     {
         if (_scFilteredActions is null
             || _cell.SelectedCell.actionIndex < 0

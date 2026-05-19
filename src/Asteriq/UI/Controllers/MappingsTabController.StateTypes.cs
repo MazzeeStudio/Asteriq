@@ -60,8 +60,6 @@ public partial class MappingsTabController
         public List<string>? SelectedModifiers;
         public SKRect CaptureBounds;
         public bool CaptureHovered;
-        public SKRect ClearBounds;
-        public bool ClearHovered;
         public bool IsCapturing;
         public long CaptureStartTicks;
         public string? PendingModifierName;
@@ -75,19 +73,8 @@ public partial class MappingsTabController
     private sealed class InputDetectionState
     {
         public bool IsListening;
-        public SKRect FieldBounds;
         public DetectedInput? PendingInput;
         public long ListeningStartTicks;
-        public bool ManualEntryMode;
-        public SKRect ManualEntryBounds;
-        public int SelectedSourceDevice;
-        public int SelectedSourceControl;
-        public SKRect DeviceDropdownBounds;
-        public SKRect ControlDropdownBounds;
-        public bool DeviceDropdownOpen;
-        public bool ControlDropdownOpen;
-        public int HoveredDeviceIndex = -1;
-        public int HoveredControlIndex = -1;
     }
 
     private sealed class MergeModeDropdownState

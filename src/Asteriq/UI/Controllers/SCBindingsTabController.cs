@@ -53,9 +53,6 @@ public partial class SCBindingsTabController : ITabController
     private bool _scExportFilenameBoxFocused;
     private string _scExportFilename = "";
     private List<SCMappingFile> _scAvailableProfiles = new();
-    private bool _scImportDropdownOpen;
-    private SKRect _scImportDropdownBounds;
-    private int _scHoveredImportProfile = -1;
     private SKRect _scClearAllButtonBounds;
     private bool _scClearAllButtonHovered;
     private SKRect _scResetDefaultsButtonBounds;
@@ -65,8 +62,8 @@ public partial class SCBindingsTabController : ITabController
     private List<SCAction>? _scFilteredActions;
     private int _scSelectedActionIndex = -1;
     private int _scHoveredActionIndex = -1;
-    private float _scBindingsScrollOffset = 0;
-    private float _scBindingsContentHeight = 0;
+    private float _scBindingsScrollOffset;
+    private float _scBindingsContentHeight;
     private SKRect _scBindingsListBounds;
     private List<SKRect> _scActionRowBounds = new();
 
@@ -220,7 +217,7 @@ public partial class SCBindingsTabController : ITabController
     /// <summary>
     /// Represents a column in the SC bindings grid
     /// </summary>
-    private class SCGridColumn
+    private sealed class SCGridColumn
     {
         public string Id { get; set; } = "";
         public string Header { get; set; } = "";

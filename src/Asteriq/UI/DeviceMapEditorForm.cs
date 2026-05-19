@@ -20,7 +20,7 @@ public partial class DeviceMapEditorForm : Form
     private SKControl _canvas = null!;
 #pragma warning restore CA2213
     private System.Windows.Forms.Timer _renderTimer = null!;
-    private float _pulsePhase = 0f;
+    private float _pulsePhase;
 
     // SVG handling
     private SKSvg? _currentSvg;
@@ -33,7 +33,7 @@ public partial class DeviceMapEditorForm : Form
     // Current device map being edited
     private DeviceMap _deviceMap = new();
     private string _currentJsonPath = "";
-    private bool _hasUnsavedChanges = false;
+    private bool _hasUnsavedChanges;
 
     // Selection and interaction state
     private string? _selectedControlKey;
@@ -57,14 +57,14 @@ public partial class DeviceMapEditorForm : Form
     private SKRect _jsonTextBoxBounds;
     private SKRect _newButtonBounds;
     private SKRect _loadButtonBounds;
-    private bool _svgDropdownOpen = false;
+    private bool _svgDropdownOpen;
     private List<SKRect> _svgDropdownItemBounds = new();
 
     // Controls list
     private List<SKRect> _controlListItemBounds = new();
     private SKRect _addControlButtonBounds;
     private SKRect _deleteControlButtonBounds;
-    private float _controlsListScroll = 0;
+    private float _controlsListScroll;
 
     // Save button
     private SKRect _saveButtonBounds;
@@ -90,11 +90,11 @@ public partial class DeviceMapEditorForm : Form
     // Hover states
     private int _hoveredSvgDropdownItem = -1;
     private int _hoveredControlListItem = -1;
-    private bool _saveButtonHovered = false;
-    private bool _newButtonHovered = false;
-    private bool _loadButtonHovered = false;
-    private bool _addControlHovered = false;
-    private bool _deleteControlHovered = false;
+    private bool _saveButtonHovered;
+    private bool _newButtonHovered;
+    private bool _loadButtonHovered;
+    private bool _addControlHovered;
+    private bool _deleteControlHovered;
 
     // Text input state (simple focus tracking)
     private string _jsonFileName = "new_device.json";
@@ -104,7 +104,7 @@ public partial class DeviceMapEditorForm : Form
     private DateTime _lastSaveTime;
 
     // Window dragging
-    private bool _isDragging = false;
+    private bool _isDragging;
     private Point _dragStart;
     private const int TitleBarHeight = 40;
 

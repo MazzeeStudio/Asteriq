@@ -8,7 +8,7 @@ namespace Asteriq.DirectInput;
 /// This provides an alternative to SDL2 for more reliable input reading,
 /// especially for dual-role controls (slider+button) and complex devices.
 /// </summary>
-public class DirectInputReader : IDisposable
+public sealed class DirectInputReader : IDisposable
 {
     private IntPtr _directInput;
     private readonly Dictionary<Guid, DeviceHandle> _openDevices = new();
@@ -19,7 +19,7 @@ public class DirectInputReader : IDisposable
     // Cached delegates to prevent GC collection
     private readonly EnumDevicesCallback _enumCallback;
 
-    private class DeviceHandle
+    private sealed class DeviceHandle
     {
         public IntPtr Device;
         public Guid InstanceGuid;
@@ -308,7 +308,7 @@ public class DirectInputReader : IDisposable
                     return false;
                 }
                 handle.IsAcquired = true;
-                hr = handle.Poll(handle.Device);
+                _ = handle.Poll(handle.Device);
             }
 
             // Get device state

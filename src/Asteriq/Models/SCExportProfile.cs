@@ -59,12 +59,12 @@ public class SCExportProfile
     /// <summary>
     /// Whether to include default keyboard bindings in export
     /// </summary>
-    public bool IncludeKeyboardDefaults { get; set; } = false;
+    public bool IncludeKeyboardDefaults { get; set; }
 
     /// <summary>
     /// Whether to include default mouse bindings in export
     /// </summary>
-    public bool IncludeMouseDefaults { get; set; } = false;
+    public bool IncludeMouseDefaults { get; set; }
 
     /// <summary>
     /// Gets the SC instance number for a vJoy device

@@ -7,11 +7,11 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController
+public sealed partial class SettingsTabController
 {
     private const float RightPanelCollapsedH = 40f;
 
-    private void DrawRightPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawRightPanel(SKCanvas canvas, SKRect bounds)
     {
         bool networkEnabled  = _ctx.AppSettings.NetworkEnabled;
         bool hidHideInstalled = _ctx.HidHide?.IsAvailable() == true;
@@ -60,7 +60,7 @@ public partial class SettingsTabController
             // 1-panel: VISUAL only
             _networkPanelHeaderBounds = SKRect.Empty;
             _hidHidePanelHeaderBounds = SKRect.Empty;
-            DrawVisualSettingsSubPanel(canvas, bounds, frameInset);
+            DrawVisualSettingsSubPanel(canvas, bounds);
             return;
         }
 
@@ -74,14 +74,14 @@ public partial class SettingsTabController
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
                 var hidHideBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, bounds.Bottom);
                 DrawVisualPanelCollapsed(canvas, visualBounds);
-                DrawHidHideSettingsPanel(canvas, hidHideBounds, frameInset);
+                DrawHidHideSettingsPanel(canvas, hidHideBounds);
             }
             else
             {
                 float hidHideTop  = bounds.Bottom - RightPanelCollapsedH;
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, hidHideTop - gap);
                 var hidHideBounds = new SKRect(bounds.Left, hidHideTop, bounds.Right, bounds.Bottom);
-                DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
+                DrawVisualSettingsSubPanel(canvas, visualBounds);
                 DrawHidHidePanelCollapsed(canvas, hidHideBounds);
             }
             return;
@@ -97,14 +97,14 @@ public partial class SettingsTabController
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, visBottom);
                 var networkBounds = new SKRect(bounds.Left, visBottom + gap, bounds.Right, bounds.Bottom);
                 DrawVisualPanelCollapsed(canvas, visualBounds);
-                DrawNetworkSettingsPanel(canvas, networkBounds, frameInset);
+                DrawNetworkSettingsPanel(canvas, networkBounds);
             }
             else
             {
                 float netTop      = bounds.Bottom - RightPanelCollapsedH;
                 var visualBounds  = new SKRect(bounds.Left, bounds.Top, bounds.Right, netTop - gap);
                 var networkBounds = new SKRect(bounds.Left, netTop, bounds.Right, bounds.Bottom);
-                DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
+                DrawVisualSettingsSubPanel(canvas, visualBounds);
                 DrawNetworkPanelCollapsed(canvas, networkBounds);
             }
             return;
@@ -138,7 +138,7 @@ public partial class SettingsTabController
             canvas.ClipRect(visualBounds);
             if (visExpanded)
             {
-                DrawVisualSettingsSubPanel(canvas, visualBounds, frameInset);
+                DrawVisualSettingsSubPanel(canvas, visualBounds);
             }
             else
                 DrawVisualPanelCollapsed(canvas, visualBounds);
@@ -148,7 +148,7 @@ public partial class SettingsTabController
             canvas.Save();
             canvas.ClipRect(networkBounds);
             if (netExpanded)
-                DrawNetworkSettingsPanel(canvas, networkBounds, frameInset);
+                DrawNetworkSettingsPanel(canvas, networkBounds);
             else
                 DrawNetworkPanelCollapsed(canvas, networkBounds);
             canvas.Restore();
@@ -157,7 +157,7 @@ public partial class SettingsTabController
             canvas.Save();
             canvas.ClipRect(hidHideBounds);
             if (hidExpanded)
-                DrawHidHideSettingsPanel(canvas, hidHideBounds, frameInset);
+                DrawHidHideSettingsPanel(canvas, hidHideBounds);
             else
                 DrawHidHidePanelCollapsed(canvas, hidHideBounds);
             canvas.Restore();

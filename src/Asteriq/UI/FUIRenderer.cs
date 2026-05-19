@@ -21,7 +21,7 @@ public static partial class FUIRenderer
     private static UIFontFamily _fontFamily = UIFontFamily.Carbon;
     private static float _windowsTextScaleFactor = 1.0f;
     private static float _displayScaleFactor = 1.0f;  // DPI scale (150% = 1.5)
-    private static bool _windowsScaleDetected = false;
+    private static bool _windowsScaleDetected;
 
     /// <summary>
     /// Initialize font scaling by detecting Windows text scale setting.

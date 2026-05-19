@@ -5,7 +5,7 @@ namespace Asteriq.UI.Controllers;
 
 public partial class SCBindingsTabController
 {
-    private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex, SCGridColumn col)
+    private string GetVJoyAxisNameFromMapping(PhysicalDeviceInfo device, int physicalAxisIndex)
     {
         // Look up the mapping in the active profile
         var profile = _ctx.ProfileManager.ActiveProfile;
@@ -119,23 +119,6 @@ public partial class SCBindingsTabController
         if (angle >= 45 && angle < 135) return 1;   // Right
         if (angle >= 135 && angle < 225) return 2;  // Down
         return 3; // Left
-    }
-
-    private static int GetAxisIndexFromBinding(string binding)
-    {
-        return binding.ToLowerInvariant() switch
-        {
-            "x" => 0,
-            "y" => 1,
-            "z" => 2,
-            "rx" => 3,
-            "ry" => 4,
-            "rz" => 5,
-            "slider1" => 6,
-            "slider2" => 7,
-            _ when binding.StartsWith("axis") && int.TryParse(binding.AsSpan(4), out int idx) => idx,
-            _ => -1
-        };
     }
 
     private static SCInputType InferInputTypeFromName(string inputName)

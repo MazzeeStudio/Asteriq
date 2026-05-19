@@ -102,8 +102,6 @@ public partial class SCBindingsTabController
         FUIRenderer.DrawButton(canvas, _profileMgmt.ImportProfileBounds, "Import",
             _profileMgmt.ImportProfileHovered ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal);
 
-        y += textBtnHeight + 10f;
-
         // Compute profile dropdown list bounds so the draw-last pass can render it on top of all panels
         if (_profileMgmt.DropdownOpen)
         {
@@ -166,59 +164,6 @@ public partial class SCBindingsTabController
         }
     }
 
-    private void DrawSCImportDropdown(SKCanvas canvas, SKRect buttonBounds)
-    {
-        float itemHeight = 28f;
-        float dropdownHeight = Math.Min(_scAvailableProfiles.Count * itemHeight + 8f, 200f);
-
-        _scImportDropdownBounds = new SKRect(
-            buttonBounds.Left,
-            buttonBounds.Bottom + 2,
-            buttonBounds.Right,
-            buttonBounds.Bottom + 2 + dropdownHeight);
-
-        // Shared FUI chrome
-        FUIRenderer.DrawPanelShadow(canvas, _scImportDropdownBounds, 4f, 4f, 15f);
-        using var glowPaint = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            Color = FUIColors.ActiveLight,
-            StrokeWidth = 3f,
-            IsAntialias = true,
-            ImageFilter = SKImageFilter.CreateBlur(4f, 4f)
-        };
-        canvas.DrawRect(_scImportDropdownBounds, glowPaint);
-        using var bgPaint = FUIRenderer.CreateFillPaint(FUIColors.Void);
-        canvas.DrawRect(_scImportDropdownBounds, bgPaint);
-        using var innerPaint = FUIRenderer.CreateFillPaint(FUIColors.Background0);
-        canvas.DrawRect(_scImportDropdownBounds.Inset(2, 2), innerPaint);
-        FUIRenderer.DrawLCornerFrame(canvas, _scImportDropdownBounds, FUIColors.ActiveStrong, 20f, 6f, 1.5f, true);
-
-        // Items (custom layout: name left, date right)
-        float y = _scImportDropdownBounds.Top + 4;
-        float leftMargin = _scImportDropdownBounds.Left + 10;
-        float rightMargin = _scImportDropdownBounds.Right - 8;
-        for (int i = 0; i < _scAvailableProfiles.Count; i++)
-        {
-            var profile = _scAvailableProfiles[i];
-            var itemBounds = new SKRect(_scImportDropdownBounds.Left + 2, y, _scImportDropdownBounds.Right - 2, y + itemHeight);
-            bool isHovered = itemBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-            if (isHovered)
-            {
-                _scHoveredImportProfile = i;
-                using var hoverBg = FUIRenderer.CreateFillPaint(FUIColors.SelectionBg);
-                canvas.DrawRect(itemBounds, hoverBg);
-                using var accentBar = FUIRenderer.CreateFillPaint(FUIColors.Active);
-                canvas.DrawRect(new SKRect(itemBounds.Left, itemBounds.Top + 2, itemBounds.Left + 2, itemBounds.Bottom - 2), accentBar);
-            }
-            var textColor = isHovered ? FUIColors.TextBright : FUIColors.TextPrimary;
-            FUIRenderer.DrawText(canvas, profile.DisplayName, new SKPoint(leftMargin, y + itemHeight / 2 + 4), textColor, 13f);
-            var dateText = profile.LastModified.ToString("MM/dd HH:mm");
-            float dateWidth = FUIRenderer.MeasureText(dateText, 12f);
-            FUIRenderer.DrawText(canvas, dateText, new SKPoint(rightMargin - dateWidth, y + itemHeight / 2 + 3), FUIColors.TextDim, 12f);
-            y += itemHeight;
-        }
-    }
 
     private void DrawSCActionMapFilterDropdown(SKCanvas canvas)
     {

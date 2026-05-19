@@ -136,7 +136,7 @@ public partial class DevicesTabController : ITabController
         if (HandleSilhouetteClick(e)) return;
         if (HandleVJoyActionClick(e)) return;
         if (HandleForwardingClick(e)) return;
-        if (HandleDeviceListClick(e)) return;
+        if (HandleDeviceListClick()) return;
         HandleSvgClick(e);
     }
 

@@ -78,7 +78,7 @@ public partial class MainForm
         }
     }
 
-    private record DisconnectedDeviceInfo
+    private sealed record DisconnectedDeviceInfo
     {
         public string Name { get; init; } = string.Empty;
         public Guid InstanceGuid { get; init; }

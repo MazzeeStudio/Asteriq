@@ -37,9 +37,7 @@ public class MappingDialogResult
 /// </summary>
 public class MappingDialog : FUIBaseDialog
 {
-    private readonly IInputService _inputService;
     private readonly InputDetectionService _detectionService;
-    private readonly IVJoyService _vjoyService;
     private readonly List<VJoyDeviceInfo> _vjoyDevices;
 
     // CA2213: SKControl is a WinForms child control — disposed automatically via Controls collection
@@ -56,16 +54,16 @@ public class MappingDialog : FUIBaseDialog
     // Dialog state
     private MappingDialogState _state = MappingDialogState.WaitingForInput;
     private DetectedInput? _detectedInput;
-    private int _selectedVJoyDevice = 0;
-    private int _selectedOutputIndex = 0;
-    private ButtonMode _selectedButtonMode = ButtonMode.Normal;
+    private int _selectedVJoyDevice;
+    private int _selectedOutputIndex;
+    private readonly ButtonMode _selectedButtonMode = ButtonMode.Normal;
     private int _timeoutRemaining = 30; // seconds
 
     // Output mode state (vJoy vs Keyboard)
-    private bool _keyboardMode = false;
+    private bool _keyboardMode;
     private string _selectedKey = "";
     private List<string> _capturedModifiers = new();  // Stores captured modifiers (LCtrl, RCtrl, LShift, RShift, LAlt, RAlt)
-    private bool _waitingForKeyCapture = false;
+    private bool _waitingForKeyCapture;
 
     // Keyboard interop delegated to KeyboardHelper
 
@@ -82,10 +80,8 @@ public class MappingDialog : FUIBaseDialog
 
     public MappingDialog(IInputService inputService, IVJoyService vjoyService, DetectedInput? preSelectedInput)
     {
-        _inputService = inputService;
-        _vjoyService = vjoyService;
-        _detectionService = new InputDetectionService(_inputService);
-        _vjoyDevices = _vjoyService.EnumerateDevices();
+        _detectionService = new InputDetectionService(inputService);
+        _vjoyDevices = vjoyService.EnumerateDevices();
 
         InitializeForm();
         InitializeCanvas();

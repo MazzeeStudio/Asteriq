@@ -9,12 +9,6 @@ namespace Asteriq.UI.Controllers;
 
 public partial class MappingsTabController
 {
-    private static string? GetKeyNameFromKeys(Keys keys)
-    {
-        var (keyName, _) = GetKeyNameAndModifiersFromKeys(keys);
-        return keyName;
-    }
-
     private static (string? keyName, List<string> modifiers) GetKeyNameAndModifiersFromKeys(Keys keys)
     {
         var modifiers = new List<string>();

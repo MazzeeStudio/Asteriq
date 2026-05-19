@@ -7,65 +7,6 @@ namespace Asteriq.UI.Controllers;
 
 public partial class MappingsTabController
 {
-    private void StartListeningForInput()
-    {
-        // Fire-and-forget async operation with internal exception handling
-        _ = StartListeningForInputAsync();
-    }
-
-    private async Task StartListeningForInputAsync()
-    {
-        if (_inputDetection.IsListening) return;
-        if (!_mappingEditorOpen) return;
-
-        _inputDetection.IsListening = true;
-        _inputDetection.ListeningStartTicks = Environment.TickCount64;
-        _inputDetection.PendingInput = null;
-
-        // Determine input type based on what we're editing
-        var filter = _isEditingAxis ? InputDetectionFilter.Axes : InputDetectionFilter.Buttons;
-
-        _inputDetectionService ??= new InputDetectionService(_ctx.InputService);
-
-        try
-        {
-            // Wait for actual input change - use a delay to skip initial state
-            await Task.Delay(200); // Small delay to let user release any currently pressed buttons
-
-            var detected = await _inputDetectionService.WaitForInputAsync(filter, 0.15f, 15000);
-
-            if (detected is not null && _mappingEditorOpen)
-            {
-                _inputDetection.PendingInput = detected;
-
-                // Update manual entry dropdowns to match detected input
-                PhysicalDeviceInfo? sourceDevice = null;
-                for (int i = 0; i < _ctx.Devices.Count; i++)
-                {
-                    if (_ctx.Devices[i].InstanceGuid == detected.DeviceGuid)
-                    {
-                        _inputDetection.SelectedSourceDevice = i;
-                        sourceDevice = _ctx.Devices[i];
-                        break;
-                    }
-                }
-                _inputDetection.SelectedSourceControl = detected.Index;
-
-                // Note: We intentionally do NOT auto-select vJoy row here.
-                // When user explicitly clicks a row to edit, their choice is respected.
-                // Type-aware mapping is only used in 1:1 auto-mapping feature.
-            }
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or InvalidOperationException)
-        {
-            System.Diagnostics.Debug.WriteLine($"[MainForm] Input listening cancelled or failed: {ex.Message}");
-        }
-        finally
-        {
-            _inputDetection.IsListening = false;
-        }
-    }
-
     private void CancelInputListening()
     {
         if (_inputDetection.IsListening)

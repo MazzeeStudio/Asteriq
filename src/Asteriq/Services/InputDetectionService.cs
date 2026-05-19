@@ -113,7 +113,7 @@ public enum InputDetectionFilter
 /// 3. Require intentional movement: large delta from stable baseline AND sustained over multiple samples
 /// 4. Noise filtering: ignore small fluctuations (jitter threshold ~0.02 = 2% of range)
 /// </summary>
-public class InputDetectionService : IDisposable
+public sealed class InputDetectionService : IDisposable
 {
     private readonly IInputService _inputService;
     private readonly object _lock = new();
@@ -124,19 +124,19 @@ public class InputDetectionService : IDisposable
     private float _axisThreshold = 0.5f;
 
     // Stable axis baseline (computed from warmup samples, represents "at rest" position)
-    private Dictionary<Guid, float[]> _stableAxisBaseline = new();
+    private readonly Dictionary<Guid, float[]> _stableAxisBaseline = new();
 
     // Button/hat state for transition detection
-    private Dictionary<Guid, bool[]> _initialButtons = new();
-    private Dictionary<Guid, int[]> _initialHats = new();
-    private Dictionary<Guid, bool[]> _previousButtons = new();
-    private Dictionary<Guid, int[]> _previousHats = new();
+    private readonly Dictionary<Guid, bool[]> _initialButtons = new();
+    private readonly Dictionary<Guid, int[]> _initialHats = new();
+    private readonly Dictionary<Guid, bool[]> _previousButtons = new();
+    private readonly Dictionary<Guid, int[]> _previousHats = new();
 
     // Axis stabilization - collect samples during warmup to establish stable baseline
-    private Dictionary<Guid, List<float[]>> _axisWarmupSamples = new();
+    private readonly Dictionary<Guid, List<float[]>> _axisWarmupSamples = new();
 
     // Track axis movement confirmation - need sustained movement to confirm intentional input
-    private Dictionary<Guid, int[]> _axisMovementConfirmCount = new();
+    private readonly Dictionary<Guid, int[]> _axisMovementConfirmCount = new();
     private const int RequiredConfirmationFrames = 3; // Reduced from 8 - quality sticks don't need much confirmation
 
     // Jitter threshold - movements smaller than this are considered noise (5% of axis range)
@@ -149,15 +149,15 @@ public class InputDetectionService : IDisposable
     private const float HighVarianceThreshold = 0.15f;
 
     // Track which axes are too noisy to use
-    private Dictionary<Guid, bool[]> _noisyAxes = new();
+    private readonly Dictionary<Guid, bool[]> _noisyAxes = new();
 
     // Warmup configuration - reduced for faster response
     private const int RequiredWarmupSamples = 10; // Reduced from 30 - fewer samples needed for baseline
     private const int RequiredWarmupPolls = 5;    // Reduced from 10 - less settle time needed
 
     // Per-device warmup tracking (each device needs its own warmup)
-    private Dictionary<Guid, int> _deviceWarmupPolls = new();
-    private Dictionary<Guid, bool> _deviceBaselineCaptured = new();
+    private readonly Dictionary<Guid, int> _deviceWarmupPolls = new();
+    private readonly Dictionary<Guid, bool> _deviceBaselineCaptured = new();
 
     /// <summary>
     /// Event fired when input is detected during waiting

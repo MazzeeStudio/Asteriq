@@ -111,7 +111,7 @@ public partial class MappingsTabController
             y = DrawAxisOutputModeToggle(canvas, leftMargin, rightMargin, y);
 
             if (_threshold.IsThresholdMode)
-                DrawThresholdSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
+                DrawThresholdSettings(canvas, leftMargin, rightMargin, y);
             else
                 DrawAxisSettings(canvas, leftMargin, rightMargin, y, bottomMargin);
         }

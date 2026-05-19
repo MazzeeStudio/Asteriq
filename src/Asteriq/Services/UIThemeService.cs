@@ -14,7 +14,7 @@ public class UIThemeService : IUIThemeService
     private readonly ILogger<UIThemeService> _logger;
     private readonly string _settingsFile;
     private readonly JsonSerializerOptions _jsonOptions;
-    private ThemeSettings _cachedSettings;
+    private readonly ThemeSettings _cachedSettings;
 
     public event EventHandler<FUITheme>? ThemeChanged;
 
@@ -96,7 +96,7 @@ public class UIThemeService : IUIThemeService
         File.WriteAllText(_settingsFile, json);
     }
 
-    private class ThemeSettings
+    private sealed class ThemeSettings
     {
         public FUITheme Theme { get; set; } = FUITheme.Drake;
         public int GridStrength { get; set; } = 30;

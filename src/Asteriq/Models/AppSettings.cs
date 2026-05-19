@@ -48,8 +48,8 @@ public class AppSettings
     public string? PreferredSCEnvironment { get; set; }
 
     // Window state
-    public int WindowWidth { get; set; } = 0;  // 0 = use default
-    public int WindowHeight { get; set; } = 0; // 0 = use default
+    public int WindowWidth { get; set; }   // 0 = use default
+    public int WindowHeight { get; set; }  // 0 = use default
     public int WindowX { get; set; } = int.MinValue; // MinValue = center on screen
     public int WindowY { get; set; } = int.MinValue; // MinValue = center on screen
 
@@ -57,5 +57,5 @@ public class AppSettings
     public List<string> CustomSCSearchPaths { get; set; } = new();
 
     // System tray settings
-    public bool CloseToTray { get; set; } = false; // Default: clicking X exits the app
+    public bool CloseToTray { get; set; }  // Default: clicking X exits the app
 }

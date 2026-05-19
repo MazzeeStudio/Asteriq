@@ -40,7 +40,6 @@ public partial class SCBindingsTabController
             && _scFilteredActions is not null
             && _cell.SelectedCell.actionIndex < _scFilteredActions.Count;
         bool showCellDetails = hasRowSelection && _cell.SelectedCell.colIndex >= 0;
-        bool hasContextualPanel = showColumnActions || hasRowSelection;
         ref var anim = ref _cpPanel.Anim;
 
         float afterInstall = installationBounds.Bottom + verticalGap;
@@ -70,7 +69,7 @@ public partial class SCBindingsTabController
         DrawSCBindingsTablePanel(canvas, leftBounds, frameInset);
 
         // RIGHT 1 — Game Environment (always visible)
-        DrawSCInstallationPanelCompact(canvas, installationBounds, frameInset);
+        DrawSCInstallationPanelCompact(canvas, installationBounds);
 
         // RIGHT 2 — Control Profiles (clipped to bounds during animation)
         bool cpExpanded = !anim.UseAnimatedLayout || _cpPanel.IsExpanded || anim.IsAnimatingOut;
@@ -99,7 +98,7 @@ public partial class SCBindingsTabController
                 if (!showCellDetails)
                 {
                     // Row selected, no cell — Binding Definition fills the contextual area.
-                    DrawBindingDefinitionPanel(canvas, contextualBounds, frameInset, contextualExpanded);
+                    DrawBindingDefinitionPanel(canvas, contextualBounds, contextualExpanded);
                 }
                 else
                 {
@@ -116,7 +115,7 @@ public partial class SCBindingsTabController
 
                     canvas.Save();
                     canvas.ClipRect(bdBounds);
-                    DrawBindingDefinitionPanel(canvas, bdBounds, frameInset,
+                    DrawBindingDefinitionPanel(canvas, bdBounds,
                         isExpanded: contextualExpanded && _bdPanel.IsExpanded);
                     canvas.Restore();
 
@@ -157,7 +156,7 @@ public partial class SCBindingsTabController
             && !_grid.Columns[_colImport.HighlightedColumn].IsReadOnly;
     }
 
-    private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawSCInstallationPanelCompact(SKCanvas canvas, SKRect bounds)
     {
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
         float y = m.Y;
@@ -251,14 +250,6 @@ public partial class SCBindingsTabController
         var items = _scInstall.Installations.Select(s => s.DisplayName).ToList();
         FUIWidgets.DrawDropdownPanel(canvas, _scInstall.DropdownBounds, items,
             _scInstall.SelectedInstallation, _scInstall.HoveredInstallation, itemH);
-    }
-
-    private static void DrawSCDetailRow(SKCanvas canvas, float leftMargin, float rightMargin, ref float y, string label, string value)
-    {
-        float lineHeight = 18f;
-        FUIRenderer.DrawText(canvas, label, new SKPoint(leftMargin, y), FUIColors.TextDim, 13f);
-        FUIRenderer.DrawText(canvas, value, new SKPoint(leftMargin + 120, y), FUIColors.TextDim, 13f);
-        y += lineHeight;
     }
 
     private static void DrawButtonCaptureToggle(SKCanvas canvas, SKRect bounds, bool active, bool hovered)

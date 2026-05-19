@@ -144,7 +144,7 @@ public partial class MappingsTabController
                     bool isSwitchBtn = rowIndex == switchRowIndex;
                     bool isShared = GetSharedSlotInfos(vjoyDevice!.Id, i).Count > 0;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, rowIndex, keyParts, isModifier, isSwitchBtn, isShared);
+                    DrawChunkyBindingRow(canvas, rowBounds, $"Button {i + 1}", binding, isSelected, isHovered, keyParts, isModifier, isSwitchBtn, isShared);
                     _mappingRowBounds.Add(rowBounds);
                 }
                 else
@@ -175,7 +175,7 @@ public partial class MappingsTabController
                     bool isHovered = rowIndex == _hoveredMappingRow;
                     bool isMergedAway = GetMergedAwayInfo(profile, vjoyDevice!.Id, axisIdx) is not null;
 
-                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered, rowIndex,
+                    DrawChunkyBindingRow(canvas, rowBounds, axisNames[axisIdx], binding, isSelected, isHovered,
                         isMergedAway: isMergedAway);
                     _mappingRowBounds.Add(rowBounds);
                 }
@@ -205,41 +205,6 @@ public partial class MappingsTabController
         }
     }
 
-    private void DrawNetSwitchBadge(SKCanvas canvas, SKRect listBounds, MappingProfile? profile)
-    {
-        _netSwitch.BadgeBounds = SKRect.Empty;
-        _netSwitch.BadgeXBounds = SKRect.Empty;
-        _netSwitch.BadgeXHovered = false;
-
-        var cfg = profile?.NetworkSwitchButton;
-        if (cfg is null) return;
-
-        const float badgeH = 26f;
-        const float badgeGap = 6f;
-        float badgeY = listBounds.Bottom + badgeGap;
-        var badgeRect = new SKRect(listBounds.Left, badgeY, listBounds.Right, badgeY + badgeH);
-        _netSwitch.BadgeBounds = badgeRect;
-
-        FUIRenderer.DrawRoundedPanel(canvas, badgeRect,
-            FUIColors.Warning.WithAlpha(FUIColors.AlphaLightTint),
-            FUIColors.Warning.WithAlpha(FUIColors.AlphaBorderSoft));
-
-        float textY = badgeRect.MidY + 5f;
-        FUIRenderer.DrawText(canvas, "TX TOGGLE: " + cfg.DisplayName,
-            new SKPoint(badgeRect.Left + 10f, textY), FUIColors.Warning, 13f);
-
-        // × close button on right
-        const float xSize = 16f;
-        var xBounds = new SKRect(badgeRect.Right - xSize - 6f, badgeRect.MidY - xSize / 2f,
-            badgeRect.Right - 6f, badgeRect.MidY + xSize / 2f);
-        _netSwitch.BadgeXBounds = xBounds;
-        _netSwitch.BadgeXHovered = xBounds.Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);
-
-        using var xPaint = FUIRenderer.CreateTextPaint(
-            _netSwitch.BadgeXHovered ? FUIColors.TextBright : FUIColors.Warning.WithAlpha(200), 12f);
-        float xTextX = xBounds.MidX - 3f;
-        canvas.DrawText("\u00D7", xTextX, xBounds.MidY + 5f, xPaint);
-    }
 
     /// <summary>
     /// Get the keyboard key parts for a button mapping (modifiers + key as separate items)
@@ -297,7 +262,7 @@ public partial class MappingsTabController
 
 
     private void DrawChunkyBindingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
-        bool isSelected, bool isHovered, int rowIndex, List<string>? keyParts = null, bool isModifier = false,
+        bool isSelected, bool isHovered, List<string>? keyParts = null, bool isModifier = false,
         bool isSwitchButton = false, bool isShared = false, bool isMergedAway = false)
     {
         bool hasBinding = !string.IsNullOrEmpty(binding) && binding != "ÔÇö";
@@ -563,120 +528,6 @@ public partial class MappingsTabController
         return $"{input.DeviceName} - {input.Type} {input.Index}";
     }
 
-    private void DrawMappingRow(SKCanvas canvas, SKRect bounds, string outputName, string binding,
-        bool isSelected, bool isHovered, bool isEditing, int rowIndex, bool hasBind)
-    {
-        // Background
-        SKColor bgColor;
-        if (isEditing)
-            bgColor = FUIColors.Active.WithAlpha(FUIColors.AlphaGlow);
-        else if (isSelected)
-            bgColor = FUIColors.SelectionBg;
-        else if (isHovered)
-            bgColor = FUIColors.Primary.WithAlpha(30);
-        else
-            bgColor = FUIColors.DisabledBg;
-
-        using var bgPaint = FUIRenderer.CreateFillPaint(bgColor);
-        canvas.DrawRect(bounds, bgPaint);
-
-        // Frame
-        using var framePaint = FUIRenderer.CreateStrokePaint(
-            isEditing ? FUIColors.Active : (isSelected ? FUIColors.SelectionBorder : (isHovered ? FUIColors.FrameBright : FUIColors.Frame.WithAlpha(FUIColors.AlphaHoverStrong))),
-            isEditing ? 2f : (isSelected ? 1.5f : 1f));
-        canvas.DrawRect(bounds, framePaint);
-
-        // Output name (left)
-        float textY = bounds.MidY + 5;
-        FUIRenderer.DrawText(canvas, outputName, new SKPoint(bounds.Left + 10, textY),
-            FUIColors.ContentColor(isEditing), 15f);
-
-        // Binding (center)
-        float bindingX = bounds.Left + 100;
-        var bindColor = binding == "ÔÇö" ? FUIColors.TextDisabled : FUIColors.TextDim;
-        FUIRenderer.DrawText(canvas, binding, new SKPoint(bindingX, textY), bindColor, 14f);
-
-        // [+] button (Edit/Add)
-        float buttonSize = 24f;
-        float buttonY = bounds.MidY - buttonSize / 2;
-        float addButtonX = bounds.Right - (hasBind ? 60 : 36);
-        var addBounds = new SKRect(addButtonX, buttonY, addButtonX + buttonSize, buttonY + buttonSize);
-        _mappingAddButtonBounds.Add(addBounds);
-
-        bool addHovered = rowIndex == _hoveredAddButton;
-        string addIcon = hasBind ? "Ô£Ä" : "+";  // Pencil for edit, plus for add
-        FUIWidgets.DrawSmallIconButton(canvas, addBounds, addIcon, addHovered);
-
-        // [X] button (only if bound)
-        if (hasBind)
-        {
-            float removeButtonX = bounds.Right - 32;
-            var removeBounds = new SKRect(removeButtonX, buttonY, removeButtonX + buttonSize, buttonY + buttonSize);
-            _mappingRemoveButtonBounds.Add(removeBounds);
-
-            bool removeHovered = rowIndex == _hoveredRemoveButton;
-            FUIWidgets.DrawSmallIconButton(canvas, removeBounds, "X", removeHovered, true);
-        }
-        else
-        {
-            _mappingRemoveButtonBounds.Add(SKRect.Empty);
-        }
-    }
-
-    private void DrawMappingList(SKCanvas canvas, SKRect bounds)
-    {
-        float itemHeight = 50f;
-        float itemGap = 8f;
-        float y = bounds.Top;
-
-        var profile = _ctx.ProfileManager.ActiveProfile;
-        if (profile is null)
-        {
-            FUIRenderer.DrawText(canvas, "No configuration selected",
-                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 15f);
-            FUIRenderer.DrawText(canvas, "Select or create a configuration to add mappings",
-                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 14f);
-            return;
-        }
-
-        var allMappings = new List<(string source, string target, string type, bool enabled)>();
-
-        // Collect all mappings
-        foreach (var m in profile.ButtonMappings)
-        {
-            string source = m.Inputs.Count > 0 ? $"{m.Inputs[0].DeviceName} Btn {m.Inputs[0].Index + 1}" : "Unknown";
-            string target = m.Output.Type == OutputType.VJoyButton
-                ? $"vJoy {m.Output.VJoyDevice} Btn {m.Output.Index}"
-                : $"Key {m.Output.Index}";
-            allMappings.Add((source, target, "BUTTON", m.Enabled));
-        }
-
-        foreach (var m in profile.AxisMappings)
-        {
-            string source = m.Inputs.Count > 0 ? $"{m.Inputs[0].DeviceName} Axis {m.Inputs[0].Index}" : "Unknown";
-            string target = $"vJoy {m.Output.VJoyDevice} Axis {m.Output.Index}";
-            allMappings.Add((source, target, "AXIS", m.Enabled));
-        }
-
-        if (allMappings.Count == 0)
-        {
-            FUIRenderer.DrawText(canvas, "No mappings configured",
-                new SKPoint(bounds.Left + 20, y + 20), FUIColors.TextDim, 15f);
-            FUIRenderer.DrawText(canvas, "Click '+ ADD MAPPING' to create your first mapping",
-                new SKPoint(bounds.Left + 20, y + 40), FUIColors.TextDisabled, 14f);
-            return;
-        }
-
-        // Draw mapping items
-        foreach (var (source, target, type, enabled) in allMappings)
-        {
-            if (y + itemHeight > bounds.Bottom) break;
-
-            var itemBounds = new SKRect(bounds.Left, y, bounds.Right, y + itemHeight);
-            FUIWidgets.DrawMappingItem(canvas, itemBounds, source, target, type, enabled);
-            y += itemHeight + itemGap;
-        }
-    }
 
     private static string GetAxisBindingName(int axisIndex) => axisIndex switch
     {

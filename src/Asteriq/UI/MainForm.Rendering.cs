@@ -77,19 +77,8 @@ public partial class MainForm
         float contentTop = 88;  // 4px aligned
         float contentBottom = bounds.Bottom - 56;  // 4px aligned
 
-        // Calculate responsive panel widths based on window size
         // Side-tabbed panels (Devices, Mappings) use reduced left padding
         float sideTabPad = FUIRenderer.SpaceSM;  // 8px
-        float contentWidth = bounds.Width - sideTabPad - pad;
-        var layout = FUIRenderer.CalculateLayout(contentWidth, minLeftPanel: 360f, minRightPanel: 280f);
-
-        float leftPanelWidth = layout.LeftPanelWidth;
-        float rightPanelWidth = layout.RightPanelWidth;
-        float gap = layout.Gutter;
-        float centerStart = sideTabPad + leftPanelWidth + gap;
-        float centerEnd = layout.ShowRightPanel
-            ? bounds.Right - pad - rightPanelWidth - gap
-            : bounds.Right - pad;
 
         // Ensure active tab is valid (e.g. ClientOnly mode may have hidden it mid-session)
         SnapToValidTab();
@@ -137,14 +126,6 @@ public partial class MainForm
             DrawProfileDropdown(canvas, _profileSelectorBounds.Left, _profileSelectorBounds.Bottom + 8);
         }
     }
-
-    private static void DrawSelector(SKCanvas canvas, SKRect bounds, string text, bool isHovered, bool isEnabled)
-        => FUIWidgets.DrawSelector(canvas, bounds, text, isHovered, isEnabled);
-
-    private static void DrawTextFieldReadOnly(SKCanvas canvas, SKRect bounds, string text, bool isHovered)
-        => FUIWidgets.DrawTextFieldReadOnly(canvas, bounds, text, isHovered);
-
-
 
     private void DrawTitleBar(SKCanvas canvas, SKRect bounds)
     {
@@ -477,11 +458,6 @@ public partial class MainForm
     private static void DrawDropdownItem(SKCanvas canvas, float x, float itemY, float width, float itemHeight,
         string text, bool isHovered, bool isActive, bool isEnabled)
         => FUIWidgets.DrawDropdownItem(canvas, x, itemY, width, itemHeight, text, isHovered, isActive, isEnabled);
-
-    private static void DrawVerticalSideTab(SKCanvas canvas, SKRect bounds, string label, bool isSelected, bool isHovered)
-        => FUIWidgets.DrawVerticalSideTab(canvas, bounds, label, isSelected, isHovered);
-
-
 
     private void DrawStatusBar(SKCanvas canvas, SKRect bounds)
     {

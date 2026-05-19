@@ -74,8 +74,6 @@ public partial class SCBindingsTabController
         var key = keyData & Keys.KeyCode;
         bool ctrl = keyData.HasFlag(Keys.Control);
         bool shift = keyData.HasFlag(Keys.Shift);
-        var text = _searchFilter.SearchText;
-        int cursor = _searchFilter.CursorPos;
 
         if (key == Keys.Escape)
         {
@@ -84,157 +82,189 @@ public partial class SCBindingsTabController
             return true;
         }
 
-        // Arrow keys â€” move cursor and optionally extend selection
-        if (key == Keys.Left)
+        return TryHandleSearchNavigationKey(key, ctrl, shift)
+            || TryHandleSearchClipboardKey(key, ctrl)
+            || TryHandleSearchEditingKey(key, ctrl, shift);
+    }
+
+    // Arrow keys + Home/End — move cursor and optionally extend selection.
+    private bool TryHandleSearchNavigationKey(Keys key, bool ctrl, bool shift)
+    {
+        var text = _searchFilter.SearchText;
+        int cursor = _searchFilter.CursorPos;
+
+        switch (key)
         {
-            int newPos = ctrl ? FindWordBoundaryLeft(text, cursor) : Math.Max(0, cursor - 1);
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, newPos, shift, collapseToStart: true);
-            return true;
+            case Keys.Left:
+                _searchFilter.CursorPos = ApplySearchCursorMove(
+                    cursor,
+                    ctrl ? FindWordBoundaryLeft(text, cursor) : Math.Max(0, cursor - 1),
+                    shift, collapseToStart: true);
+                return true;
+            case Keys.Right:
+                _searchFilter.CursorPos = ApplySearchCursorMove(
+                    cursor,
+                    ctrl ? FindWordBoundaryRight(text, cursor) : Math.Min(text.Length, cursor + 1),
+                    shift, collapseToStart: false);
+                return true;
+            case Keys.Home:
+                _searchFilter.CursorPos = ApplySearchCursorMove(cursor, 0, shift, collapseToStart: true);
+                return true;
+            case Keys.End:
+                _searchFilter.CursorPos = ApplySearchCursorMove(cursor, text.Length, shift, collapseToStart: false);
+                return true;
+            default:
+                return false;
         }
+    }
 
-        if (key == Keys.Right)
+    private bool TryHandleSearchClipboardKey(Keys key, bool ctrl)
+    {
+        if (!ctrl) return false;
+        return key switch
         {
-            int newPos = ctrl ? FindWordBoundaryRight(text, cursor) : Math.Min(text.Length, cursor + 1);
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, newPos, shift, collapseToStart: false);
-            return true;
-        }
+            Keys.C => HandleSearchCopy(),
+            Keys.X => HandleSearchCut(),
+            Keys.V => HandleSearchPaste(),
+            Keys.A => HandleSearchSelectAll(),
+            _ => false
+        };
+    }
 
-        if (key == Keys.Home)
+    private bool HandleSearchCopy()
+    {
+        var text = _searchFilter.SearchText;
+        if (HasSearchSelection())
         {
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, 0, shift, collapseToStart: true);
-            return true;
+            var (s, e) = GetOrderedSelection();
+            Clipboard.SetText(text[s..e]);
         }
-
-        if (key == Keys.End)
+        else if (!string.IsNullOrEmpty(text))
         {
-            _searchFilter.CursorPos = ApplySearchCursorMove(cursor, text.Length, shift, collapseToStart: false);
-            return true;
+            Clipboard.SetText(text);
         }
+        return true;
+    }
 
-        // Clipboard operations
-        if (ctrl && key == Keys.C)
+    private bool HandleSearchCut()
+    {
+        var text = _searchFilter.SearchText;
+        if (HasSearchSelection())
         {
-            if (HasSearchSelection())
-            {
-                var (s, e) = GetOrderedSelection();
-                Clipboard.SetText(text[s..e]);
-            }
-            else if (!string.IsNullOrEmpty(text))
-            {
-                Clipboard.SetText(text);
-            }
-            return true;
+            var (s, e) = GetOrderedSelection();
+            Clipboard.SetText(text[s..e]);
+            DeleteSearchSelection();
         }
-
-        if (ctrl && key == Keys.X)
+        else if (!string.IsNullOrEmpty(text))
         {
-            if (HasSearchSelection())
-            {
-                var (s, e) = GetOrderedSelection();
-                Clipboard.SetText(text[s..e]);
-                DeleteSearchSelection();
-            }
-            else if (!string.IsNullOrEmpty(text))
-            {
-                Clipboard.SetText(text);
-                _searchFilter.SearchText = "";
-                _searchFilter.CursorPos = 0;
-                ClearSearchSelection();
-            }
-            ResetSearchCaptureState();
-            RefreshFilteredActions();
-            return true;
+            Clipboard.SetText(text);
+            _searchFilter.SearchText = "";
+            _searchFilter.CursorPos = 0;
+            ClearSearchSelection();
         }
+        ResetSearchCaptureState();
+        RefreshFilteredActions();
+        return true;
+    }
 
-        if (ctrl && key == Keys.V)
-        {
-            if (Clipboard.ContainsText())
-            {
-                string pasted = Clipboard.GetText().ReplaceLineEndings(" ").Trim();
-                ResetSearchCaptureState();
+    private bool HandleSearchPaste()
+    {
+        if (!Clipboard.ContainsText()) return true;
 
-                if (HasSearchSelection())
-                    DeleteSearchSelection();
+        string pasted = Clipboard.GetText().ReplaceLineEndings(" ").Trim();
+        ResetSearchCaptureState();
 
-                text = _searchFilter.SearchText;
-                cursor = _searchFilter.CursorPos;
-                int remaining = MaxSearchLength - text.Length;
-                if (remaining > 0)
-                {
-                    string toInsert = pasted.Length > remaining ? pasted[..remaining] : pasted;
-                    _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), toInsert, text.AsSpan(cursor));
-                    _searchFilter.CursorPos = cursor + toInsert.Length;
-                    RefreshFilteredActions();
-                }
-            }
-            return true;
-        }
+        if (HasSearchSelection())
+            DeleteSearchSelection();
 
-        if (ctrl && key == Keys.A)
-        {
-            if (!string.IsNullOrEmpty(text))
-            {
-                _searchFilter.SelectionStart = 0;
-                _searchFilter.SelectionEnd = text.Length;
-                _searchFilter.CursorPos = text.Length;
-            }
-            return true;
-        }
+        var text = _searchFilter.SearchText;
+        int cursor = _searchFilter.CursorPos;
+        int remaining = MaxSearchLength - text.Length;
+        if (remaining <= 0) return true;
 
-        // Text-modifying keys â€” reset capture state once up front
-        bool modifiesText = key is Keys.Back or Keys.Delete || KeyToChar(key, shift) != '\0';
-        if (modifiesText)
-            ResetSearchCaptureState();
+        string toInsert = pasted.Length > remaining ? pasted[..remaining] : pasted;
+        _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), toInsert, text.AsSpan(cursor));
+        _searchFilter.CursorPos = cursor + toInsert.Length;
+        RefreshFilteredActions();
+        return true;
+    }
 
-        if (key == Keys.Back)
-        {
-            if (HasSearchSelection())
-            {
-                DeleteSearchSelection();
-            }
-            else if (cursor > 0)
-            {
-                int deleteFrom = ctrl ? FindWordBoundaryLeft(text, cursor) : cursor - 1;
-                _searchFilter.SearchText = string.Concat(text.AsSpan(0, deleteFrom), text.AsSpan(cursor));
-                _searchFilter.CursorPos = deleteFrom;
-            }
-            RefreshFilteredActions();
-            return true;
-        }
+    private bool HandleSearchSelectAll()
+    {
+        var text = _searchFilter.SearchText;
+        if (string.IsNullOrEmpty(text)) return true;
 
-        if (key == Keys.Delete)
-        {
-            if (HasSearchSelection())
-            {
-                DeleteSearchSelection();
-            }
-            else if (cursor < text.Length)
-            {
-                int deleteTo = ctrl ? FindWordBoundaryRight(text, cursor) : cursor + 1;
-                _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), text.AsSpan(deleteTo));
-            }
-            RefreshFilteredActions();
-            return true;
-        }
+        _searchFilter.SelectionStart = 0;
+        _searchFilter.SelectionEnd = text.Length;
+        _searchFilter.CursorPos = text.Length;
+        return true;
+    }
 
+    private bool TryHandleSearchEditingKey(Keys key, bool ctrl, bool shift)
+    {
         char c = KeyToChar(key, shift);
-        if (c != '\0')
+        bool modifiesText = key is Keys.Back or Keys.Delete || c != '\0';
+        if (!modifiesText) return false;
+
+        // Reset capture state once for any text-modifying key.
+        ResetSearchCaptureState();
+
+        if (key == Keys.Back) return HandleSearchBackspace(ctrl);
+        if (key == Keys.Delete) return HandleSearchDelete(ctrl);
+        return HandleSearchCharInsert(c);
+    }
+
+    private bool HandleSearchBackspace(bool ctrl)
+    {
+        var text = _searchFilter.SearchText;
+        int cursor = _searchFilter.CursorPos;
+
+        if (HasSearchSelection())
         {
-            if (HasSearchSelection())
-                DeleteSearchSelection();
-
-            text = _searchFilter.SearchText;
-            cursor = _searchFilter.CursorPos;
-            if (text.Length < MaxSearchLength)
-            {
-                _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), c.ToString(), text.AsSpan(cursor));
-                _searchFilter.CursorPos = cursor + 1;
-                RefreshFilteredActions();
-            }
-            return true;
+            DeleteSearchSelection();
         }
+        else if (cursor > 0)
+        {
+            int deleteFrom = ctrl ? FindWordBoundaryLeft(text, cursor) : cursor - 1;
+            _searchFilter.SearchText = string.Concat(text.AsSpan(0, deleteFrom), text.AsSpan(cursor));
+            _searchFilter.CursorPos = deleteFrom;
+        }
+        RefreshFilteredActions();
+        return true;
+    }
 
-        return false;
+    private bool HandleSearchDelete(bool ctrl)
+    {
+        var text = _searchFilter.SearchText;
+        int cursor = _searchFilter.CursorPos;
+
+        if (HasSearchSelection())
+        {
+            DeleteSearchSelection();
+        }
+        else if (cursor < text.Length)
+        {
+            int deleteTo = ctrl ? FindWordBoundaryRight(text, cursor) : cursor + 1;
+            _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), text.AsSpan(deleteTo));
+        }
+        RefreshFilteredActions();
+        return true;
+    }
+
+    private bool HandleSearchCharInsert(char c)
+    {
+        if (HasSearchSelection())
+            DeleteSearchSelection();
+
+        var text = _searchFilter.SearchText;
+        int cursor = _searchFilter.CursorPos;
+        if (text.Length < MaxSearchLength)
+        {
+            _searchFilter.SearchText = string.Concat(text.AsSpan(0, cursor), c.ToString(), text.AsSpan(cursor));
+            _searchFilter.CursorPos = cursor + 1;
+            RefreshFilteredActions();
+        }
+        return true;
     }
 
     /// <summary>

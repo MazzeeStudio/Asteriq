@@ -14,12 +14,9 @@ public partial class MappingsTabController
         _vjoyPrevHovered = false;
         _vjoyNextHovered = false;
         _hoveredMappingRow = -1;
-        _hoveredAddButton = -1;
-        _hoveredRemoveButton = -1;
         _buttonMode.HoveredMode = -1;
         _keyboardOutput.HoveredOutputType = -1;
         _keyboardOutput.CaptureHovered = false;
-        _keyboardOutput.ClearHovered = false;
         _addInputButtonHovered = false;
         _clearAllButtonHovered = false;
         _hoveredInputSourceRemove = -1;
@@ -57,112 +54,168 @@ public partial class MappingsTabController
         return false;
     }
 
-    private bool UpdateRightPanelHover(MouseEventArgs e)
+    private bool UpdateRightPanelHover(MouseEventArgs e) =>
+        TryHoverAutoScrollCheckbox(e)
+        || TryHoverAddInputButton(e)
+        || TryHoverInputSourceRemoveButtons(e)
+        || TryHoverMergeDropdown(e)
+        || TryHoverAxisOutputModeToggle(e)
+        || TryHoverThresholdControls(e)
+        || TryHoverButtonModeControls(e)
+        || TryHoverSharedManageButton(e)
+        || TryHoverMergedAwayManageButton(e);
+
+    private bool TryHoverAutoScrollCheckbox(MouseEventArgs e)
     {
-        if (_autoScroll.CheckboxBounds.Contains(e.X, e.Y))
-        { _autoScroll.CheckboxHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        if (!_autoScroll.CheckboxBounds.Contains(e.X, e.Y)) return false;
+        _autoScroll.CheckboxHovered = true;
+        _ctx.OwnerForm.Cursor = Cursors.Hand;
+        return true;
+    }
 
-        if (_addInputButtonBounds.Contains(e.X, e.Y))
-        { _addInputButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+    private bool TryHoverAddInputButton(MouseEventArgs e)
+    {
+        if (!_addInputButtonBounds.Contains(e.X, e.Y)) return false;
+        _addInputButtonHovered = true;
+        _ctx.OwnerForm.Cursor = Cursors.Hand;
+        return true;
+    }
 
+    private bool TryHoverInputSourceRemoveButtons(MouseEventArgs e)
+    {
         for (int i = 0; i < _inputSourceRemoveBounds.Count; i++)
         {
             if (_inputSourceRemoveBounds[i].Contains(e.X, e.Y))
-            { _hoveredInputSourceRemove = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-        }
-
-        // Merge operation dropdown (axis category)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0)
-        {
-            if (_merge.DropdownOpen && !_merge.DropdownBounds.IsEmpty
-                && _merge.DropdownBounds.Contains(e.X, e.Y))
             {
-                const float itemHeight = 28f;
-                int idx = (int)((e.Y - _merge.DropdownBounds.Top - 2f) / itemHeight);
-                _merge.HoveredIndex = (idx >= 0 && idx < s_mergeOps.Length) ? idx : -1;
-                _ctx.OwnerForm.Cursor = Cursors.Hand;
-                return true;
-            }
-
-            if (_merge.SelectorBounds.Contains(e.X, e.Y))
-            {
-                _merge.SelectorHovered = true;
-                _merge.HoveredIndex = -1;
+                _hoveredInputSourceRemove = i;
                 _ctx.OwnerForm.Cursor = Cursors.Hand;
                 return true;
             }
         }
+        return false;
+    }
 
-        // Axis output mode toggle and threshold controls (axis category)
-        if (_mappingCategory == 1 && _selectedMappingRow >= 0)
+    private bool TryHoverMergeDropdown(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0) return false;
+
+        if (_merge.DropdownOpen && !_merge.DropdownBounds.IsEmpty
+            && _merge.DropdownBounds.Contains(e.X, e.Y))
         {
-            if (_threshold.AxisModeBounds.Contains(e.X, e.Y))
-            { _threshold.HoveredOutputMode = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-            if (_threshold.ThresholdModeBounds.Contains(e.X, e.Y))
-            {
-                // Don't show hand cursor when disabled (merge mode)
-                bool mergeActive = !_threshold.IsThresholdMode && GetInputsForSelectedOutput().Count >= 2;
-                if (!mergeActive) _ctx.OwnerForm.Cursor = Cursors.Hand;
-                _threshold.HoveredOutputMode = 1;
-                return true;
-            }
-
-            if (_threshold.IsThresholdMode)
-            {
-                if (_threshold.AboveBounds.Contains(e.X, e.Y))
-                { _threshold.HoveredDirection = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-                if (_threshold.BelowBounds.Contains(e.X, e.Y))
-                { _threshold.HoveredDirection = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-
-                if (_threshold.AboveEnabled)
-                {
-                    if (_threshold.AboveClearBounds.HitTest(e.X, e.Y))
-                    { _threshold.AboveClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-                    if (_threshold.AboveCaptureBounds.Contains(e.X, e.Y))
-                    { _threshold.AboveCaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
-                }
-                if (_threshold.BelowEnabled)
-                {
-                    if (_threshold.BelowClearBounds.HitTest(e.X, e.Y))
-                    { _threshold.BelowClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-                    if (_threshold.BelowCaptureBounds.Contains(e.X, e.Y))
-                    { _threshold.BelowCaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
-                }
-            }
+            const float itemHeight = 28f;
+            int idx = (int)((e.Y - _merge.DropdownBounds.Top - 2f) / itemHeight);
+            _merge.HoveredIndex = (idx >= 0 && idx < s_mergeOps.Length) ? idx : -1;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return true;
         }
 
-        // Button mode controls (button category)
-        if (_mappingCategory == 0 && _selectedMappingRow >= 0)
+        if (_merge.SelectorBounds.Contains(e.X, e.Y))
         {
-            for (int i = 0; i < _buttonMode.ModeBounds.Length; i++)
-            {
-                if (_buttonMode.ModeBounds[i].Contains(e.X, e.Y))
-                { _buttonMode.HoveredMode = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-            }
-
-            if (_keyboardOutput.BtnBounds.Contains(e.X, e.Y))
-            { _keyboardOutput.HoveredOutputType = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-            if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
-            { _keyboardOutput.HoveredOutputType = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-
-            if (_keyboardOutput.IsKeyboard && _keyboardOutput.ClearBounds.HitTest(e.X, e.Y))
-            { _keyboardOutput.ClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-            if (_keyboardOutput.IsKeyboard && _keyboardOutput.CaptureBounds.Contains(e.X, e.Y))
-            { _keyboardOutput.CaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
-
-            if (_clearAllButtonBounds.Contains(e.X, e.Y))
-            { _clearAllButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+            _merge.SelectorHovered = true;
+            _merge.HoveredIndex = -1;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return true;
         }
-
-        // Manage button only exists when the row is shared-away; bounds are SKRect.Empty otherwise.
-        if (_sharedManageButtonBounds.Contains(e.X, e.Y))
-        { _sharedManageButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
-
-        // Same pattern for the merged-away "go to merged axis" button.
-        if (_mergedAwayManageButtonBounds.Contains(e.X, e.Y))
-        { _mergedAwayManageButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
 
         return false;
+    }
+
+    private bool TryHoverAxisOutputModeToggle(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0) return false;
+
+        if (_threshold.AxisModeBounds.Contains(e.X, e.Y))
+        {
+            _threshold.HoveredOutputMode = 0;
+            _ctx.OwnerForm.Cursor = Cursors.Hand;
+            return true;
+        }
+
+        if (_threshold.ThresholdModeBounds.Contains(e.X, e.Y))
+        {
+            // Don't show hand cursor when disabled (merge mode)
+            bool mergeActive = !_threshold.IsThresholdMode && GetInputsForSelectedOutput().Count >= 2;
+            if (!mergeActive) _ctx.OwnerForm.Cursor = Cursors.Hand;
+            _threshold.HoveredOutputMode = 1;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryHoverThresholdControls(MouseEventArgs e)
+    {
+        if (_mappingCategory != 1 || _selectedMappingRow < 0 || !_threshold.IsThresholdMode)
+            return false;
+
+        if (_threshold.AboveBounds.Contains(e.X, e.Y))
+        { _threshold.HoveredDirection = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        if (_threshold.BelowBounds.Contains(e.X, e.Y))
+        { _threshold.HoveredDirection = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        if (_threshold.AboveEnabled && TryHoverThresholdAboveButtons(e)) return true;
+        if (_threshold.BelowEnabled && TryHoverThresholdBelowButtons(e)) return true;
+        return false;
+    }
+
+    private bool TryHoverThresholdAboveButtons(MouseEventArgs e)
+    {
+        if (_threshold.AboveClearBounds.HitTest(e.X, e.Y))
+        { _threshold.AboveClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        if (_threshold.AboveCaptureBounds.Contains(e.X, e.Y))
+        { _threshold.AboveCaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
+        return false;
+    }
+
+    private bool TryHoverThresholdBelowButtons(MouseEventArgs e)
+    {
+        if (_threshold.BelowClearBounds.HitTest(e.X, e.Y))
+        { _threshold.BelowClearHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        if (_threshold.BelowCaptureBounds.Contains(e.X, e.Y))
+        { _threshold.BelowCaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
+        return false;
+    }
+
+    private bool TryHoverButtonModeControls(MouseEventArgs e)
+    {
+        if (_mappingCategory != 0 || _selectedMappingRow < 0) return false;
+
+        for (int i = 0; i < _buttonMode.ModeBounds.Length; i++)
+        {
+            if (_buttonMode.ModeBounds[i].Contains(e.X, e.Y))
+            { _buttonMode.HoveredMode = i; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        }
+
+        if (_keyboardOutput.BtnBounds.Contains(e.X, e.Y))
+        { _keyboardOutput.HoveredOutputType = 0; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+        if (_keyboardOutput.KeyBounds.Contains(e.X, e.Y))
+        { _keyboardOutput.HoveredOutputType = 1; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        if (_keyboardOutput.IsKeyboard && _keyboardOutput.CaptureBounds.Contains(e.X, e.Y))
+        { _keyboardOutput.CaptureHovered = true; _ctx.OwnerForm.Cursor = Cursors.IBeam; return true; }
+
+        if (_clearAllButtonBounds.Contains(e.X, e.Y))
+        { _clearAllButtonHovered = true; _ctx.OwnerForm.Cursor = Cursors.Hand; return true; }
+
+        return false;
+    }
+
+    // Manage button only exists when the row is shared-away; bounds are SKRect.Empty otherwise.
+    private bool TryHoverSharedManageButton(MouseEventArgs e)
+    {
+        if (!_sharedManageButtonBounds.Contains(e.X, e.Y)) return false;
+        _sharedManageButtonHovered = true;
+        _ctx.OwnerForm.Cursor = Cursors.Hand;
+        return true;
+    }
+
+    // Same pattern for the merged-away "go to merged axis" button.
+    private bool TryHoverMergedAwayManageButton(MouseEventArgs e)
+    {
+        if (!_mergedAwayManageButtonBounds.Contains(e.X, e.Y)) return false;
+        _mergedAwayManageButtonHovered = true;
+        _ctx.OwnerForm.Cursor = Cursors.Hand;
+        return true;
     }
 
     private bool UpdateAxisEditorHover(MouseEventArgs e)

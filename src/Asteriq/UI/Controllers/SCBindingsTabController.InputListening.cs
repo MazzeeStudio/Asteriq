@@ -24,7 +24,7 @@ public partial class SCBindingsTabController
             return;
         }
 
-        var (actionIndex, colIndex) = _cell.SelectedCell;
+        var (actionIndex, _) = _cell.SelectedCell;
         if (actionIndex < 0 || actionIndex >= _scFilteredActions.Count)
             return;
 
@@ -286,7 +286,7 @@ public partial class SCBindingsTabController
                     {
                         string axisName = col.IsPhysical
                             ? GetSCAxisNameFromDevice(i, device)
-                            : GetVJoyAxisNameFromMapping(device, i, col);
+                            : GetVJoyAxisNameFromMapping(device, i);
                         System.Diagnostics.Debug.WriteLine($"[SCBindings] SDL2 detected axis {i} -> {axisName} on {device.Name}, deflection: {deflection:F2}");
                         ResetJoystickDetectionState();
                         return (axisName, device.InstanceGuid);
@@ -577,7 +577,6 @@ public partial class SCBindingsTabController
                 _captureCandidateInput = $"kb:{modPrefix}{scInput}";
                 _captureCandidatePath = null;
                 _captureCandidateDebounceUntil = now.AddMilliseconds(CaptureDebounceMs);
-                detectedThisEvent = true;
             }
         }
 

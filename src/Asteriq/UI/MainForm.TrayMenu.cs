@@ -80,16 +80,25 @@ public partial class MainForm
             };
             menu.Items.Add(connectItem);
 
-            // Rebuild peer submenu each time the menu opens; also re-evaluate visibility
-            menu.Opening += (s, e) =>
+            // Refresh peer list every time the user hovers the "Connect to..." submenu
+            // â€” catches peers discovered after the main tray menu opened.
+            connectItem.DropDownOpening += (s, e) => RefreshPeerSubmenu(connectItem);
+
+            // Live updates: re-render the submenu when discovery reports a peer change.
+            // Marshal to the UI thread because PeersChanged fires on the discovery worker.
+            _networkDiscovery.PeersChanged += (s, e) =>
             {
-                bool isClientRole = _appSettings.NetworkEnabled && _appSettings.NetworkRole == Models.NetworkRole.Client;
-                connectItem.Visible = !isClientRole && _networkMode != NetworkInputMode.Receiving;
-                if (_trayIcon.ContextMenuStrip?.Items["forwarding"] is ToolStripMenuItem fwd)
-                    fwd.Visible = !isClientRole;
-                if (connectItem.Visible) RefreshPeerSubmenu(connectItem);
+                if (IsDisposed || !IsHandleCreated) return;
+                BeginInvoke(() =>
+                {
+                    if (connectItem.Visible) RefreshPeerSubmenu(connectItem);
+                });
             };
         }
+
+        // Sync label + visibility every time the menu opens. UpdateTrayMenu handles
+        // forwarding label, plus Visible for forwarding/connect based on network role.
+        menu.Opening += (s, e) => UpdateTrayMenu();
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -115,7 +124,6 @@ public partial class MainForm
         connectItem.DropDownItems.Clear();
 
         var peers     = _networkDiscovery.KnownPeers.Values.ToList();
-        var textColor = SkiaColorToGdi(FUIColors.TextPrimary);
         var dimColor  = SkiaColorToGdi(FUIColors.TextDim);
 
         if (peers.Count == 0)
@@ -187,6 +195,6 @@ public partial class MainForm
     // (Networking methods moved to MainForm.Networking.cs)
 
 
-    private bool _forceClose = false;
+    private bool _forceClose;
 
 }

@@ -21,7 +21,7 @@ public enum InputPollingBackend
 /// <summary>
 /// Handles physical device input using SDL2 or DirectInput
 /// </summary>
-public class InputService : IInputService
+public sealed class InputService : IInputService
 {
     [DllImport("winmm.dll")]
     private static extern int timeBeginPeriod(uint uPeriod);
@@ -53,7 +53,7 @@ public class InputService : IInputService
     private DirectInputService? _directInputService;
     private readonly ConcurrentDictionary<int, Guid> _sdlToDirectInputGuid = new();
 
-    public bool OnlyFireOnChange { get; set; } = false;
+    public bool OnlyFireOnChange { get; set; }
     public InputPollingBackend InputBackend { get; set; } = InputPollingBackend.DirectInput;
 
     public event EventHandler<DeviceInputState>? InputReceived;

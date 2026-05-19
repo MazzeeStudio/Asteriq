@@ -7,9 +7,9 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController
+public sealed partial class SettingsTabController
 {
-    private void DrawSupportPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawSupportPanel(SKCanvas canvas, SKRect bounds)
     {
         var m = FUIRenderer.DrawPanelChrome(canvas, bounds);
         float y = m.Y;

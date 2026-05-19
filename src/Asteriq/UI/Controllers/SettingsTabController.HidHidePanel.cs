@@ -7,9 +7,9 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController
+public sealed partial class SettingsTabController
 {
-    private void DrawHidHideSettingsPanel(SKCanvas canvas, SKRect bounds, float frameInset)
+    private void DrawHidHideSettingsPanel(SKCanvas canvas, SKRect bounds)
     {
         bool headerHovered = new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Top + RightPanelCollapsedH)
             .Contains(_ctx.MousePosition.X, _ctx.MousePosition.Y);

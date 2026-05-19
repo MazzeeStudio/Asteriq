@@ -195,7 +195,6 @@ public class HidDeviceService
             int axisIndex = 0;
             int buttonCount = 0;
             int hatCount = 0;
-            int sliderCount = 0;
 
             foreach (var deviceItem in reportDescriptor.DeviceItems)
             {
@@ -212,7 +211,7 @@ public class HidDeviceService
 
                             if (usagePage == HID_USAGE_PAGE_GENERIC)
                             {
-                                var axisType = UsageToAxisType(usageId, ref sliderCount);
+                                var axisType = UsageToAxisType(usageId);
                                 if (axisType != AxisType.Unknown)
                                 {
                                     axes.Add(new AxisInfo
@@ -253,7 +252,7 @@ public class HidDeviceService
         }
     }
 
-    private static AxisType UsageToAxisType(uint usageId, ref int sliderCount)
+    private static AxisType UsageToAxisType(uint usageId)
     {
         return usageId switch
         {

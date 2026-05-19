@@ -7,7 +7,7 @@ namespace Asteriq.UI.Controllers;
 
 public partial class MappingsTabController
 {
-    private void DrawThresholdSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y, float bottom)
+    private void DrawThresholdSettings(SKCanvas canvas, float leftMargin, float rightMargin, float y)
     {
         float width = rightMargin - leftMargin;
 
@@ -41,7 +41,7 @@ public partial class MappingsTabController
 
         if (_threshold.BelowEnabled)
         {
-            y = DrawThresholdSection(canvas, leftMargin, rightMargin, y, width, liveValue,
+            DrawThresholdSection(canvas, leftMargin, rightMargin, y, width, liveValue,
                 _threshold.BelowThreshold, _threshold.BelowHysteresis, false,
                 _threshold.BelowKeyName, _threshold.BelowModifiers,
                 ref _threshold.BelowSliderBounds, ref _threshold.BelowHystSliderBounds,
@@ -177,19 +177,6 @@ public partial class MappingsTabController
         return y;
     }
 
-    private static void DrawToggleButton(SKCanvas canvas, SKRect bounds, string text, bool active, bool hovered)
-    {
-        var bg = active ? FUIColors.Active.WithAlpha(FUIColors.AlphaGlow) : (hovered ? FUIColors.Primary.WithAlpha(40) : FUIColors.Background2);
-        var frame = active ? FUIColors.Active : (hovered ? FUIColors.FrameBright : FUIColors.Frame);
-        var textColor = active ? FUIColors.TextBright : (hovered ? FUIColors.TextPrimary : FUIColors.TextDim);
-
-        using (var bgPaint = FUIRenderer.CreateFillPaint(bg))
-            canvas.DrawRoundRect(bounds, 3, 3, bgPaint);
-        using (var framePaint = FUIRenderer.CreateStrokePaint(frame, active ? 2f : 1f))
-            canvas.DrawRoundRect(bounds, 3, 3, framePaint);
-        FUIRenderer.DrawTextCentered(canvas, text, bounds, textColor, 13f);
-    }
-
     private float GetLiveAxisValueForThreshold()
     {
         var mappings = GetCurrentAxisToButtonMappings();
@@ -218,8 +205,6 @@ public partial class MappingsTabController
         float rowHeight = 16f;
         float checkboxY = y + (rowHeight - checkboxSize) / 2; // Center checkbox in row
         float fontSize = 12f;
-        float scaledFontSize = fontSize;
-        float textY = y + (rowHeight / 2) + (scaledFontSize / 3); // Center text baseline
 
         // Symmetrical checkbox (leftmost) - checkbox then label
         _curve.CheckboxBounds = new SKRect(leftMargin, checkboxY, leftMargin + checkboxSize, checkboxY + checkboxSize);

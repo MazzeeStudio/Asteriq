@@ -7,7 +7,7 @@ using SkiaSharp;
 
 namespace Asteriq.UI.Controllers;
 
-public partial class SettingsTabController : ITabController, IDisposable
+public sealed partial class SettingsTabController : ITabController, IDisposable
 {
     private readonly TabContext _ctx;
 
@@ -177,9 +177,9 @@ public partial class SettingsTabController : ITabController, IDisposable
             contentBounds.Right, topAreaBottom);
 
         DrawProfileManagementPanel(canvas, leftBounds, frameInset);
-        DrawSystemSettingsSubPanel(canvas, centerBounds, frameInset);
-        DrawRightPanel(canvas, rightBounds, frameInset);
-        DrawSupportPanel(canvas, supportBounds, frameInset);
+        DrawSystemSettingsSubPanel(canvas, centerBounds);
+        DrawRightPanel(canvas, rightBounds);
+        DrawSupportPanel(canvas, supportBounds);
     }
 
     public void OnMouseDown(MouseEventArgs e)

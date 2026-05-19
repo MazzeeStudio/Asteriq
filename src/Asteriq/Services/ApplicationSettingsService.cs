@@ -15,7 +15,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
     private readonly ILogger<ApplicationSettingsService> _logger;
     private readonly string _settingsFile;
     private readonly JsonSerializerOptions _jsonOptions;
-    private AppSettings _cachedSettings;
+    private readonly AppSettings _cachedSettings;
 
     public event EventHandler<float>? FontSizeChanged;
 
@@ -424,7 +424,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         File.WriteAllText(_settingsFile, json);
     }
 
-    private class AppSettings
+    private sealed class AppSettings
     {
         public Guid? LastProfileId { get; set; }
         public bool AutoLoadLastProfile { get; set; } = true;
@@ -442,17 +442,17 @@ public class ApplicationSettingsService : IApplicationSettingsService
         public string? LastSCExportProfile { get; set; }
         public bool AutoLoadLastSCExportProfile { get; set; } = true;
         public bool SCBindingsShowPhysicalHeaders { get; set; } = true;
-        public bool SCBindingsShowBoundOnly { get; set; } = false;
+        public bool SCBindingsShowBoundOnly { get; set; }
         public Dictionary<string, string> LastSCExportProfileByEnvironment { get; set; } = new();
         public string? PreferredSCEnvironment { get; set; }
         public bool SkipDriverSetup { get; set; }
-        public bool ClientOnlyMode { get; set; } = false;
+        public bool ClientOnlyMode { get; set; }
         public string SettingsRightPanel { get; set; } = "network";
         public DateTime? LastUpdateCheck { get; set; }
         /// <summary>Per-vJoy-slot silhouette override. Key = vJoy ID, Value = device map filename key.</summary>
         public Dictionary<uint, string> VJoySilhouetteOverrides { get; set; } = new();
         /// <summary>Enable network input forwarding. Default false.</summary>
-        public bool NetworkEnabled { get; set; } = false;
+        public bool NetworkEnabled { get; set; }
         /// <summary>Override for broadcast machine name. Empty = use Environment.MachineName.</summary>
         public string NetworkMachineName { get; set; } = "";
         /// <summary>TCP/UDP port for network discovery and forwarding. Default 47191.</summary>
@@ -466,7 +466,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
         /// <summary>SDL instance GUIDs of devices the user has hidden from the Devices list (UI preference only).</summary>
         public List<string> HiddenDeviceGuids { get; set; } = new();
         /// <summary>Whether the "Include hidden" checkbox in the Devices tab was last enabled.</summary>
-        public bool DevicesIncludeHidden { get; set; } = false;
+        public bool DevicesIncludeHidden { get; set; }
         /// <summary>User-configured additional search paths for SC installations.</summary>
         public List<string> CustomSCSearchPaths { get; set; } = new();
     }
@@ -475,7 +475,7 @@ public class ApplicationSettingsService : IApplicationSettingsService
     /// Reads legacy FontSizeOption strings ("VSmall"…"XLarge") as floats,
     /// and passes through numeric values unchanged.
     /// </summary>
-    private class FontScaleConverter : JsonConverter<float>
+    private sealed class FontScaleConverter : JsonConverter<float>
     {
         public override float Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {

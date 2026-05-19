@@ -8,13 +8,13 @@ namespace Asteriq.UI;
 public partial class MainForm : Form
 {
     // Input forwarding state (physical → vJoy)
-    private bool _isForwarding = false;
+    private bool _isForwarding;
 
     // Network forwarding state
     private volatile NetworkInputMode _networkMode = NetworkInputMode.Local;
     private bool _isNetworkConnecting;    // true while master-side handshake is in-flight
-    private bool _lastSwitchButtonState = false;
-    private long _lastSwitchButtonTick = 0;
+    private bool _lastSwitchButtonState;
+    private long _lastSwitchButtonTick;
     private const int SwitchDebounceMs = 400;
 
     // NetworkVJoyService wrapper — provides capture-mode forwarding; always the same object as _vjoyService
@@ -85,6 +85,7 @@ public partial class MainForm : Form
             _isForwarding = true;
             _tabContext.IsForwarding = true;
             _trayIcon.SetActive(true);
+            UpdateTrayMenu();
         }
     }
 
@@ -98,6 +99,7 @@ public partial class MainForm : Form
         _isForwarding = false;
         _tabContext.IsForwarding = false;
         _trayIcon.SetActive(false);
+        UpdateTrayMenu();
     }
 
     /// <summary>
@@ -178,54 +180,6 @@ public partial class MainForm : Form
         BeginInvoke(MarkDirty);
     }
 
-    private async Task SwitchToRemoteAsync()
-    {
-        // Pick first known peer for MVP (2-machine scenario).
-        // Skip staleness check — TCP connect fails fast (<1s) if truly unreachable.
-        var peer = _networkDiscovery.KnownPeers.Values.FirstOrDefault();
-        if (peer is null)
-        {
-            BeginInvoke(() => _tabContext.MarkDirty()); // flash handled by status bar
-            return;
-        }
-
-        // Set capture mode first (same as ConnectAsMasterAsync) so AcquireDevice skips vJoy.
-        _networkVjoy.ForwardingMode = true;
-
-        // Ensure MappingEngine is running so snapshots are populated from physical input.
-        if (!_isForwarding)
-        {
-            var profile = _profileManager.ActiveProfile;
-            if (profile is not null)
-            {
-                _mappingEngine.LoadProfile(profile);
-                if (_mappingEngine.Start())
-                {
-                    _isForwarding = true;
-                    _tabContext.IsForwarding = true;
-                    _trayIcon.SetActive(true);
-                    BeginInvoke(UpdateTrayMenu);
-                }
-            }
-        }
-
-        try
-        {
-            await _networkInput.ConnectToAsync(peer).ConfigureAwait(false);
-            _networkMode = NetworkInputMode.Remote;
-            _tabContext.NetworkMode = _networkMode;
-            _tabContext.ConnectedPeerIp = peer.IpAddress;
-            PreInitializeAllNetworkSnapshots();
-            StartNetworkHeartbeat();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Connection refused or rejected — roll back
-            _networkVjoy.ForwardingMode = false;
-            System.Diagnostics.Debug.WriteLine($"[Network] SwitchToRemote failed: {ex.Message}");
-        }
-        BeginInvoke(MarkDirty);
-    }
 
     private async Task SwitchToLocalAsync()
     {

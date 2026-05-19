@@ -16,14 +16,14 @@ public partial class MappingsTabController : ITabController
     private readonly SCExportProfileService? _scExportProfileService;
 
     // Mapping category tabs (M1 = Buttons, M2 = Axes)
-    private int _mappingCategory = 0;  // 0 = Buttons, 1 = Axes
+    private int _mappingCategory;  // 0 = Buttons, 1 = Axes
     private int _hoveredMappingCategory = -1;
     private SKRect _mappingCategoryButtonsBounds;
     private SKRect _mappingCategoryAxesBounds;
 
     // Mappings tab UI state - Left panel (output list)
     private int _selectedMappingRow = -1;
-    private bool _selectionIsExplicit = false; // true only when user explicitly clicked a row
+    private bool _selectionIsExplicit; // true only when user explicitly clicked a row
     private int _hoveredMappingRow = -1;
 
     // Maps visual axis row index â†’ actual vJoy axis index (0-7).
@@ -37,13 +37,7 @@ public partial class MappingsTabController : ITabController
     private List<SKRect> _mappingRowBounds = new();
     private List<SKRect> _mappingAddButtonBounds = new();
     private List<SKRect> _mappingRemoveButtonBounds = new();
-    private int _hoveredAddButton = -1;
-    private int _hoveredRemoveButton = -1;
 
-    // Mappings tab UI state - Right panel (mapping editor)
-    private bool _mappingEditorOpen = false;
-    private int _editingRowIndex = -1;
-    private bool _isEditingAxis = false;
     private InputDetectionService? _inputDetectionService;
 
     private const int KeyCaptureTimeoutMs = 10000; // 10 second timeout for key capture
@@ -82,12 +76,6 @@ public partial class MappingsTabController : ITabController
     private int _hoveredCurvePreset = -1;
     private int _hoveredDeadzonePreset = -1;
 
-    // Mapping editor - action buttons
-    private SKRect _saveButtonBounds;
-    private SKRect _cancelButtonBounds;
-    private bool _saveButtonHovered = false;
-    private bool _cancelButtonHovered = false;
-
     private const int HighlightDurationMs = 1500; // How long the attention highlight lasts (1.5 seconds)
     private const int HighlightDebounceCooldownMs = 500; // Minimum time between highlights for same button
 
@@ -102,16 +90,6 @@ public partial class MappingsTabController : ITabController
     private readonly NetworkSwitchState _netSwitch = new();
     private readonly ListScrollState _listScroll = new();
     private readonly ThresholdEditorState _threshold = new();
-    // Legacy compatibility â€” computed alias kept for use in axis logic
-    private float _axisDeadzone
-    {
-        get => Math.Max(Math.Abs(_deadzone.CenterMin), Math.Abs(_deadzone.CenterMax));
-        set
-        {
-            _deadzone.CenterMin = -Math.Abs(value);
-            _deadzone.CenterMax = Math.Abs(value);
-        }
-    }
 
     // Keyboard interop delegated to KeyboardHelper
 

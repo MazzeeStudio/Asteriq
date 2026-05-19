@@ -17,14 +17,14 @@ public class FUISelectionDialog : FUIBaseDialog
     private readonly SKControl _canvas;
 #pragma warning restore CA2213
     private int _hoveredItem = -1;
-    private int _selectedItem = 0;
+    private int _selectedItem;
     private int _hoveredButton = -1;
     private readonly string[] _buttonLabels;
     private SKRect[] _buttonBounds = Array.Empty<SKRect>();
     private SKRect[] _itemBounds = Array.Empty<SKRect>();
     private int _result = -1;
-    private int _scrollOffset = 0;
-    private int _maxVisibleItems = 6;
+    private int _scrollOffset;
+    private readonly int _maxVisibleItems = 6;
 
     // Dragging support
     private bool _isDragging;

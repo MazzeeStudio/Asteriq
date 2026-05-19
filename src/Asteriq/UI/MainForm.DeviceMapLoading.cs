@@ -18,7 +18,6 @@ public partial class MainForm
     private void LoadSvgAssets()
     {
         var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices");
-        var mapsDir = Path.Combine(imagesDir, "Maps");
 
         var joystickPath = Path.Combine(imagesDir, "joystick.svg");
         if (File.Exists(joystickPath))
@@ -46,181 +45,80 @@ public partial class MainForm
     /// </summary>
     private void LoadDeviceMapForDevice(PhysicalDeviceInfo? device)
     {
-        var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
-        string? deviceName = device?.Name;
+        var mapsDir = GetMapsDir();
 
-        // For virtual (vJoy) devices, check for a silhouette override first
-        if (device is not null && device.IsVirtual)
-        {
-            // Derive vjoy ID using index-based lookup (most reliable; SDL2 names vary)
-            uint vjoyId = 0;
-            if (_vjoyDevices.Count > 0)
-            {
-                var virtualDevices = _devices.Where(d => d.IsVirtual).ToList();
-                int virtualIndex = virtualDevices.IndexOf(device);
-                if (virtualIndex >= 0 && virtualIndex < _vjoyDevices.Count)
-                    vjoyId = _vjoyDevices[virtualIndex].Id;
-            }
-            // Fallback: parse from name (e.g. "vJoy Device 1" â†’ 1)
-            if (vjoyId == 0)
-            {
-                var vMatch = System.Text.RegularExpressions.Regex.Match(device.Name, @"\d+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
-                if (vMatch.Success && uint.TryParse(vMatch.Value, out uint parsedId))
-                    vjoyId = parsedId;
-            }
+        DeviceMap? resolved = device is { IsVirtual: true }
+            ? ResolveVirtualDeviceMap(device, mapsDir)
+            : LoadDeviceMapForDeviceInfo(device);
 
-            if (vjoyId > 0)
-            {
-                var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyId);
-                if (!string.IsNullOrEmpty(overrideKey))
-                {
-                    var overridePath = Path.Combine(mapsDir, $"{overrideKey}.json");
-                    if (File.Exists(overridePath))
-                    {
-                        _deviceMap = DeviceMap.Load(overridePath);
-                        SyncDeviceMapToTabContext();
-                        return;
-                    }
-                }
-
-                // Auto: try to find the physical device assigned to this vJoy slot
-                var profile = _profileManager.ActiveProfile;
-                if (profile is not null)
-                {
-                    var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyId);
-                    if (string.IsNullOrEmpty(primaryGuid))
-                    {
-                        var assignment = profile.GetAssignmentForVJoy(vjoyId);
-                        if (assignment is not null && !string.IsNullOrEmpty(assignment.PhysicalDevice.Guid))
-                            primaryGuid = assignment.PhysicalDevice.Guid;
-                    }
-
-                    PhysicalDeviceInfo? physicalDevice = null;
-                    if (!string.IsNullOrEmpty(primaryGuid))
-                        physicalDevice = _devices.FirstOrDefault(d =>
-                            !d.IsVirtual && d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
-
-                    // Fallback: match by device name
-                    if (physicalDevice is null)
-                    {
-                        var assignment = profile.GetAssignmentForVJoy(vjoyId);
-                        if (assignment is not null && !string.IsNullOrEmpty(assignment.PhysicalDevice.Name))
-                            physicalDevice = _devices.FirstOrDefault(d =>
-                                !d.IsVirtual && d.Name.Equals(assignment.PhysicalDevice.Name, StringComparison.OrdinalIgnoreCase));
-                    }
-
-                    if (physicalDevice is not null)
-                    {
-                        _deviceMap = LoadDeviceMapForDeviceInfo(physicalDevice);
-                        SyncDeviceMapToTabContext();
-                        return;
-                    }
-                }
-            }
-            // No override and no physical device found - use generic joystick map
-            _deviceMap = DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
-            SyncDeviceMapToTabContext();
-            return;
-        }
-
-        // Try to find a device-specific map
-        if (device is not null && !string.IsNullOrEmpty(deviceName))
-        {
-            // Extract VID:PID from device's InstanceGuid
-            var (vid, pid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
-            string vidPidStr = vid > 0 ? $"{vid:X4}:{pid:X4}" : "";
-
-            // Load all device maps
-            var allMaps = new List<(string path, DeviceMap map)>();
-            foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
-            {
-                if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var map = DeviceMap.Load(mapFile);
-                if (map is not null)
-                    allMaps.Add((mapFile, map));
-            }
-
-            // VID:PID match (most reliable)
-            if (!string.IsNullOrEmpty(vidPidStr))
-            {
-                foreach (var (path, map) in allMaps)
-                {
-                    if (!string.IsNullOrEmpty(map.VidPid) &&
-                        map.VidPid.Equals(vidPidStr, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _deviceMap = map;
-                        SyncDeviceMapToTabContext();
-                        return;
-                    }
-                }
-            }
-
-            // Device name match (skip generic maps).
-            // Strip manufacturer prefixes before comparing so map display names (e.g. "MongoosT-50CM3 Throttle")
-            // still match SDL-reported names (e.g. "VPC MongoosT-50CM3").
-            static string StripMfr(string s) => s
-                .Replace("VPC ", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("VKB ", "", StringComparison.OrdinalIgnoreCase)
-                .Trim();
-
-            string normDevice = StripMfr(deviceName);
-            foreach (var (path, map) in allMaps)
-            {
-                if (!string.IsNullOrEmpty(map.Device) &&
-                    !map.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase))
-                {
-                    string normMap = StripMfr(map.Device);
-                    if (normDevice.Contains(normMap, StringComparison.OrdinalIgnoreCase) ||
-                        normMap.Contains(normDevice, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _deviceMap = map;
-                        SyncDeviceMapToTabContext();
-                        System.Diagnostics.Debug.WriteLine($"Loaded device map (name match): {path} for device: {deviceName}");
-                        return;
-                    }
-                }
-            }
-
-            // Type match based on keywords in device name
-            string detectedType = DetectDeviceType(deviceName);
-            if (detectedType != "Joystick")
-            {
-                foreach (var (path, map) in allMaps)
-                {
-                    if (map.DeviceType.Equals(detectedType, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _deviceMap = map;
-                        SyncDeviceMapToTabContext();
-                        System.Diagnostics.Debug.WriteLine($"Loaded device map (type match '{detectedType}'): {path} for device: {deviceName}");
-                        return;
-                    }
-                }
-            }
-
-            // Fallback: detect left-hand from device name to mirror the default joystick map
-            bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
-                              deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
-                              deviceName.EndsWith(" L", StringComparison.OrdinalIgnoreCase);
-
-            var defaultMapPath = Path.Combine(mapsDir, "joystick.json");
-            _deviceMap = DeviceMap.Load(defaultMapPath);
-
-            if (_deviceMap is not null && isLeftHand)
-            {
-                // Override mirror setting for left-hand devices using generic map
-                _deviceMap.Mirror = true;
-            }
-            SyncDeviceMapToTabContext();
-            System.Diagnostics.Debug.WriteLine($"Loaded default device map: joystick.json for device: {deviceName} (left={isLeftHand})");
-            return;
-        }
-
-        // Fall back to generic joystick map
-        var defaultMapPath2 = Path.Combine(mapsDir, "joystick.json");
-        _deviceMap = DeviceMap.Load(defaultMapPath2);
+        _deviceMap = resolved ?? DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
         SyncDeviceMapToTabContext();
+    }
+
+    private DeviceMap? ResolveVirtualDeviceMap(PhysicalDeviceInfo device, string mapsDir)
+    {
+        uint vjoyId = DeriveVJoyId(device);
+        if (vjoyId == 0)
+            return null;
+
+        if (TryLoadOverrideMap(vjoyId, mapsDir) is { } overrideMap)
+            return overrideMap;
+
+        var physicalDevice = FindPhysicalDeviceForVJoy(vjoyId);
+        return physicalDevice is not null ? LoadDeviceMapForDeviceInfo(physicalDevice) : null;
+    }
+
+    private uint DeriveVJoyId(PhysicalDeviceInfo device)
+    {
+        if (_vjoyDevices.Count > 0)
+        {
+            var virtualDevices = _devices.Where(d => d.IsVirtual).ToList();
+            int virtualIndex = virtualDevices.IndexOf(device);
+            if (virtualIndex >= 0 && virtualIndex < _vjoyDevices.Count)
+                return _vjoyDevices[virtualIndex].Id;
+        }
+
+        var vMatch = System.Text.RegularExpressions.Regex.Match(
+            device.Name, @"\d+", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
+        return vMatch.Success && uint.TryParse(vMatch.Value, out uint parsedId) ? parsedId : 0u;
+    }
+
+    private DeviceMap? TryLoadOverrideMap(uint vjoyId, string mapsDir)
+    {
+        var overrideKey = _appSettings.GetVJoySilhouetteOverride(vjoyId);
+        if (string.IsNullOrEmpty(overrideKey))
+            return null;
+
+        var overridePath = Path.Combine(mapsDir, $"{overrideKey}.json");
+        return File.Exists(overridePath) ? DeviceMap.Load(overridePath) : null;
+    }
+
+    private PhysicalDeviceInfo? FindPhysicalDeviceForVJoy(uint vjoyId)
+    {
+        var profile = _profileManager.ActiveProfile;
+        if (profile is null)
+            return null;
+
+        var assignment = profile.GetAssignmentForVJoy(vjoyId);
+        var primaryGuid = profile.GetPrimaryDeviceForVJoy(vjoyId);
+        if (string.IsNullOrEmpty(primaryGuid) && !string.IsNullOrEmpty(assignment?.PhysicalDevice.Guid))
+            primaryGuid = assignment.PhysicalDevice.Guid;
+
+        if (!string.IsNullOrEmpty(primaryGuid))
+        {
+            var byGuid = _devices.FirstOrDefault(d =>
+                !d.IsVirtual && d.InstanceGuid.ToString().Equals(primaryGuid, StringComparison.OrdinalIgnoreCase));
+            if (byGuid is not null)
+                return byGuid;
+        }
+
+        if (!string.IsNullOrEmpty(assignment?.PhysicalDevice.Name))
+        {
+            return _devices.FirstOrDefault(d =>
+                !d.IsVirtual && d.Name.Equals(assignment.PhysicalDevice.Name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -234,87 +132,91 @@ public partial class MainForm
     }
 
     /// <summary>
-    /// Load device map for a device and return it (doesn't modify _deviceMap field)
+    /// Load device map for a device and return it (doesn't modify _deviceMap field).
+    /// Match order: VID:PID, device name (manufacturer-stripped), device type, generic joystick (mirrored for left-hand).
     /// </summary>
     private static DeviceMap? LoadDeviceMapForDeviceInfo(PhysicalDeviceInfo? device)
     {
-        var mapsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
-        string? deviceName = device?.Name;
+        var mapsDir = GetMapsDir();
+        if (device is null || string.IsNullOrEmpty(device.Name))
+            return DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
 
-        if (device is not null && !string.IsNullOrEmpty(deviceName))
-        {
-            // Extract VID:PID from device's InstanceGuid
-            var (vid, pid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(device.InstanceGuid);
-            string vidPidStr = vid > 0 ? $"{vid:X4}:{pid:X4}" : "";
-
-            var allMaps = new List<(string path, DeviceMap map)>();
-            foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
-            {
-                if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                var map = DeviceMap.Load(mapFile);
-                if (map is not null)
-                    allMaps.Add((mapFile, map));
-            }
-
-            // Try VID:PID match first (most reliable)
-            if (!string.IsNullOrEmpty(vidPidStr))
-            {
-                foreach (var (path, map) in allMaps)
-                {
-                    if (!string.IsNullOrEmpty(map.VidPid) &&
-                        map.VidPid.Equals(vidPidStr, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return map;
-                    }
-                }
-            }
-
-            // Try device name match (strip manufacturer prefixes so display names match SDL names)
-            static string StripMfr(string s) => s
-                .Replace("VPC ", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("VKB ", "", StringComparison.OrdinalIgnoreCase)
-                .Trim();
-
-            string normDevice = StripMfr(deviceName);
-            foreach (var (path, map) in allMaps)
-            {
-                if (!string.IsNullOrEmpty(map.Device) &&
-                    !map.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase))
-                {
-                    string normMap = StripMfr(map.Device);
-                    if (normDevice.Contains(normMap, StringComparison.OrdinalIgnoreCase) ||
-                        normMap.Contains(normDevice, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return map;
-                    }
-                }
-            }
-
-            // Try device type match
-            string detectedType = DetectDeviceType(deviceName);
-            if (detectedType != "Joystick")
-            {
-                foreach (var (path, map) in allMaps)
-                {
-                    if (map.DeviceType.Equals(detectedType, StringComparison.OrdinalIgnoreCase))
-                        return map;
-                }
-            }
-
-            // Check left-hand and apply mirror
-            bool isLeftHand = deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
-                              deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
-                              deviceName.EndsWith(" L", StringComparison.OrdinalIgnoreCase);
-
-            var defaultMap = DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
-            if (defaultMap is not null && isLeftHand)
-                defaultMap.Mirror = true;
-            return defaultMap;
-        }
-
-        return DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
+        var allMaps = LoadAllDeviceMaps(mapsDir);
+        return MatchByVidPid(allMaps, device.InstanceGuid)
+            ?? MatchByName(allMaps, device.Name)
+            ?? MatchByType(allMaps, device.Name)
+            ?? LoadDefaultMapForDevice(device.Name, mapsDir);
     }
+
+    private static string GetMapsDir() =>
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "Devices", "Maps");
+
+    private static List<DeviceMap> LoadAllDeviceMaps(string mapsDir)
+    {
+        var result = new List<DeviceMap>();
+        foreach (var mapFile in Directory.GetFiles(mapsDir, "*.json"))
+        {
+            if (Path.GetFileName(mapFile).Equals("device-control-map.schema.json", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var map = DeviceMap.Load(mapFile);
+            if (map is not null)
+                result.Add(map);
+        }
+        return result;
+    }
+
+    private static DeviceMap? MatchByVidPid(List<DeviceMap> maps, Guid instanceGuid)
+    {
+        var (vid, pid) = Services.DeviceMatchingService.ExtractVidPidFromSdlGuid(instanceGuid);
+        if (vid == 0)
+            return null;
+        string vidPid = $"{vid:X4}:{pid:X4}";
+        return maps.FirstOrDefault(m =>
+            !string.IsNullOrEmpty(m.VidPid) &&
+            m.VidPid.Equals(vidPid, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static DeviceMap? MatchByName(List<DeviceMap> maps, string deviceName)
+    {
+        // Strip manufacturer prefixes so map display names (e.g. "MongoosT-50CM3 Throttle")
+        // still match SDL-reported names (e.g. "VPC MongoosT-50CM3").
+        string normDevice = StripMfr(deviceName);
+        return maps.FirstOrDefault(m =>
+            !string.IsNullOrEmpty(m.Device) &&
+            !m.Device.StartsWith("Generic", StringComparison.OrdinalIgnoreCase) &&
+            NamesOverlap(normDevice, StripMfr(m.Device)));
+    }
+
+    private static bool NamesOverlap(string a, string b) =>
+        a.Contains(b, StringComparison.OrdinalIgnoreCase) ||
+        b.Contains(a, StringComparison.OrdinalIgnoreCase);
+
+    private static string StripMfr(string s) => s
+        .Replace("VPC ", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("VKB ", "", StringComparison.OrdinalIgnoreCase)
+        .Trim();
+
+    private static DeviceMap? MatchByType(List<DeviceMap> maps, string deviceName)
+    {
+        string detectedType = DetectDeviceType(deviceName);
+        if (detectedType == "Joystick")
+            return null;
+        return maps.FirstOrDefault(m =>
+            m.DeviceType.Equals(detectedType, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static DeviceMap? LoadDefaultMapForDevice(string deviceName, string mapsDir)
+    {
+        var map = DeviceMap.Load(Path.Combine(mapsDir, "joystick.json"));
+        if (map is not null && IsLeftHandName(deviceName))
+            map.Mirror = true;
+        return map;
+    }
+
+    private static bool IsLeftHandName(string deviceName) =>
+        deviceName.StartsWith("LEFT", StringComparison.OrdinalIgnoreCase) ||
+        deviceName.Contains("- L", StringComparison.OrdinalIgnoreCase) ||
+        deviceName.EndsWith(" L", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Get the appropriate SVG for a given device map.

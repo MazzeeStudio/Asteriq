@@ -97,7 +97,6 @@ public partial class MappingsTabController
 
     private float DrawAxisMovementIndicator(SKCanvas canvas, float leftMargin, float rightMargin, float y, AxisMapping axisMapping)
     {
-        float width = rightMargin - leftMargin;
         float startY = y;
 
         // Get current raw input values for all input sources

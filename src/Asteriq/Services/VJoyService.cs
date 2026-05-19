@@ -9,7 +9,7 @@ namespace Asteriq.Services;
 /// <summary>
 /// Service for managing vJoy virtual devices
 /// </summary>
-public class VJoyService : IVJoyService
+public sealed class VJoyService : IVJoyService
 {
     private readonly ILogger<VJoyService> _logger;
     private readonly ConcurrentDictionary<uint, bool> _acquiredDevices = new();

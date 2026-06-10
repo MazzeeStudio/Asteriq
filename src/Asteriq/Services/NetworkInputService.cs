@@ -61,6 +61,8 @@ public sealed class NetworkInputService : INetworkInputService
     private readonly HashSet<uint> _acquiredDevices = [];
     // Devices that failed acquisition — skip retry until next session to avoid spam.
     private readonly HashSet<uint> _failedDevices = [];
+    // Diagnostic: last known write state per device, so success/failure transitions are logged once.
+    private readonly Dictionary<uint, bool> _deviceWriteOk = new();
 
     // ── Events ───────────────────────────────────────────────────────────────
     public event EventHandler? ConnectionLost;
@@ -441,7 +443,15 @@ public sealed class NetworkInputService : INetworkInputService
                         // Acquire the device lazily — the master may forward multiple vJoy
                         // devices (e.g. JS1, JS2, JS3) but only sends one Acquire packet.
                         EnsureDeviceAcquired(snapshot.DeviceId);
-                        ApplySnapshot(snapshot, snapshot.DeviceId);
+                        bool writesOk = ApplySnapshot(snapshot, snapshot.DeviceId);
+                        if (!_deviceWriteOk.TryGetValue(snapshot.DeviceId, out var prevOk) || prevOk != writesOk)
+                        {
+                            _deviceWriteOk[snapshot.DeviceId] = writesOk;
+                            _logger.LogInformation(
+                                "vJoy device {DeviceId} input from master: axes={AxisCount} buttons={ButtonCount} hats={HatCount}, writes {State}",
+                                snapshot.DeviceId, snapshot.AxisCount, snapshot.ButtonCount, snapshot.HatCount,
+                                writesOk ? "OK" : "FAILING");
+                        }
                         Interlocked.Increment(ref _packetsReceived);
                         break;
 
@@ -523,6 +533,7 @@ public sealed class NetworkInputService : INetworkInputService
         }
         _acquiredDevices.Clear();
         _failedDevices.Clear();        // reset so next session can retry (vJoy config may have changed)
+        _deviceWriteOk.Clear();        // re-log write state on the next session
     }
 
     private static List<(string Name, byte[] XmlBytes)> DecodeProfileList(byte[] payload)
@@ -738,16 +749,21 @@ public sealed class NetworkInputService : INetworkInputService
         return (deviceId, flags, buttonCount, povCount, continuous);
     }
 
-    private void ApplySnapshot(VJoyOutputSnapshot snapshot, uint deviceId)
+    /// <summary>Returns true if at least one vJoy write succeeded (diagnostic).</summary>
+    private bool ApplySnapshot(VJoyOutputSnapshot snapshot, uint deviceId)
     {
+        bool anyOk = false;
+
         for (int i = 0; i < snapshot.AxisCount && i < 8; i++)
-            _vjoy.SetAxis(deviceId, VJoyAxisHelper.IndexToHidUsage(i), snapshot.Axes[i]);
+            anyOk |= _vjoy.SetAxis(deviceId, VJoyAxisHelper.IndexToHidUsage(i), snapshot.Axes[i]);
 
         for (int i = 0; i < snapshot.ButtonCount; i++)
-            _vjoy.SetButton(deviceId, i + 1, snapshot.Buttons[i]);
+            anyOk |= _vjoy.SetButton(deviceId, i + 1, snapshot.Buttons[i]);
 
         for (int i = 0; i < snapshot.HatCount; i++)
-            _vjoy.SetContinuousPov(deviceId, (uint)i, snapshot.Hats[i]);
+            anyOk |= _vjoy.SetContinuousPov(deviceId, (uint)i, snapshot.Hats[i]);
+
+        return anyOk;
     }
 
     // ── Packet I/O ────────────────────────────────────────────────────────────

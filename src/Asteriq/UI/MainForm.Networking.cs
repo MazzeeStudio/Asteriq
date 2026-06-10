@@ -234,6 +234,7 @@ public partial class MainForm : Form
     {
         try
         {
+            string? lastSentIds = null;
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(50, ct).ConfigureAwait(false); // 20 Hz
@@ -243,7 +244,14 @@ public partial class MainForm : Form
 
                 if (!_tabContext.SuppressForwarding)
                 {
-                    foreach (var snapshot in _networkVjoy.GetAllSnapshots())
+                    var snapshots = _networkVjoy.GetAllSnapshots();
+                    var ids = string.Join(",", snapshots.Select(s => s.DeviceId).OrderBy(id => id));
+                    if (ids != lastSentIds)
+                    {
+                        _logger.LogInformation("[Heartbeat] Forwarding snapshots for vJoy devices [{Ids}]", ids);
+                        lastSentIds = ids;
+                    }
+                    foreach (var snapshot in snapshots)
                         _networkInput.SendVJoyState(snapshot);
                 }
             }

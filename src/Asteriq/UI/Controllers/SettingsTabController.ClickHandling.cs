@@ -329,6 +329,10 @@ public sealed partial class SettingsTabController
                 {
                     // Clear the code — getter in ApplicationSettingsService auto-generates a new one
                     _ctx.AppSettings.NetworkMasterCode = "";
+                    // If a client is connected, push the new code so its stored trust
+                    // stays valid and future connections keep auto-accepting.
+                    if (_ctx.NetworkInput?.Mode == NetworkInputMode.Remote)
+                        _ctx.NetworkInput.SendCodeChanged(_ctx.AppSettings.NetworkMasterCode);
                     _ctx.InvalidateCanvas();
                     return;
                 }

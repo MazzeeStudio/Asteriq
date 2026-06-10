@@ -25,6 +25,7 @@ internal sealed class NullNetworkInputService : INetworkInputService
     public int PacketsReceived => 0;
     public event EventHandler? ConnectionLost { add { } remove { } }
     public event EventHandler<string>? ClientConnected { add { } remove { } }
+    public event EventHandler<string>? MasterCodeChanged { add { } remove { } }
     public event EventHandler<TrustRequestEventArgs>? TrustRequested { add { } remove { } }
     public event EventHandler<ProfileListReceivedEventArgs>? ProfileListReceived { add { } remove { } }
     public event EventHandler<VJoyConfigReceivedEventArgs>? VJoyConfigReceived { add { } remove { } }
@@ -33,6 +34,7 @@ internal sealed class NullNetworkInputService : INetworkInputService
     public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public void SendVJoyState(VJoyOutputSnapshot snapshot) { }
     public void SendVJoyConfig(VJoyDeviceInfo deviceInfo) { }
+    public void SendCodeChanged(string newCode) { }
     public void SendProfileList(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles) { }
     public void AcceptPairing() { }
     public void RejectPairing() { }

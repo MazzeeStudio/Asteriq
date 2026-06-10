@@ -46,6 +46,7 @@ public partial class MainForm : Form
         _networkInput.ConnectionLost      += OnNetworkConnectionLost;
         _networkInput.ClientConnected     += OnClientConnected;
         _networkInput.TrustRequested      += OnTrustRequested;
+        _networkInput.MasterCodeChanged   += OnMasterCodeChanged;
         _networkInput.ProfileListReceived += OnProfileListReceived;
         _networkInput.VJoyConfigReceived  += OnVJoyConfigReceived;
 
@@ -60,6 +61,7 @@ public partial class MainForm : Form
         _networkInput.ConnectionLost      -= OnNetworkConnectionLost;
         _networkInput.ClientConnected     -= OnClientConnected;
         _networkInput.TrustRequested      -= OnTrustRequested;
+        _networkInput.MasterCodeChanged   -= OnMasterCodeChanged;
         _networkInput.ProfileListReceived -= OnProfileListReceived;
         _networkInput.VJoyConfigReceived  -= OnVJoyConfigReceived;
 
@@ -314,6 +316,29 @@ public partial class MainForm : Form
             {
                 _networkInput.RejectPairing();
             }
+        });
+    }
+
+    private void OnMasterCodeChanged(object? sender, string newCode)
+    {
+        // Fired on the background receive thread — marshal to UI thread.
+        // The connected master regenerated its pairing code; update the stored trust
+        // so future connections from it still auto-accept instead of failing validation.
+        BeginInvoke(() =>
+        {
+            var trusted = _appSettings.TrustedMaster;
+            if (trusted is null || trusted.MachineName != _connectedMasterName) return;
+
+            _appSettings.TrustedMaster = new TrustedPeerConfig
+            {
+                MachineName = trusted.MachineName,
+                Code        = newCode,
+                LastIp      = trusted.LastIp
+            };
+            _logger.LogInformation("Trusted master {Master} regenerated its code; stored trust updated",
+                _connectedMasterName);
+            _trayIcon.ShowBalloonTip("Asteriq", $"{_connectedMasterName} regenerated its pairing code");
+            MarkDirty();
         });
     }
 

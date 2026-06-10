@@ -82,6 +82,13 @@ public interface INetworkInputService : IDisposable
     void SendVJoyConfig(VJoyDeviceInfo deviceInfo);
 
     /// <summary>
+    /// Notify the connected client that this master regenerated its pairing code,
+    /// so the client can update its stored trust and keep auto-accepting future
+    /// connections. No-op when Mode != Remote or not connected.
+    /// </summary>
+    void SendCodeChanged(string newCode);
+
+    /// <summary>
     /// Accept the pending trust request (called after the user approves in the trust dialog).
     /// </summary>
     void AcceptPairing();
@@ -121,6 +128,13 @@ public interface INetworkInputService : IDisposable
     /// UI should show a one-time trust dialog and call AcceptPairing() or RejectPairing().
     /// </summary>
     event EventHandler<TrustRequestEventArgs>? TrustRequested;
+
+    /// <summary>
+    /// Fired on the client side (background receive thread) when the connected master
+    /// regenerated its pairing code. Carries the new code; the caller should update
+    /// the stored TrustedMaster so future connections still auto-accept.
+    /// </summary>
+    event EventHandler<string>? MasterCodeChanged;
 }
 
 /// <summary>

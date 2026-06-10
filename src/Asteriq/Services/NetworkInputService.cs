@@ -34,6 +34,7 @@ public sealed class NetworkInputService : INetworkInputService
         public const byte HelloReject = 7; // client→master: empty
         public const byte ProfileList  = 8; // master→client: [count:4][nameLen:2][name][xmlLen:4][xml] × count
         public const byte VJoyConfig   = 9; // master→client: vJoy device config (axes, buttons, POVs)
+        public const byte CodeChanged  = 10; // master→client: {codeLen,code} — master regenerated its pairing code
     }
 
     // ── Services ─────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ public sealed class NetworkInputService : INetworkInputService
     // ── Events ───────────────────────────────────────────────────────────────
     public event EventHandler? ConnectionLost;
     public event EventHandler<string>? ClientConnected;
+    public event EventHandler<string>? MasterCodeChanged;
     public event EventHandler<TrustRequestEventArgs>? TrustRequested;
     public event EventHandler<ProfileListReceivedEventArgs>? ProfileListReceived;
     public event EventHandler<VJoyConfigReceivedEventArgs>? VJoyConfigReceived;
@@ -222,11 +224,11 @@ public sealed class NetworkInputService : INetworkInputService
             var helloPayload = EncodeHello(Environment.MachineName, (ushort)peer.TcpPort, code);
             await WritePacketAsync(stream, MsgType.Hello, helloPayload, cancellationToken).ConfigureAwait(false);
 
-            // Wait for accept/reject from client.  The client shows a trust dialog so we
-            // allow up to 45 seconds — longer than the client's own 60 s timeout so Castra
-            // gets a clean rejection rather than a raw socket error.
+            // Wait for accept/reject from client.  The client shows a trust dialog with its
+            // own 60 s timeout, so allow 75 s here — longer than the client's window — so we
+            // always get a clean accept/reject rather than timing out while the dialog is open.
             using var handshakeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            handshakeCts.CancelAfter(TimeSpan.FromSeconds(45));
+            handshakeCts.CancelAfter(TimeSpan.FromSeconds(75));
             byte responseType;
             try
             {
@@ -334,6 +336,31 @@ public sealed class NetworkInputService : INetworkInputService
         }
     }
 
+    public void SendCodeChanged(string newCode)
+    {
+        if (_mode != NetworkInputMode.Remote || _stream is null) return;
+
+        var codeBytes = System.Text.Encoding.UTF8.GetBytes(newCode);
+        var payload = new byte[1 + codeBytes.Length];
+        payload[0] = (byte)codeBytes.Length;
+        codeBytes.CopyTo(payload, 1);
+
+        lock (_sendLock)
+        {
+            try
+            {
+                WritePacketSync(_stream, MsgType.CodeChanged, payload);
+                _logger.LogInformation("Sent regenerated pairing code to client");
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "SendCodeChanged failed, connection lost");
+                _mode = NetworkInputMode.Local;
+                ConnectionLost?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
     public void SendProfileList(IReadOnlyList<(string Name, byte[] XmlBytes)> profiles)
     {
         if (_mode != NetworkInputMode.Remote || _stream is null) return;
@@ -412,6 +439,15 @@ public sealed class NetworkInputService : INetworkInputService
                         var profileList = DecodeProfileList(payload);
                         if (profileList.Count > 0)
                             ProfileListReceived?.Invoke(this, new ProfileListReceivedEventArgs(profileList));
+                        break;
+
+                    case MsgType.CodeChanged:
+                        if (payload.Length >= 1 && payload.Length >= 1 + payload[0])
+                        {
+                            var newCode = System.Text.Encoding.UTF8.GetString(payload, 1, payload[0]);
+                            _logger.LogInformation("Master regenerated its pairing code, updating stored trust");
+                            MasterCodeChanged?.Invoke(this, newCode);
+                        }
                         break;
 
                     case MsgType.VJoyConfig:

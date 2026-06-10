@@ -391,7 +391,11 @@ public partial class MainForm : Form
         // Refresh vJoy device list so the SC Keybindings tab shows JS columns.
         // This is necessary because the first render of the tab in client mode uses
         // _ctx.VJoyDevices which may not have been synced since startup.
-        RefreshVJoyDevicesInternal();
+        // Re-enumerate only — RefreshVJoyDevicesInternal() calls ReleaseAllDevices(),
+        // which would relinquish vJoy device 1 already acquired by the receive loop
+        // on behalf of the master, silently killing its forwarded input.
+        _vjoyDevices = _vjoyService.EnumerateDevices();
+        _tabContext.VJoyDevices = _vjoyDevices;
 
         // Force to Settings tab (the only tab freely accessible in client mode)
         if (_activeTab < 2)

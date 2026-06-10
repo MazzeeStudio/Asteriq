@@ -494,16 +494,18 @@ public sealed class NetworkInputService : INetworkInputService
 
     private void EnsureDeviceAcquired(uint deviceId)
     {
-        if (_acquiredDevices.Contains(deviceId)) return;
         if (_failedDevices.Contains(deviceId)) return;  // don't spam retries each session
 
         if (!_vjoy.IsInitialized)
             _vjoy.Initialize();
 
+        // Always delegate to the vJoy service rather than trusting _acquiredDevices —
+        // the no-op case is a dictionary lookup, and it self-heals if something else
+        // released the device behind our back (e.g. a vJoy device-list refresh).
         if (_vjoy.AcquireDevice(deviceId))
         {
-            _acquiredDevices.Add(deviceId);
-            _logger.LogInformation("Acquired vJoy device {DeviceId}", deviceId);
+            if (_acquiredDevices.Add(deviceId))
+                _logger.LogInformation("Acquired vJoy device {DeviceId}", deviceId);
         }
         else
         {

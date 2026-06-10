@@ -171,7 +171,7 @@ public partial class MainForm : Form
             _logger.LogWarning("[ConnectMaster] FAILED → {Peer} ({Ip}): {Error}",
                 peer.MachineName, peer.IpAddress, ex.Message);
             BeginInvoke(() => _trayIcon.ShowBalloonTip("Asteriq",
-                $"Could not connect to {peer.MachineName}"));
+                $"Could not connect to {peer.MachineName}: {ex.Message}"));
         }
         finally
         {

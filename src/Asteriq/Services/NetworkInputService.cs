@@ -92,9 +92,23 @@ public sealed class NetworkInputService : INetworkInputService
     {
         if (_listener is not null) return;
 
+        // Assign _listener only after Start() succeeds — IsListening must never
+        // report true while the socket failed to bind (port in use, ACL, etc.).
+        var listener = new TcpListener(IPAddress.Any, port);
+        try
+        {
+            listener.Start();
+        }
+        catch (SocketException ex)
+        {
+            listener.Dispose();
+            _logger.LogError(ex, "NetworkInput listener FAILED to start on port {Port} — " +
+                "incoming connections will be refused (port in use by another process?)", port);
+            return;
+        }
+
         _listenerCts = new CancellationTokenSource();
-        _listener = new TcpListener(IPAddress.Any, port);
-        _listener.Start();
+        _listener = listener;
 
         _logger.LogInformation("NetworkInput listener started on port {Port}", port);
         _ = RunAcceptLoopAsync(_listenerCts.Token);

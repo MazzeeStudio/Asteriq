@@ -246,8 +246,12 @@ public sealed partial class SettingsTabController
                 discHov ? FUIRenderer.ButtonState.Hover : FUIRenderer.ButtonState.Normal, isDanger: true);
             y += btnH + sectionGap;
 
-            string statusText2 = isReceiving ? $"Connected to {trusted?.MachineName ?? "master"}" : "Waiting for master";
-            var statusColor2 = FUIColors.InteractiveColor(isReceiving);
+            bool isListening = _ctx.NetworkInput?.IsListening ?? false;
+            string statusText2 = isReceiving  ? $"Connected to {trusted?.MachineName ?? "master"}"
+                               : isListening  ? $"Waiting for master (listening on port {_ctx.AppSettings.NetworkListenPort})"
+                               : $"NOT LISTENING: port {_ctx.AppSettings.NetworkListenPort} unavailable, restart Asteriq";
+            var statusColor2 = isReceiving ? FUIColors.Active
+                             : isListening ? FUIColors.TextDim : FUIColors.Warning;
             FUIRenderer.DrawTextTruncated(canvas, $"Status:  {statusText2}",
                 new SKPoint(leftMargin, y + rowH / 2f + 4f), contentWidth, statusColor2, 13f);
             y += rowH;

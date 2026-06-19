@@ -172,6 +172,27 @@ public sealed partial class SettingsTabController
         // VERSION & UPDATES section
         FUIWidgets.DrawSectionLabel(canvas, "VERSION & UPDATES", leftMargin, ref y);
 
+        if (AppPackaging.IsPackaged)
+        {
+            // Store-installed (MSIX): the Microsoft Store delivers updates. Hide the
+            // self-update controls and clear their hit-test bounds so no clicks register.
+            _checkUpdatesToggleBounds = SKRect.Empty;
+            _updateChannelSegBounds = Array.Empty<SKRect>();
+            _checkButtonBounds = SKRect.Empty;
+            _downloadButtonBounds = SKRect.Empty;
+            _applyButtonBounds = SKRect.Empty;
+
+            string packagedVersion = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "0.0.0";
+            FUIRenderer.DrawText(canvas, $"v{packagedVersion}", new SKPoint(leftMargin, y + 10f), FUIColors.TextPrimary, 14f);
+            y += 22f;
+            FUIRenderer.DrawText(canvas, "Updates are managed by the Microsoft Store.",
+                new SKPoint(leftMargin, y + 10f), FUIColors.TextDim, 13f);
+            y += 20f;
+            return;
+        }
+
         // "Check for updates automatically" toggle — first in this section
         float autoCheckLabelMaxWidth = contentWidth - toggleWidth - minControlGap;
         float autoCheckLabelY = y + (rowHeight - 11f) / 2 + 11f - 3;

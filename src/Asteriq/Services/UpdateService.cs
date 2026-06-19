@@ -38,6 +38,15 @@ public sealed class UpdateService : IUpdateService
 
     public async Task CheckAsync(CancellationToken ct = default)
     {
+        if (AppPackaging.IsPackaged)
+        {
+            // Store-installed (MSIX): the Microsoft Store delivers updates. The GitHub
+            // self-updater cannot write to the read-only WindowsApps install location, so
+            // skip the check entirely and report up to date.
+            Status = UpdateStatus.UpToDate;
+            return;
+        }
+
         Status = UpdateStatus.Checking;
         try
         {

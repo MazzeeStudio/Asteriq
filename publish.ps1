@@ -95,6 +95,12 @@ if (Test-Path $msixLayout) { Remove-Item $msixLayout -Recurse -Force }
 New-Item -ItemType Directory -Path $msixLayout | Out-Null
 Copy-Item "$outputDir\*" $msixLayout -Recurse
 
+# Store policy 10.2.4.2 rejects packages that contain non-Microsoft driver binaries.
+# vJoyInterface.dll's PE metadata identifies it as a "vJoy Driver" interface, which the
+# certification scanner flags. The ZIP/MSI keep bundling it (already built above); the MSIX
+# omits it and loads it at runtime from the user's vJoy installation (see VJoyInterop).
+Remove-Item "$msixLayout\vJoyInterface.dll" -Force -ErrorAction SilentlyContinue
+
 New-Item -ItemType Directory -Path "$msixLayout\Assets" | Out-Null
 Copy-Item "$msixSourceDir\Assets\*" "$msixLayout\Assets\"
 

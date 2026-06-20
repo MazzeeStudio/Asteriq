@@ -1,6 +1,8 @@
 // HID/vJoy interop constants must match OS/SDK-defined names exactly.
 #pragma warning disable CA1707
+using System.Reflection;
 using System.Runtime.InteropServices;
+using Asteriq.Services;
 
 namespace Asteriq.VJoy;
 
@@ -40,6 +42,33 @@ public enum VjdStat
 public static class VJoyInterop
 {
     private const string DllName = "vJoyInterface.dll";
+
+    static VJoyInterop()
+    {
+        // The ZIP/MSI builds ship vJoyInterface.dll next to the exe and load it from
+        // there. The Store (MSIX) package must not contain driver-named binaries, so it
+        // omits the DLL; on those builds we load it from the user's vJoy installation
+        // instead. Registering a resolver keeps every [DllImport] below unchanged.
+        NativeLibrary.SetDllImportResolver(typeof(VJoyInterop).Assembly, ResolveVJoyInterface);
+    }
+
+    private static IntPtr ResolveVJoyInterface(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+    {
+        if (!string.Equals(libraryName, DllName, StringComparison.OrdinalIgnoreCase))
+            return IntPtr.Zero; // not ours — let the default resolver handle it
+
+        // 1. Bundled alongside the app (ZIP/MSI distributions) — preserves existing behaviour.
+        var local = Path.Combine(AppContext.BaseDirectory, DllName);
+        if (File.Exists(local) && NativeLibrary.TryLoad(local, out var localHandle))
+            return localHandle;
+
+        // 2. Installed vJoy directory (MSIX builds don't bundle the DLL).
+        var installed = DriverSetupManager.GetVJoyInterfaceDllPath();
+        if (!string.IsNullOrEmpty(installed) && NativeLibrary.TryLoad(installed, out var installedHandle))
+            return installedHandle;
+
+        return IntPtr.Zero; // fall back to the default OS search (throws DllNotFound if absent)
+    }
 
     // General driver data
     [DllImport(DllName, EntryPoint = "GetvJoyVersion")]

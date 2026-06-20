@@ -134,6 +134,32 @@ public class DriverSetupManager
         return null;
     }
 
+    /// <summary>
+    /// Get path to the installed vJoyInterface.dll (the user-mode feeder interface).
+    /// Used to load the DLL from the vJoy installation rather than bundling it — the
+    /// Store (MSIX) package must not contain driver-named binaries (policy 10.2.4.2).
+    /// </summary>
+    public static string? GetVJoyInterfaceDllPath()
+    {
+        var installPath = GetVJoyInstallPath();
+        if (string.IsNullOrEmpty(installPath))
+            return null;
+
+        var pathX64 = Path.Combine(installPath, "x64", "vJoyInterface.dll");
+        if (File.Exists(pathX64))
+            return pathX64;
+
+        var pathX86 = Path.Combine(installPath, "x86", "vJoyInterface.dll");
+        if (File.Exists(pathX86))
+            return pathX86;
+
+        var path = Path.Combine(installPath, "vJoyInterface.dll");
+        if (File.Exists(path))
+            return path;
+
+        return null;
+    }
+
     #endregion
 
     #region HidHide Detection

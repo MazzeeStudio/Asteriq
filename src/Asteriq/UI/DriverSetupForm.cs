@@ -13,6 +13,9 @@ public class DriverSetupForm : FUIBaseDialog
     private readonly DriverSetupManager _driverSetup;
     private readonly IApplicationSettingsService? _appSettings;
     private readonly bool _settingsMode;
+    // Store (MSIX) builds must not install non-Microsoft drivers (policy 10.2.4.2): the
+    // one-click install buttons are hidden and only the manual-download links remain.
+    private readonly bool _isPackaged = AppPackaging.IsPackaged;
     private readonly FUIBackground _background = new();
     // CA2213: SKControl and ListBox are WinForms child controls — disposed automatically via Controls collection
 #pragma warning disable CA2213
@@ -226,16 +229,25 @@ public class DriverSetupForm : FUIBaseDialog
             "Hides physical devices so only virtual devices are visible",
             _hidHideStatusText, _hidHideStatusColor, required: false);
 
-        // Canvas-drawn install buttons (inside panels)
-        float installBtnX = Pad + contentW - InstallBtnW - 14f;
+        // Canvas-drawn install buttons (inside panels). Hidden in packaged (Store) builds —
+        // those must not install drivers, so only the manual-download links below are offered.
+        if (_isPackaged)
+        {
+            _vJoyInstallBounds = SKRect.Empty;
+            _hidHideInstallBounds = SKRect.Empty;
+        }
+        else
+        {
+            float installBtnX = Pad + contentW - InstallBtnW - 14f;
 
-        _vJoyInstallBounds = new SKRect(installBtnX, panel1Y + InstallBtnOffsetY,
-            installBtnX + InstallBtnW, panel1Y + InstallBtnOffsetY + InstallBtnH);
-        DrawInstallButton(canvas, _vJoyInstallBounds, _vJoyInstalled, _vJoyInstalling, _hoveredRegion == 4);
+            _vJoyInstallBounds = new SKRect(installBtnX, panel1Y + InstallBtnOffsetY,
+                installBtnX + InstallBtnW, panel1Y + InstallBtnOffsetY + InstallBtnH);
+            DrawInstallButton(canvas, _vJoyInstallBounds, _vJoyInstalled, _vJoyInstalling, _hoveredRegion == 4);
 
-        _hidHideInstallBounds = new SKRect(installBtnX, panel2Y + InstallBtnOffsetY,
-            installBtnX + InstallBtnW, panel2Y + InstallBtnOffsetY + InstallBtnH);
-        DrawInstallButton(canvas, _hidHideInstallBounds, _hidHideInstalled, _hidHideInstalling, _hoveredRegion == 5);
+            _hidHideInstallBounds = new SKRect(installBtnX, panel2Y + InstallBtnOffsetY,
+                installBtnX + InstallBtnW, panel2Y + InstallBtnOffsetY + InstallBtnH);
+            DrawInstallButton(canvas, _hidHideInstallBounds, _hidHideInstalled, _hidHideInstalling, _hoveredRegion == 5);
+        }
 
         // Manual download links — anchored below panel 2
         float linkY = panel2Y + PanelH + 18f;
@@ -377,8 +389,8 @@ public class DriverSetupForm : FUIBaseDialog
         else if (_exitButtonBounds.Contains(pt)) newHovered = 1;
         else if (_vJoyLinkBounds.Contains(pt)) newHovered = 2;
         else if (_hidHideLinkBounds.Contains(pt)) newHovered = 3;
-        else if (!_vJoyInstalled && !_vJoyInstalling && _vJoyInstallBounds.Contains(pt)) newHovered = 4;
-        else if (!_hidHideInstalled && !_hidHideInstalling && _hidHideInstallBounds.Contains(pt)) newHovered = 5;
+        else if (!_isPackaged && !_vJoyInstalled && !_vJoyInstalling && _vJoyInstallBounds.Contains(pt)) newHovered = 4;
+        else if (!_isPackaged && !_hidHideInstalled && !_hidHideInstalling && _hidHideInstallBounds.Contains(pt)) newHovered = 5;
         else if (_dontShowAgainBounds.Contains(pt) || CheckDontShowAgainLabelHit(pt)) newHovered = 6;
 
         if (newHovered != _hoveredRegion)

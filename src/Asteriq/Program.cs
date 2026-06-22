@@ -275,6 +275,16 @@ static class Program
             status.VJoyInstalled, status.HidHideInstalled, status.IsComplete, forceShow,
             appSettings.SkipDriverSetup, appSettings.ClientOnlyMode);
 
+        // Microsoft Store (MSIX) builds must never prompt to install non-Microsoft drivers
+        // (policy 10.2.4.2). vJoy/HidHide are optional — the full interface works without them —
+        // so the packaged build skips the driver-setup modal entirely and launches straight to
+        // the UI. Users who want virtual-joystick output install vJoy themselves from the vendor.
+        if (Services.AppPackaging.IsPackaged)
+        {
+            Log.Information("Driver setup modal skipped: running as a packaged (Store/MSIX) build");
+            return true;
+        }
+
         if (status.IsComplete && !forceShow)
         {
             Log.Information("Driver setup modal skipped: vJoy is already installed");

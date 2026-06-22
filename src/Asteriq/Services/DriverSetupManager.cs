@@ -208,6 +208,16 @@ public class DriverSetupManager
     /// </summary>
     public async Task<bool> InstallViaWinGetAsync(string packageId, Action<string>? log = null, CancellationToken cancellationToken = default)
     {
+        // Store (MSIX) builds must not install non-Microsoft drivers (policy 10.2.4.2).
+        // This is a hard backstop: even if a UI affordance is reached, the packaged build
+        // never spawns winget to install a driver. The unpackaged ZIP/MSI build is unaffected.
+        if (AppPackaging.IsPackaged)
+        {
+            _logger.LogWarning("Skipping winget install of {PackageId}: disabled in packaged (Store/MSIX) build", packageId);
+            log?.Invoke("Automatic installation is unavailable in the Microsoft Store version. Please install this driver from the vendor.");
+            return false;
+        }
+
         _logger.LogInformation("Installing {PackageId} via winget", packageId);
         log?.Invoke($"Running: winget install --id {packageId}");
 
